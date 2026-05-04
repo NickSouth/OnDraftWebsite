@@ -20,6 +20,26 @@
       <input type="date" name="publicationDate" value="<%= values.publicationDate || new Date().toISOString().slice(0, 10) %>" required />
     </label>
     <label>
+      Writeup
+      <textarea name="writeup" maxlength="200" required><%= values.writeup || "" %></textarea>
+    </label>
+    <div
+      class="tag-editor"
+      data-existing-tags="<%= JSON.stringify(existingTags || []).replace(/</g, "\\u003c") %>"
+    >
+      <label for="tag-entry">Tags</label>
+      <div class="tag-editor-box">
+        <div class="tag-chip-list" data-tag-list></div>
+        <input id="tag-entry" data-tag-input list="article-tag-suggestions" autocomplete="off" />
+      </div>
+      <input type="hidden" name="tags" value="<%= values.tags || "" %>" data-tag-value />
+      <datalist id="article-tag-suggestions">
+        <% (existingTags || []).forEach((tag) => { %>
+          <option value="<%= tag %>"></option>
+        <% }) %>
+      </datalist>
+    </div>
+    <label>
       Article image
       <input type="file" name="image" accept="image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp" />
     </label>
@@ -42,4 +62,5 @@
     </div>
     <button type="submit">Create article</button>
   </form>
+  <script src="/articleTags.js" defer></script>
 </section>

@@ -15,6 +15,15 @@ class InMemoryWebsiteRepository implements IWebsiteRepository {
     return Ok(this.articles);
   }
 
+  async getArticleTags(): Promise<Result<string[], ArticleError>> {
+    const tags = new Set<string>();
+    this.articles.forEach((article) => {
+      (article.tags ?? []).forEach((tag) => tags.add(tag));
+    });
+
+    return Ok([...tags].sort((a, b) => a.localeCompare(b)));
+  }
+
   async getFilteredArticles(filter: ArticleFilter): Promise<Result<Article[], ArticleError>> {
     const filtered = this.articles.filter((article) => {
       if (filter.author && !article.author.toLowerCase().includes(filter.author.toLowerCase())) {
@@ -38,7 +47,8 @@ class InMemoryWebsiteRepository implements IWebsiteRepository {
             ? article.content.text
             : article.content.body
           : article.content.originalName;
-        if (!`${article.title} ${article.author} ${contentText}`.toLowerCase().includes(keyword)) {
+        const searchText = `${article.title} ${article.author} ${article.writeup} ${(article.tags ?? []).join(" ")} ${contentText}`;
+        if (!searchText.toLowerCase().includes(keyword)) {
           return false;
         }
       }

@@ -51,6 +51,7 @@ export type Article = {
   id: string;
   title: string;
   author: string;
+  writeup: string;
   tags?: string[];
   publicationDate: Date;
   content: ArticleContent;

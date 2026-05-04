@@ -18,6 +18,14 @@
                 on <%= new Date(article.publicationDate).toLocaleDateString() %>
               <% } %>
             </span>
+            <span class="article-list-writeup"><%= article.writeup %></span>
+            <% if (article.tags && article.tags.length > 0) { %>
+              <span class="article-tags">
+                <% article.tags.forEach((tag) => { %>
+                  <span class="article-tag"><%= tag %></span>
+                <% }) %>
+              </span>
+            <% } %>
           </span>
         </a>
       </li>

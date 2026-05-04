@@ -94,6 +94,8 @@ describe("Website HTTP contracts", () => {
       .send({
         title: "Plain Text Film Room",
         author: "Ryan McWalter",
+        writeup: "A short plain text summary.",
+        tags: "draft,film-room",
         publicationDate: "2024-01-01",
         contentType: "plainText",
         content: "A regular article body.",
@@ -106,6 +108,13 @@ describe("Website HTTP contracts", () => {
 
     expect(article.status).toBe(200);
     expect(article.text).toContain("A regular article body.");
+
+    const articles = await agent.get("/articles");
+
+    expect(articles.status).toBe(200);
+    expect(articles.text).toContain("A short plain text summary.");
+    expect(articles.text).toContain("draft");
+    expect(articles.text).toContain("film-room");
   });
 
   it("keeps plain text article content escaped", async () => {
@@ -117,6 +126,7 @@ describe("Website HTTP contracts", () => {
       .send({
         title: "Escaped Plain Text",
         author: "Ryan McWalter",
+        writeup: "A short escaped summary.",
         publicationDate: "2024-01-01",
         contentType: "plainText",
         content: "<strong>Not html</strong>",
@@ -140,6 +150,7 @@ describe("Website HTTP contracts", () => {
       .send({
         title: "HTML Film Room",
         author: "Ryan McWalter",
+        writeup: "A short HTML summary.",
         publicationDate: "2024-01-01",
         contentType: "html",
         content: '<h2>Film Room</h2><p onclick="alert(1)">Safe copy</p><script>alert(1)</script><iframe src="https://example.com"></iframe>',
@@ -188,6 +199,7 @@ describe("Website HTTP contracts", () => {
       .post("/articles")
       .field("title", "PDF Film Room")
       .field("author", "Ryan McWalter")
+      .field("writeup", "A short PDF summary.")
       .field("publicationDate", "2024-01-01")
       .field("contentType", "pdf")
       .attach("pdf", pdf, { filename: "film-room.pdf", contentType: "application/pdf" });
@@ -217,6 +229,7 @@ describe("Website HTTP contracts", () => {
       .post("/articles")
       .field("title", "Image Film Room")
       .field("author", "Ryan McWalter")
+      .field("writeup", "A short image summary.")
       .field("publicationDate", "2024-01-01")
       .field("contentType", "plainText")
       .field("content", "Article with an uploaded image.")
@@ -246,6 +259,7 @@ describe("Website HTTP contracts", () => {
       .post("/articles")
       .field("title", "Bad Upload")
       .field("author", "Ryan McWalter")
+      .field("writeup", "A short bad upload summary.")
       .field("publicationDate", "2024-01-01")
       .field("contentType", "pdf")
       .attach("pdf", Buffer.from("not a pdf"), { filename: "notes.txt", contentType: "text/plain" });
@@ -261,6 +275,7 @@ describe("Website HTTP contracts", () => {
       .post("/articles")
       .field("title", "Missing PDF")
       .field("author", "Ryan McWalter")
+      .field("writeup", "A short missing PDF summary.")
       .field("publicationDate", "2024-01-01")
       .field("contentType", "pdf");
 
@@ -276,6 +291,7 @@ describe("Website HTTP contracts", () => {
       .post("/articles")
       .field("title", "Large Upload")
       .field("author", "Ryan McWalter")
+      .field("writeup", "A short large upload summary.")
       .field("publicationDate", "2024-01-01")
       .field("contentType", "pdf")
       .attach("pdf", oversizedPdf, { filename: "large.pdf", contentType: "application/pdf" });

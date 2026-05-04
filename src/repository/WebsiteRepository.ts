@@ -28,6 +28,7 @@ export const UnknownBigBoardError = (message: string): BigBoardError => ({ name:
 export interface IWebsiteRepository {
     getBigBoard(): Promise<Result<BigBoard, BigBoardError>>;
     getArticles(): Promise<Result<Article[], ArticleError>>;
+    getArticleTags(): Promise<Result<string[], ArticleError>>;
     createArticle(article: Article): Promise<Result<Article, ArticleError>>;
     createBigBoardEntry(entry: BigBoardEntry): Promise<Result<BigBoardEntry, BigBoardError>>;
     deleteArticle(id: string): Promise<Result<void, ArticleError>>;

@@ -111,6 +111,7 @@ class ExpressApp implements IApp {
         isAdmin: isAdminSession(browserSession),
         errorMessage: message,
         values: req.body ?? {},
+        existingTags: [],
       });
     });
   }

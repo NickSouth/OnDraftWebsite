@@ -116,6 +116,22 @@ class WebsiteController implements IWebsiteController {
     return filter;
   }
 
+  private parseArticleTags(rawTags: unknown): string[] {
+    if (typeof rawTags !== "string") {
+      return [];
+    }
+
+    return rawTags
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+  }
+
+  private async getArticleTagSuggestions(): Promise<string[]> {
+    const result = await this.service.getArticleTags();
+    return result.ok === true ? result.value : [];
+  }
+
   async showHome(res: Response, session: IWebsiteBrowserSession): Promise<void> {
     this.logger.info("Rendering website home page");
     res.render("website/index", { session, isAdmin: isAdminSession(session) });
@@ -177,6 +193,7 @@ class WebsiteController implements IWebsiteController {
       isAdmin: isAdminSession(session),
       errorMessage: null,
       values: {},
+      existingTags: await this.getArticleTagSuggestions(),
     });
   }
 
@@ -200,6 +217,8 @@ class WebsiteController implements IWebsiteController {
     const input = {
       title: req.body.title,
       author: req.body.author,
+      writeup: req.body.writeup,
+      tags: this.parseArticleTags(req.body.tags),
       publicationDate: new Date(req.body.publicationDate),
       content: contentType === "pdf"
         ? uploadedPdf
@@ -238,6 +257,7 @@ class WebsiteController implements IWebsiteController {
         isAdmin: isAdminSession(session),
         errorMessage: result.value.message,
         values: req.body,
+        existingTags: await this.getArticleTagSuggestions(),
       });
       return;
     }
