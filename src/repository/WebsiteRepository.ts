@@ -5,23 +5,25 @@ export type BigBoardError =
     | {name: "PlayerNotFound"; message: string} 
     | {name: "DuplicatePlayer"; message: string}
     | {name: "DatabaseError"; message: string}
-    | {name: "ValidationError"; message: string}
-    | {name: "UnknownError"; message: string};
+    | {name: "BigBoardValidationError"; message: string}
+    | {name: "UnknownBigBoardError"; message: string};
 
 export type ArticleError = 
     | {name: "ArticleNotFound"; message: string} 
     | {name: "DuplicateArticle"; message: string}
     | {name: "DatabaseError"; message: string}
-    | {name: "ValidationError"; message: string}
-    | {name: "UnknownError"; message: string};
+    | {name: "ArticleValidationError"; message: string}
+    | {name: "UnknownArticleError"; message: string};
 
 export const ArticleNotFound = (message: string): ArticleError => ({ name: "ArticleNotFound", message });
 export const PlayerNotFound = (message: string): BigBoardError => ({ name: "PlayerNotFound", message });
 export const DuplicateArticle = (message: string): ArticleError => ({ name: "DuplicateArticle", message });
 export const DuplicatePlayer = (message: string): BigBoardError => ({ name: "DuplicatePlayer", message });
 export const DatabaseError = (message: string): ArticleError | BigBoardError => ({ name: "DatabaseError", message });
-export const ValidationError = (message: string): ArticleError | BigBoardError => ({ name: "ValidationError", message });
-export const UnknownError = (message: string): ArticleError | BigBoardError => ({ name: "UnknownError", message });
+export const ArticleValidationError = (message: string): ArticleError => ({ name: "ArticleValidationError", message });
+export const BigBoardValidationError = (message: string): BigBoardError => ({ name: "BigBoardValidationError", message });
+export const UnknownArticleError = (message: string): ArticleError => ({ name: "UnknownArticleError", message });
+export const UnknownBigBoardError = (message: string): BigBoardError => ({ name: "UnknownBigBoardError", message });
 
 export interface IWebsiteRepository {
     getBigBoard(): Promise<Result<BigBoard, BigBoardError>>;
