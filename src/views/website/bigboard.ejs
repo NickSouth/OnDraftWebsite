@@ -1,0 +1,30 @@
+<section class="plain-page">
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">Big Board</p>
+      <h1>Big Board</h1>
+    </div>
+    <% if (isAdmin) { %>
+      <a class="button-link" href="/bigboard/new">Create entry</a>
+    <% } %>
+  </div>
+
+  <% if (bigBoard.length === 0) { %>
+    <p>No big board entries have been created yet.</p>
+  <% } else { %>
+    <ol class="ranking-list">
+      <% bigBoard.forEach((entry) => { %>
+        <li>
+          <div>
+            <strong><%= entry.rank %>. <%= entry.playerName %></strong>
+            <span><%= entry.position %><%= entry.posRank ? entry.posRank : "" %> · <%= entry.school %></span>
+          </div>
+          <p>
+            Age <%= entry.age %> · <%= entry.height.feet %>'<%= entry.height.inches %>" · <%= entry.weight %> lbs
+          </p>
+          <p><%= entry.writeup %></p>
+        </li>
+      <% }) %>
+    </ol>
+  <% } %>
+</section>

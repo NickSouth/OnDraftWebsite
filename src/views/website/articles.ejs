@@ -1,0 +1,24 @@
+<section class="plain-page">
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">Articles</p>
+      <h1>Articles</h1>
+    </div>
+    <% if (isAdmin) { %>
+      <a class="button-link" href="/articles/new">Create article</a>
+    <% } %>
+  </div>
+
+  <% if (articles.length === 0) { %>
+    <p>No articles have been created yet.</p>
+  <% } else { %>
+    <ul class="simple-list">
+      <% articles.forEach((article) => { %>
+        <li>
+          <a href="/articles/<%= encodeURIComponent(article.title) %>"><%= article.title %></a>
+          <span>by <%= article.author %></span>
+        </li>
+      <% }) %>
+    </ul>
+  <% } %>
+</section>
