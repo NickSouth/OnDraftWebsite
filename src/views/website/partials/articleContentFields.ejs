@@ -1,0 +1,11 @@
+<% if (values.contentType === "pdf") { %>
+  <label>
+    PDF
+    <input type="file" name="pdf" accept="application/pdf,.pdf" />
+  </label>
+<% } else { %>
+  <label>
+    Content
+    <textarea name="content"><%= values.content || "" %></textarea>
+  </label>
+<% } %>

@@ -14,11 +14,7 @@
 
   <% if (article.content.type === "pdf") { %>
     <div class="article-pdf-viewer">
-      <object data="<%= article.content.url %>" type="application/pdf">
-        <p>
-          <a href="<%= article.content.url %>">Open <%= article.content.originalName %></a>
-        </p>
-      </object>
+      <iframe src="<%= article.content.url %>#toolbar=1&navpanes=0" title="<%= article.title %> PDF"></iframe>
     </div>
   <% } else { %>
     <div class="article-body"><%= article.content.text %></div>

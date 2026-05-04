@@ -16,15 +16,13 @@ async function adminAgent() {
   return agent;
 }
 
-function removeUploadedPdfFromHtml(html: string) {
-  const match = html.match(/\/uploads\/articles\/([^"]+\.pdf)/);
-  if (!match) {
-    return;
+function removeUploadedAssetsFromHtml(html: string) {
+  const matches = html.matchAll(/\/uploads\/articles\/([^"#]+?\.(?:pdf|jpg|jpeg|png|gif|webp))/g);
+  for (const match of matches) {
+    fs.rmSync(path.join(process.cwd(), "public", "uploads", "articles", decodeURIComponent(match[1])), {
+      force: true,
+    });
   }
-
-  fs.rmSync(path.join(process.cwd(), "public", "uploads", "articles", decodeURIComponent(match[1])), {
-    force: true,
-  });
 }
 
 describe("Website HTTP contracts", () => {
@@ -110,6 +108,25 @@ describe("Website HTTP contracts", () => {
     expect(article.text).toContain("A regular article body.");
   });
 
+  it("swaps article content fields with the HTMX partial route", async () => {
+    const agent = await adminAgent();
+
+    const createForm = await agent.get("/articles/new");
+    expect(createForm.status).toBe(200);
+    expect(createForm.text).toContain('hx-get="/articles/new/content-fields"');
+    expect(createForm.text).toContain('id="article-content-fields"');
+
+    const pdfFields = await agent.get("/articles/new/content-fields?contentType=pdf");
+    expect(pdfFields.status).toBe(200);
+    expect(pdfFields.text).toContain('type="file" name="pdf"');
+    expect(pdfFields.text).not.toContain("<textarea");
+
+    const plainTextFields = await agent.get("/articles/new/content-fields?contentType=plainText");
+    expect(plainTextFields.status).toBe(200);
+    expect(plainTextFields.text).toContain("<textarea");
+    expect(plainTextFields.text).not.toContain('name="pdf"');
+  });
+
   it("renders uploaded PDF articles with an embedded viewer", async () => {
     const agent = await adminAgent();
     const pdf = Buffer.from("%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF");
@@ -128,10 +145,37 @@ describe("Website HTTP contracts", () => {
 
     expect(article.status).toBe(200);
     expect(article.text).toContain("article-pdf-viewer");
-    expect(article.text).toContain('type="application/pdf"');
+    expect(article.text).toContain("<iframe");
     expect(article.text).toContain("/uploads/articles/");
 
-    removeUploadedPdfFromHtml(article.text);
+    removeUploadedAssetsFromHtml(article.text);
+  });
+
+  it("renders uploaded article images", async () => {
+    const agent = await adminAgent();
+    const png = Buffer.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+      0x00, 0x00, 0x00, 0x0d,
+    ]);
+
+    const create = await agent
+      .post("/articles")
+      .field("title", "Image Film Room")
+      .field("author", "Alice Website")
+      .field("publicationDate", "2024-01-01")
+      .field("contentType", "plainText")
+      .field("content", "Article with an uploaded image.")
+      .attach("image", png, { filename: "cover.png", contentType: "image/png" });
+
+    expect(create.status).toBe(302);
+
+    const article = await agent.get(create.headers.location);
+
+    expect(article.status).toBe(200);
+    expect(article.text).toContain('class="article-image"');
+    expect(article.text).toContain("/uploads/articles/");
+
+    removeUploadedAssetsFromHtml(article.text);
   });
 
   it("rejects non-PDF article uploads", async () => {

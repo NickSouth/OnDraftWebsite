@@ -4,7 +4,7 @@ import { isAdminSession } from "../session/WebsiteSession";
 import type { IWebsiteService } from "../service/WebsiteService";
 import type { ILoggingService } from "../service/LoggingService";
 import { ArticleError, BigBoardError } from "../repository/WebsiteRepository";
-import { publicArticlePdfUrl } from "../uploads/articlePdfUpload";
+import { publicArticleUploadUrl } from "../uploads/articlePdfUpload";
 
 export interface IWebsiteController {
   showHome(res: Response, session: IWebsiteBrowserSession): Promise<void>;
@@ -53,6 +53,15 @@ class WebsiteController implements IWebsiteController {
       default:
         return 500;
     }
+  }
+
+  private articleUpload(req: Request, fieldName: "pdf" | "image"): Express.Multer.File | undefined {
+    const files = req.files;
+    if (!files || Array.isArray(files)) {
+      return undefined;
+    }
+
+    return files[fieldName]?.[0];
   }
 
   async showHome(res: Response, session: IWebsiteBrowserSession): Promise<void> {
@@ -117,7 +126,8 @@ class WebsiteController implements IWebsiteController {
   async createArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
     this.logger.info("Creating new article");
     const contentType = req.body.contentType === "pdf" ? "pdf" : "plainText";
-    const uploadedPdf = req.file;
+    const uploadedPdf = this.articleUpload(req, "pdf");
+    const uploadedImage = this.articleUpload(req, "image");
     const input = {
       title: req.body.title,
       author: req.body.author,
@@ -126,7 +136,7 @@ class WebsiteController implements IWebsiteController {
         ? uploadedPdf
           ? {
               type: "pdf" as const,
-              url: publicArticlePdfUrl(uploadedPdf.filename),
+              url: publicArticleUploadUrl(uploadedPdf.filename),
               originalName: uploadedPdf.originalname,
               mimeType: "application/pdf" as const,
               size: uploadedPdf.size,
@@ -142,7 +152,7 @@ class WebsiteController implements IWebsiteController {
             type: "plainText" as const,
             text: req.body.content,
           },
-      imageUrl: req.body.imageUrl?.trim() ? req.body.imageUrl.trim() : undefined,
+      imageUrl: uploadedImage ? publicArticleUploadUrl(uploadedImage.filename) : undefined,
     };
     const result = await this.service.createArticle(input);
     if (result.ok === false) {

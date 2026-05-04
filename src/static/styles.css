@@ -212,7 +212,7 @@ textarea {
   margin-top: 18px;
 }
 
-.article-pdf-viewer object {
+.article-pdf-viewer iframe {
   display: block;
   width: 100%;
   height: min(78vh, 900px);

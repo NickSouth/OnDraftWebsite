@@ -5,7 +5,7 @@ import Layouts from "express-ejs-layouts";
 import { IAuthController } from "./auth/AuthController";
 import { IApp } from "./contracts";
 import { IWebsiteController } from "./controller/WebsiteController";
-import { ARTICLE_PDF_MAX_BYTES, articlePdfUpload } from "./uploads/articlePdfUpload";
+import { ARTICLE_PDF_MAX_BYTES, articleUpload } from "./uploads/articlePdfUpload";
 import {
   getAuthenticatedUser,
   isAdminSession,
@@ -43,7 +43,14 @@ class ExpressApp implements IApp {
 
   private registerMiddleware(): void {
     this.app.use(express.static(path.join(process.cwd(), "src/static")));
-    this.app.use(express.static(path.join(process.cwd(), "public")));
+    this.app.use("/vendor/htmx", express.static(path.join(process.cwd(), "node_modules", "htmx.org", "dist")));
+    this.app.use(express.static(path.join(process.cwd(), "public"), {
+      setHeaders: (res, filePath) => {
+        if (path.extname(filePath).toLowerCase() === ".pdf") {
+          res.setHeader("Content-Disposition", "inline");
+        }
+      },
+    }));
     this.app.use(
       session({
         name: "website.sid",
@@ -82,7 +89,10 @@ class ExpressApp implements IApp {
   }
 
   private handleArticlePdfUpload(req: Request, res: Response, next: NextFunction): void {
-    articlePdfUpload.single("pdf")(req, res, (err: unknown) => {
+    articleUpload.fields([
+      { name: "pdf", maxCount: 1 },
+      { name: "image", maxCount: 1 },
+    ])(req, res, (err: unknown) => {
       if (!err) {
         next();
         return;
@@ -193,6 +203,21 @@ class ExpressApp implements IApp {
 
         const browserSession = recordPageView(sessionStore(req));
         await this.controller.showCreateArticleForm(res, browserSession);
+      }),
+    );
+
+    this.app.get(
+      "/articles/new/content-fields",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const contentType = req.query.contentType === "pdf" ? "pdf" : "plainText";
+        res.render("website/partials/articleContentFields", {
+          layout: false,
+          values: { contentType },
+        });
       }),
     );
 

@@ -20,24 +20,25 @@
       <input type="date" name="publicationDate" value="<%= values.publicationDate || new Date().toISOString().slice(0, 10) %>" required />
     </label>
     <label>
-      Image URL
-      <input name="imageUrl" value="<%= values.imageUrl || "" %>" />
+      Article image
+      <input type="file" name="image" accept="image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp" />
     </label>
     <label>
       Content type
-      <select name="contentType">
+      <select
+        name="contentType"
+        hx-get="/articles/new/content-fields"
+        hx-trigger="change"
+        hx-target="#article-content-fields"
+        hx-swap="innerHTML"
+      >
         <option value="plainText" <%= values.contentType === "pdf" ? "" : "selected" %>>Plain text</option>
         <option value="pdf" <%= values.contentType === "pdf" ? "selected" : "" %>>PDF</option>
       </select>
     </label>
-    <label>
-      Content
-      <textarea name="content"><%= values.content || "" %></textarea>
-    </label>
-    <label>
-      PDF
-      <input type="file" name="pdf" accept="application/pdf,.pdf" />
-    </label>
+    <div id="article-content-fields">
+      <%- include("partials/articleContentFields", { values }) %>
+    </div>
     <button type="submit">Create article</button>
   </form>
 </section>

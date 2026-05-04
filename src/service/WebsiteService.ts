@@ -73,8 +73,8 @@ class WebsiteService implements IWebsiteService {
     if (isNaN(input.publicationDate.getTime())) {
       return Err(ArticleValidationError("Invalid publication date."));
     }
-    if (input.imageUrl && !/^https?:\/\/.+\.(jpg|jpeg|png|gif|bmp|webp)$/.test(input.imageUrl)) {
-      return Err(ArticleValidationError("Invalid image URL format."));
+    if (input.imageUrl && !/^\/uploads\/articles\/.+\.(jpg|jpeg|png|gif|webp)$/.test(input.imageUrl)) {
+      return Err(ArticleValidationError("Invalid image upload path."));
     }
     if (input.publicationDate > new Date()) {
       return Err(ArticleValidationError("Publication date cannot be in the future."));
