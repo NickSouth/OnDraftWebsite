@@ -1,6 +1,6 @@
 # CheeksCast Website
 
-A blank Express and TypeScript website template for CheeksCast.
+TypeScript website for CheeksCast (Ryan McWalter and Aleks Ryabinkin).
 
 The app currently includes:
 
