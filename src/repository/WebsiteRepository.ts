@@ -39,7 +39,7 @@ export interface IWebsiteRepository {
     getArticle(id: string): Promise<Result<Article, ArticleError>>;
     getFilteredArticles(filter: ArticleFilter): Promise<Result<Article[], ArticleError>>;
     commentByArticleId(articleId: string, comment: Comment): Promise<Result<Comment, ArticleError>>;
-    likeByArticleId(articleId: string): Promise<Result<Article, ArticleError>>;
-    likeByCommentId(commentId: string): Promise<Result<Comment, ArticleError>>;
+    likeByArticleId(articleId: string, userId: string): Promise<Result<Article, ArticleError>>;
+    likeByCommentId(commentId: string, userId: string): Promise<Result<Comment, ArticleError>>;
     deleteComment(commentId: string): Promise<Result<void, ArticleError>>;
 }

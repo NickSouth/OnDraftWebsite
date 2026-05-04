@@ -73,10 +73,16 @@ describe("WebsiteService article validation", () => {
       return;
     }
 
-    const likedArticle = await websiteService.likeByArticleId(created.value.id);
+    const likedArticle = await websiteService.likeByArticleId(created.value.id, "reader-1");
     expect(likedArticle.ok).toBe(true);
     if (likedArticle.ok === true) {
       expect(likedArticle.value.likes).toBe(1);
+    }
+
+    const unlikedArticle = await websiteService.likeByArticleId(created.value.id, "reader-1");
+    expect(unlikedArticle.ok).toBe(true);
+    if (unlikedArticle.ok === true) {
+      expect(unlikedArticle.value.likes).toBe(0);
     }
 
     const comment = await websiteService.commentByArticleId({
@@ -93,10 +99,16 @@ describe("WebsiteService article validation", () => {
     expect(comment.value.id).toMatch(/^[A-Za-z0-9]{8}$/);
     expect(comment.value.likes).toBe(0);
 
-    const likedComment = await websiteService.likeByCommentId(comment.value.id);
+    const likedComment = await websiteService.likeByCommentId(comment.value.id, "reader-1");
     expect(likedComment.ok).toBe(true);
     if (likedComment.ok === true) {
       expect(likedComment.value.likes).toBe(1);
+    }
+
+    const unlikedComment = await websiteService.likeByCommentId(comment.value.id, "reader-1");
+    expect(unlikedComment.ok).toBe(true);
+    if (unlikedComment.ok === true) {
+      expect(unlikedComment.value.likes).toBe(0);
     }
 
     const deleted = await websiteService.deleteComment(comment.value.id);

@@ -61,8 +61,8 @@ export interface IWebsiteService {
   getArticle(id: string): Promise<Result<Article, ArticleError>>;
   getFilteredArticles(filter: ArticleFilter): Promise<Result<Article[], ArticleError>>;
   commentByArticleId(input: CreateCommentInput): Promise<Result<Comment, ArticleError>>;
-  likeByArticleId(articleId: string): Promise<Result<Article, ArticleError>>;
-  likeByCommentId(commentId: string): Promise<Result<Comment, ArticleError>>;
+  likeByArticleId(articleId: string, userId: string): Promise<Result<Article, ArticleError>>;
+  likeByCommentId(commentId: string, userId: string): Promise<Result<Comment, ArticleError>>;
   deleteComment(commentId: string): Promise<Result<void, ArticleError>>;
 }
 
@@ -281,6 +281,7 @@ class WebsiteService implements IWebsiteService {
       imageUrl: prepared.value.imageUrl,
       comments: [],
       likes: 0,
+      likedByUserIds: [],
     });
   }
   
@@ -302,7 +303,8 @@ class WebsiteService implements IWebsiteService {
         content: prepared.value.content,
         imageUrl: prepared.value.imageUrl,
         comments: [],
-        likes: 0
+        likes: 0,
+        likedByUserIds: []
       };
       const result = await this.repository.createArticle(article);
       if (result.ok === true) {
@@ -387,25 +389,32 @@ class WebsiteService implements IWebsiteService {
       text: input.text.trim(),
       createdAt: new Date(),
       likes: 0,
+      likedByUserIds: [],
     };
 
     return await this.repository.commentByArticleId(input.articleId.trim(), comment);
   }
 
-  async likeByArticleId(articleId: string): Promise<Result<Article, ArticleError>> {
+  async likeByArticleId(articleId: string, userId: string): Promise<Result<Article, ArticleError>> {
     if (!articleId || articleId.trim() === "") {
       return Err(ArticleValidationError("Article id is required."));
     }
+    if (!userId || userId.trim() === "") {
+      return Err(ArticleValidationError("User id is required."));
+    }
 
-    return await this.repository.likeByArticleId(articleId.trim());
+    return await this.repository.likeByArticleId(articleId.trim(), userId.trim());
   }
 
-  async likeByCommentId(commentId: string): Promise<Result<Comment, ArticleError>> {
+  async likeByCommentId(commentId: string, userId: string): Promise<Result<Comment, ArticleError>> {
     if (!commentId || commentId.trim() === "") {
       return Err(ArticleValidationError("Comment id is required."));
     }
+    if (!userId || userId.trim() === "") {
+      return Err(ArticleValidationError("User id is required."));
+    }
 
-    return await this.repository.likeByCommentId(commentId.trim());
+    return await this.repository.likeByCommentId(commentId.trim(), userId.trim());
   }
 
   async deleteComment(commentId: string): Promise<Result<void, ArticleError>> {

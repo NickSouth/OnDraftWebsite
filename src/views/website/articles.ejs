@@ -14,20 +14,14 @@
       <button
         type="button"
         class="<%= showingPublished ? "is-active" : "" %>"
-        hx-get="/articles/filter?status=published"
-        hx-target="#articles-results"
-        hx-swap="innerHTML"
-        onclick="document.getElementById('article-status-field').value = 'published'; this.parentElement.querySelectorAll('button').forEach((button) => button.classList.remove('is-active')); this.classList.add('is-active');"
+        onclick="document.getElementById('article-status-field').value = 'published'; this.parentElement.querySelectorAll('button').forEach((button) => button.classList.remove('is-active')); this.classList.add('is-active'); htmx.trigger(document.querySelector('.article-filter-form'), 'submit');"
       >
         Published
       </button>
       <button
         type="button"
         class="<%= showingPublished ? "" : "is-active" %>"
-        hx-get="/articles/filter?status=draft"
-        hx-target="#articles-results"
-        hx-swap="innerHTML"
-        onclick="document.getElementById('article-status-field').value = 'draft'; this.parentElement.querySelectorAll('button').forEach((button) => button.classList.remove('is-active')); this.classList.add('is-active');"
+        onclick="document.getElementById('article-status-field').value = 'draft'; this.parentElement.querySelectorAll('button').forEach((button) => button.classList.remove('is-active')); this.classList.add('is-active'); htmx.trigger(document.querySelector('.article-filter-form'), 'submit');"
       >
         Unpublished
       </button>
@@ -60,6 +54,24 @@
       </button>
     </div>
 
+    <div class="article-sort-row">
+      <label>
+        Sort by
+        <select id="article-sort-by" name="sortBy" onchange="htmx.trigger(this.form, 'submit');">
+          <option value="date" <%= sortBy === "date" ? "selected" : "" %>>Date</option>
+          <option value="likes" <%= sortBy === "likes" ? "selected" : "" %>>Likes</option>
+          <option value="comments" <%= sortBy === "comments" ? "selected" : "" %>>Comments</option>
+        </select>
+      </label>
+      <label>
+        Direction
+        <select id="article-sort-direction" name="sortDirection" onchange="htmx.trigger(this.form, 'submit');">
+          <option value="desc" <%= sortDirection === "desc" ? "selected" : "" %>>Descending</option>
+          <option value="asc" <%= sortDirection === "asc" ? "selected" : "" %>>Ascending</option>
+        </select>
+      </label>
+    </div>
+
     <div id="article-filter-panel" class="article-filter-panel" hidden>
       <label>
         Author
@@ -82,7 +94,7 @@
         <button
           type="button"
           class="secondary-button"
-          onclick="const status = document.getElementById('article-status-field')?.value || 'published'; this.form.reset(); const statusField = document.getElementById('article-status-field'); if (statusField) statusField.value = status; htmx.ajax('GET', `/articles/filter?status=${status}`, { target: '#articles-results', swap: 'innerHTML' });"
+          onclick="const status = document.getElementById('article-status-field')?.value || 'published'; this.form.reset(); const statusField = document.getElementById('article-status-field'); if (statusField) statusField.value = status; htmx.trigger(this.form, 'submit');"
         >
           Clear
         </button>

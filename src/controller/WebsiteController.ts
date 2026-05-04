@@ -5,7 +5,7 @@ import type { CreateArticleInput, IWebsiteService } from "../service/WebsiteServ
 import type { ILoggingService } from "../service/LoggingService";
 import { ArticleError, BigBoardError } from "../repository/WebsiteRepository";
 import { publicArticleUploadUrl } from "../uploads/articlePdfUpload";
-import type { ArticleContent, ArticleFilter } from "../model/WebsiteContent";
+import type { Article, ArticleContent, ArticleFilter } from "../model/WebsiteContent";
 
 export interface IWebsiteController {
   showHome(res: Response, session: IWebsiteBrowserSession): Promise<void>;
@@ -20,7 +20,7 @@ export interface IWebsiteController {
   likeArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   showArticleComments(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   commentOnArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
-  likeComment(req: Request, res: Response): Promise<void>;
+  likeComment(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   deleteComment(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   createBigBoardEntry(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   deleteArticle(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void>;
@@ -101,6 +101,15 @@ class WebsiteController implements IWebsiteController {
     return this.queryString(req, "status") === "draft" ? false : true;
   }
 
+  private articleSortBy(req: Request): ArticleFilter["sortBy"] {
+    const sortBy = this.queryString(req, "sortBy");
+    return sortBy === "likes" || sortBy === "comments" ? sortBy : "date";
+  }
+
+  private articleSortDirection(req: Request): ArticleFilter["sortDirection"] {
+    return this.queryString(req, "sortDirection") === "asc" ? "asc" : "desc";
+  }
+
   private buildArticleFilter(req: Request, session: IWebsiteBrowserSession): ArticleFilter {
     const keyword = this.queryString(req, "keyword");
     const author = this.queryString(req, "author");
@@ -113,6 +122,8 @@ class WebsiteController implements IWebsiteController {
 
     const filter: ArticleFilter = {
       published: this.articleStatus(req, session),
+      sortBy: this.articleSortBy(req),
+      sortDirection: this.articleSortDirection(req),
     };
     if (keyword) {
       filter.keyword = keyword;
@@ -156,6 +167,10 @@ class WebsiteController implements IWebsiteController {
     }
 
     return Math.max(10, Math.min(100, Math.floor(rawLimit)));
+  }
+
+  private likeActorId(session: IWebsiteBrowserSession): string {
+    return session.authenticatedUser?.userId ?? session.browserId;
   }
 
   private async getArticleTagSuggestions(): Promise<string[]> {
@@ -227,7 +242,7 @@ class WebsiteController implements IWebsiteController {
   async showArticles(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
     this.logger.info("Rendering articles page");
     const showingPublished = this.articleStatus(req, session);
-    const result = await this.service.getArticles(showingPublished);
+    const result = await this.service.getFilteredArticles(this.buildArticleFilter(req, session));
     if (result.ok === false) {
       this.logger.error("Failed to load articles" + { error: result.value });
       res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
@@ -238,6 +253,8 @@ class WebsiteController implements IWebsiteController {
       isAdmin: isAdminSession(session),
       articles: result.value,
       showingPublished,
+      sortBy: this.articleSortBy(req),
+      sortDirection: this.articleSortDirection(req),
     });
   }
 
@@ -287,6 +304,16 @@ class WebsiteController implements IWebsiteController {
       isAdmin: isAdminSession(session),
       article: result.value,
       commentsLimit: 10,
+      likeActorId: this.likeActorId(session),
+    });
+  }
+
+  private renderArticleActions(res: Response, article: Article, session: IWebsiteBrowserSession): void {
+    res.render("website/partials/articleActions", {
+      layout: false,
+      article,
+      session,
+      likeActorId: this.likeActorId(session),
     });
   }
 
@@ -331,6 +358,7 @@ class WebsiteController implements IWebsiteController {
       session,
       isAdmin: isAdminSession(session),
       article: result.value,
+      likeActorId: this.likeActorId(session),
       values: {
         ...req.body,
         tags: (result.value.tags ?? []).join(","),
@@ -367,17 +395,13 @@ class WebsiteController implements IWebsiteController {
 
   async likeArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
     const articleId = this.routeParam(req, "id");
-    const result = await this.service.likeByArticleId(articleId);
+    const result = await this.service.likeByArticleId(articleId, this.likeActorId(session));
     if (result.ok === false) {
       res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
       return;
     }
 
-    res.render("website/partials/articleActions", {
-      layout: false,
-      article: result.value,
-      session,
-    });
+    this.renderArticleActions(res, result.value, session);
   }
 
   async showArticleComments(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
@@ -394,6 +418,7 @@ class WebsiteController implements IWebsiteController {
       session,
       isAdmin: isAdminSession(session),
       commentsLimit: this.commentLimit(req),
+      likeActorId: this.likeActorId(session),
       errorMessage: null,
     });
   }
@@ -427,6 +452,7 @@ class WebsiteController implements IWebsiteController {
           session,
           isAdmin: isAdminSession(session),
           commentsLimit: this.commentLimit(req),
+          likeActorId: this.likeActorId(session),
           errorMessage: result.value.message,
         });
         return;
@@ -439,9 +465,9 @@ class WebsiteController implements IWebsiteController {
     await this.showArticleComments(req, res, session);
   }
 
-  async likeComment(req: Request, res: Response): Promise<void> {
+  async likeComment(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
     const commentId = this.routeParam(req, "commentId");
-    const result = await this.service.likeByCommentId(commentId);
+    const result = await this.service.likeByCommentId(commentId, this.likeActorId(session));
     if (result.ok === false) {
       res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
       return;
@@ -450,6 +476,7 @@ class WebsiteController implements IWebsiteController {
     res.render("website/partials/commentLikeButton", {
       layout: false,
       comment: result.value,
+      likeActorId: this.likeActorId(session),
     });
   }
 

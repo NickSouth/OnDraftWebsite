@@ -50,7 +50,7 @@
             <% } %>
           </div>
           <p class="comment-text"><%= comment.text %></p>
-          <%- include("commentLikeButton", { comment }) %>
+          <%- include("commentLikeButton", { comment, likeActorId }) %>
         </li>
       <% }) %>
     </ol>

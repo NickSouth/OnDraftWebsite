@@ -65,7 +65,24 @@ class InMemoryWebsiteRepository implements IWebsiteRepository {
       return true;
     });
 
-    return Ok(filtered);
+    const sortBy = filter.sortBy ?? "date";
+    const direction = filter.sortDirection === "asc" ? 1 : -1;
+    const sorted = [...filtered].sort((first, second) => {
+      const firstValue = sortBy === "likes"
+        ? first.likes
+        : sortBy === "comments"
+          ? first.comments.length
+          : first.publicationDate.getTime();
+      const secondValue = sortBy === "likes"
+        ? second.likes
+        : sortBy === "comments"
+          ? second.comments.length
+          : second.publicationDate.getTime();
+
+      return (firstValue - secondValue) * direction;
+    });
+
+    return Ok(sorted);
   }
 
   async createArticle(article: Article): Promise<Result<Article, ArticleError>> {
@@ -128,21 +145,32 @@ class InMemoryWebsiteRepository implements IWebsiteRepository {
     return Ok(comment);
   }
 
-  async likeByArticleId(articleId: string): Promise<Result<Article, ArticleError>> {
+  private toggleLike(likedByUserIds: string[], userId: string): number {
+    const likeIndex = likedByUserIds.indexOf(userId);
+    if (likeIndex === -1) {
+      likedByUserIds.push(userId);
+    } else {
+      likedByUserIds.splice(likeIndex, 1);
+    }
+
+    return likedByUserIds.length;
+  }
+
+  async likeByArticleId(articleId: string, userId: string): Promise<Result<Article, ArticleError>> {
     const article = this.articles.find(a => a.id === articleId);
     if (!article) {
       return Err(ArticleNotFound(`Article with id "${articleId}" not found.`));
     }
 
-    article.likes += 1;
+    article.likes = this.toggleLike(article.likedByUserIds, userId);
     return Ok(article);
   }
 
-  async likeByCommentId(commentId: string): Promise<Result<Comment, ArticleError>> {
+  async likeByCommentId(commentId: string, userId: string): Promise<Result<Comment, ArticleError>> {
     for (const article of this.articles) {
       const comment = article.comments.find((entry) => entry.id === commentId);
       if (comment) {
-        comment.likes += 1;
+        comment.likes = this.toggleLike(comment.likedByUserIds, userId);
         return Ok(comment);
       }
     }

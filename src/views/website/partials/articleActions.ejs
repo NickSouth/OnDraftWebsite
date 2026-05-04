@@ -1,13 +1,15 @@
 <div class="article-actions" id="article-actions">
+  <% const articleLiked = article.likedByUserIds.includes(likeActorId); %>
   <button
     type="button"
-    class="icon-button"
-    aria-label="Like article"
+    class="icon-button <%= articleLiked ? "is-liked" : "" %>"
+    aria-label="<%= articleLiked ? "Unlike article" : "Like article" %>"
+    aria-pressed="<%= articleLiked ? "true" : "false" %>"
     hx-post="/articles/<%= article.id %>/like"
     hx-target="#article-actions"
     hx-swap="outerHTML"
   >
-    <span aria-hidden="true">&#9825;</span>
+    <span aria-hidden="true"><%- articleLiked ? "&hearts;" : "&#9825;" %></span>
     <span><%= article.likes %></span>
   </button>
   <a class="icon-link" href="#article-comments-section" aria-label="Jump to comments">

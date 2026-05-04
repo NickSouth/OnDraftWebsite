@@ -170,9 +170,18 @@ describe("Website HTTP contracts", () => {
     const articlePath = create.headers.location;
     const articleId = articlePath.split("/").pop();
 
-    const like = await request(website).post(`/articles/${articleId}/like`);
+    const anonymous = request.agent(website);
+    const like = await anonymous.post(`/articles/${articleId}/like`);
     expect(like.status).toBe(200);
     expect(like.text).toContain(">1</span>");
+
+    const unlike = await anonymous.post(`/articles/${articleId}/like`);
+    expect(unlike.status).toBe(200);
+    expect(unlike.text).toContain(">0</span>");
+
+    const likeAgain = await anonymous.post(`/articles/${articleId}/like`);
+    expect(likeAgain.status).toBe(200);
+    expect(likeAgain.text).toContain(">1</span>");
 
     const anonymousComment = await request(website)
       .post(`/articles/${articleId}/comments`)
@@ -202,9 +211,15 @@ describe("Website HTTP contracts", () => {
     const commentId = comment.text.match(/id="comment-([A-Za-z0-9]{8})"/)?.[1];
     expect(commentId).toBeDefined();
 
-    const likedComment = await request(website).post(`/comments/${commentId}/like`);
+    const likedComment = await anonymous.post(`/comments/${commentId}/like`);
     expect(likedComment.status).toBe(200);
     expect(likedComment.text).toContain(">1</span>");
+
+    const unlikedComment = await anonymous.post(`/comments/${commentId}/like`);
+    expect(unlikedComment.status).toBe(200);
+    expect(unlikedComment.text).toContain(">0</span>");
+
+    await anonymous.post(`/comments/${commentId}/like`);
 
     const articles = await request(website).get("/articles");
     expect(articles.status).toBe(200);
@@ -267,6 +282,57 @@ describe("Website HTTP contracts", () => {
     const deletedByAdmin = await admin.delete(`/articles/${articleId}/comments/${commentId}`);
     expect(deletedByAdmin.status).toBe(200);
     expect(deletedByAdmin.text).not.toContain("Comment 11");
+  });
+
+  it("sorts filtered article results by date, likes, and comments", async () => {
+    const website = app();
+    const admin = await loginAdminAgent(website);
+
+    const older = await admin
+      .post("/articles")
+      .type("form")
+      .send({
+        title: "Older Sort Article",
+        author: "Ryan McWalter",
+        writeup: "Older summary.",
+        publicationDate: "2024-01-01",
+        contentType: "plainText",
+        content: "Older article body.",
+      });
+    const newer = await admin
+      .post("/articles")
+      .type("form")
+      .send({
+        title: "Newer Sort Article",
+        author: "Ryan McWalter",
+        writeup: "Newer summary.",
+        publicationDate: "2024-02-01",
+        contentType: "plainText",
+        content: "Newer article body.",
+      });
+
+    const olderId = older.headers.location.split("/").pop();
+    const newerId = newer.headers.location.split("/").pop();
+    await request(website).post(`/articles/${olderId}/like`);
+    await admin
+      .post(`/articles/${newerId}/comments`)
+      .type("form")
+      .send({ text: "Newer comment." });
+
+    const articlesPage = await request(website).get("/articles");
+    expect(articlesPage.status).toBe(200);
+    expect(articlesPage.text).toContain('name="sortBy"');
+    expect(articlesPage.text).toContain('name="sortDirection"');
+    expect(articlesPage.text).toContain("htmx.trigger(this.form, 'submit')");
+
+    const dateAsc = await request(website).get("/articles/filter?sortBy=date&sortDirection=asc");
+    expect(dateAsc.text.indexOf("Older Sort Article")).toBeLessThan(dateAsc.text.indexOf("Newer Sort Article"));
+
+    const likesDesc = await request(website).get("/articles/filter?sortBy=likes&sortDirection=desc");
+    expect(likesDesc.text.indexOf("Older Sort Article")).toBeLessThan(likesDesc.text.indexOf("Newer Sort Article"));
+
+    const commentsDesc = await request(website).get("/articles/filter?sortBy=comments&sortDirection=desc");
+    expect(commentsDesc.text.indexOf("Newer Sort Article")).toBeLessThan(commentsDesc.text.indexOf("Older Sort Article"));
   });
 
   it("renders sanitized HTML article content unescaped", async () => {
