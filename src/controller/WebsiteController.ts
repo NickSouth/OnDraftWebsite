@@ -125,7 +125,9 @@ class WebsiteController implements IWebsiteController {
 
   async createArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
     this.logger.info("Creating new article");
-    const contentType = req.body.contentType === "pdf" ? "pdf" : "plainText";
+    const contentType = req.body.contentType === "pdf" || req.body.contentType === "html"
+      ? req.body.contentType
+      : "plainText";
     const uploadedPdf = this.articleUpload(req, "pdf");
     const uploadedImage = this.articleUpload(req, "image");
     const input = {
@@ -149,8 +151,15 @@ class WebsiteController implements IWebsiteController {
               size: 0,
             }
         : {
-            type: "plainText" as const,
-            text: req.body.content,
+            ...(contentType === "html"
+              ? {
+                  kind: "html" as const,
+                  body: req.body.content,
+                }
+              : {
+                  type: "plainText" as const,
+                  text: req.body.content,
+                }),
           },
       imageUrl: uploadedImage ? publicArticleUploadUrl(uploadedImage.filename) : undefined,
     };

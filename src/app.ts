@@ -214,7 +214,9 @@ class ExpressApp implements IApp {
           return;
         }
 
-        const contentType = req.query.contentType === "pdf" ? "pdf" : "plainText";
+        const contentType = req.query.contentType === "pdf" || req.query.contentType === "html"
+          ? req.query.contentType
+          : "plainText";
         res.render("website/partials/articleContentFields", {
           layout: false,
           values: { contentType },

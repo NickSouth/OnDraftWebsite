@@ -44,4 +44,24 @@ describe("WebsiteService article validation", () => {
       expect(result.value.message).toContain("valid PDF");
     }
   });
+
+  it("sanitizes HTML article content before saving", async () => {
+    const result = await service().createArticle({
+      title: "HTML Notes",
+      author: "Alice Website",
+      publicationDate: new Date("2024-01-01"),
+      content: {
+        kind: "html",
+        body: '<h2>Film Room</h2><p onclick="alert(1)">Safe copy</p><script>alert(1)</script><iframe src="https://example.com"></iframe>',
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok === true) {
+      expect(result.value.content).toEqual({
+        kind: "html",
+        body: "<h2>Film Room</h2><p>Safe copy</p>",
+      });
+    }
+  });
 });

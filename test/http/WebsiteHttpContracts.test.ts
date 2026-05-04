@@ -108,6 +108,54 @@ describe("Website HTTP contracts", () => {
     expect(article.text).toContain("A regular article body.");
   });
 
+  it("keeps plain text article content escaped", async () => {
+    const agent = await adminAgent();
+
+    const create = await agent
+      .post("/articles")
+      .type("form")
+      .send({
+        title: "Escaped Plain Text",
+        author: "Alice Website",
+        publicationDate: "2024-01-01",
+        contentType: "plainText",
+        content: "<strong>Not html</strong>",
+      });
+
+    expect(create.status).toBe(302);
+
+    const article = await agent.get(create.headers.location);
+
+    expect(article.status).toBe(200);
+    expect(article.text).toContain("&lt;strong&gt;Not html&lt;/strong&gt;");
+    expect(article.text).not.toContain("<strong>Not html</strong>");
+  });
+
+  it("renders sanitized HTML article content unescaped", async () => {
+    const agent = await adminAgent();
+
+    const create = await agent
+      .post("/articles")
+      .type("form")
+      .send({
+        title: "HTML Film Room",
+        author: "Alice Website",
+        publicationDate: "2024-01-01",
+        contentType: "html",
+        content: '<h2>Film Room</h2><p onclick="alert(1)">Safe copy</p><script>alert(1)</script><iframe src="https://example.com"></iframe>',
+      });
+
+    expect(create.status).toBe(302);
+
+    const article = await agent.get(create.headers.location);
+
+    expect(article.status).toBe(200);
+    expect(article.text).toContain('<div class="article-body article-html-body"><h2>Film Room</h2><p>Safe copy</p></div>');
+    expect(article.text).not.toContain("<script>alert");
+    expect(article.text).not.toContain("onclick");
+    expect(article.text).not.toContain("<iframe");
+  });
+
   it("swaps article content fields with the HTMX partial route", async () => {
     const agent = await adminAgent();
 
@@ -120,6 +168,11 @@ describe("Website HTTP contracts", () => {
     expect(pdfFields.status).toBe(200);
     expect(pdfFields.text).toContain('type="file" name="pdf"');
     expect(pdfFields.text).not.toContain("<textarea");
+
+    const htmlFields = await agent.get("/articles/new/content-fields?contentType=html");
+    expect(htmlFields.status).toBe(200);
+    expect(htmlFields.text).toContain("HTML content");
+    expect(htmlFields.text).toContain("<textarea");
 
     const plainTextFields = await agent.get("/articles/new/content-fields?contentType=plainText");
     expect(plainTextFields.status).toBe(200);

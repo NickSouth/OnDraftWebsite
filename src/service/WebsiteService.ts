@@ -1,4 +1,5 @@
 import { Err, Ok, Result } from "../lib/result";
+import sanitizeHtml from "sanitize-html";
 import { Article, ArticleContent, BigBoard, BigBoardEntry, Position, Height } from "../model/WebsiteContent";
 import { UnknownArticleError, ArticleError,  BigBoardError, IWebsiteRepository, ArticleValidationError, BigBoardValidationError } from "../repository/WebsiteRepository";
 
@@ -41,16 +42,69 @@ export interface IWebsiteService {
 class WebsiteService implements IWebsiteService {
   constructor(private readonly repository: IWebsiteRepository) {}
 
+  private sanitizeArticleHtml(body: string): string {
+    return sanitizeHtml(body, {
+      allowedTags: [
+        "a",
+        "blockquote",
+        "br",
+        "code",
+        "div",
+        "em",
+        "h2",
+        "h3",
+        "h4",
+        "hr",
+        "li",
+        "ol",
+        "p",
+        "pre",
+        "span",
+        "strong",
+        "ul",
+      ],
+      allowedAttributes: {
+        a: ["href", "title", "target", "rel"],
+      },
+      allowedSchemes: ["http", "https", "mailto"],
+      transformTags: {
+        a: sanitizeHtml.simpleTransform("a", { rel: "noopener noreferrer" }, true),
+      },
+    }).trim();
+  }
+
+  private sanitizeArticleContent(content: ArticleContent): ArticleContent {
+    if ("kind" in content && content.kind === "html") {
+      return {
+        kind: "html",
+        body: this.sanitizeArticleHtml(content.body),
+      };
+    }
+
+    return content;
+  }
+
   private validateArticleContent(content: ArticleContent | undefined): Result<void, ArticleError> {
     if (!content) {
       return Err(ArticleValidationError("Article content is required."));
     }
 
-    if (content.type === "plainText") {
+    if ("kind" in content && content.kind === "html") {
+      if (typeof content.body !== "string" || content.body.trim() === "") {
+        return Err(ArticleValidationError("Title, author, and content cannot be empty."));
+      }
+      return Ok(undefined);
+    }
+
+    if ("type" in content && content.type === "plainText") {
       if (typeof content.text !== "string" || content.text.trim() === "") {
         return Err(ArticleValidationError("Title, author, and content cannot be empty."));
       }
       return Ok(undefined);
+    }
+
+    if (!("type" in content) || content.type !== "pdf") {
+      return Err(ArticleValidationError("Unsupported article content type."));
     }
 
     if (!content.url || !content.originalName || content.mimeType !== "application/pdf" || content.size <= 0) {
@@ -106,17 +160,21 @@ class WebsiteService implements IWebsiteService {
   }
   
   async createArticle(input: CreateArticleInput): Promise<Result<Article, ArticleError>> {
-    const validation = this.validateArticleInput(input);
+    const sanitizedInput: CreateArticleInput = {
+      ...input,
+      content: input.content ? this.sanitizeArticleContent(input.content) : input.content,
+    };
+    const validation = this.validateArticleInput(sanitizedInput);
     if (validation.ok === false) {
       return Err(validation.value);
     }
 
     const article: Article = {
-      title: input.title,
-      author: input.author,
-      publicationDate: input.publicationDate,
-      content: input.content,
-      imageUrl: input.imageUrl
+      title: sanitizedInput.title,
+      author: sanitizedInput.author,
+      publicationDate: sanitizedInput.publicationDate,
+      content: sanitizedInput.content,
+      imageUrl: sanitizedInput.imageUrl
     };
     const result = await this.repository.createArticle(article);
     if (result.ok === false) {

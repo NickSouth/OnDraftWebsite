@@ -32,7 +32,8 @@
         hx-target="#article-content-fields"
         hx-swap="innerHTML"
       >
-        <option value="plainText" <%= values.contentType === "pdf" ? "" : "selected" %>>Plain text</option>
+        <option value="plainText" <%= values.contentType === "pdf" || values.contentType === "html" ? "" : "selected" %>>Plain text</option>
+        <option value="html" <%= values.contentType === "html" ? "selected" : "" %>>HTML</option>
         <option value="pdf" <%= values.contentType === "pdf" ? "selected" : "" %>>PDF</option>
       </select>
     </label>

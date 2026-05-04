@@ -26,6 +26,10 @@ export type ArticleContent =
       text: string;
     }
   | {
+      kind: "html";
+      body: string;
+    }
+  | {
       type: "pdf";
       url: string;
       originalName: string;
