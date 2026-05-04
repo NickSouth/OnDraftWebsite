@@ -112,6 +112,9 @@ class ExpressApp implements IApp {
         errorMessage: message,
         values: req.body ?? {},
         existingTags: [],
+        heading: "Create Article",
+        formAction: "/articles/preview",
+        saveAction: "/articles",
       });
     });
   }
@@ -233,6 +236,19 @@ class ExpressApp implements IApp {
       }),
     );
 
+    this.app.get(
+      "/articles/:id/edit",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+        await this.controller.showEditArticleForm(res, browserSession, id);
+      }),
+    );
+
     this.app.post(
       "/articles",
       (req, res, next) => {
@@ -260,6 +276,101 @@ class ExpressApp implements IApp {
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
         await this.controller.previewArticle(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/articles/:id/preview",
+      (req, res, next) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        this.handleArticlePdfUpload(req, res, next);
+      },
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.previewArticle(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/articles/:id",
+      (req, res, next) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        this.handleArticlePdfUpload(req, res, next);
+      },
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.updateArticle(req, res, browserSession);
+      }),
+    );
+
+    this.app.delete(
+      "/articles/:id",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.deleteArticle(req, res, browserSession);
+      }),
+    );
+
+    this.app.get(
+      "/articles/:id/preview",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+        await this.controller.showArticlePreview(res, browserSession, id);
+      }),
+    );
+
+    this.app.post(
+      "/articles/:id/like",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.likeArticle(req, res, browserSession);
+      }),
+    );
+
+    this.app.get(
+      "/articles/:id/comments",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.showArticleComments(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/articles/:id/comments",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.commentOnArticle(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/comments/:commentId/like",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.likeComment(req, res, browserSession);
+      }),
+    );
+
+    this.app.delete(
+      "/articles/:id/comments/:commentId",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.deleteComment(req, res, browserSession);
       }),
     );
 

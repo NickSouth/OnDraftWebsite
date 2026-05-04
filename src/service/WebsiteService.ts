@@ -1,17 +1,24 @@
 import { randomInt } from "node:crypto";
 import { Err, Ok, Result } from "../lib/result";
 import sanitizeHtml from "sanitize-html";
-import { Article, ArticleContent, BigBoard, BigBoardEntry, Position, Height, ArticleFilter } from "../model/WebsiteContent";
+import { Article, ArticleContent, BigBoard, BigBoardEntry, Position, ArticleFilter, Comment } from "../model/WebsiteContent";
 import { UnknownArticleError, ArticleError,  BigBoardError, IWebsiteRepository, ArticleValidationError, BigBoardValidationError } from "../repository/WebsiteRepository";
 
 const ARTICLE_PDF_MAX_BYTES = 5 * 1024 * 1024;
 const ARTICLE_ID_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 const ARTICLE_ID_LENGTH = 5;
 const ARTICLE_ID_MAX_ATTEMPTS = 10;
+const COMMENT_ID_LENGTH = 8;
+const DEFAULT_ARTICLE_IMAGE_URLS = [
+  "/images/article-defaults/football.png",
+  "/images/article-defaults/helmet.png",
+  "/images/article-defaults/uprights.png",
+];
 const ARTICLE_WRITEUP_MAX_LENGTH = 200;
 const ARTICLE_TAG_MAX_LENGTH = 24;
 const ARTICLE_TAG_MAX_COUNT = 12;
 const ARTICLE_TAG_PATTERN = /^[a-z0-9-]+$/;
+const COMMENT_TEXT_MAX_LENGTH = 1000;
 
 export interface CreateArticleInput {
   title: string;
@@ -39,9 +46,18 @@ export interface BigBoardEntryInput {
   weight: number;
 }
 
+export interface CreateCommentInput {
+  articleId: string;
+  userId: string;
+  userName: string;
+  text: string;
+}
+
 export interface IWebsiteService {
   previewArticle(input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
   createArticle(input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
+  previewUpdatedArticle(id: string, input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
+  updateArticle(id: string, input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
   createBigBoardEntry(input: BigBoardEntryInput): Promise<Result<BigBoardEntry, BigBoardError>>;
   deleteArticle(id: string): Promise<Result<void, ArticleError>>;
   deleteBigBoardEntry(playerName: string): Promise<Result<void, BigBoardError>>;
@@ -51,14 +67,30 @@ export interface IWebsiteService {
   getBigBoardEntry(playerName: string): Promise<Result<BigBoardEntry, BigBoardError>>;
   getArticle(id: string): Promise<Result<Article, ArticleError>>;
   getFilteredArticles(filter: ArticleFilter): Promise<Result<Article[], ArticleError>>;
+  commentByArticleId(input: CreateCommentInput): Promise<Result<Comment, ArticleError>>;
+  likeByArticleId(articleId: string, userId: string): Promise<Result<Article, ArticleError>>;
+  likeByCommentId(commentId: string, userId: string): Promise<Result<Comment, ArticleError>>;
+  deleteComment(commentId: string): Promise<Result<void, ArticleError>>;
 }
 
 class WebsiteService implements IWebsiteService {
   constructor(private readonly repository: IWebsiteRepository) {}
 
   private createArticleId(): string {
+    return this.createRandomId(ARTICLE_ID_LENGTH);
+  }
+
+  private createCommentId(): string {
+    return this.createRandomId(COMMENT_ID_LENGTH);
+  }
+
+  private defaultArticleImageUrl(): string {
+    return DEFAULT_ARTICLE_IMAGE_URLS[randomInt(DEFAULT_ARTICLE_IMAGE_URLS.length)];
+  }
+
+  private createRandomId(length: number): string {
     let id = "";
-    for (let index = 0; index < ARTICLE_ID_LENGTH; index += 1) {
+    for (let index = 0; index < length; index += 1) {
       id += ARTICLE_ID_ALPHABET[randomInt(ARTICLE_ID_ALPHABET.length)];
     }
     return id;
@@ -177,7 +209,11 @@ class WebsiteService implements IWebsiteService {
     if (isNaN(input.publicationDate.getTime())) {
       return Err(ArticleValidationError("Invalid publication date."));
     }
-    if (input.imageUrl && !/^\/uploads\/articles\/.+\.(jpg|jpeg|png|gif|webp)$/.test(input.imageUrl)) {
+    if (
+      input.imageUrl &&
+      !/^\/uploads\/articles\/.+\.(jpg|jpeg|png|gif|webp)$/.test(input.imageUrl) &&
+      !DEFAULT_ARTICLE_IMAGE_URLS.includes(input.imageUrl)
+    ) {
       return Err(ArticleValidationError("Invalid image upload path."));
     }
     if (input.publicationDate > new Date()) {
@@ -209,6 +245,19 @@ class WebsiteService implements IWebsiteService {
     }
     if (input.weight <= 0) {
       return Err(BigBoardValidationError("Weight must be a positive number."));
+    }
+    return Ok(undefined);
+  }
+
+  private validateCommentInput(input: CreateCommentInput): Result<void, ArticleError> {
+    if (!input.articleId || !input.userId || !input.userName || !input.text) {
+      return Err(ArticleValidationError("Article, user, user name, and comment text are required."));
+    }
+    if (input.articleId.trim() === "" || input.userId.trim() === "" || input.userName.trim() === "" || input.text.trim() === "") {
+      return Err(ArticleValidationError("Article, user, user name, and comment text cannot be empty."));
+    }
+    if (input.text.length > COMMENT_TEXT_MAX_LENGTH) {
+      return Err(ArticleValidationError(`Comment text cannot be more than ${COMMENT_TEXT_MAX_LENGTH} characters.`));
     }
     return Ok(undefined);
   }
@@ -244,7 +293,10 @@ class WebsiteService implements IWebsiteService {
       tags: prepared.value.tags,
       publicationDate: prepared.value.publicationDate,
       content: prepared.value.content,
-      imageUrl: prepared.value.imageUrl,
+      imageUrl: prepared.value.imageUrl ?? this.defaultArticleImageUrl(),
+      comments: [],
+      likes: 0,
+      likedByUserIds: [],
     });
   }
   
@@ -264,7 +316,10 @@ class WebsiteService implements IWebsiteService {
         tags: prepared.value.tags,
         publicationDate: prepared.value.publicationDate,
         content: prepared.value.content,
-        imageUrl: prepared.value.imageUrl
+        imageUrl: prepared.value.imageUrl ?? this.defaultArticleImageUrl(),
+        comments: [],
+        likes: 0,
+        likedByUserIds: []
       };
       const result = await this.repository.createArticle(article);
       if (result.ok === true) {
@@ -276,6 +331,43 @@ class WebsiteService implements IWebsiteService {
     }
 
     return Err(UnknownArticleError("Unable to generate a unique article id."));
+  }
+
+  private mergeArticleUpdate(existing: Article, prepared: CreateArticleInput): Article {
+    return {
+      ...existing,
+      title: prepared.title,
+      published: prepared.published ?? existing.published,
+      author: prepared.author,
+      writeup: prepared.writeup,
+      tags: prepared.tags,
+      publicationDate: prepared.publicationDate,
+      content: prepared.content,
+      imageUrl: prepared.imageUrl ?? existing.imageUrl ?? this.defaultArticleImageUrl(),
+    };
+  }
+
+  async previewUpdatedArticle(id: string, input: CreateArticleInput): Promise<Result<Article, ArticleError>> {
+    const existing = await this.repository.getArticle(id);
+    if (existing.ok === false) {
+      return Err(existing.value);
+    }
+
+    const prepared = this.prepareArticleInput(input);
+    if (prepared.ok === false) {
+      return Err(prepared.value);
+    }
+
+    return Ok(this.mergeArticleUpdate(existing.value, prepared.value));
+  }
+
+  async updateArticle(id: string, input: CreateArticleInput): Promise<Result<Article, ArticleError>> {
+    const preview = await this.previewUpdatedArticle(id, input);
+    if (preview.ok === false) {
+      return Err(preview.value);
+    }
+
+    return await this.repository.updateArticle(preview.value);
   }
 
   async createBigBoardEntry(input: BigBoardEntryInput): Promise<Result<BigBoardEntry, BigBoardError>> {
@@ -334,6 +426,55 @@ class WebsiteService implements IWebsiteService {
 
   async getFilteredArticles(filter: ArticleFilter): Promise<Result<Article[], ArticleError>> {
     return await this.repository.getFilteredArticles(filter);
+  }
+
+  async commentByArticleId(input: CreateCommentInput): Promise<Result<Comment, ArticleError>> {
+    const validation = this.validateCommentInput(input);
+    if (validation.ok === false) {
+      return Err(validation.value);
+    }
+
+    const comment: Comment = {
+      id: this.createCommentId(),
+      userId: input.userId.trim(),
+      userName: input.userName.trim(),
+      text: input.text.trim(),
+      createdAt: new Date(),
+      likes: 0,
+      likedByUserIds: [],
+    };
+
+    return await this.repository.commentByArticleId(input.articleId.trim(), comment);
+  }
+
+  async likeByArticleId(articleId: string, userId: string): Promise<Result<Article, ArticleError>> {
+    if (!articleId || articleId.trim() === "") {
+      return Err(ArticleValidationError("Article id is required."));
+    }
+    if (!userId || userId.trim() === "") {
+      return Err(ArticleValidationError("User id is required."));
+    }
+
+    return await this.repository.likeByArticleId(articleId.trim(), userId.trim());
+  }
+
+  async likeByCommentId(commentId: string, userId: string): Promise<Result<Comment, ArticleError>> {
+    if (!commentId || commentId.trim() === "") {
+      return Err(ArticleValidationError("Comment id is required."));
+    }
+    if (!userId || userId.trim() === "") {
+      return Err(ArticleValidationError("User id is required."));
+    }
+
+    return await this.repository.likeByCommentId(commentId.trim(), userId.trim());
+  }
+
+  async deleteComment(commentId: string): Promise<Result<void, ArticleError>> {
+    if (!commentId || commentId.trim() === "") {
+      return Err(ArticleValidationError("Comment id is required."));
+    }
+
+    return await this.repository.deleteComment(commentId.trim());
   }
 }
 

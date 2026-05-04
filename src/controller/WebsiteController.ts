@@ -5,7 +5,7 @@ import type { CreateArticleInput, IWebsiteService } from "../service/WebsiteServ
 import type { ILoggingService } from "../service/LoggingService";
 import { ArticleError, BigBoardError } from "../repository/WebsiteRepository";
 import { publicArticleUploadUrl } from "../uploads/articlePdfUpload";
-import type { ArticleContent, ArticleFilter } from "../model/WebsiteContent";
+import type { Article, ArticleContent, ArticleFilter } from "../model/WebsiteContent";
 
 export interface IWebsiteController {
   showHome(res: Response, session: IWebsiteBrowserSession): Promise<void>;
@@ -14,9 +14,17 @@ export interface IWebsiteController {
   showBigBoard(res: Response, session: IWebsiteBrowserSession): Promise<void>;
   showOneArticle(res: Response, session: IWebsiteBrowserSession, id: string): Promise<void>;
   showCreateArticleForm(res: Response, session: IWebsiteBrowserSession): Promise<void>;
+  showEditArticleForm(res: Response, session: IWebsiteBrowserSession, id: string): Promise<void>;
+  showArticlePreview(res: Response, session: IWebsiteBrowserSession, id: string): Promise<void>;
   showCreateBigBoardEntryForm(res: Response, session: IWebsiteBrowserSession): Promise<void>;
   previewArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   createArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
+  updateArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
+  likeArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
+  showArticleComments(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
+  commentOnArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
+  likeComment(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
+  deleteComment(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   createBigBoardEntry(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   deleteArticle(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   deleteBigBoardEntry(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void>;
@@ -31,6 +39,7 @@ class WebsiteController implements IWebsiteController {
   private mapArticleErrorToStatusCode(error: ArticleError): number {
     switch (error.name) {
       case "ArticleNotFound":
+      case "CommentNotFound":
         return 404;
       case "DuplicateArticle":
         return 409;
@@ -95,6 +104,15 @@ class WebsiteController implements IWebsiteController {
     return this.queryString(req, "status") === "draft" ? false : true;
   }
 
+  private articleSortBy(req: Request): ArticleFilter["sortBy"] {
+    const sortBy = this.queryString(req, "sortBy");
+    return sortBy === "likes" || sortBy === "comments" ? sortBy : "date";
+  }
+
+  private articleSortDirection(req: Request): ArticleFilter["sortDirection"] {
+    return this.queryString(req, "sortDirection") === "asc" ? "asc" : "desc";
+  }
+
   private buildArticleFilter(req: Request, session: IWebsiteBrowserSession): ArticleFilter {
     const keyword = this.queryString(req, "keyword");
     const author = this.queryString(req, "author");
@@ -107,6 +125,8 @@ class WebsiteController implements IWebsiteController {
 
     const filter: ArticleFilter = {
       published: this.articleStatus(req, session),
+      sortBy: this.articleSortBy(req),
+      sortDirection: this.articleSortDirection(req),
     };
     if (keyword) {
       filter.keyword = keyword;
@@ -136,6 +156,24 @@ class WebsiteController implements IWebsiteController {
       .split(",")
       .map((tag) => tag.trim())
       .filter(Boolean);
+  }
+
+  private routeParam(req: Request, key: string): string {
+    const value = req.params[key];
+    return Array.isArray(value) ? value[0] : value;
+  }
+
+  private commentLimit(req: Request): number {
+    const rawLimit = typeof req.query.limit === "string" ? Number(req.query.limit) : 10;
+    if (!Number.isFinite(rawLimit)) {
+      return 10;
+    }
+
+    return Math.max(10, Math.min(100, Math.floor(rawLimit)));
+  }
+
+  private likeActorId(session: IWebsiteBrowserSession): string {
+    return session.authenticatedUser?.userId ?? session.browserId;
   }
 
   private async getArticleTagSuggestions(): Promise<string[]> {
@@ -207,7 +245,7 @@ class WebsiteController implements IWebsiteController {
   async showArticles(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
     this.logger.info("Rendering articles page");
     const showingPublished = this.articleStatus(req, session);
-    const result = await this.service.getArticles(showingPublished);
+    const result = await this.service.getFilteredArticles(this.buildArticleFilter(req, session));
     if (result.ok === false) {
       this.logger.error("Failed to load articles" + { error: result.value });
       res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
@@ -218,6 +256,40 @@ class WebsiteController implements IWebsiteController {
       isAdmin: isAdminSession(session),
       articles: result.value,
       showingPublished,
+      sortBy: this.articleSortBy(req),
+      sortDirection: this.articleSortDirection(req),
+    });
+  }
+
+  private articleFormValues(article: Article): Record<string, string> {
+    return {
+      title: article.title,
+      author: article.author,
+      publicationDate: new Date(article.publicationDate).toISOString().slice(0, 10),
+      writeup: article.writeup,
+      tags: (article.tags ?? []).join(","),
+      contentType: article.content.type === "plainText" ? "plainText" : article.content.type,
+      content: article.content.type === "plainText"
+        ? article.content.text
+        : article.content.type === "html"
+          ? article.content.body
+          : "",
+      imageUrl: article.imageUrl ?? "",
+      pdfUrl: article.content.type === "pdf" ? article.content.url : "",
+      pdfOriginalName: article.content.type === "pdf" ? article.content.originalName : "",
+      pdfSize: article.content.type === "pdf" ? String(article.content.size) : "",
+    };
+  }
+
+  private renderArticlePreview(res: Response, session: IWebsiteBrowserSession, article: Article): void {
+    res.render("website/articlePreview", {
+      session,
+      isAdmin: isAdminSession(session),
+      article,
+      likeActorId: this.likeActorId(session),
+      values: this.articleFormValues(article),
+      formAction: article.id === "preview" ? "/articles" : `/articles/${article.id}`,
+      editHref: article.id === "preview" ? "/articles/new" : `/articles/${article.id}/edit`,
     });
   }
 
@@ -235,6 +307,7 @@ class WebsiteController implements IWebsiteController {
       layout: false,
       articles: result.value,
       showingPublished,
+      isAdmin: isAdminSession(session),
     });
   }
 
@@ -262,7 +335,22 @@ class WebsiteController implements IWebsiteController {
       res.status(404).send("Article not found.");
       return;
     }
-    res.render("website/article", { session, isAdmin: isAdminSession(session), article: result.value });
+    res.render("website/article", {
+      session,
+      isAdmin: isAdminSession(session),
+      article: result.value,
+      commentsLimit: 10,
+      likeActorId: this.likeActorId(session),
+    });
+  }
+
+  private renderArticleActions(res: Response, article: Article, session: IWebsiteBrowserSession): void {
+    res.render("website/partials/articleActions", {
+      layout: false,
+      article,
+      session,
+      likeActorId: this.likeActorId(session),
+    });
   }
 
   async showCreateArticleForm(res: Response, session: IWebsiteBrowserSession): Promise<void> {
@@ -273,7 +361,41 @@ class WebsiteController implements IWebsiteController {
       errorMessage: null,
       values: {},
       existingTags: await this.getArticleTagSuggestions(),
+      heading: "Create Article",
+      formAction: "/articles/preview",
+      saveAction: "/articles",
     });
+  }
+
+  async showEditArticleForm(res: Response, session: IWebsiteBrowserSession, id: string): Promise<void> {
+    this.logger.info(`Rendering edit article page for "${id}"`);
+    const result = await this.service.getArticle(id);
+    if (result.ok === false) {
+      res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    res.render("website/createArticle", {
+      session,
+      isAdmin: isAdminSession(session),
+      errorMessage: null,
+      values: this.articleFormValues(result.value),
+      existingTags: await this.getArticleTagSuggestions(),
+      heading: "Edit Article",
+      formAction: `/articles/${result.value.id}/preview`,
+      saveAction: `/articles/${result.value.id}`,
+    });
+  }
+
+  async showArticlePreview(res: Response, session: IWebsiteBrowserSession, id: string): Promise<void> {
+    this.logger.info(`Rendering article preview page for "${id}"`);
+    const result = await this.service.getArticle(id);
+    if (result.ok === false) {
+      res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    this.renderArticlePreview(res, session, result.value);
   }
 
   async showCreateBigBoardEntryForm(res: Response, session: IWebsiteBrowserSession): Promise<void> {
@@ -289,7 +411,10 @@ class WebsiteController implements IWebsiteController {
   async previewArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
     this.logger.info("Previewing new article");
     const input = this.buildArticleInput(req, false);
-    const result = await this.service.previewArticle(input);
+    const id = req.params.id;
+    const result = typeof id === "string"
+      ? await this.service.previewUpdatedArticle(id, input)
+      : await this.service.previewArticle(input);
     if (result.ok === false) {
       this.logger.error("Failed to preview article" + { error: result.value });
       res.status(this.mapArticleErrorToStatusCode(result.value)).render("website/createArticle", {
@@ -298,28 +423,14 @@ class WebsiteController implements IWebsiteController {
         errorMessage: result.value.message,
         values: req.body,
         existingTags: await this.getArticleTagSuggestions(),
+        heading: typeof id === "string" ? "Edit Article" : "Create Article",
+        formAction: typeof id === "string" ? `/articles/${id}/preview` : "/articles/preview",
+        saveAction: typeof id === "string" ? `/articles/${id}` : "/articles",
       });
       return;
     }
 
-    res.render("website/articlePreview", {
-      session,
-      isAdmin: isAdminSession(session),
-      article: result.value,
-      values: {
-        ...req.body,
-        tags: (result.value.tags ?? []).join(","),
-        content: result.value.content.type === "plainText"
-          ? result.value.content.text
-          : result.value.content.type === "html"
-            ? result.value.content.body
-            : "",
-        imageUrl: result.value.imageUrl,
-        pdfUrl: result.value.content.type === "pdf" ? result.value.content.url : "",
-        pdfOriginalName: result.value.content.type === "pdf" ? result.value.content.originalName : "",
-        pdfSize: result.value.content.type === "pdf" ? String(result.value.content.size) : "",
-      },
-    });
+    this.renderArticlePreview(res, session, result.value);
   }
 
   async createArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
@@ -338,6 +449,145 @@ class WebsiteController implements IWebsiteController {
       return;
     }
     res.redirect(result.value.published ? `/articles/${result.value.id}` : "/articles?status=draft");
+  }
+
+  async updateArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+    this.logger.info("Updating article");
+    const id = this.routeParam(req, "id");
+    const input = this.buildArticleInput(req, req.body.published === "false" ? false : true);
+    const result = await this.service.updateArticle(id, input);
+    if (result.ok === false) {
+      res.status(this.mapArticleErrorToStatusCode(result.value)).render("website/createArticle", {
+        session,
+        isAdmin: isAdminSession(session),
+        errorMessage: result.value.message,
+        values: req.body,
+        existingTags: await this.getArticleTagSuggestions(),
+        heading: "Edit Article",
+        formAction: `/articles/${id}/preview`,
+        saveAction: `/articles/${id}`,
+      });
+      return;
+    }
+
+    res.redirect(result.value.published ? `/articles/${result.value.id}` : "/articles?status=draft");
+  }
+
+  async likeArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+    const articleId = this.routeParam(req, "id");
+    const result = await this.service.likeByArticleId(articleId, this.likeActorId(session));
+    if (result.ok === false) {
+      res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    this.renderArticleActions(res, result.value, session);
+  }
+
+  async showArticleComments(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+    const articleId = this.routeParam(req, "id");
+    const result = await this.service.getArticle(articleId);
+    if (result.ok === false) {
+      res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    res.render("website/partials/articleComments", {
+      layout: false,
+      article: result.value,
+      session,
+      isAdmin: isAdminSession(session),
+      commentsLimit: this.commentLimit(req),
+      likeActorId: this.likeActorId(session),
+      errorMessage: null,
+    });
+  }
+
+  async commentOnArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+    const authenticatedUser = session.authenticatedUser;
+    if (!authenticatedUser) {
+      res.status(403).render("website/partials/error", {
+        layout: false,
+        message: "Log in to comment.",
+      });
+      return;
+    }
+
+    const articleId = this.routeParam(req, "id");
+    const result = await this.service.commentByArticleId({
+      articleId,
+      userId: authenticatedUser.userId,
+      userName: authenticatedUser.displayName,
+      text: req.body.text,
+    });
+    if (result.ok === false) {
+      const articleResult = await this.service.getArticle(articleId);
+      if (articleResult.ok === true) {
+        const statusCode = result.value.name === "ArticleValidationError"
+          ? 200
+          : this.mapArticleErrorToStatusCode(result.value);
+        res.status(statusCode).render("website/partials/articleComments", {
+          layout: false,
+          article: articleResult.value,
+          session,
+          isAdmin: isAdminSession(session),
+          commentsLimit: this.commentLimit(req),
+          likeActorId: this.likeActorId(session),
+          errorMessage: result.value.message,
+        });
+        return;
+      }
+
+      res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    await this.showArticleComments(req, res, session);
+  }
+
+  async likeComment(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+    const commentId = this.routeParam(req, "commentId");
+    const result = await this.service.likeByCommentId(commentId, this.likeActorId(session));
+    if (result.ok === false) {
+      res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    res.render("website/partials/commentLikeButton", {
+      layout: false,
+      comment: result.value,
+      likeActorId: this.likeActorId(session),
+    });
+  }
+
+  async deleteComment(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+    const articleId = this.routeParam(req, "id");
+    const commentId = this.routeParam(req, "commentId");
+    const articleResult = await this.service.getArticle(articleId);
+    if (articleResult.ok === false) {
+      res.status(this.mapArticleErrorToStatusCode(articleResult.value)).send(articleResult.value.message);
+      return;
+    }
+
+    const comment = articleResult.value.comments.find((entry) => entry.id === commentId);
+    if (!comment) {
+      res.status(404).send("Comment not found.");
+      return;
+    }
+
+    const canDelete = isAdminSession(session) || comment.userId === session.authenticatedUser?.userId;
+    if (!canDelete) {
+      res.status(403).send("You can only delete your own comments.");
+      return;
+    }
+
+    const result = await this.service.deleteComment(commentId);
+    if (result.ok === false) {
+      res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    await this.showArticleComments(req, res, session);
   }
 
   async createBigBoardEntry(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void> {
@@ -379,7 +629,7 @@ class WebsiteController implements IWebsiteController {
       res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
       return;
     }
-    res.status(204).send();
+    res.status(200).send("");
   }
 
   async deleteBigBoardEntry(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void> {

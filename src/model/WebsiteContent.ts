@@ -23,6 +23,8 @@ export type BigBoardEntry = {
 export type ArticleFilter = {
   author?: string;
   published?: boolean;
+  sortBy?: "date" | "likes" | "comments";
+  sortDirection?: "asc" | "desc";
   publicationDateRange?: {
     from: Date;
     to: Date;
@@ -58,4 +60,17 @@ export type Article = {
   publicationDate: Date;
   content: ArticleContent;
   imageUrl?: string;
+  comments: Comment[];
+  likes: number;
+  likedByUserIds: string[];
+};
+
+export type Comment = {
+  id: string;
+  userId: string;
+  userName: string;
+  text: string;
+  createdAt: Date;
+  likes: number;
+  likedByUserIds: string[];
 };

@@ -1,12 +1,15 @@
 <section class="plain-page form-page">
   <p><a href="/articles">Back to articles</a></p>
-  <h1>Create Article</h1>
+  <% const pageHeading = typeof heading !== "undefined" ? heading : "Create Article"; %>
+  <% const previewAction = typeof formAction !== "undefined" ? formAction : "/articles/preview"; %>
+  <% const draftSaveAction = typeof saveAction !== "undefined" ? saveAction : "/articles"; %>
+  <h1><%= pageHeading %></h1>
 
   <% if (errorMessage) { %>
     <p class="error-message"><%= errorMessage %></p>
   <% } %>
 
-  <form class="website-form" method="post" action="/articles/preview" enctype="multipart/form-data">
+  <form class="website-form" method="post" action="<%= previewAction %>" enctype="multipart/form-data">
     <label>
       Title
       <input name="title" value="<%= values.title || "" %>" required />
@@ -43,6 +46,9 @@
       Article image
       <input type="file" name="image" accept="image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp" />
     </label>
+    <% if (values.imageUrl) { %>
+      <input type="hidden" name="imageUrl" value="<%= values.imageUrl %>" />
+    <% } %>
     <label>
       Content type
       <select
@@ -60,8 +66,13 @@
     <div id="article-content-fields">
       <%- include("partials/articleContentFields", { values }) %>
     </div>
+    <% if (values.pdfUrl) { %>
+      <input type="hidden" name="pdfUrl" value="<%= values.pdfUrl %>" />
+      <input type="hidden" name="pdfOriginalName" value="<%= values.pdfOriginalName || "" %>" />
+      <input type="hidden" name="pdfSize" value="<%= values.pdfSize || "" %>" />
+    <% } %>
     <div class="form-actions">
-      <button type="submit" formaction="/articles" name="published" value="false">Save As Draft</button>
+      <button type="submit" formaction="<%= draftSaveAction %>" name="published" value="false">Save As Draft</button>
       <button type="submit">Preview</button>
     </div>
   </form>

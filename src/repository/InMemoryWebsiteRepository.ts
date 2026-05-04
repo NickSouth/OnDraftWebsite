@@ -1,6 +1,6 @@
 import { Err, Ok, Result } from "../lib/result";
-import { Article, ArticleFilter, BigBoard, BigBoardEntry } from "../model/WebsiteContent";
-import { ArticleNotFound, DuplicatePlayer, DuplicateArticle, type ArticleError, type BigBoardError, type IWebsiteRepository, PlayerNotFound } from "./WebsiteRepository";
+import { Article, ArticleFilter, BigBoard, BigBoardEntry, Comment } from "../model/WebsiteContent";
+import { ArticleNotFound, CommentNotFound, DuplicatePlayer, DuplicateArticle, type ArticleError, type BigBoardError, type IWebsiteRepository, PlayerNotFound } from "./WebsiteRepository";
 
 
 class InMemoryWebsiteRepository implements IWebsiteRepository {
@@ -65,7 +65,24 @@ class InMemoryWebsiteRepository implements IWebsiteRepository {
       return true;
     });
 
-    return Ok(filtered);
+    const sortBy = filter.sortBy ?? "date";
+    const direction = filter.sortDirection === "asc" ? 1 : -1;
+    const sorted = [...filtered].sort((first, second) => {
+      const firstValue = sortBy === "likes"
+        ? first.likes
+        : sortBy === "comments"
+          ? first.comments.length
+          : first.publicationDate.getTime();
+      const secondValue = sortBy === "likes"
+        ? second.likes
+        : sortBy === "comments"
+          ? second.comments.length
+          : second.publicationDate.getTime();
+
+      return (firstValue - secondValue) * direction;
+    });
+
+    return Ok(sorted);
   }
 
   async createArticle(article: Article): Promise<Result<Article, ArticleError>> {
@@ -116,6 +133,71 @@ class InMemoryWebsiteRepository implements IWebsiteRepository {
       return Err(ArticleNotFound(`Article with id "${id}" not found.`));
     }
     return Ok(article);
+  }
+
+  async updateArticle(article: Article): Promise<Result<Article, ArticleError>> {
+    const articleIndex = this.articles.findIndex(a => a.id === article.id);
+    if (articleIndex === -1) {
+      return Err(ArticleNotFound(`Article with id "${article.id}" not found.`));
+    }
+
+    this.articles[articleIndex] = article;
+    return Ok(article);
+  }
+
+  async commentByArticleId(articleId: string, comment: Comment): Promise<Result<Comment, ArticleError>> {
+    const article = this.articles.find(a => a.id === articleId);
+    if (!article) {
+      return Err(ArticleNotFound(`Article with id "${articleId}" not found.`));
+    }
+
+    article.comments.push(comment);
+    return Ok(comment);
+  }
+
+  private toggleLike(likedByUserIds: string[], userId: string): number {
+    const likeIndex = likedByUserIds.indexOf(userId);
+    if (likeIndex === -1) {
+      likedByUserIds.push(userId);
+    } else {
+      likedByUserIds.splice(likeIndex, 1);
+    }
+
+    return likedByUserIds.length;
+  }
+
+  async likeByArticleId(articleId: string, userId: string): Promise<Result<Article, ArticleError>> {
+    const article = this.articles.find(a => a.id === articleId);
+    if (!article) {
+      return Err(ArticleNotFound(`Article with id "${articleId}" not found.`));
+    }
+
+    article.likes = this.toggleLike(article.likedByUserIds, userId);
+    return Ok(article);
+  }
+
+  async likeByCommentId(commentId: string, userId: string): Promise<Result<Comment, ArticleError>> {
+    for (const article of this.articles) {
+      const comment = article.comments.find((entry) => entry.id === commentId);
+      if (comment) {
+        comment.likes = this.toggleLike(comment.likedByUserIds, userId);
+        return Ok(comment);
+      }
+    }
+
+    return Err(CommentNotFound(`Comment with id "${commentId}" not found.`));
+  }
+
+  async deleteComment(commentId: string): Promise<Result<void, ArticleError>> {
+    for (const article of this.articles) {
+      const commentIndex = article.comments.findIndex((entry) => entry.id === commentId);
+      if (commentIndex !== -1) {
+        article.comments.splice(commentIndex, 1);
+        return Ok(undefined);
+      }
+    }
+
+    return Err(CommentNotFound(`Comment with id "${commentId}" not found.`));
   }
 }
 

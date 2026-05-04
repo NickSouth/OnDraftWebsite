@@ -24,6 +24,24 @@ describe("WebsiteService article validation", () => {
     }
   });
 
+  it("assigns a default football thumbnail when no article image is provided", async () => {
+    const result = await service().createArticle({
+      title: "Default Image Notes",
+      author: "Alice Website",
+      writeup: "A short default image summary.",
+      publicationDate: new Date("2024-01-01"),
+      content: {
+        type: "plainText",
+        text: "A regular article body.",
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok === true) {
+      expect(result.value.imageUrl).toMatch(/^\/images\/article-defaults\/(football|helmet|uprights)\.png$/);
+    }
+  });
+
   it("keeps draft articles out of the published article list", async () => {
     const websiteService = service();
     const draft = await websiteService.createArticle({
@@ -52,6 +70,72 @@ describe("WebsiteService article validation", () => {
       expect(publishedArticles.value).toHaveLength(0);
       expect(draftArticles.value).toHaveLength(1);
       expect(draftArticles.value[0].title).toBe("Draft Notes");
+    }
+  });
+
+  it("adds comments, likes articles, likes comments, and deletes comments", async () => {
+    const websiteService = service();
+    const created = await websiteService.createArticle({
+      title: "Discussion Notes",
+      author: "Alice Website",
+      writeup: "A short discussion summary.",
+      publicationDate: new Date("2024-01-01"),
+      content: {
+        type: "plainText",
+        text: "A regular article body.",
+      },
+    });
+
+    expect(created.ok).toBe(true);
+    if (created.ok === false) {
+      return;
+    }
+
+    const likedArticle = await websiteService.likeByArticleId(created.value.id, "reader-1");
+    expect(likedArticle.ok).toBe(true);
+    if (likedArticle.ok === true) {
+      expect(likedArticle.value.likes).toBe(1);
+    }
+
+    const unlikedArticle = await websiteService.likeByArticleId(created.value.id, "reader-1");
+    expect(unlikedArticle.ok).toBe(true);
+    if (unlikedArticle.ok === true) {
+      expect(unlikedArticle.value.likes).toBe(0);
+    }
+
+    const comment = await websiteService.commentByArticleId({
+      articleId: created.value.id,
+      userId: "reader-1",
+      userName: "Reader One",
+      text: "Good read.",
+    });
+
+    expect(comment.ok).toBe(true);
+    if (comment.ok === false) {
+      return;
+    }
+    expect(comment.value.id).toMatch(/^[A-Za-z0-9]{8}$/);
+    expect(comment.value.likes).toBe(0);
+
+    const likedComment = await websiteService.likeByCommentId(comment.value.id, "reader-1");
+    expect(likedComment.ok).toBe(true);
+    if (likedComment.ok === true) {
+      expect(likedComment.value.likes).toBe(1);
+    }
+
+    const unlikedComment = await websiteService.likeByCommentId(comment.value.id, "reader-1");
+    expect(unlikedComment.ok).toBe(true);
+    if (unlikedComment.ok === true) {
+      expect(unlikedComment.value.likes).toBe(0);
+    }
+
+    const deleted = await websiteService.deleteComment(comment.value.id);
+    expect(deleted.ok).toBe(true);
+
+    const deletedAgain = await websiteService.deleteComment(comment.value.id);
+    expect(deletedAgain.ok).toBe(false);
+    if (deletedAgain.ok === false) {
+      expect(deletedAgain.value.name).toBe("CommentNotFound");
     }
   });
 

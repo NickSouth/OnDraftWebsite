@@ -16,6 +16,15 @@ async function adminAgent() {
   return agent;
 }
 
+async function loginAdminAgent(website: ReturnType<typeof app>) {
+  const agent = request.agent(website);
+  await agent
+    .post("/login")
+    .type("form")
+    .send({ email: "ryanmcwalter@cheekscast.test", password: "password123" });
+  return agent;
+}
+
 function removeUploadedAssetsFromHtml(html: string) {
   const matches = html.matchAll(/\/uploads\/articles\/([^"#]+?\.(?:pdf|jpg|jpeg|png|gif|webp))/g);
   for (const match of matches) {
@@ -141,6 +150,191 @@ describe("Website HTTP contracts", () => {
     expect(article.text).not.toContain("<strong>Not html</strong>");
   });
 
+  it("supports article likes and authenticated HTMX comments", async () => {
+    const website = app();
+    const admin = await loginAdminAgent(website);
+
+    const create = await admin
+      .post("/articles")
+      .type("form")
+      .send({
+        title: "Interactive Film Room",
+        author: "Ryan McWalter",
+        writeup: "A short interactive summary.",
+        publicationDate: "2024-01-01",
+        contentType: "plainText",
+        content: "A regular article body.",
+      });
+
+    expect(create.status).toBe(302);
+    const articlePath = create.headers.location;
+    const articleId = articlePath.split("/").pop();
+
+    const anonymous = request.agent(website);
+    const like = await anonymous.post(`/articles/${articleId}/like`);
+    expect(like.status).toBe(200);
+    expect(like.text).toContain(">1</span>");
+
+    const unlike = await anonymous.post(`/articles/${articleId}/like`);
+    expect(unlike.status).toBe(200);
+    expect(unlike.text).toContain(">0</span>");
+
+    const likeAgain = await anonymous.post(`/articles/${articleId}/like`);
+    expect(likeAgain.status).toBe(200);
+    expect(likeAgain.text).toContain(">1</span>");
+
+    const anonymousComment = await request(website)
+      .post(`/articles/${articleId}/comments`)
+      .type("form")
+      .send({ text: "Anonymous comment." });
+    expect(anonymousComment.status).toBe(403);
+
+    const reader = request.agent(website);
+    await reader
+      .post("/register")
+      .type("form")
+      .send({
+        displayName: "Reader One",
+        email: "reader@website.test",
+        password: "password123",
+      });
+
+    const comment = await reader
+      .post(`/articles/${articleId}/comments`)
+      .type("form")
+      .send({ text: "Good read." });
+
+    expect(comment.status).toBe(200);
+    expect(comment.text).toContain("Good read.");
+    expect(comment.text).toContain("Reader One");
+
+    const commentId = comment.text.match(/id="comment-([A-Za-z0-9]{8})"/)?.[1];
+    expect(commentId).toBeDefined();
+
+    const likedComment = await anonymous.post(`/comments/${commentId}/like`);
+    expect(likedComment.status).toBe(200);
+    expect(likedComment.text).toContain(">1</span>");
+
+    const unlikedComment = await anonymous.post(`/comments/${commentId}/like`);
+    expect(unlikedComment.status).toBe(200);
+    expect(unlikedComment.text).toContain(">0</span>");
+
+    await anonymous.post(`/comments/${commentId}/like`);
+
+    const articles = await request(website).get("/articles");
+    expect(articles.status).toBe(200);
+    expect(articles.text).toContain("1 likes");
+    expect(articles.text).toContain("1 comments");
+
+    const deleted = await reader.delete(`/articles/${articleId}/comments/${commentId}`);
+    expect(deleted.status).toBe(200);
+    expect(deleted.text).not.toContain("Good read.");
+  });
+
+  it("lets admins delete any comment and pages comments ten at a time", async () => {
+    const website = app();
+    const admin = await loginAdminAgent(website);
+
+    const create = await admin
+      .post("/articles")
+      .type("form")
+      .send({
+        title: "Paged Comments",
+        author: "Ryan McWalter",
+        writeup: "A short comments summary.",
+        publicationDate: "2024-01-01",
+        contentType: "plainText",
+        content: "A regular article body.",
+      });
+
+    const articleId = create.headers.location.split("/").pop();
+    const reader = request.agent(website);
+    await reader
+      .post("/register")
+      .type("form")
+      .send({
+        displayName: "Many Comments",
+        email: "many-comments@website.test",
+        password: "password123",
+      });
+
+    for (let index = 1; index <= 11; index += 1) {
+      await reader
+        .post(`/articles/${articleId}/comments`)
+        .type("form")
+        .send({ text: `Comment ${index}` });
+    }
+
+    const firstPage = await request(website).get(`/articles/${articleId}/comments`);
+    expect(firstPage.status).toBe(200);
+    expect(firstPage.text).toContain("Comment 10");
+    expect(firstPage.text).not.toContain("Comment 11");
+    expect(firstPage.text).toContain("Show More");
+
+    const secondPage = await request(website).get(`/articles/${articleId}/comments?limit=20`);
+    expect(secondPage.status).toBe(200);
+    expect(secondPage.text).toContain("Comment 11");
+
+    const commentIds = [...secondPage.text.matchAll(/id="comment-([A-Za-z0-9]{8})"/g)].map((match) => match[1]);
+    const commentId = commentIds.at(-1);
+    expect(commentId).toBeDefined();
+
+    const deletedByAdmin = await admin.delete(`/articles/${articleId}/comments/${commentId}`);
+    expect(deletedByAdmin.status).toBe(200);
+    expect(deletedByAdmin.text).not.toContain("Comment 11");
+  });
+
+  it("sorts filtered article results by date, likes, and comments", async () => {
+    const website = app();
+    const admin = await loginAdminAgent(website);
+
+    const older = await admin
+      .post("/articles")
+      .type("form")
+      .send({
+        title: "Older Sort Article",
+        author: "Ryan McWalter",
+        writeup: "Older summary.",
+        publicationDate: "2024-01-01",
+        contentType: "plainText",
+        content: "Older article body.",
+      });
+    const newer = await admin
+      .post("/articles")
+      .type("form")
+      .send({
+        title: "Newer Sort Article",
+        author: "Ryan McWalter",
+        writeup: "Newer summary.",
+        publicationDate: "2024-02-01",
+        contentType: "plainText",
+        content: "Newer article body.",
+      });
+
+    const olderId = older.headers.location.split("/").pop();
+    const newerId = newer.headers.location.split("/").pop();
+    await request(website).post(`/articles/${olderId}/like`);
+    await admin
+      .post(`/articles/${newerId}/comments`)
+      .type("form")
+      .send({ text: "Newer comment." });
+
+    const articlesPage = await request(website).get("/articles");
+    expect(articlesPage.status).toBe(200);
+    expect(articlesPage.text).toContain('name="sortBy"');
+    expect(articlesPage.text).toContain('name="sortDirection"');
+    expect(articlesPage.text).toContain("htmx.trigger(this.form, 'submit')");
+
+    const dateAsc = await request(website).get("/articles/filter?sortBy=date&sortDirection=asc");
+    expect(dateAsc.text.indexOf("Older Sort Article")).toBeLessThan(dateAsc.text.indexOf("Newer Sort Article"));
+
+    const likesDesc = await request(website).get("/articles/filter?sortBy=likes&sortDirection=desc");
+    expect(likesDesc.text.indexOf("Older Sort Article")).toBeLessThan(likesDesc.text.indexOf("Newer Sort Article"));
+
+    const commentsDesc = await request(website).get("/articles/filter?sortBy=comments&sortDirection=desc");
+    expect(commentsDesc.text.indexOf("Newer Sort Article")).toBeLessThan(commentsDesc.text.indexOf("Older Sort Article"));
+  });
+
   it("renders sanitized HTML article content unescaped", async () => {
     const agent = await adminAgent();
 
@@ -209,6 +403,7 @@ describe("Website HTTP contracts", () => {
     expect(preview.status).toBe(200);
     expect(preview.text).toContain("Article Preview");
     expect(preview.text).toContain("Preview article body.");
+    expect(preview.text).toMatch(/\/images\/article-defaults\/(?:football|helmet|uprights)\.png/);
     expect(preview.text).toContain('name="published" value="false"');
     expect(preview.text).toContain('name="published" value="true"');
   });
@@ -240,6 +435,87 @@ describe("Website HTTP contracts", () => {
     expect(draftArticles.status).toBe(200);
     expect(draftArticles.text).toContain("Draft Film Room");
     expect(draftArticles.text).toContain("Draft -");
+  });
+
+  it("links draft articles to preview and lets admins edit and publish them", async () => {
+    const agent = await adminAgent();
+
+    const create = await agent
+      .post("/articles")
+      .type("form")
+      .send({
+        title: "Editable Draft",
+        author: "Ryan McWalter",
+        writeup: "A draft before edits.",
+        publicationDate: "2024-01-01",
+        contentType: "plainText",
+        content: "Draft body.",
+        published: "false",
+      });
+
+    expect(create.status).toBe(302);
+    const draftList = await agent.get("/articles/filter?status=draft");
+    const articleId = draftList.text.match(/href="\/articles\/([A-Za-z0-9]{5})\/preview"/)?.[1];
+    expect(articleId).toBeDefined();
+    expect(draftList.text).toContain('hx-confirm="Are you sure? Deleted articles cannot be recovered."');
+
+    const preview = await agent.get(`/articles/${articleId}/preview`);
+    expect(preview.status).toBe(200);
+    expect(preview.text).toContain(`href="/articles/${articleId}/edit"`);
+    expect(preview.text).toContain(`action="/articles/${articleId}"`);
+
+    const edit = await agent.get(`/articles/${articleId}/edit`);
+    expect(edit.status).toBe(200);
+    expect(edit.text).toContain("Edit Article");
+    expect(edit.text).toContain('value="Editable Draft"');
+    expect(edit.text).toContain("Draft body.");
+
+    const update = await agent
+      .post(`/articles/${articleId}`)
+      .type("form")
+      .send({
+        title: "Published After Edit",
+        author: "Ryan McWalter",
+        writeup: "An edited summary.",
+        publicationDate: "2024-01-01",
+        contentType: "plainText",
+        content: "Edited body.",
+        published: "true",
+      });
+
+    expect(update.status).toBe(302);
+    expect(update.headers.location).toBe(`/articles/${articleId}`);
+
+    const article = await agent.get(`/articles/${articleId}`);
+    expect(article.status).toBe(200);
+    expect(article.text).toContain("Published After Edit");
+    expect(article.text).toContain("Edited body.");
+  });
+
+  it("lets admins delete articles from the list", async () => {
+    const agent = await adminAgent();
+
+    const create = await agent
+      .post("/articles")
+      .type("form")
+      .send({
+        title: "Delete Me",
+        author: "Ryan McWalter",
+        writeup: "A short delete summary.",
+        publicationDate: "2024-01-01",
+        contentType: "plainText",
+        content: "Article to delete.",
+      });
+
+    const articleId = create.headers.location.split("/").pop();
+    const articles = await agent.get("/articles");
+    expect(articles.text).toContain(`hx-delete="/articles/${articleId}"`);
+
+    const deleted = await agent.delete(`/articles/${articleId}`);
+    expect(deleted.status).toBe(200);
+
+    const missing = await agent.get(`/articles/${articleId}`);
+    expect(missing.status).toBe(404);
   });
 
   it("renders uploaded PDF articles as in-page article canvases", async () => {

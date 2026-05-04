@@ -3,8 +3,9 @@
 <% } else { %>
   <ul class="simple-list">
     <% articles.forEach((article) => { %>
-      <li>
-        <a class="article-list-row" href="/articles/<%= article.id %>">
+      <% const articleHref = isAdmin && !article.published ? `/articles/${article.id}/preview` : `/articles/${article.id}`; %>
+      <li id="article-list-item-<%= article.id %>" class="article-list-item">
+        <a class="article-list-row" href="<%= articleHref %>">
           <% if (article.imageUrl) { %>
             <img class="article-list-thumb" src="<%= article.imageUrl %>" alt="" />
           <% } else { %>
@@ -22,6 +23,10 @@
               <% } %>
             </span>
             <span class="article-list-writeup"><%= article.writeup %></span>
+            <span class="article-list-stats muted-text">
+              <span><%= article.likes %> likes</span>
+              <span><%= article.comments.length %> comments</span>
+            </span>
             <% if (article.tags && article.tags.length > 0) { %>
               <span class="article-tags">
                 <% article.tags.forEach((tag) => { %>
@@ -31,6 +36,18 @@
             <% } %>
           </span>
         </a>
+        <% if (isAdmin) { %>
+          <button
+            type="button"
+            class="danger-button article-delete-button"
+            hx-delete="/articles/<%= article.id %>"
+            hx-confirm="Are you sure? Deleted articles cannot be recovered."
+            hx-target="#article-list-item-<%= article.id %>"
+            hx-swap="outerHTML"
+          >
+            Delete
+          </button>
+        <% } %>
       </li>
     <% }) %>
   </ul>
