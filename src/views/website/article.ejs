@@ -1,21 +1,26 @@
 <article class="plain-page readable-page">
   <p><a href="/articles">Back to articles</a></p>
-  <h1><%= article.title %></h1>
-  <p class="muted-text">
-    By <%= article.author %>
-    <% if (article.publicationDate) { %>
-      on <%= new Date(article.publicationDate).toLocaleDateString() %>
+  <header class="article-header">
+    <% if (article.imageUrl) { %>
+      <img class="article-cover-thumb" src="<%= article.imageUrl %>" alt="" />
     <% } %>
-  </p>
-
-  <% if (article.imageUrl) { %>
-    <img class="article-image" src="<%= article.imageUrl %>" alt="" />
-  <% } %>
+    <div>
+      <h1><%= article.title %></h1>
+      <p class="muted-text">
+        By <%= article.author %>
+        <% if (article.publicationDate) { %>
+          on <%= new Date(article.publicationDate).toLocaleDateString() %>
+        <% } %>
+      </p>
+    </div>
+  </header>
 
   <% if (article.content.type === "pdf") { %>
-    <div class="article-pdf-viewer">
-      <iframe src="<%= article.content.url %>#toolbar=1&navpanes=0" title="<%= article.title %> PDF"></iframe>
+    <div class="article-pdf-document" data-pdf-url="<%= article.content.url %>">
+      <p class="article-pdf-status muted-text">Loading article...</p>
+      <div class="article-pdf-pages"></div>
     </div>
+    <script type="module" src="/articlePdf.js"></script>
   <% } else { %>
     <div class="article-body"><%= article.content.text %></div>
   <% } %>

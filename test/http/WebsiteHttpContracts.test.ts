@@ -127,7 +127,7 @@ describe("Website HTTP contracts", () => {
     expect(plainTextFields.text).not.toContain('name="pdf"');
   });
 
-  it("renders uploaded PDF articles with an embedded viewer", async () => {
+  it("renders uploaded PDF articles as in-page article canvases", async () => {
     const agent = await adminAgent();
     const pdf = Buffer.from("%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF");
 
@@ -144,8 +144,10 @@ describe("Website HTTP contracts", () => {
     const article = await agent.get(create.headers.location);
 
     expect(article.status).toBe(200);
-    expect(article.text).toContain("article-pdf-viewer");
-    expect(article.text).toContain("<iframe");
+    expect(article.text).toContain("article-pdf-document");
+    expect(article.text).toContain("data-pdf-url=");
+    expect(article.text).toContain("/articlePdf.js");
+    expect(article.text).not.toContain("<iframe");
     expect(article.text).toContain("/uploads/articles/");
 
     removeUploadedAssetsFromHtml(article.text);
@@ -172,10 +174,16 @@ describe("Website HTTP contracts", () => {
     const article = await agent.get(create.headers.location);
 
     expect(article.status).toBe(200);
-    expect(article.text).toContain('class="article-image"');
+    expect(article.text).toContain('class="article-cover-thumb"');
     expect(article.text).toContain("/uploads/articles/");
 
-    removeUploadedAssetsFromHtml(article.text);
+    const articles = await agent.get("/articles");
+
+    expect(articles.status).toBe(200);
+    expect(articles.text).toContain('class="article-list-thumb"');
+    expect(articles.text).toContain("Image Film Room");
+
+    removeUploadedAssetsFromHtml(article.text + articles.text);
   });
 
   it("rejects non-PDF article uploads", async () => {
