@@ -1,17 +1,19 @@
 import { randomInt } from "node:crypto";
 import { Err, Ok, Result } from "../lib/result";
 import sanitizeHtml from "sanitize-html";
-import { Article, ArticleContent, BigBoard, BigBoardEntry, Position, Height, ArticleFilter } from "../model/WebsiteContent";
+import { Article, ArticleContent, BigBoard, BigBoardEntry, Position, ArticleFilter, Comment } from "../model/WebsiteContent";
 import { UnknownArticleError, ArticleError,  BigBoardError, IWebsiteRepository, ArticleValidationError, BigBoardValidationError } from "../repository/WebsiteRepository";
 
 const ARTICLE_PDF_MAX_BYTES = 5 * 1024 * 1024;
 const ARTICLE_ID_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 const ARTICLE_ID_LENGTH = 5;
 const ARTICLE_ID_MAX_ATTEMPTS = 10;
+const COMMENT_ID_LENGTH = 8;
 const ARTICLE_WRITEUP_MAX_LENGTH = 200;
 const ARTICLE_TAG_MAX_LENGTH = 24;
 const ARTICLE_TAG_MAX_COUNT = 12;
 const ARTICLE_TAG_PATTERN = /^[a-z0-9-]+$/;
+const COMMENT_TEXT_MAX_LENGTH = 1000;
 
 export interface CreateArticleInput {
   title: string;
@@ -39,6 +41,12 @@ export interface BigBoardEntryInput {
   weight: number;
 }
 
+export interface CreateCommentInput {
+  articleId: string;
+  userName: string;
+  text: string;
+}
+
 export interface IWebsiteService {
   previewArticle(input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
   createArticle(input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
@@ -51,14 +59,26 @@ export interface IWebsiteService {
   getBigBoardEntry(playerName: string): Promise<Result<BigBoardEntry, BigBoardError>>;
   getArticle(id: string): Promise<Result<Article, ArticleError>>;
   getFilteredArticles(filter: ArticleFilter): Promise<Result<Article[], ArticleError>>;
+  commentByArticleId(input: CreateCommentInput): Promise<Result<Comment, ArticleError>>;
+  likeByArticleId(articleId: string): Promise<Result<Article, ArticleError>>;
+  likeByCommentId(commentId: string): Promise<Result<Comment, ArticleError>>;
+  deleteComment(commentId: string): Promise<Result<void, ArticleError>>;
 }
 
 class WebsiteService implements IWebsiteService {
   constructor(private readonly repository: IWebsiteRepository) {}
 
   private createArticleId(): string {
+    return this.createRandomId(ARTICLE_ID_LENGTH);
+  }
+
+  private createCommentId(): string {
+    return this.createRandomId(COMMENT_ID_LENGTH);
+  }
+
+  private createRandomId(length: number): string {
     let id = "";
-    for (let index = 0; index < ARTICLE_ID_LENGTH; index += 1) {
+    for (let index = 0; index < length; index += 1) {
       id += ARTICLE_ID_ALPHABET[randomInt(ARTICLE_ID_ALPHABET.length)];
     }
     return id;
@@ -212,6 +232,19 @@ class WebsiteService implements IWebsiteService {
     }
     return Ok(undefined);
   }
+
+  private validateCommentInput(input: CreateCommentInput): Result<void, ArticleError> {
+    if (!input.articleId || !input.userName || !input.text) {
+      return Err(ArticleValidationError("Article, user name, and comment text are required."));
+    }
+    if (input.articleId.trim() === "" || input.userName.trim() === "" || input.text.trim() === "") {
+      return Err(ArticleValidationError("Article, user name, and comment text cannot be empty."));
+    }
+    if (input.text.length > COMMENT_TEXT_MAX_LENGTH) {
+      return Err(ArticleValidationError(`Comment text cannot be more than ${COMMENT_TEXT_MAX_LENGTH} characters.`));
+    }
+    return Ok(undefined);
+  }
   
   private prepareArticleInput(input: CreateArticleInput): Result<CreateArticleInput, ArticleError> {
     const sanitizedInput: CreateArticleInput = {
@@ -245,6 +278,8 @@ class WebsiteService implements IWebsiteService {
       publicationDate: prepared.value.publicationDate,
       content: prepared.value.content,
       imageUrl: prepared.value.imageUrl,
+      comments: [],
+      likes: 0,
     });
   }
   
@@ -264,7 +299,9 @@ class WebsiteService implements IWebsiteService {
         tags: prepared.value.tags,
         publicationDate: prepared.value.publicationDate,
         content: prepared.value.content,
-        imageUrl: prepared.value.imageUrl
+        imageUrl: prepared.value.imageUrl,
+        comments: [],
+        likes: 0
       };
       const result = await this.repository.createArticle(article);
       if (result.ok === true) {
@@ -334,6 +371,47 @@ class WebsiteService implements IWebsiteService {
 
   async getFilteredArticles(filter: ArticleFilter): Promise<Result<Article[], ArticleError>> {
     return await this.repository.getFilteredArticles(filter);
+  }
+
+  async commentByArticleId(input: CreateCommentInput): Promise<Result<Comment, ArticleError>> {
+    const validation = this.validateCommentInput(input);
+    if (validation.ok === false) {
+      return Err(validation.value);
+    }
+
+    const comment: Comment = {
+      id: this.createCommentId(),
+      userName: input.userName.trim(),
+      text: input.text.trim(),
+      createdAt: new Date(),
+      likes: 0,
+    };
+
+    return await this.repository.commentByArticleId(input.articleId.trim(), comment);
+  }
+
+  async likeByArticleId(articleId: string): Promise<Result<Article, ArticleError>> {
+    if (!articleId || articleId.trim() === "") {
+      return Err(ArticleValidationError("Article id is required."));
+    }
+
+    return await this.repository.likeByArticleId(articleId.trim());
+  }
+
+  async likeByCommentId(commentId: string): Promise<Result<Comment, ArticleError>> {
+    if (!commentId || commentId.trim() === "") {
+      return Err(ArticleValidationError("Comment id is required."));
+    }
+
+    return await this.repository.likeByCommentId(commentId.trim());
+  }
+
+  async deleteComment(commentId: string): Promise<Result<void, ArticleError>> {
+    if (!commentId || commentId.trim() === "") {
+      return Err(ArticleValidationError("Comment id is required."));
+    }
+
+    return await this.repository.deleteComment(commentId.trim());
   }
 }
 

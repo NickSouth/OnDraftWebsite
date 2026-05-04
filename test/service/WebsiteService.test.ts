@@ -55,6 +55,59 @@ describe("WebsiteService article validation", () => {
     }
   });
 
+  it("adds comments, likes articles, likes comments, and deletes comments", async () => {
+    const websiteService = service();
+    const created = await websiteService.createArticle({
+      title: "Discussion Notes",
+      author: "Alice Website",
+      writeup: "A short discussion summary.",
+      publicationDate: new Date("2024-01-01"),
+      content: {
+        type: "plainText",
+        text: "A regular article body.",
+      },
+    });
+
+    expect(created.ok).toBe(true);
+    if (created.ok === false) {
+      return;
+    }
+
+    const likedArticle = await websiteService.likeByArticleId(created.value.id);
+    expect(likedArticle.ok).toBe(true);
+    if (likedArticle.ok === true) {
+      expect(likedArticle.value.likes).toBe(1);
+    }
+
+    const comment = await websiteService.commentByArticleId({
+      articleId: created.value.id,
+      userName: "Reader One",
+      text: "Good read.",
+    });
+
+    expect(comment.ok).toBe(true);
+    if (comment.ok === false) {
+      return;
+    }
+    expect(comment.value.id).toMatch(/^[A-Za-z0-9]{8}$/);
+    expect(comment.value.likes).toBe(0);
+
+    const likedComment = await websiteService.likeByCommentId(comment.value.id);
+    expect(likedComment.ok).toBe(true);
+    if (likedComment.ok === true) {
+      expect(likedComment.value.likes).toBe(1);
+    }
+
+    const deleted = await websiteService.deleteComment(comment.value.id);
+    expect(deleted.ok).toBe(true);
+
+    const deletedAgain = await websiteService.deleteComment(comment.value.id);
+    expect(deletedAgain.ok).toBe(false);
+    if (deletedAgain.ok === false) {
+      expect(deletedAgain.value.name).toBe("CommentNotFound");
+    }
+  });
+
   it("rejects empty plain text article content", async () => {
     const result = await service().createArticle({
       title: "Draft Notes",
