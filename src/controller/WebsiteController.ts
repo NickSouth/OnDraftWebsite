@@ -17,6 +17,11 @@ export interface IWebsiteController {
   showCreateBigBoardEntryForm(res: Response, session: IWebsiteBrowserSession): Promise<void>;
   previewArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   createArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
+  likeArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
+  showArticleComments(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
+  commentOnArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
+  likeComment(req: Request, res: Response): Promise<void>;
+  deleteComment(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   createBigBoardEntry(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   deleteArticle(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   deleteBigBoardEntry(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void>;
@@ -137,6 +142,20 @@ class WebsiteController implements IWebsiteController {
       .split(",")
       .map((tag) => tag.trim())
       .filter(Boolean);
+  }
+
+  private routeParam(req: Request, key: string): string {
+    const value = req.params[key];
+    return Array.isArray(value) ? value[0] : value;
+  }
+
+  private commentLimit(req: Request): number {
+    const rawLimit = typeof req.query.limit === "string" ? Number(req.query.limit) : 10;
+    if (!Number.isFinite(rawLimit)) {
+      return 10;
+    }
+
+    return Math.max(10, Math.min(100, Math.floor(rawLimit)));
   }
 
   private async getArticleTagSuggestions(): Promise<string[]> {
@@ -263,7 +282,12 @@ class WebsiteController implements IWebsiteController {
       res.status(404).send("Article not found.");
       return;
     }
-    res.render("website/article", { session, isAdmin: isAdminSession(session), article: result.value });
+    res.render("website/article", {
+      session,
+      isAdmin: isAdminSession(session),
+      article: result.value,
+      commentsLimit: 10,
+    });
   }
 
   async showCreateArticleForm(res: Response, session: IWebsiteBrowserSession): Promise<void> {
@@ -339,6 +363,124 @@ class WebsiteController implements IWebsiteController {
       return;
     }
     res.redirect(result.value.published ? `/articles/${result.value.id}` : "/articles?status=draft");
+  }
+
+  async likeArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+    const articleId = this.routeParam(req, "id");
+    const result = await this.service.likeByArticleId(articleId);
+    if (result.ok === false) {
+      res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    res.render("website/partials/articleActions", {
+      layout: false,
+      article: result.value,
+      session,
+    });
+  }
+
+  async showArticleComments(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+    const articleId = this.routeParam(req, "id");
+    const result = await this.service.getArticle(articleId);
+    if (result.ok === false) {
+      res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    res.render("website/partials/articleComments", {
+      layout: false,
+      article: result.value,
+      session,
+      isAdmin: isAdminSession(session),
+      commentsLimit: this.commentLimit(req),
+      errorMessage: null,
+    });
+  }
+
+  async commentOnArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+    const authenticatedUser = session.authenticatedUser;
+    if (!authenticatedUser) {
+      res.status(403).render("website/partials/error", {
+        layout: false,
+        message: "Log in to comment.",
+      });
+      return;
+    }
+
+    const articleId = this.routeParam(req, "id");
+    const result = await this.service.commentByArticleId({
+      articleId,
+      userId: authenticatedUser.userId,
+      userName: authenticatedUser.displayName,
+      text: req.body.text,
+    });
+    if (result.ok === false) {
+      const articleResult = await this.service.getArticle(articleId);
+      if (articleResult.ok === true) {
+        const statusCode = result.value.name === "ArticleValidationError"
+          ? 200
+          : this.mapArticleErrorToStatusCode(result.value);
+        res.status(statusCode).render("website/partials/articleComments", {
+          layout: false,
+          article: articleResult.value,
+          session,
+          isAdmin: isAdminSession(session),
+          commentsLimit: this.commentLimit(req),
+          errorMessage: result.value.message,
+        });
+        return;
+      }
+
+      res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    await this.showArticleComments(req, res, session);
+  }
+
+  async likeComment(req: Request, res: Response): Promise<void> {
+    const commentId = this.routeParam(req, "commentId");
+    const result = await this.service.likeByCommentId(commentId);
+    if (result.ok === false) {
+      res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    res.render("website/partials/commentLikeButton", {
+      layout: false,
+      comment: result.value,
+    });
+  }
+
+  async deleteComment(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+    const articleId = this.routeParam(req, "id");
+    const commentId = this.routeParam(req, "commentId");
+    const articleResult = await this.service.getArticle(articleId);
+    if (articleResult.ok === false) {
+      res.status(this.mapArticleErrorToStatusCode(articleResult.value)).send(articleResult.value.message);
+      return;
+    }
+
+    const comment = articleResult.value.comments.find((entry) => entry.id === commentId);
+    if (!comment) {
+      res.status(404).send("Comment not found.");
+      return;
+    }
+
+    const canDelete = isAdminSession(session) || comment.userId === session.authenticatedUser?.userId;
+    if (!canDelete) {
+      res.status(403).send("You can only delete your own comments.");
+      return;
+    }
+
+    const result = await this.service.deleteComment(commentId);
+    if (result.ok === false) {
+      res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    await this.showArticleComments(req, res, session);
   }
 
   async createBigBoardEntry(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void> {

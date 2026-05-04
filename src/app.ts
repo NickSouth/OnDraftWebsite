@@ -263,6 +263,45 @@ class ExpressApp implements IApp {
       }),
     );
 
+    this.app.post(
+      "/articles/:id/like",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.likeArticle(req, res, browserSession);
+      }),
+    );
+
+    this.app.get(
+      "/articles/:id/comments",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.showArticleComments(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/articles/:id/comments",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.commentOnArticle(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/comments/:commentId/like",
+      asyncHandler(async (req, res) => {
+        await this.controller.likeComment(req, res);
+      }),
+    );
+
+    this.app.delete(
+      "/articles/:id/comments/:commentId",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.deleteComment(req, res, browserSession);
+      }),
+    );
+
     this.app.get(
       "/articles/:id",
       asyncHandler(async (req, res) => {

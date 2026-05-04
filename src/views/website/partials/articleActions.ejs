@@ -1,0 +1,17 @@
+<div class="article-actions" id="article-actions">
+  <button
+    type="button"
+    class="icon-button"
+    aria-label="Like article"
+    hx-post="/articles/<%= article.id %>/like"
+    hx-target="#article-actions"
+    hx-swap="outerHTML"
+  >
+    <span aria-hidden="true">&#9825;</span>
+    <span><%= article.likes %></span>
+  </button>
+  <a class="icon-link" href="#article-comments-section" aria-label="Jump to comments">
+    <span aria-hidden="true">&#9634;</span>
+    <span><%= article.comments.length %></span>
+  </a>
+</div>

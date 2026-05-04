@@ -64,6 +64,7 @@ export type Article = {
 
 export type Comment = {
   id: string;
+  userId: string;
   userName: string;
   text: string;
   createdAt: Date;

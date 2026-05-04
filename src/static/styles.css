@@ -223,6 +223,12 @@ textarea {
   color: var(--text);
 }
 
+.article-list-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .article-tags {
   display: flex;
   flex-wrap: wrap;
@@ -385,6 +391,78 @@ textarea {
 .article-body {
   white-space: pre-wrap;
   line-height: 1.7;
+}
+
+.article-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.icon-button,
+.icon-link,
+.comment-like-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  background: #ffffff;
+  color: var(--accent-strong);
+  text-decoration: none;
+}
+
+.icon-button:hover,
+.icon-link:hover,
+.comment-like-button:hover {
+  background: #eef4ff;
+}
+
+.article-comments-section {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.section-heading,
+.comment-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.comment-form {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.comment-list {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.comment-item {
+  display: grid;
+  gap: 8px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.comment-text {
+  margin-bottom: 0;
+  white-space: pre-wrap;
+}
+
+.show-more-comments {
+  margin-top: 16px;
 }
 
 .article-pdf-document {
@@ -573,6 +651,18 @@ button {
 
 button:hover {
   background: var(--accent-strong);
+}
+
+button.icon-button,
+button.comment-like-button {
+  border-color: var(--panel-border);
+  background: #ffffff;
+  color: var(--accent-strong);
+}
+
+button.icon-button:hover,
+button.comment-like-button:hover {
+  background: #eef4ff;
 }
 
 .secondary-button {

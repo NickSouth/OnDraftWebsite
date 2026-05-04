@@ -43,6 +43,7 @@ export interface BigBoardEntryInput {
 
 export interface CreateCommentInput {
   articleId: string;
+  userId: string;
   userName: string;
   text: string;
 }
@@ -234,11 +235,11 @@ class WebsiteService implements IWebsiteService {
   }
 
   private validateCommentInput(input: CreateCommentInput): Result<void, ArticleError> {
-    if (!input.articleId || !input.userName || !input.text) {
-      return Err(ArticleValidationError("Article, user name, and comment text are required."));
+    if (!input.articleId || !input.userId || !input.userName || !input.text) {
+      return Err(ArticleValidationError("Article, user, user name, and comment text are required."));
     }
-    if (input.articleId.trim() === "" || input.userName.trim() === "" || input.text.trim() === "") {
-      return Err(ArticleValidationError("Article, user name, and comment text cannot be empty."));
+    if (input.articleId.trim() === "" || input.userId.trim() === "" || input.userName.trim() === "" || input.text.trim() === "") {
+      return Err(ArticleValidationError("Article, user, user name, and comment text cannot be empty."));
     }
     if (input.text.length > COMMENT_TEXT_MAX_LENGTH) {
       return Err(ArticleValidationError(`Comment text cannot be more than ${COMMENT_TEXT_MAX_LENGTH} characters.`));
@@ -381,6 +382,7 @@ class WebsiteService implements IWebsiteService {
 
     const comment: Comment = {
       id: this.createCommentId(),
+      userId: input.userId.trim(),
       userName: input.userName.trim(),
       text: input.text.trim(),
       createdAt: new Date(),

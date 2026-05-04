@@ -22,6 +22,10 @@
               <% } %>
             </span>
             <span class="article-list-writeup"><%= article.writeup %></span>
+            <span class="article-list-stats muted-text">
+              <span><%= article.likes %> likes</span>
+              <span><%= article.comments.length %> comments</span>
+            </span>
             <% if (article.tags && article.tags.length > 0) { %>
               <span class="article-tags">
                 <% article.tags.forEach((tag) => { %>

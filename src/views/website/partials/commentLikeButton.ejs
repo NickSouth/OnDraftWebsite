@@ -1,0 +1,12 @@
+<button
+  id="comment-like-<%= comment.id %>"
+  type="button"
+  class="comment-like-button"
+  aria-label="Like comment"
+  hx-post="/comments/<%= comment.id %>/like"
+  hx-target="#comment-like-<%= comment.id %>"
+  hx-swap="outerHTML"
+>
+  <span aria-hidden="true">&#9825;</span>
+  <span><%= comment.likes %></span>
+</button>

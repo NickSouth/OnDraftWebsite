@@ -81,6 +81,7 @@ describe("WebsiteService article validation", () => {
 
     const comment = await websiteService.commentByArticleId({
       articleId: created.value.id,
+      userId: "reader-1",
       userName: "Reader One",
       text: "Good read.",
     });
