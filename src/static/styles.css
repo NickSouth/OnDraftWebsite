@@ -298,6 +298,23 @@ textarea {
   margin-bottom: 18px;
 }
 
+.article-status-toggle,
+.form-actions,
+.preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.article-status-toggle {
+  margin-bottom: 14px;
+}
+
+.article-status-toggle button.is-active {
+  background: var(--accent-strong);
+}
+
 .article-search-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
@@ -386,6 +403,19 @@ textarea {
   border: 1px solid var(--panel-border);
   border-radius: 4px;
   background: #ffffff;
+}
+
+.preview-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.preview-article {
+  padding-top: 18px;
+  border-top: 1px solid var(--panel-border);
 }
 
 .form-page {
@@ -630,6 +660,7 @@ button:hover {
   }
 
   .list-header,
+  .preview-heading,
   .main-nav,
   .nav-actions {
     flex-direction: column;

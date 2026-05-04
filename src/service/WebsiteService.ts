@@ -18,6 +18,7 @@ export interface CreateArticleInput {
   author: string;
   writeup: string;
   tags?: string[];
+  published?: boolean;
   publicationDate: Date;
   content: ArticleContent;
   imageUrl?: string;
@@ -39,12 +40,13 @@ export interface BigBoardEntryInput {
 }
 
 export interface IWebsiteService {
+  previewArticle(input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
   createArticle(input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
   createBigBoardEntry(input: BigBoardEntryInput): Promise<Result<BigBoardEntry, BigBoardError>>;
   deleteArticle(id: string): Promise<Result<void, ArticleError>>;
   deleteBigBoardEntry(playerName: string): Promise<Result<void, BigBoardError>>;
   getBigBoard(): Promise<Result<BigBoard, BigBoardError>>;
-  getArticles(): Promise<Result<Article[], ArticleError>>;
+  getArticles(published?: boolean): Promise<Result<Article[], ArticleError>>;
   getArticleTags(): Promise<Result<string[], ArticleError>>;
   getBigBoardEntry(playerName: string): Promise<Result<BigBoardEntry, BigBoardError>>;
   getArticle(id: string): Promise<Result<Article, ArticleError>>;
@@ -211,9 +213,11 @@ class WebsiteService implements IWebsiteService {
     return Ok(undefined);
   }
   
-  async createArticle(input: CreateArticleInput): Promise<Result<Article, ArticleError>> {
+  private prepareArticleInput(input: CreateArticleInput): Result<CreateArticleInput, ArticleError> {
     const sanitizedInput: CreateArticleInput = {
       ...input,
+      title: input.title.trim(),
+      author: input.author.trim(),
       writeup: input.writeup.trim(),
       tags: this.normalizeArticleTags(input.tags),
       content: input.content ? this.sanitizeArticleContent(input.content) : input.content,
@@ -222,17 +226,45 @@ class WebsiteService implements IWebsiteService {
     if (validation.ok === false) {
       return Err(validation.value);
     }
+    return Ok(sanitizedInput);
+  }
+
+  async previewArticle(input: CreateArticleInput): Promise<Result<Article, ArticleError>> {
+    const prepared = this.prepareArticleInput(input);
+    if (prepared.ok === false) {
+      return Err(prepared.value);
+    }
+
+    return Ok({
+      id: "preview",
+      title: prepared.value.title,
+      published: prepared.value.published ?? false,
+      author: prepared.value.author,
+      writeup: prepared.value.writeup,
+      tags: prepared.value.tags,
+      publicationDate: prepared.value.publicationDate,
+      content: prepared.value.content,
+      imageUrl: prepared.value.imageUrl,
+    });
+  }
+  
+  async createArticle(input: CreateArticleInput): Promise<Result<Article, ArticleError>> {
+    const prepared = this.prepareArticleInput(input);
+    if (prepared.ok === false) {
+      return Err(prepared.value);
+    }
 
     for (let attempt = 0; attempt < ARTICLE_ID_MAX_ATTEMPTS; attempt += 1) {
       const article: Article = {
         id: this.createArticleId(),
-        title: sanitizedInput.title,
-        author: sanitizedInput.author,
-        writeup: sanitizedInput.writeup,
-        tags: sanitizedInput.tags,
-        publicationDate: sanitizedInput.publicationDate,
-        content: sanitizedInput.content,
-        imageUrl: sanitizedInput.imageUrl
+        title: prepared.value.title,
+        published: prepared.value.published ?? true,
+        author: prepared.value.author,
+        writeup: prepared.value.writeup,
+        tags: prepared.value.tags,
+        publicationDate: prepared.value.publicationDate,
+        content: prepared.value.content,
+        imageUrl: prepared.value.imageUrl
       };
       const result = await this.repository.createArticle(article);
       if (result.ok === true) {
@@ -284,8 +316,8 @@ class WebsiteService implements IWebsiteService {
     return await this.repository.getBigBoard();
   }
 
-  async getArticles(): Promise<Result<Article[], ArticleError>> {
-    return await this.repository.getArticles();
+  async getArticles(published = true): Promise<Result<Article[], ArticleError>> {
+    return await this.repository.getArticles(published);
   }
 
   async getArticleTags(): Promise<Result<string[], ArticleError>> {

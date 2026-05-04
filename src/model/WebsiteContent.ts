@@ -22,6 +22,7 @@ export type BigBoardEntry = {
 
 export type ArticleFilter = {
   author?: string;
+  published?: boolean;
   publicationDateRange?: {
     from: Date;
     to: Date;
@@ -49,6 +50,7 @@ export type ArticleContent =
 
 export type Article = {
   id: string;
+  published: boolean;
   title: string;
   author: string;
   writeup: string;

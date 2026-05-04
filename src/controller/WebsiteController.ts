@@ -1,20 +1,21 @@
 import type { Request, Response } from "express";
 import type { IWebsiteBrowserSession } from "../session/WebsiteSession";
 import { isAdminSession } from "../session/WebsiteSession";
-import type { IWebsiteService } from "../service/WebsiteService";
+import type { CreateArticleInput, IWebsiteService } from "../service/WebsiteService";
 import type { ILoggingService } from "../service/LoggingService";
 import { ArticleError, BigBoardError } from "../repository/WebsiteRepository";
 import { publicArticleUploadUrl } from "../uploads/articlePdfUpload";
-import type { ArticleFilter } from "../model/WebsiteContent";
+import type { ArticleContent, ArticleFilter } from "../model/WebsiteContent";
 
 export interface IWebsiteController {
   showHome(res: Response, session: IWebsiteBrowserSession): Promise<void>;
-  showArticles(res: Response, session: IWebsiteBrowserSession): Promise<void>;
-  showFilteredArticles(req: Request, res: Response): Promise<void>;
+  showArticles(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
+  showFilteredArticles(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   showBigBoard(res: Response, session: IWebsiteBrowserSession): Promise<void>;
   showOneArticle(res: Response, session: IWebsiteBrowserSession, id: string): Promise<void>;
   showCreateArticleForm(res: Response, session: IWebsiteBrowserSession): Promise<void>;
   showCreateBigBoardEntryForm(res: Response, session: IWebsiteBrowserSession): Promise<void>;
+  previewArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   createArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   createBigBoardEntry(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   deleteArticle(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void>;
@@ -86,7 +87,15 @@ class WebsiteController implements IWebsiteController {
     return isNaN(date.getTime()) ? undefined : date;
   }
 
-  private buildArticleFilter(req: Request): ArticleFilter {
+  private articleStatus(req: Request, session: IWebsiteBrowserSession): boolean {
+    if (!isAdminSession(session)) {
+      return true;
+    }
+
+    return this.queryString(req, "status") === "draft" ? false : true;
+  }
+
+  private buildArticleFilter(req: Request, session: IWebsiteBrowserSession): ArticleFilter {
     const keyword = this.queryString(req, "keyword");
     const author = this.queryString(req, "author");
     const dateFrom = this.queryDate(req, "dateFrom");
@@ -96,7 +105,9 @@ class WebsiteController implements IWebsiteController {
       .map((tag) => tag.trim())
       .filter(Boolean);
 
-    const filter: ArticleFilter = {};
+    const filter: ArticleFilter = {
+      published: this.articleStatus(req, session),
+    };
     if (keyword) {
       filter.keyword = keyword;
     }
@@ -132,25 +143,88 @@ class WebsiteController implements IWebsiteController {
     return result.ok === true ? result.value : [];
   }
 
+  private buildArticleContent(req: Request): ArticleContent {
+    const contentType = req.body.contentType === "pdf" || req.body.contentType === "html"
+      ? req.body.contentType
+      : "plainText";
+    const uploadedPdf = this.articleUpload(req, "pdf");
+
+    if (contentType === "pdf") {
+      return uploadedPdf
+        ? {
+            type: "pdf" as const,
+            url: publicArticleUploadUrl(uploadedPdf.filename),
+            originalName: uploadedPdf.originalname,
+            mimeType: "application/pdf" as const,
+            size: uploadedPdf.size,
+          }
+        : {
+            type: "pdf" as const,
+            url: typeof req.body.pdfUrl === "string" ? req.body.pdfUrl : "",
+            originalName: typeof req.body.pdfOriginalName === "string" ? req.body.pdfOriginalName : "",
+            mimeType: "application/pdf" as const,
+            size: Number(req.body.pdfSize ?? 0),
+          };
+    }
+
+    if (contentType === "html") {
+      return {
+        type: "html" as const,
+        body: req.body.content,
+      };
+    }
+
+    return {
+      type: "plainText" as const,
+      text: req.body.content,
+    };
+  }
+
+  private buildArticleInput(req: Request, published: boolean): CreateArticleInput {
+    const uploadedImage = this.articleUpload(req, "image");
+
+    return {
+      title: req.body.title,
+      author: req.body.author,
+      writeup: req.body.writeup,
+      tags: this.parseArticleTags(req.body.tags),
+      published,
+      publicationDate: new Date(req.body.publicationDate),
+      content: this.buildArticleContent(req),
+      imageUrl: uploadedImage
+        ? publicArticleUploadUrl(uploadedImage.filename)
+        : typeof req.body.imageUrl === "string" && req.body.imageUrl
+          ? req.body.imageUrl
+          : undefined,
+    };
+  }
+
   async showHome(res: Response, session: IWebsiteBrowserSession): Promise<void> {
     this.logger.info("Rendering website home page");
     res.render("website/index", { session, isAdmin: isAdminSession(session) });
   }
 
-  async showArticles(res: Response, session: IWebsiteBrowserSession): Promise<void> {
+  async showArticles(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
     this.logger.info("Rendering articles page");
-    const result = await this.service.getArticles();
+    const showingPublished = this.articleStatus(req, session);
+    const result = await this.service.getArticles(showingPublished);
     if (result.ok === false) {
       this.logger.error("Failed to load articles" + { error: result.value });
       res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
       return;
     }
-    res.render("website/articles", { session, isAdmin: isAdminSession(session), articles: result.value });
+    res.render("website/articles", {
+      session,
+      isAdmin: isAdminSession(session),
+      articles: result.value,
+      showingPublished,
+    });
   }
 
-  async showFilteredArticles(req: Request, res: Response): Promise<void> {
+  async showFilteredArticles(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
     this.logger.info("Rendering filtered articles");
-    const result = await this.service.getFilteredArticles(this.buildArticleFilter(req));
+    const showingPublished = this.articleStatus(req, session);
+    const result = await this.service.getFilteredArticles(this.buildArticleFilter(req, session));
     if (result.ok === false) {
       this.logger.error("Failed to filter articles" + { error: result.value });
       res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
@@ -160,6 +234,7 @@ class WebsiteController implements IWebsiteController {
     res.render("website/partials/articleList", {
       layout: false,
       articles: result.value,
+      showingPublished,
     });
   }
 
@@ -181,6 +256,10 @@ class WebsiteController implements IWebsiteController {
     if (result.ok === false) {
       this.logger.error(`Failed to load article "${id}"`+ { error: result.value });
       res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+    if (!result.value.published && !isAdminSession(session)) {
+      res.status(404).send("Article not found.");
       return;
     }
     res.render("website/article", { session, isAdmin: isAdminSession(session), article: result.value });
@@ -207,48 +286,45 @@ class WebsiteController implements IWebsiteController {
     });
   }
 
+  async previewArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+    this.logger.info("Previewing new article");
+    const input = this.buildArticleInput(req, false);
+    const result = await this.service.previewArticle(input);
+    if (result.ok === false) {
+      this.logger.error("Failed to preview article" + { error: result.value });
+      res.status(this.mapArticleErrorToStatusCode(result.value)).render("website/createArticle", {
+        session,
+        isAdmin: isAdminSession(session),
+        errorMessage: result.value.message,
+        values: req.body,
+        existingTags: await this.getArticleTagSuggestions(),
+      });
+      return;
+    }
+
+    res.render("website/articlePreview", {
+      session,
+      isAdmin: isAdminSession(session),
+      article: result.value,
+      values: {
+        ...req.body,
+        tags: (result.value.tags ?? []).join(","),
+        content: result.value.content.type === "plainText"
+          ? result.value.content.text
+          : result.value.content.type === "html"
+            ? result.value.content.body
+            : "",
+        imageUrl: result.value.imageUrl,
+        pdfUrl: result.value.content.type === "pdf" ? result.value.content.url : "",
+        pdfOriginalName: result.value.content.type === "pdf" ? result.value.content.originalName : "",
+        pdfSize: result.value.content.type === "pdf" ? String(result.value.content.size) : "",
+      },
+    });
+  }
+
   async createArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
     this.logger.info("Creating new article");
-    const contentType = req.body.contentType === "pdf" || req.body.contentType === "html"
-      ? req.body.contentType
-      : "plainText";
-    const uploadedPdf = this.articleUpload(req, "pdf");
-    const uploadedImage = this.articleUpload(req, "image");
-    const input = {
-      title: req.body.title,
-      author: req.body.author,
-      writeup: req.body.writeup,
-      tags: this.parseArticleTags(req.body.tags),
-      publicationDate: new Date(req.body.publicationDate),
-      content: contentType === "pdf"
-        ? uploadedPdf
-          ? {
-              type: "pdf" as const,
-              url: publicArticleUploadUrl(uploadedPdf.filename),
-              originalName: uploadedPdf.originalname,
-              mimeType: "application/pdf" as const,
-              size: uploadedPdf.size,
-            }
-          : {
-              type: "pdf" as const,
-              url: "",
-              originalName: "",
-              mimeType: "application/pdf" as const,
-              size: 0,
-            }
-        : {
-            ...(contentType === "html"
-              ? {
-                  type: "html" as const,
-                  body: req.body.content,
-                }
-              : {
-                  type: "plainText" as const,
-                  text: req.body.content,
-                }),
-          },
-      imageUrl: uploadedImage ? publicArticleUploadUrl(uploadedImage.filename) : undefined,
-    };
+    const input = this.buildArticleInput(req, req.body.published === "false" ? false : true);
     const result = await this.service.createArticle(input);
     if (result.ok === false) {
       this.logger.error("Failed to create article" + { error: result.value });
@@ -261,7 +337,7 @@ class WebsiteController implements IWebsiteController {
       });
       return;
     }
-    res.redirect(`/articles/${result.value.id}`);
+    res.redirect(result.value.published ? `/articles/${result.value.id}` : "/articles?status=draft");
   }
 
   async createBigBoardEntry(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void> {

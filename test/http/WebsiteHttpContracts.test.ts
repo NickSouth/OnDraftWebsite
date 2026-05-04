@@ -191,6 +191,57 @@ describe("Website HTTP contracts", () => {
     expect(plainTextFields.text).not.toContain('name="pdf"');
   });
 
+  it("previews an article before publishing", async () => {
+    const agent = await adminAgent();
+
+    const preview = await agent
+      .post("/articles/preview")
+      .type("form")
+      .send({
+        title: "Preview Film Room",
+        author: "Ryan McWalter",
+        writeup: "A short preview summary.",
+        publicationDate: "2024-01-01",
+        contentType: "plainText",
+        content: "Preview article body.",
+      });
+
+    expect(preview.status).toBe(200);
+    expect(preview.text).toContain("Article Preview");
+    expect(preview.text).toContain("Preview article body.");
+    expect(preview.text).toContain('name="published" value="false"');
+    expect(preview.text).toContain('name="published" value="true"');
+  });
+
+  it("lets admins save drafts and swap to the unpublished article list", async () => {
+    const agent = await adminAgent();
+
+    const create = await agent
+      .post("/articles")
+      .type("form")
+      .send({
+        title: "Draft Film Room",
+        author: "Ryan McWalter",
+        writeup: "A short draft summary.",
+        publicationDate: "2024-01-01",
+        contentType: "plainText",
+        content: "Draft article body.",
+        published: "false",
+      });
+
+    expect(create.status).toBe(302);
+    expect(create.headers.location).toBe("/articles?status=draft");
+
+    const publishedArticles = await agent.get("/articles/filter?status=published");
+    const draftArticles = await agent.get("/articles/filter?status=draft");
+
+    expect(publishedArticles.status).toBe(200);
+    expect(publishedArticles.text).not.toContain("Draft Film Room");
+    expect(draftArticles.status).toBe(200);
+    expect(draftArticles.text).toContain("Draft Film Room");
+    expect(draftArticles.text).toContain("Draft -");
+  });
+
   it("renders uploaded PDF articles as in-page article canvases", async () => {
     const agent = await adminAgent();
     const pdf = Buffer.from("%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF");

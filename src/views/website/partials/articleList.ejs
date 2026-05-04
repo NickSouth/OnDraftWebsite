@@ -13,6 +13,9 @@
           <span class="article-list-copy">
             <span class="article-list-title"><%= article.title %></span>
             <span class="muted-text">
+              <% if (!article.published) { %>
+                Draft -
+              <% } %>
               by <%= article.author %>
               <% if (article.publicationDate) { %>
                 on <%= new Date(article.publicationDate).toLocaleDateString() %>
