@@ -24,6 +24,24 @@ describe("WebsiteService article validation", () => {
     }
   });
 
+  it("assigns a default football thumbnail when no article image is provided", async () => {
+    const result = await service().createArticle({
+      title: "Default Image Notes",
+      author: "Alice Website",
+      writeup: "A short default image summary.",
+      publicationDate: new Date("2024-01-01"),
+      content: {
+        type: "plainText",
+        text: "A regular article body.",
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok === true) {
+      expect(result.value.imageUrl).toMatch(/^\/images\/article-defaults\/(football|helmet|uprights)\.png$/);
+    }
+  });
+
   it("keeps draft articles out of the published article list", async () => {
     const websiteService = service();
     const draft = await websiteService.createArticle({

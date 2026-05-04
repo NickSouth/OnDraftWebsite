@@ -9,6 +9,11 @@ const ARTICLE_ID_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy
 const ARTICLE_ID_LENGTH = 5;
 const ARTICLE_ID_MAX_ATTEMPTS = 10;
 const COMMENT_ID_LENGTH = 8;
+const DEFAULT_ARTICLE_IMAGE_URLS = [
+  "/images/article-defaults/football.png",
+  "/images/article-defaults/helmet.png",
+  "/images/article-defaults/uprights.png",
+];
 const ARTICLE_WRITEUP_MAX_LENGTH = 200;
 const ARTICLE_TAG_MAX_LENGTH = 24;
 const ARTICLE_TAG_MAX_COUNT = 12;
@@ -75,6 +80,10 @@ class WebsiteService implements IWebsiteService {
 
   private createCommentId(): string {
     return this.createRandomId(COMMENT_ID_LENGTH);
+  }
+
+  private defaultArticleImageUrl(): string {
+    return DEFAULT_ARTICLE_IMAGE_URLS[randomInt(DEFAULT_ARTICLE_IMAGE_URLS.length)];
   }
 
   private createRandomId(length: number): string {
@@ -198,7 +207,11 @@ class WebsiteService implements IWebsiteService {
     if (isNaN(input.publicationDate.getTime())) {
       return Err(ArticleValidationError("Invalid publication date."));
     }
-    if (input.imageUrl && !/^\/uploads\/articles\/.+\.(jpg|jpeg|png|gif|webp)$/.test(input.imageUrl)) {
+    if (
+      input.imageUrl &&
+      !/^\/uploads\/articles\/.+\.(jpg|jpeg|png|gif|webp)$/.test(input.imageUrl) &&
+      !DEFAULT_ARTICLE_IMAGE_URLS.includes(input.imageUrl)
+    ) {
       return Err(ArticleValidationError("Invalid image upload path."));
     }
     if (input.publicationDate > new Date()) {
@@ -278,7 +291,7 @@ class WebsiteService implements IWebsiteService {
       tags: prepared.value.tags,
       publicationDate: prepared.value.publicationDate,
       content: prepared.value.content,
-      imageUrl: prepared.value.imageUrl,
+      imageUrl: prepared.value.imageUrl ?? this.defaultArticleImageUrl(),
       comments: [],
       likes: 0,
       likedByUserIds: [],
@@ -301,7 +314,7 @@ class WebsiteService implements IWebsiteService {
         tags: prepared.value.tags,
         publicationDate: prepared.value.publicationDate,
         content: prepared.value.content,
-        imageUrl: prepared.value.imageUrl,
+        imageUrl: prepared.value.imageUrl ?? this.defaultArticleImageUrl(),
         comments: [],
         likes: 0,
         likedByUserIds: []

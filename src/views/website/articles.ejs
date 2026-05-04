@@ -64,7 +64,6 @@
         </select>
       </label>
       <label>
-        Direction
         <select id="article-sort-direction" name="sortDirection" onchange="htmx.trigger(this.form, 'submit');">
           <option value="desc" <%= sortDirection === "desc" ? "selected" : "" %>>Descending</option>
           <option value="asc" <%= sortDirection === "asc" ? "selected" : "" %>>Ascending</option>

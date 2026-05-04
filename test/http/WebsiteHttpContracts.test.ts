@@ -403,6 +403,7 @@ describe("Website HTTP contracts", () => {
     expect(preview.status).toBe(200);
     expect(preview.text).toContain("Article Preview");
     expect(preview.text).toContain("Preview article body.");
+    expect(preview.text).toMatch(/\/images\/article-defaults\/(?:football|helmet|uprights)\.png/);
     expect(preview.text).toContain('name="published" value="false"');
     expect(preview.text).toContain('name="published" value="true"');
   });
