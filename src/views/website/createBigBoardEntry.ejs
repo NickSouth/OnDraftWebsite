@@ -1,0 +1,56 @@
+<section class="plain-page form-page">
+  <p><a href="/bigboard">Back to big board</a></p>
+  <h1>Create Big Board Entry</h1>
+
+  <% if (errorMessage) { %>
+    <p class="error-message"><%= errorMessage %></p>
+  <% } %>
+
+  <form class="website-form" method="post" action="/bigboard">
+    <label>
+      Player name
+      <input name="playerName" value="<%= values.playerName || "" %>" required />
+    </label>
+    <label>
+      Position
+      <select name="position" required>
+        <% ["QB", "RB", "WR", "TE", "K", "OT", "OG", "C", "DE", "DT", "LB", "CB", "S"].forEach((position) => { %>
+          <option value="<%= position %>" <%= values.position === position ? "selected" : "" %>><%= position %></option>
+        <% }) %>
+      </select>
+    </label>
+    <label>
+      School
+      <input name="school" value="<%= values.school || "" %>" required />
+    </label>
+    <label>
+      Overall rank
+      <input type="number" name="rank" min="1" value="<%= values.rank || "" %>" required />
+    </label>
+    <label>
+      Position rank
+      <input type="number" name="posRank" min="1" value="<%= values.posRank || "" %>" required />
+    </label>
+    <label>
+      Age
+      <input type="number" name="age" min="1" value="<%= values.age || "" %>" required />
+    </label>
+    <label>
+      Height feet
+      <input type="number" name="height[feet]" min="0" value="<%= values.height?.feet || "" %>" required />
+    </label>
+    <label>
+      Height inches
+      <input type="number" name="height[inches]" min="0" max="11" value="<%= values.height?.inches || "" %>" required />
+    </label>
+    <label>
+      Weight
+      <input type="number" name="weight" min="1" value="<%= values.weight || "" %>" required />
+    </label>
+    <label>
+      Writeup
+      <textarea name="writeup" required><%= values.writeup || "" %></textarea>
+    </label>
+    <button type="submit">Create entry</button>
+  </form>
+</section>

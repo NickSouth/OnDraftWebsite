@@ -1,9 +1,9 @@
 export interface IWebsiteContent {}
 export type BigBoard = BigBoardEntry[];
 
-type Position = "QB" | "RB" | "WR" | "TE" | "K" | "OT" | "OG" | "C" | "DE" | "DT" | "LB" | "CB" | "S";
+export type Position = "QB" | "RB" | "WR" | "TE" | "K" | "OT" | "OG" | "C" | "DE" | "DT" | "LB" | "CB" | "S";
 
-type Height = {
+export type Height = {
   feet: number;
   inches: number;
 };

@@ -6,14 +6,15 @@ function app() {
 }
 
 describe("Website HTTP contracts", () => {
-  it("redirects anonymous visitors to login", async () => {
+  it("renders the home page for anonymous visitors", async () => {
     const response = await request(app()).get("/");
 
-    expect(response.status).toBe(302);
-    expect(response.headers.location).toBe("/login");
+    expect(response.status).toBe(200);
+    expect(response.text).toContain("View articles");
+    expect(response.text).toContain("Log in");
   });
 
-  it("logs in a demo user and renders the website shell", async () => {
+  it("logs in a demo user and renders the home page", async () => {
     const agent = request.agent(app());
 
     const login = await agent
@@ -22,9 +23,9 @@ describe("Website HTTP contracts", () => {
       .send({ email: "alice@website.test", password: "password123" });
 
     expect(login.status).toBe(302);
-    expect(login.headers.location).toBe("/website");
+    expect(login.headers.location).toBe("/");
 
-    const website = await agent.get("/website");
+    const website = await agent.get("/");
 
     expect(website.status).toBe(200);
     expect(website.text).toContain("Website Shell");
@@ -44,11 +45,23 @@ describe("Website HTTP contracts", () => {
       });
 
     expect(register.status).toBe(302);
-    expect(register.headers.location).toBe("/website");
+    expect(register.headers.location).toBe("/");
 
-    const website = await agent.get("/website");
+    const website = await agent.get("/");
 
     expect(website.status).toBe(200);
     expect(website.text).toContain("New Analyst");
+  });
+
+  it("allows anonymous visitors to view articles and the big board", async () => {
+    const website = app();
+
+    const articles = await request(website).get("/articles");
+    const bigBoard = await request(website).get("/bigboard");
+
+    expect(articles.status).toBe(200);
+    expect(articles.text).toContain("Articles");
+    expect(bigBoard.status).toBe(200);
+    expect(bigBoard.text).toContain("Big Board");
   });
 });

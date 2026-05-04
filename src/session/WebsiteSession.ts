@@ -116,3 +116,17 @@ export function isAuthenticatedSession(
 ): boolean {
   return getAuthenticatedUser(store, now) !== null;
 }
+
+export function isAdminSession(session: IWebsiteBrowserSession): boolean {
+  const email = session.authenticatedUser?.email;
+  if (!email) {
+    return false;
+  }
+
+  const adminEmails = (process.env.ADMIN_EMAILS ?? "alice@website.test")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  return adminEmails.includes(email.toLowerCase());
+}

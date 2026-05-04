@@ -83,7 +83,7 @@ class WebsiteService implements IWebsiteService {
   
   async createArticle(input: CreateArticleInput): Promise<Result<Article, ArticleError>> {
     const validation = this.validateArticleInput(input);
-    if (!validation.ok) {
+    if (validation.ok === false) {
       return Err(validation.value);
     }
 
@@ -95,7 +95,7 @@ class WebsiteService implements IWebsiteService {
       imageUrl: input.imageUrl
     };
     const result = await this.repository.createArticle(article);
-    if (!result.ok) {
+    if (result.ok === false) {
       return Err(result.value);
     }
     return Ok(result.value);
@@ -103,7 +103,7 @@ class WebsiteService implements IWebsiteService {
 
   async createBigBoardEntry(input: BigBoardEntryInput): Promise<Result<BigBoardEntry, BigBoardError>> {
     const validation = this.validateBigBoardEntry(input);
-    if (!validation.ok) {
+    if (validation.ok === false) {
       return Err(validation.value);
     }
     const entry: BigBoardEntry = {
@@ -121,7 +121,7 @@ class WebsiteService implements IWebsiteService {
       weight: input.weight
     };
     const result = await this.repository.createBigBoardEntry(entry);
-    if (!result.ok) {
+    if (result.ok === false) {
       return Err(result.value);
     }
     return Ok(result.value);

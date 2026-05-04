@@ -80,7 +80,7 @@ class AuthController implements IAuthController {
 
     const nextSession = signInAuthenticatedUser(store, result.value);
     this.logger.info(`Authenticated ${nextSession.authenticatedUser?.email ?? "unknown user"}`);
-    res.redirect("/website");
+    res.redirect("/");
   }
 
   async registerFromForm(
@@ -105,7 +105,7 @@ class AuthController implements IAuthController {
 
     const nextSession = signInAuthenticatedUser(store, result.value);
     this.logger.info(`Registered ${nextSession.authenticatedUser?.email ?? "unknown user"}`);
-    res.redirect("/website");
+    res.redirect("/");
   }
 
   async logoutFromForm(res: Response, store: WebsiteSessionStore): Promise<void> {
@@ -116,7 +116,7 @@ class AuthController implements IAuthController {
     }
 
     signOutAuthenticatedUser(store);
-    res.redirect("/login");
+    res.redirect("/");
   }
 }
 

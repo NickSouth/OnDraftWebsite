@@ -1,0 +1,32 @@
+<section class="plain-page form-page">
+  <p><a href="/articles">Back to articles</a></p>
+  <h1>Create Article</h1>
+
+  <% if (errorMessage) { %>
+    <p class="error-message"><%= errorMessage %></p>
+  <% } %>
+
+  <form class="website-form" method="post" action="/articles">
+    <label>
+      Title
+      <input name="title" value="<%= values.title || "" %>" required />
+    </label>
+    <label>
+      Author
+      <input name="author" value="<%= values.author || session.authenticatedUser?.displayName || "" %>" required />
+    </label>
+    <label>
+      Publication date
+      <input type="date" name="publicationDate" value="<%= values.publicationDate || new Date().toISOString().slice(0, 10) %>" required />
+    </label>
+    <label>
+      Image URL
+      <input name="imageUrl" value="<%= values.imageUrl || "" %>" />
+    </label>
+    <label>
+      Content
+      <textarea name="content" required><%= values.content || "" %></textarea>
+    </label>
+    <button type="submit">Create article</button>
+  </form>
+</section>
