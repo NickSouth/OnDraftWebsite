@@ -3,12 +3,11 @@ import express, { Request, RequestHandler, Response } from "express";
 import session from "express-session";
 import Layouts from "express-ejs-layouts";
 import { IAuthController } from "./auth/AuthController";
-import { AuthenticationRequired } from "./auth/errors";
 import { IApp } from "./contracts";
 import { IWebsiteController } from "./controller/WebsiteController";
 import {
   getAuthenticatedUser,
-  isAuthenticatedSession,
+  isAdminSession,
   recordPageView,
   touchWebsiteSession,
   WebsiteSessionStore,
@@ -65,28 +64,18 @@ class ExpressApp implements IApp {
     this.app.set("layout", "layouts/base");
   }
 
-  private isHtmxRequest(req: Request): boolean {
-    return req.get("HX-Request") === "true";
-  }
-
-  private requireAuthenticated(req: Request, res: Response): boolean {
+  private requireAdmin(req: Request, res: Response): boolean {
     const store = sessionStore(req);
-    touchWebsiteSession(store);
+    const browserSession = touchWebsiteSession(store);
 
-    if (getAuthenticatedUser(store)) {
+    if (isAdminSession(browserSession)) {
       return true;
     }
 
-    this.logger.warn("Blocked unauthenticated request to a protected route");
-    if (this.isHtmxRequest(req) || req.method !== "GET") {
-      res.status(401).render("website/partials/error", {
-        message: AuthenticationRequired("Please log in to continue.").message,
-        layout: false,
-      });
-      return false;
-    }
-
-    res.redirect("/login");
+    this.logger.warn("Blocked non-admin request to an admin route");
+    res.status(403).render("website/partials/error", {
+      message: "Admin access is required.",
+    });
     return false;
   }
 
@@ -95,8 +84,8 @@ class ExpressApp implements IApp {
       "/",
       asyncHandler(async (req, res) => {
         this.logger.info("GET /");
-        const store = sessionStore(req);
-        res.redirect(isAuthenticatedSession(store) ? "/website" : "/login");
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.showHome(res, browserSession);
       }),
     );
 
@@ -107,7 +96,7 @@ class ExpressApp implements IApp {
         const browserSession = recordPageView(store);
 
         if (getAuthenticatedUser(store)) {
-          res.redirect("/website");
+          res.redirect("/");
           return;
         }
 
@@ -131,7 +120,7 @@ class ExpressApp implements IApp {
         const browserSession = recordPageView(store);
 
         if (getAuthenticatedUser(store)) {
-          res.redirect("/website");
+          res.redirect("/");
           return;
         }
 
@@ -163,15 +152,75 @@ class ExpressApp implements IApp {
     );
 
     this.app.get(
-      "/website",
+      "/articles",
       asyncHandler(async (req, res) => {
-        if (!this.requireAuthenticated(req, res)) {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.showArticles(res, browserSession);
+      }),
+    );
+
+    this.app.get(
+      "/articles/new",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
           return;
         }
 
         const browserSession = recordPageView(sessionStore(req));
-        this.logger.info(`GET /website for ${browserSession.browserLabel}`);
-        await this.controller.showHome(res, browserSession);
+        await this.controller.showCreateArticleForm(res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/articles",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.createArticle(req, res, browserSession);
+      }),
+    );
+
+    this.app.get(
+      "/articles/:title",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        const title = Array.isArray(req.params.title) ? req.params.title[0] : req.params.title;
+        await this.controller.showOneArticle(res, browserSession, title);
+      }),
+    );
+
+    this.app.get(
+      "/bigboard",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.showBigBoard(res, browserSession);
+      }),
+    );
+
+    this.app.get(
+      "/bigboard/new",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.showCreateBigBoardEntryForm(res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/bigboard",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.createBigBoardEntry(req, res, browserSession);
       }),
     );
 

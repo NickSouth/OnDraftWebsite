@@ -7,15 +7,16 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
+    <% const currentSession = typeof session !== "undefined" ? session : null; %>
     <div class="page-shell">
       <nav class="main-nav">
-        <a href="<%= session?.authenticatedUser ? '/website' : '/login' %>" class="nav-brand">
+        <a href="/" class="nav-brand">
           CheeksCast
         </a>
         <div class="nav-actions">
-          <% if (session?.authenticatedUser) { %>
+          <% if (currentSession?.authenticatedUser) { %>
             <span class="nav-status">
-              Signed in as <strong><%= session.authenticatedUser.displayName %></strong>
+              Signed in as <strong><%= currentSession.authenticatedUser.displayName %></strong>
             </span>
             <form method="post" action="/logout" class="nav-form">
               <button type="submit" class="secondary-button">Log out</button>

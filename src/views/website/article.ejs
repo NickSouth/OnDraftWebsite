@@ -1,0 +1,16 @@
+<article class="plain-page readable-page">
+  <p><a href="/articles">Back to articles</a></p>
+  <h1><%= article.title %></h1>
+  <p class="muted-text">
+    By <%= article.author %>
+    <% if (article.publicationDate) { %>
+      on <%= new Date(article.publicationDate).toLocaleDateString() %>
+    <% } %>
+  </p>
+
+  <% if (article.imageUrl) { %>
+    <img class="article-image" src="<%= article.imageUrl %>" alt="" />
+  <% } %>
+
+  <div class="article-body"><%= article.content %></div>
+</article>
