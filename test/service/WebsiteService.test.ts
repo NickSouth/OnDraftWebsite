@@ -6,6 +6,23 @@ function service() {
 }
 
 describe("WebsiteService article validation", () => {
+  it("generates a five character alphanumeric article id", async () => {
+    const result = await service().createArticle({
+      title: "Draft Notes",
+      author: "Alice Website",
+      publicationDate: new Date("2024-01-01"),
+      content: {
+        type: "plainText",
+        text: "A regular article body.",
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok === true) {
+      expect(result.value.id).toMatch(/^[A-Za-z0-9]{5}$/);
+    }
+  });
+
   it("rejects empty plain text article content", async () => {
     const result = await service().createArticle({
       title: "Draft Notes",
@@ -51,7 +68,7 @@ describe("WebsiteService article validation", () => {
       author: "Alice Website",
       publicationDate: new Date("2024-01-01"),
       content: {
-        kind: "html",
+        type: "html",
         body: '<h2>Film Room</h2><p onclick="alert(1)">Safe copy</p><script>alert(1)</script><iframe src="https://example.com"></iframe>',
       },
     });
@@ -59,7 +76,7 @@ describe("WebsiteService article validation", () => {
     expect(result.ok).toBe(true);
     if (result.ok === true) {
       expect(result.value.content).toEqual({
-        kind: "html",
+        type: "html",
         body: "<h2>Film Room</h2><p>Safe copy</p>",
       });
     }

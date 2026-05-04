@@ -196,6 +196,13 @@ class ExpressApp implements IApp {
     );
 
     this.app.get(
+      "/articles/filter",
+      asyncHandler(async (req, res) => {
+        await this.controller.showFilteredArticles(req, res);
+      }),
+    );
+
+    this.app.get(
       "/articles/new",
       asyncHandler(async (req, res) => {
         if (!this.requireAdmin(req, res)) {
@@ -240,11 +247,11 @@ class ExpressApp implements IApp {
     );
 
     this.app.get(
-      "/articles/:title",
+      "/articles/:id",
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
-        const title = Array.isArray(req.params.title) ? req.params.title[0] : req.params.title;
-        await this.controller.showOneArticle(res, browserSession, title);
+        const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+        await this.controller.showOneArticle(res, browserSession, id);
       }),
     );
 

@@ -9,25 +9,64 @@
     <% } %>
   </div>
 
-  <% if (articles.length === 0) { %>
-    <p>No articles have been created yet.</p>
-  <% } else { %>
-    <ul class="simple-list">
-      <% articles.forEach((article) => { %>
-        <li>
-          <a class="article-list-row" href="/articles/<%= encodeURIComponent(article.title) %>">
-            <% if (article.imageUrl) { %>
-              <img class="article-list-thumb" src="<%= article.imageUrl %>" alt="" />
-            <% } else { %>
-              <span class="article-list-thumb article-list-thumb-empty"></span>
-            <% } %>
-            <span class="article-list-copy">
-              <span class="article-list-title"><%= article.title %></span>
-              <span class="muted-text">by <%= article.author %></span>
-            </span>
-          </a>
-        </li>
-      <% }) %>
-    </ul>
-  <% } %>
+  <form
+    class="article-filter-form"
+    hx-get="/articles/filter"
+    hx-target="#articles-results"
+    hx-swap="innerHTML"
+  >
+    <div class="article-search-row">
+      <label class="article-search-field">
+        <span>Search</span>
+        <input name="keyword" type="search" placeholder="Search articles" />
+      </label>
+      <button type="submit">Search</button>
+      <button
+        type="button"
+        class="secondary-button"
+        aria-expanded="false"
+        aria-controls="article-filter-panel"
+        onclick="const panel = document.getElementById('article-filter-panel'); const expanded = this.getAttribute('aria-expanded') === 'true'; this.setAttribute('aria-expanded', String(!expanded)); panel.hidden = expanded;"
+      >
+        Filters
+      </button>
+    </div>
+
+    <div id="article-filter-panel" class="article-filter-panel" hidden>
+      <label>
+        Author
+        <input name="author" />
+      </label>
+      <label>
+        From
+        <input type="date" name="dateFrom" />
+      </label>
+      <label>
+        To
+        <input type="date" name="dateTo" />
+      </label>
+      <label>
+        Tags
+        <input name="tags" />
+      </label>
+      <div class="article-filter-actions">
+        <button type="submit">Apply filters</button>
+        <button
+          type="button"
+          class="secondary-button"
+          onclick="this.form.reset(); htmx.ajax('GET', '/articles/filter', { target: '#articles-results', swap: 'innerHTML' });"
+        >
+          Clear
+        </button>
+      </div>
+    </div>
+  </form>
+
+  <div id="articles-results">
+    <% if (articles.length === 0) { %>
+      <p>No articles have been created yet.</p>
+    <% } else { %>
+      <%- include("partials/articleList", { articles }) %>
+    <% } %>
+  </div>
 </section>

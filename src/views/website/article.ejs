@@ -21,7 +21,7 @@
       <div class="article-pdf-pages"></div>
     </div>
     <script type="module" src="/articlePdf.js"></script>
-  <% } else if (article.content.kind === "html") { %>
+  <% } else if (article.content.type === "html") { %>
     <div class="article-body article-html-body"><%- article.content.body %></div>
   <% } else { %>
     <div class="article-body"><%= article.content.text %></div>

@@ -100,7 +100,7 @@ describe("Website HTTP contracts", () => {
       });
 
     expect(create.status).toBe(302);
-    expect(create.headers.location).toBe("/articles/Plain%20Text%20Film%20Room");
+    expect(create.headers.location).toMatch(/^\/articles\/[A-Za-z0-9]{5}$/);
 
     const article = await agent.get(create.headers.location);
 

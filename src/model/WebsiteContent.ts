@@ -20,13 +20,23 @@ export type BigBoardEntry = {
   weight: number;
 };
 
+export type ArticleFilter = {
+  author?: string;
+  publicationDateRange?: {
+    from: Date;
+    to: Date;
+  };
+  keyword?: string;
+  tags?: string[];
+};
+
 export type ArticleContent =
   | {
       type: "plainText";
       text: string;
     }
   | {
-      kind: "html";
+      type: "html";
       body: string;
     }
   | {
@@ -38,8 +48,10 @@ export type ArticleContent =
     };
 
 export type Article = {
+  id: string;
   title: string;
   author: string;
+  tags?: string[];
   publicationDate: Date;
   content: ArticleContent;
   imageUrl?: string;

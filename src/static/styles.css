@@ -219,6 +219,43 @@ textarea {
   font-weight: 600;
 }
 
+.article-filter-form {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.article-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.article-search-field {
+  display: grid;
+  gap: 6px;
+}
+
+.article-filter-panel {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+}
+
+.article-filter-panel[hidden] {
+  display: none;
+}
+
+.article-filter-actions {
+  display: flex;
+  gap: 10px;
+  align-items: end;
+}
+
 .simple-list span,
 .ranking-list span,
 .muted-text,
@@ -511,6 +548,11 @@ button:hover {
   }
 
   .toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .article-search-row,
+  .article-filter-panel {
     grid-template-columns: 1fr;
   }
 

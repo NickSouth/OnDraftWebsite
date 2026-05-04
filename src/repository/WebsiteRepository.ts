@@ -1,5 +1,5 @@
 import { Result, Err, Ok } from "../lib/result";
-import { type BigBoard, Article, BigBoardEntry } from "../model/WebsiteContent";
+import { type BigBoard, Article, BigBoardEntry, ArticleFilter } from "../model/WebsiteContent";
 
 export type BigBoardError = 
     | {name: "PlayerNotFound"; message: string} 
@@ -30,8 +30,9 @@ export interface IWebsiteRepository {
     getArticles(): Promise<Result<Article[], ArticleError>>;
     createArticle(article: Article): Promise<Result<Article, ArticleError>>;
     createBigBoardEntry(entry: BigBoardEntry): Promise<Result<BigBoardEntry, BigBoardError>>;
-    deleteArticle(title: string): Promise<Result<void, ArticleError>>;
+    deleteArticle(id: string): Promise<Result<void, ArticleError>>;
     deleteBigBoardEntry(playerName: string): Promise<Result<void, BigBoardError>>;
     getBigBoardEntry(playerName: string): Promise<Result<BigBoardEntry, BigBoardError>>;
-    getArticle(title: string): Promise<Result<Article, ArticleError>>;
+    getArticle(id: string): Promise<Result<Article, ArticleError>>;
+    getFilteredArticles(filter: ArticleFilter): Promise<Result<Article[], ArticleError>>;
 }
