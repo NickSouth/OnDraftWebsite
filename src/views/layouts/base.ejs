@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CheeksCast</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <nav class="main-nav">
+        <a href="<%= session?.authenticatedUser ? '/website' : '/login' %>" class="nav-brand">
+          CheeksCast
+        </a>
+        <div class="nav-actions">
+          <% if (session?.authenticatedUser) { %>
+            <span class="nav-status">
+              Signed in as <strong><%= session.authenticatedUser.displayName %></strong>
+            </span>
+            <form method="post" action="/logout" class="nav-form">
+              <button type="submit" class="secondary-button">Log out</button>
+            </form>
+          <% } else { %>
+            <a href="/login" class="nav-link">Log in</a>
+            <a href="/register" class="nav-link">Register</a>
+          <% } %>
+        </div>
+      </nav>
+      <main><%- body %></main>
+    </div>
+  </body>
+</html>

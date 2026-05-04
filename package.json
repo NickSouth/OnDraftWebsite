@@ -1,0 +1,43 @@
+{
+  "name": "cheekscast-website",
+  "version": "1.0.0",
+  "description": "A CheeksCast website template with authentication.",
+  "main": "index.js",
+  "scripts": {
+    "dev": "npm run build && node dist/server.js",
+    "build": "tsc --outDir dist -m nodenext -t es2024 --esModuleInterop src/app.ts src/server.ts",
+    "test": "jest --runInBand",
+    "test:watch": "jest --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": ""
+  },
+  "homepage": "",
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "ejs": "^4.0.1",
+    "express": "^5.2.1",
+    "express-ejs-layouts": "^2.5.1",
+    "express-session": "^1.18.2",
+    "ts-node": "^10.9.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/express-ejs-layouts": "^2.5.4",
+    "@types/express-session": "^1.18.2",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.3.0",
+    "@types/supertest": "^6.0.3",
+    "jest": "^30.2.0",
+    "supertest": "^7.2.2",
+    "ts-jest": "^29.4.6",
+    "typescript": "^5.9.3"
+  }
+}

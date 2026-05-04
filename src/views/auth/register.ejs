@@ -1,0 +1,40 @@
+<section class="page-intro">
+  <p class="eyebrow">CheeksCast</p>
+  <h1>Register</h1>
+  <p>Create an account for the website shell.</p>
+</section>
+
+<% if (pageError) { %>
+  <%- include("partials/error", { message: pageError }) %>
+<% } %>
+
+<section class="panel auth-panel">
+  <div class="panel-header">
+    <h2>Create Account</h2>
+    <p>This in-memory registration flow is ready to swap for a persistent user store later.</p>
+  </div>
+
+  <form class="website-form" method="post" action="/register">
+    <label for="displayName">Display Name</label>
+    <input id="displayName" name="displayName" autocomplete="name" required />
+
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" autocomplete="username" required />
+
+    <label for="password">Password</label>
+    <input
+      id="password"
+      name="password"
+      type="password"
+      autocomplete="new-password"
+      minlength="8"
+      required
+    />
+
+    <button type="submit">Register</button>
+  </form>
+
+  <p class="form-note">
+    Already have an account? <a href="/login">Log in</a>.
+  </p>
+</section>

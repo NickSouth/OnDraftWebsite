@@ -1,0 +1,44 @@
+<section class="page-intro">
+  <p class="eyebrow">CheeksCast</p>
+  <h1>Log In</h1>
+  <p>Sign in to the website shell.</p>
+</section>
+
+<% if (pageError) { %>
+  <%- include("partials/error", { message: pageError }) %>
+<% } %>
+
+<section class="panel auth-panel">
+  <div class="panel-header">
+    <h2>Account Login</h2>
+    <p>Use a demo user or register a new account.</p>
+  </div>
+
+  <form class="website-form" method="post" action="/login">
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" autocomplete="username" required />
+
+    <label for="password">Password</label>
+    <input
+      id="password"
+      name="password"
+      type="password"
+      autocomplete="current-password"
+      required
+    />
+
+    <button type="submit">Log in</button>
+  </form>
+
+  <p class="form-note">
+    New here? <a href="/register">Create an account</a>.
+  </p>
+
+  <div class="demo-users">
+    <h3>Demo Users</h3>
+    <ul class="credential-list">
+      <li><code>alice@website.test</code> / <code>password123</code></li>
+      <li><code>bob@website.test</code> / <code>password123</code></li>
+    </ul>
+  </div>
+</section>

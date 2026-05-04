@@ -1,0 +1,16 @@
+<section class="page-intro">
+  <p class="eyebrow">CheeksCast</p>
+  <h1>Website Shell</h1>
+  <p>
+    This protected page is intentionally empty. Add articles, videos, draft boards, and
+    viewer features here as the site takes shape.
+  </p>
+  <% if (session.authenticatedUser) { %>
+    <p class="welcome-note">
+      Signed in as <strong><%= session.authenticatedUser.displayName %></strong>
+      (<%= session.authenticatedUser.email %>).
+    </p>
+  <% } %>
+</section>
+
+<%- include("partials/sessionPanel", { session, outOfBand: false }) %>

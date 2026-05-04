@@ -1,0 +1,29 @@
+<section
+  id="session-panel"
+  class="panel session-panel"
+  <% if (outOfBand) { %>hx-swap-oob="true"<% } %>
+>
+  <div class="panel-header">
+    <h2>Session</h2>
+    <p>Authentication state and lightweight browser state live here.</p>
+  </div>
+
+  <div class="session-grid">
+    <div class="session-field">
+      <span class="session-key">authStatus</span>
+      <code><%= session.authenticatedUser ? "authenticated" : "anonymous" %></code>
+    </div>
+    <div class="session-field">
+      <span class="session-key">browserLabel</span>
+      <code><%= session.browserLabel %></code>
+    </div>
+    <div class="session-field">
+      <span class="session-key">visitCount</span>
+      <code><%= session.visitCount %></code>
+    </div>
+    <div class="session-field">
+      <span class="session-key">userEmail</span>
+      <code><%= session.authenticatedUser?.email || "(none)" %></code>
+    </div>
+  </div>
+</section>
