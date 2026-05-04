@@ -38,6 +38,7 @@ export interface IWebsiteRepository {
     getBigBoardEntry(playerName: string): Promise<Result<BigBoardEntry, BigBoardError>>;
     getArticle(id: string): Promise<Result<Article, ArticleError>>;
     getFilteredArticles(filter: ArticleFilter): Promise<Result<Article[], ArticleError>>;
+    updateArticle(article: Article): Promise<Result<Article, ArticleError>>;
     commentByArticleId(articleId: string, comment: Comment): Promise<Result<Comment, ArticleError>>;
     likeByArticleId(articleId: string, userId: string): Promise<Result<Article, ArticleError>>;
     likeByCommentId(commentId: string, userId: string): Promise<Result<Comment, ArticleError>>;

@@ -14,9 +14,12 @@ export interface IWebsiteController {
   showBigBoard(res: Response, session: IWebsiteBrowserSession): Promise<void>;
   showOneArticle(res: Response, session: IWebsiteBrowserSession, id: string): Promise<void>;
   showCreateArticleForm(res: Response, session: IWebsiteBrowserSession): Promise<void>;
+  showEditArticleForm(res: Response, session: IWebsiteBrowserSession, id: string): Promise<void>;
+  showArticlePreview(res: Response, session: IWebsiteBrowserSession, id: string): Promise<void>;
   showCreateBigBoardEntryForm(res: Response, session: IWebsiteBrowserSession): Promise<void>;
   previewArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   createArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
+  updateArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   likeArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   showArticleComments(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   commentOnArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
@@ -258,6 +261,38 @@ class WebsiteController implements IWebsiteController {
     });
   }
 
+  private articleFormValues(article: Article): Record<string, string> {
+    return {
+      title: article.title,
+      author: article.author,
+      publicationDate: new Date(article.publicationDate).toISOString().slice(0, 10),
+      writeup: article.writeup,
+      tags: (article.tags ?? []).join(","),
+      contentType: article.content.type === "plainText" ? "plainText" : article.content.type,
+      content: article.content.type === "plainText"
+        ? article.content.text
+        : article.content.type === "html"
+          ? article.content.body
+          : "",
+      imageUrl: article.imageUrl ?? "",
+      pdfUrl: article.content.type === "pdf" ? article.content.url : "",
+      pdfOriginalName: article.content.type === "pdf" ? article.content.originalName : "",
+      pdfSize: article.content.type === "pdf" ? String(article.content.size) : "",
+    };
+  }
+
+  private renderArticlePreview(res: Response, session: IWebsiteBrowserSession, article: Article): void {
+    res.render("website/articlePreview", {
+      session,
+      isAdmin: isAdminSession(session),
+      article,
+      likeActorId: this.likeActorId(session),
+      values: this.articleFormValues(article),
+      formAction: article.id === "preview" ? "/articles" : `/articles/${article.id}`,
+      editHref: article.id === "preview" ? "/articles/new" : `/articles/${article.id}/edit`,
+    });
+  }
+
   async showFilteredArticles(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
     this.logger.info("Rendering filtered articles");
     const showingPublished = this.articleStatus(req, session);
@@ -272,6 +307,7 @@ class WebsiteController implements IWebsiteController {
       layout: false,
       articles: result.value,
       showingPublished,
+      isAdmin: isAdminSession(session),
     });
   }
 
@@ -325,7 +361,41 @@ class WebsiteController implements IWebsiteController {
       errorMessage: null,
       values: {},
       existingTags: await this.getArticleTagSuggestions(),
+      heading: "Create Article",
+      formAction: "/articles/preview",
+      saveAction: "/articles",
     });
+  }
+
+  async showEditArticleForm(res: Response, session: IWebsiteBrowserSession, id: string): Promise<void> {
+    this.logger.info(`Rendering edit article page for "${id}"`);
+    const result = await this.service.getArticle(id);
+    if (result.ok === false) {
+      res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    res.render("website/createArticle", {
+      session,
+      isAdmin: isAdminSession(session),
+      errorMessage: null,
+      values: this.articleFormValues(result.value),
+      existingTags: await this.getArticleTagSuggestions(),
+      heading: "Edit Article",
+      formAction: `/articles/${result.value.id}/preview`,
+      saveAction: `/articles/${result.value.id}`,
+    });
+  }
+
+  async showArticlePreview(res: Response, session: IWebsiteBrowserSession, id: string): Promise<void> {
+    this.logger.info(`Rendering article preview page for "${id}"`);
+    const result = await this.service.getArticle(id);
+    if (result.ok === false) {
+      res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    this.renderArticlePreview(res, session, result.value);
   }
 
   async showCreateBigBoardEntryForm(res: Response, session: IWebsiteBrowserSession): Promise<void> {
@@ -341,7 +411,10 @@ class WebsiteController implements IWebsiteController {
   async previewArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
     this.logger.info("Previewing new article");
     const input = this.buildArticleInput(req, false);
-    const result = await this.service.previewArticle(input);
+    const id = req.params.id;
+    const result = typeof id === "string"
+      ? await this.service.previewUpdatedArticle(id, input)
+      : await this.service.previewArticle(input);
     if (result.ok === false) {
       this.logger.error("Failed to preview article" + { error: result.value });
       res.status(this.mapArticleErrorToStatusCode(result.value)).render("website/createArticle", {
@@ -350,29 +423,14 @@ class WebsiteController implements IWebsiteController {
         errorMessage: result.value.message,
         values: req.body,
         existingTags: await this.getArticleTagSuggestions(),
+        heading: typeof id === "string" ? "Edit Article" : "Create Article",
+        formAction: typeof id === "string" ? `/articles/${id}/preview` : "/articles/preview",
+        saveAction: typeof id === "string" ? `/articles/${id}` : "/articles",
       });
       return;
     }
 
-    res.render("website/articlePreview", {
-      session,
-      isAdmin: isAdminSession(session),
-      article: result.value,
-      likeActorId: this.likeActorId(session),
-      values: {
-        ...req.body,
-        tags: (result.value.tags ?? []).join(","),
-        content: result.value.content.type === "plainText"
-          ? result.value.content.text
-          : result.value.content.type === "html"
-            ? result.value.content.body
-            : "",
-        imageUrl: result.value.imageUrl,
-        pdfUrl: result.value.content.type === "pdf" ? result.value.content.url : "",
-        pdfOriginalName: result.value.content.type === "pdf" ? result.value.content.originalName : "",
-        pdfSize: result.value.content.type === "pdf" ? String(result.value.content.size) : "",
-      },
-    });
+    this.renderArticlePreview(res, session, result.value);
   }
 
   async createArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
@@ -390,6 +448,28 @@ class WebsiteController implements IWebsiteController {
       });
       return;
     }
+    res.redirect(result.value.published ? `/articles/${result.value.id}` : "/articles?status=draft");
+  }
+
+  async updateArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+    this.logger.info("Updating article");
+    const id = this.routeParam(req, "id");
+    const input = this.buildArticleInput(req, req.body.published === "false" ? false : true);
+    const result = await this.service.updateArticle(id, input);
+    if (result.ok === false) {
+      res.status(this.mapArticleErrorToStatusCode(result.value)).render("website/createArticle", {
+        session,
+        isAdmin: isAdminSession(session),
+        errorMessage: result.value.message,
+        values: req.body,
+        existingTags: await this.getArticleTagSuggestions(),
+        heading: "Edit Article",
+        formAction: `/articles/${id}/preview`,
+        saveAction: `/articles/${id}`,
+      });
+      return;
+    }
+
     res.redirect(result.value.published ? `/articles/${result.value.id}` : "/articles?status=draft");
   }
 
@@ -549,7 +629,7 @@ class WebsiteController implements IWebsiteController {
       res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
       return;
     }
-    res.status(204).send();
+    res.status(200).send("");
   }
 
   async deleteBigBoardEntry(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void> {

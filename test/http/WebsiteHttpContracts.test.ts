@@ -437,6 +437,87 @@ describe("Website HTTP contracts", () => {
     expect(draftArticles.text).toContain("Draft -");
   });
 
+  it("links draft articles to preview and lets admins edit and publish them", async () => {
+    const agent = await adminAgent();
+
+    const create = await agent
+      .post("/articles")
+      .type("form")
+      .send({
+        title: "Editable Draft",
+        author: "Ryan McWalter",
+        writeup: "A draft before edits.",
+        publicationDate: "2024-01-01",
+        contentType: "plainText",
+        content: "Draft body.",
+        published: "false",
+      });
+
+    expect(create.status).toBe(302);
+    const draftList = await agent.get("/articles/filter?status=draft");
+    const articleId = draftList.text.match(/href="\/articles\/([A-Za-z0-9]{5})\/preview"/)?.[1];
+    expect(articleId).toBeDefined();
+    expect(draftList.text).toContain('hx-confirm="Are you sure? Deleted articles cannot be recovered."');
+
+    const preview = await agent.get(`/articles/${articleId}/preview`);
+    expect(preview.status).toBe(200);
+    expect(preview.text).toContain(`href="/articles/${articleId}/edit"`);
+    expect(preview.text).toContain(`action="/articles/${articleId}"`);
+
+    const edit = await agent.get(`/articles/${articleId}/edit`);
+    expect(edit.status).toBe(200);
+    expect(edit.text).toContain("Edit Article");
+    expect(edit.text).toContain('value="Editable Draft"');
+    expect(edit.text).toContain("Draft body.");
+
+    const update = await agent
+      .post(`/articles/${articleId}`)
+      .type("form")
+      .send({
+        title: "Published After Edit",
+        author: "Ryan McWalter",
+        writeup: "An edited summary.",
+        publicationDate: "2024-01-01",
+        contentType: "plainText",
+        content: "Edited body.",
+        published: "true",
+      });
+
+    expect(update.status).toBe(302);
+    expect(update.headers.location).toBe(`/articles/${articleId}`);
+
+    const article = await agent.get(`/articles/${articleId}`);
+    expect(article.status).toBe(200);
+    expect(article.text).toContain("Published After Edit");
+    expect(article.text).toContain("Edited body.");
+  });
+
+  it("lets admins delete articles from the list", async () => {
+    const agent = await adminAgent();
+
+    const create = await agent
+      .post("/articles")
+      .type("form")
+      .send({
+        title: "Delete Me",
+        author: "Ryan McWalter",
+        writeup: "A short delete summary.",
+        publicationDate: "2024-01-01",
+        contentType: "plainText",
+        content: "Article to delete.",
+      });
+
+    const articleId = create.headers.location.split("/").pop();
+    const articles = await agent.get("/articles");
+    expect(articles.text).toContain(`hx-delete="/articles/${articleId}"`);
+
+    const deleted = await agent.delete(`/articles/${articleId}`);
+    expect(deleted.status).toBe(200);
+
+    const missing = await agent.get(`/articles/${articleId}`);
+    expect(missing.status).toBe(404);
+  });
+
   it("renders uploaded PDF articles as in-page article canvases", async () => {
     const agent = await adminAgent();
     const pdf = Buffer.from("%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF");

@@ -135,6 +135,16 @@ class InMemoryWebsiteRepository implements IWebsiteRepository {
     return Ok(article);
   }
 
+  async updateArticle(article: Article): Promise<Result<Article, ArticleError>> {
+    const articleIndex = this.articles.findIndex(a => a.id === article.id);
+    if (articleIndex === -1) {
+      return Err(ArticleNotFound(`Article with id "${article.id}" not found.`));
+    }
+
+    this.articles[articleIndex] = article;
+    return Ok(article);
+  }
+
   async commentByArticleId(articleId: string, comment: Comment): Promise<Result<Comment, ArticleError>> {
     const article = this.articles.find(a => a.id === articleId);
     if (!article) {

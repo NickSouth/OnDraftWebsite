@@ -56,6 +56,8 @@ export interface CreateCommentInput {
 export interface IWebsiteService {
   previewArticle(input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
   createArticle(input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
+  previewUpdatedArticle(id: string, input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
+  updateArticle(id: string, input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
   createBigBoardEntry(input: BigBoardEntryInput): Promise<Result<BigBoardEntry, BigBoardError>>;
   deleteArticle(id: string): Promise<Result<void, ArticleError>>;
   deleteBigBoardEntry(playerName: string): Promise<Result<void, BigBoardError>>;
@@ -329,6 +331,43 @@ class WebsiteService implements IWebsiteService {
     }
 
     return Err(UnknownArticleError("Unable to generate a unique article id."));
+  }
+
+  private mergeArticleUpdate(existing: Article, prepared: CreateArticleInput): Article {
+    return {
+      ...existing,
+      title: prepared.title,
+      published: prepared.published ?? existing.published,
+      author: prepared.author,
+      writeup: prepared.writeup,
+      tags: prepared.tags,
+      publicationDate: prepared.publicationDate,
+      content: prepared.content,
+      imageUrl: prepared.imageUrl ?? existing.imageUrl ?? this.defaultArticleImageUrl(),
+    };
+  }
+
+  async previewUpdatedArticle(id: string, input: CreateArticleInput): Promise<Result<Article, ArticleError>> {
+    const existing = await this.repository.getArticle(id);
+    if (existing.ok === false) {
+      return Err(existing.value);
+    }
+
+    const prepared = this.prepareArticleInput(input);
+    if (prepared.ok === false) {
+      return Err(prepared.value);
+    }
+
+    return Ok(this.mergeArticleUpdate(existing.value, prepared.value));
+  }
+
+  async updateArticle(id: string, input: CreateArticleInput): Promise<Result<Article, ArticleError>> {
+    const preview = await this.previewUpdatedArticle(id, input);
+    if (preview.ok === false) {
+      return Err(preview.value);
+    }
+
+    return await this.repository.updateArticle(preview.value);
   }
 
   async createBigBoardEntry(input: BigBoardEntryInput): Promise<Result<BigBoardEntry, BigBoardError>> {
