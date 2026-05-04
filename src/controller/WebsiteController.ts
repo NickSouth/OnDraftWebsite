@@ -1,9 +1,10 @@
-import type { Response } from "express";
+import type { Request, Response } from "express";
 import type { IWebsiteBrowserSession } from "../session/WebsiteSession";
 import { isAdminSession } from "../session/WebsiteSession";
 import type { IWebsiteService } from "../service/WebsiteService";
 import type { ILoggingService } from "../service/LoggingService";
 import { ArticleError, BigBoardError } from "../repository/WebsiteRepository";
+import { publicArticlePdfUrl } from "../uploads/articlePdfUpload";
 
 export interface IWebsiteController {
   showHome(res: Response, session: IWebsiteBrowserSession): Promise<void>;
@@ -12,7 +13,7 @@ export interface IWebsiteController {
   showOneArticle(res: Response, session: IWebsiteBrowserSession, title: string): Promise<void>;
   showCreateArticleForm(res: Response, session: IWebsiteBrowserSession): Promise<void>;
   showCreateBigBoardEntryForm(res: Response, session: IWebsiteBrowserSession): Promise<void>;
-  createArticle(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void>;
+  createArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   createBigBoardEntry(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   deleteArticle(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   deleteBigBoardEntry(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void>;
@@ -113,13 +114,34 @@ class WebsiteController implements IWebsiteController {
     });
   }
 
-  async createArticle(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+  async createArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
     this.logger.info("Creating new article");
+    const contentType = req.body.contentType === "pdf" ? "pdf" : "plainText";
+    const uploadedPdf = req.file;
     const input = {
       title: req.body.title,
       author: req.body.author,
       publicationDate: new Date(req.body.publicationDate),
-      content: req.body.content,
+      content: contentType === "pdf"
+        ? uploadedPdf
+          ? {
+              type: "pdf" as const,
+              url: publicArticlePdfUrl(uploadedPdf.filename),
+              originalName: uploadedPdf.originalname,
+              mimeType: "application/pdf" as const,
+              size: uploadedPdf.size,
+            }
+          : {
+              type: "pdf" as const,
+              url: "",
+              originalName: "",
+              mimeType: "application/pdf" as const,
+              size: 0,
+            }
+        : {
+            type: "plainText" as const,
+            text: req.body.content,
+          },
       imageUrl: req.body.imageUrl?.trim() ? req.body.imageUrl.trim() : undefined,
     };
     const result = await this.service.createArticle(input);

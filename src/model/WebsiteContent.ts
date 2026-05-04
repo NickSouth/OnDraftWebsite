@@ -20,10 +20,23 @@ export type BigBoardEntry = {
   weight: number;
 };
 
+export type ArticleContent =
+  | {
+      type: "plainText";
+      text: string;
+    }
+  | {
+      type: "pdf";
+      url: string;
+      originalName: string;
+      mimeType: "application/pdf";
+      size: number;
+    };
+
 export type Article = {
   title: string;
   author: string;
   publicationDate: Date;
-  content: string;
+  content: ArticleContent;
   imageUrl?: string;
 };

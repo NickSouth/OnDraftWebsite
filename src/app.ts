@@ -1,10 +1,11 @@
 import path from "node:path";
-import express, { Request, RequestHandler, Response } from "express";
+import express, { NextFunction, Request, RequestHandler, Response } from "express";
 import session from "express-session";
 import Layouts from "express-ejs-layouts";
 import { IAuthController } from "./auth/AuthController";
 import { IApp } from "./contracts";
 import { IWebsiteController } from "./controller/WebsiteController";
+import { ARTICLE_PDF_MAX_BYTES, articlePdfUpload } from "./uploads/articlePdfUpload";
 import {
   getAuthenticatedUser,
   isAdminSession,
@@ -42,6 +43,7 @@ class ExpressApp implements IApp {
 
   private registerMiddleware(): void {
     this.app.use(express.static(path.join(process.cwd(), "src/static")));
+    this.app.use(express.static(path.join(process.cwd(), "public")));
     this.app.use(
       session({
         name: "website.sid",
@@ -77,6 +79,29 @@ class ExpressApp implements IApp {
       message: "Admin access is required.",
     });
     return false;
+  }
+
+  private handleArticlePdfUpload(req: Request, res: Response, next: NextFunction): void {
+    articlePdfUpload.single("pdf")(req, res, (err: unknown) => {
+      if (!err) {
+        next();
+        return;
+      }
+
+      const browserSession = recordPageView(sessionStore(req));
+      const message = err instanceof Error && err.name === "MulterError" && err.message === "File too large"
+        ? `PDF uploads must be ${Math.floor(ARTICLE_PDF_MAX_BYTES / 1024 / 1024)} MB or smaller.`
+        : err instanceof Error
+          ? err.message
+          : "Unable to upload the PDF article.";
+
+      res.status(400).render("website/createArticle", {
+        session: browserSession,
+        isAdmin: isAdminSession(browserSession),
+        errorMessage: message,
+        values: req.body ?? {},
+      });
+    });
   }
 
   private registerRoutes(): void {
@@ -173,11 +198,14 @@ class ExpressApp implements IApp {
 
     this.app.post(
       "/articles",
-      asyncHandler(async (req, res) => {
+      (req, res, next) => {
         if (!this.requireAdmin(req, res)) {
           return;
         }
 
+        this.handleArticlePdfUpload(req, res, next);
+      },
+      asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
         await this.controller.createArticle(req, res, browserSession);
       }),

@@ -12,5 +12,15 @@
     <img class="article-image" src="<%= article.imageUrl %>" alt="" />
   <% } %>
 
-  <div class="article-body"><%= article.content %></div>
+  <% if (article.content.type === "pdf") { %>
+    <div class="article-pdf-viewer">
+      <object data="<%= article.content.url %>" type="application/pdf">
+        <p>
+          <a href="<%= article.content.url %>">Open <%= article.content.originalName %></a>
+        </p>
+      </object>
+    </div>
+  <% } else { %>
+    <div class="article-body"><%= article.content.text %></div>
+  <% } %>
 </article>

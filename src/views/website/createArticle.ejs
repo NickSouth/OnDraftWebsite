@@ -6,7 +6,7 @@
     <p class="error-message"><%= errorMessage %></p>
   <% } %>
 
-  <form class="website-form" method="post" action="/articles">
+  <form class="website-form" method="post" action="/articles" enctype="multipart/form-data">
     <label>
       Title
       <input name="title" value="<%= values.title || "" %>" required />
@@ -24,8 +24,19 @@
       <input name="imageUrl" value="<%= values.imageUrl || "" %>" />
     </label>
     <label>
+      Content type
+      <select name="contentType">
+        <option value="plainText" <%= values.contentType === "pdf" ? "" : "selected" %>>Plain text</option>
+        <option value="pdf" <%= values.contentType === "pdf" ? "selected" : "" %>>PDF</option>
+      </select>
+    </label>
+    <label>
       Content
-      <textarea name="content" required><%= values.content || "" %></textarea>
+      <textarea name="content"><%= values.content || "" %></textarea>
+    </label>
+    <label>
+      PDF
+      <input type="file" name="pdf" accept="application/pdf,.pdf" />
     </label>
     <button type="submit">Create article</button>
   </form>

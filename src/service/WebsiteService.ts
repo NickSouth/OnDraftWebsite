@@ -1,12 +1,14 @@
 import { Err, Ok, Result } from "../lib/result";
-import { Article, BigBoard, BigBoardEntry, Position, Height } from "../model/WebsiteContent";
+import { Article, ArticleContent, BigBoard, BigBoardEntry, Position, Height } from "../model/WebsiteContent";
 import { UnknownArticleError, ArticleError,  BigBoardError, IWebsiteRepository, ArticleValidationError, BigBoardValidationError } from "../repository/WebsiteRepository";
+
+const ARTICLE_PDF_MAX_BYTES = 5 * 1024 * 1024;
 
 export interface CreateArticleInput {
   title: string;
   author: string;
   publicationDate: Date;
-  content: string;
+  content: ArticleContent;
   imageUrl?: string;
 }
 
@@ -39,12 +41,34 @@ export interface IWebsiteService {
 class WebsiteService implements IWebsiteService {
   constructor(private readonly repository: IWebsiteRepository) {}
 
+  private validateArticleContent(content: ArticleContent | undefined): Result<void, ArticleError> {
+    if (!content) {
+      return Err(ArticleValidationError("Article content is required."));
+    }
+
+    if (content.type === "plainText") {
+      if (typeof content.text !== "string" || content.text.trim() === "") {
+        return Err(ArticleValidationError("Title, author, and content cannot be empty."));
+      }
+      return Ok(undefined);
+    }
+
+    if (!content.url || !content.originalName || content.mimeType !== "application/pdf" || content.size <= 0) {
+      return Err(ArticleValidationError("A valid PDF article upload is required."));
+    }
+    if (content.size > ARTICLE_PDF_MAX_BYTES) {
+      return Err(ArticleValidationError("PDF uploads must be 5 MB or smaller."));
+    }
+
+    return Ok(undefined);
+  }
+
   private validateArticleInput(input: CreateArticleInput): Result<void, ArticleError> {
     if (!input.title || !input.author || !input.publicationDate || !input.content) {
       return Err(ArticleValidationError("All fields except imageUrl are required."));
     }
-    if (input.title.trim() === "" || input.author.trim() === "" || input.content.trim() === "") {
-      return Err(ArticleValidationError("Title, author, and content cannot be empty."));
+    if (input.title.trim() === "" || input.author.trim() === "") {
+      return Err(ArticleValidationError("Title and author cannot be empty."));
     }
     if (isNaN(input.publicationDate.getTime())) {
       return Err(ArticleValidationError("Invalid publication date."));
@@ -55,7 +79,7 @@ class WebsiteService implements IWebsiteService {
     if (input.publicationDate > new Date()) {
       return Err(ArticleValidationError("Publication date cannot be in the future."));
     }
-    return Ok(undefined);
+    return this.validateArticleContent(input.content);
   }
 
   private validateBigBoardEntry(input: BigBoardEntryInput): Result<void, BigBoardError> {

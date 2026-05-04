@@ -208,6 +208,19 @@ textarea {
   line-height: 1.7;
 }
 
+.article-pdf-viewer {
+  margin-top: 18px;
+}
+
+.article-pdf-viewer object {
+  display: block;
+  width: 100%;
+  height: min(78vh, 900px);
+  min-height: 520px;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+}
+
 .form-page {
   max-width: 680px;
 }
