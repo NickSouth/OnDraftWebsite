@@ -1,13 +1,23 @@
+import { randomInt } from "node:crypto";
 import { Err, Ok, Result } from "../lib/result";
 import sanitizeHtml from "sanitize-html";
-import { Article, ArticleContent, BigBoard, BigBoardEntry, Position, Height } from "../model/WebsiteContent";
+import { Article, ArticleContent, BigBoard, BigBoardEntry, Position, Height, ArticleFilter } from "../model/WebsiteContent";
 import { UnknownArticleError, ArticleError,  BigBoardError, IWebsiteRepository, ArticleValidationError, BigBoardValidationError } from "../repository/WebsiteRepository";
 
 const ARTICLE_PDF_MAX_BYTES = 5 * 1024 * 1024;
+const ARTICLE_ID_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+const ARTICLE_ID_LENGTH = 5;
+const ARTICLE_ID_MAX_ATTEMPTS = 10;
+const ARTICLE_WRITEUP_MAX_LENGTH = 200;
+const ARTICLE_TAG_MAX_LENGTH = 24;
+const ARTICLE_TAG_MAX_COUNT = 12;
+const ARTICLE_TAG_PATTERN = /^[a-z0-9-]+$/;
 
 export interface CreateArticleInput {
   title: string;
   author: string;
+  writeup: string;
+  tags?: string[];
   publicationDate: Date;
   content: ArticleContent;
   imageUrl?: string;
@@ -31,16 +41,26 @@ export interface BigBoardEntryInput {
 export interface IWebsiteService {
   createArticle(input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
   createBigBoardEntry(input: BigBoardEntryInput): Promise<Result<BigBoardEntry, BigBoardError>>;
-  deleteArticle(title: string): Promise<Result<void, ArticleError>>;
+  deleteArticle(id: string): Promise<Result<void, ArticleError>>;
   deleteBigBoardEntry(playerName: string): Promise<Result<void, BigBoardError>>;
   getBigBoard(): Promise<Result<BigBoard, BigBoardError>>;
   getArticles(): Promise<Result<Article[], ArticleError>>;
+  getArticleTags(): Promise<Result<string[], ArticleError>>;
   getBigBoardEntry(playerName: string): Promise<Result<BigBoardEntry, BigBoardError>>;
-  getArticle(title: string): Promise<Result<Article, ArticleError>>;
+  getArticle(id: string): Promise<Result<Article, ArticleError>>;
+  getFilteredArticles(filter: ArticleFilter): Promise<Result<Article[], ArticleError>>;
 }
 
 class WebsiteService implements IWebsiteService {
   constructor(private readonly repository: IWebsiteRepository) {}
+
+  private createArticleId(): string {
+    let id = "";
+    for (let index = 0; index < ARTICLE_ID_LENGTH; index += 1) {
+      id += ARTICLE_ID_ALPHABET[randomInt(ARTICLE_ID_ALPHABET.length)];
+    }
+    return id;
+  }
 
   private sanitizeArticleHtml(body: string): string {
     return sanitizeHtml(body, {
@@ -74,9 +94,9 @@ class WebsiteService implements IWebsiteService {
   }
 
   private sanitizeArticleContent(content: ArticleContent): ArticleContent {
-    if ("kind" in content && content.kind === "html") {
+    if (content.type === "html") {
       return {
-        kind: "html",
+        type: "html",
         body: this.sanitizeArticleHtml(content.body),
       };
     }
@@ -84,26 +104,51 @@ class WebsiteService implements IWebsiteService {
     return content;
   }
 
+  private normalizeArticleTags(tags: string[] | undefined): string[] {
+    const uniqueTags = new Map<string, string>();
+    (tags ?? []).forEach((tag) => {
+      const normalized = tag.trim().toLowerCase().replace(/\s+/g, "-");
+      if (normalized) {
+        uniqueTags.set(normalized, normalized);
+      }
+    });
+
+    return [...uniqueTags.values()];
+  }
+
+  private validateArticleTags(tags: string[]): Result<void, ArticleError> {
+    if (tags.length > ARTICLE_TAG_MAX_COUNT) {
+      return Err(ArticleValidationError(`Articles can have no more than ${ARTICLE_TAG_MAX_COUNT} tags.`));
+    }
+
+    const invalidTag = tags.find((tag) => tag.length > ARTICLE_TAG_MAX_LENGTH || !ARTICLE_TAG_PATTERN.test(tag));
+    if (invalidTag) {
+      return Err(ArticleValidationError("Tags must be short and use only letters, numbers, and hyphens."));
+    }
+
+    return Ok(undefined);
+  }
+
   private validateArticleContent(content: ArticleContent | undefined): Result<void, ArticleError> {
     if (!content) {
       return Err(ArticleValidationError("Article content is required."));
     }
 
-    if ("kind" in content && content.kind === "html") {
+    if (content.type === "html") {
       if (typeof content.body !== "string" || content.body.trim() === "") {
         return Err(ArticleValidationError("Title, author, and content cannot be empty."));
       }
       return Ok(undefined);
     }
 
-    if ("type" in content && content.type === "plainText") {
+    if (content.type === "plainText") {
       if (typeof content.text !== "string" || content.text.trim() === "") {
         return Err(ArticleValidationError("Title, author, and content cannot be empty."));
       }
       return Ok(undefined);
     }
 
-    if (!("type" in content) || content.type !== "pdf") {
+    if (content.type !== "pdf") {
       return Err(ArticleValidationError("Unsupported article content type."));
     }
 
@@ -118,11 +163,14 @@ class WebsiteService implements IWebsiteService {
   }
 
   private validateArticleInput(input: CreateArticleInput): Result<void, ArticleError> {
-    if (!input.title || !input.author || !input.publicationDate || !input.content) {
-      return Err(ArticleValidationError("All fields except imageUrl are required."));
+    if (!input.title || !input.author || !input.writeup || !input.publicationDate || !input.content) {
+      return Err(ArticleValidationError("Title, author, writeup, publication date, and content are required."));
     }
-    if (input.title.trim() === "" || input.author.trim() === "") {
-      return Err(ArticleValidationError("Title and author cannot be empty."));
+    if (input.title.trim() === "" || input.author.trim() === "" || input.writeup.trim() === "") {
+      return Err(ArticleValidationError("Title, author, and writeup cannot be empty."));
+    }
+    if (input.writeup.length > ARTICLE_WRITEUP_MAX_LENGTH) {
+      return Err(ArticleValidationError(`Writeup cannot be more than ${ARTICLE_WRITEUP_MAX_LENGTH} characters.`));
     }
     if (isNaN(input.publicationDate.getTime())) {
       return Err(ArticleValidationError("Invalid publication date."));
@@ -132,6 +180,10 @@ class WebsiteService implements IWebsiteService {
     }
     if (input.publicationDate > new Date()) {
       return Err(ArticleValidationError("Publication date cannot be in the future."));
+    }
+    const tagValidation = this.validateArticleTags(input.tags ?? []);
+    if (tagValidation.ok === false) {
+      return Err(tagValidation.value);
     }
     return this.validateArticleContent(input.content);
   }
@@ -162,6 +214,8 @@ class WebsiteService implements IWebsiteService {
   async createArticle(input: CreateArticleInput): Promise<Result<Article, ArticleError>> {
     const sanitizedInput: CreateArticleInput = {
       ...input,
+      writeup: input.writeup.trim(),
+      tags: this.normalizeArticleTags(input.tags),
       content: input.content ? this.sanitizeArticleContent(input.content) : input.content,
     };
     const validation = this.validateArticleInput(sanitizedInput);
@@ -169,18 +223,27 @@ class WebsiteService implements IWebsiteService {
       return Err(validation.value);
     }
 
-    const article: Article = {
-      title: sanitizedInput.title,
-      author: sanitizedInput.author,
-      publicationDate: sanitizedInput.publicationDate,
-      content: sanitizedInput.content,
-      imageUrl: sanitizedInput.imageUrl
-    };
-    const result = await this.repository.createArticle(article);
-    if (result.ok === false) {
-      return Err(result.value);
+    for (let attempt = 0; attempt < ARTICLE_ID_MAX_ATTEMPTS; attempt += 1) {
+      const article: Article = {
+        id: this.createArticleId(),
+        title: sanitizedInput.title,
+        author: sanitizedInput.author,
+        writeup: sanitizedInput.writeup,
+        tags: sanitizedInput.tags,
+        publicationDate: sanitizedInput.publicationDate,
+        content: sanitizedInput.content,
+        imageUrl: sanitizedInput.imageUrl
+      };
+      const result = await this.repository.createArticle(article);
+      if (result.ok === true) {
+        return Ok(result.value);
+      }
+      if (result.value.name !== "DuplicateArticle") {
+        return Err(result.value);
+      }
     }
-    return Ok(result.value);
+
+    return Err(UnknownArticleError("Unable to generate a unique article id."));
   }
 
   async createBigBoardEntry(input: BigBoardEntryInput): Promise<Result<BigBoardEntry, BigBoardError>> {
@@ -209,8 +272,8 @@ class WebsiteService implements IWebsiteService {
     return Ok(result.value);
   }
 
-  async deleteArticle(title: string): Promise<Result<void, ArticleError>> {
-    return await this.repository.deleteArticle(title);
+  async deleteArticle(id: string): Promise<Result<void, ArticleError>> {
+    return await this.repository.deleteArticle(id);
   }
 
   async deleteBigBoardEntry(playerName: string): Promise<Result<void, BigBoardError>> {
@@ -225,12 +288,20 @@ class WebsiteService implements IWebsiteService {
     return await this.repository.getArticles();
   }
 
+  async getArticleTags(): Promise<Result<string[], ArticleError>> {
+    return await this.repository.getArticleTags();
+  }
+
   async getBigBoardEntry(playerName: string): Promise<Result<BigBoardEntry, BigBoardError>> {
     return await this.repository.getBigBoardEntry(playerName);
   }
 
-  async getArticle(title: string): Promise<Result<Article, ArticleError>> {
-    return await this.repository.getArticle(title);
+  async getArticle(id: string): Promise<Result<Article, ArticleError>> {
+    return await this.repository.getArticle(id);
+  }
+
+  async getFilteredArticles(filter: ArticleFilter): Promise<Result<Article[], ArticleError>> {
+    return await this.repository.getFilteredArticles(filter);
   }
 }
 

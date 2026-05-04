@@ -5,12 +5,14 @@ import type { IWebsiteService } from "../service/WebsiteService";
 import type { ILoggingService } from "../service/LoggingService";
 import { ArticleError, BigBoardError } from "../repository/WebsiteRepository";
 import { publicArticleUploadUrl } from "../uploads/articlePdfUpload";
+import type { ArticleFilter } from "../model/WebsiteContent";
 
 export interface IWebsiteController {
   showHome(res: Response, session: IWebsiteBrowserSession): Promise<void>;
   showArticles(res: Response, session: IWebsiteBrowserSession): Promise<void>;
+  showFilteredArticles(req: Request, res: Response): Promise<void>;
   showBigBoard(res: Response, session: IWebsiteBrowserSession): Promise<void>;
-  showOneArticle(res: Response, session: IWebsiteBrowserSession, title: string): Promise<void>;
+  showOneArticle(res: Response, session: IWebsiteBrowserSession, id: string): Promise<void>;
   showCreateArticleForm(res: Response, session: IWebsiteBrowserSession): Promise<void>;
   showCreateBigBoardEntryForm(res: Response, session: IWebsiteBrowserSession): Promise<void>;
   createArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
@@ -64,6 +66,72 @@ class WebsiteController implements IWebsiteController {
     return files[fieldName]?.[0];
   }
 
+  private queryString(req: Request, key: string): string | undefined {
+    const value = req.query[key];
+    if (typeof value !== "string") {
+      return undefined;
+    }
+
+    const trimmed = value.trim();
+    return trimmed ? trimmed : undefined;
+  }
+
+  private queryDate(req: Request, key: string): Date | undefined {
+    const value = this.queryString(req, key);
+    if (!value) {
+      return undefined;
+    }
+
+    const date = new Date(value);
+    return isNaN(date.getTime()) ? undefined : date;
+  }
+
+  private buildArticleFilter(req: Request): ArticleFilter {
+    const keyword = this.queryString(req, "keyword");
+    const author = this.queryString(req, "author");
+    const dateFrom = this.queryDate(req, "dateFrom");
+    const dateTo = this.queryDate(req, "dateTo");
+    const tags = this.queryString(req, "tags")
+      ?.split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+
+    const filter: ArticleFilter = {};
+    if (keyword) {
+      filter.keyword = keyword;
+    }
+    if (author) {
+      filter.author = author;
+    }
+    if (tags && tags.length > 0) {
+      filter.tags = tags;
+    }
+    if (dateFrom || dateTo) {
+      filter.publicationDateRange = {
+        from: dateFrom ?? new Date(0),
+        to: dateTo ?? new Date(),
+      };
+    }
+
+    return filter;
+  }
+
+  private parseArticleTags(rawTags: unknown): string[] {
+    if (typeof rawTags !== "string") {
+      return [];
+    }
+
+    return rawTags
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+  }
+
+  private async getArticleTagSuggestions(): Promise<string[]> {
+    const result = await this.service.getArticleTags();
+    return result.ok === true ? result.value : [];
+  }
+
   async showHome(res: Response, session: IWebsiteBrowserSession): Promise<void> {
     this.logger.info("Rendering website home page");
     res.render("website/index", { session, isAdmin: isAdminSession(session) });
@@ -80,6 +148,21 @@ class WebsiteController implements IWebsiteController {
     res.render("website/articles", { session, isAdmin: isAdminSession(session), articles: result.value });
   }
 
+  async showFilteredArticles(req: Request, res: Response): Promise<void> {
+    this.logger.info("Rendering filtered articles");
+    const result = await this.service.getFilteredArticles(this.buildArticleFilter(req));
+    if (result.ok === false) {
+      this.logger.error("Failed to filter articles" + { error: result.value });
+      res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    res.render("website/partials/articleList", {
+      layout: false,
+      articles: result.value,
+    });
+  }
+
   async showBigBoard(res: Response, session: IWebsiteBrowserSession): Promise<void> {
     this.logger.info("Rendering big board page");
     const result = await this.service.getBigBoard();
@@ -92,11 +175,11 @@ class WebsiteController implements IWebsiteController {
     res.render("website/bigboard", { session, isAdmin: isAdminSession(session), bigBoard: rankedBigBoard });
   }
 
-  async showOneArticle(res: Response, session: IWebsiteBrowserSession, title: string): Promise<void> {
-    this.logger.info(`Rendering article page for "${title}"`);
-    const result = await this.service.getArticle(title);
+  async showOneArticle(res: Response, session: IWebsiteBrowserSession, id: string): Promise<void> {
+    this.logger.info(`Rendering article page for "${id}"`);
+    const result = await this.service.getArticle(id);
     if (result.ok === false) {
-      this.logger.error(`Failed to load article "${title}"`+ { error: result.value });
+      this.logger.error(`Failed to load article "${id}"`+ { error: result.value });
       res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
       return;
     }
@@ -110,6 +193,7 @@ class WebsiteController implements IWebsiteController {
       isAdmin: isAdminSession(session),
       errorMessage: null,
       values: {},
+      existingTags: await this.getArticleTagSuggestions(),
     });
   }
 
@@ -133,6 +217,8 @@ class WebsiteController implements IWebsiteController {
     const input = {
       title: req.body.title,
       author: req.body.author,
+      writeup: req.body.writeup,
+      tags: this.parseArticleTags(req.body.tags),
       publicationDate: new Date(req.body.publicationDate),
       content: contentType === "pdf"
         ? uploadedPdf
@@ -153,7 +239,7 @@ class WebsiteController implements IWebsiteController {
         : {
             ...(contentType === "html"
               ? {
-                  kind: "html" as const,
+                  type: "html" as const,
                   body: req.body.content,
                 }
               : {
@@ -171,10 +257,11 @@ class WebsiteController implements IWebsiteController {
         isAdmin: isAdminSession(session),
         errorMessage: result.value.message,
         values: req.body,
+        existingTags: await this.getArticleTagSuggestions(),
       });
       return;
     }
-    res.redirect(`/articles/${encodeURIComponent(result.value.title)}`);
+    res.redirect(`/articles/${result.value.id}`);
   }
 
   async createBigBoardEntry(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void> {
@@ -209,10 +296,10 @@ class WebsiteController implements IWebsiteController {
 
   async deleteArticle(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void> {
     this.logger.info("Deleting article");
-    const title = req.params.title;
-    const result = await this.service.deleteArticle(title);
+    const id = req.params.id;
+    const result = await this.service.deleteArticle(id);
     if (result.ok === false) {
-      this.logger.error(`Failed to delete article "${title}" ` + { error: result.value });
+      this.logger.error(`Failed to delete article "${id}" ` + { error: result.value });
       res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
       return;
     }

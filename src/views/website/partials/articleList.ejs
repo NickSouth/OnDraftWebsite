@@ -1,0 +1,34 @@
+<% if (articles.length === 0) { %>
+  <p>No articles match those filters.</p>
+<% } else { %>
+  <ul class="simple-list">
+    <% articles.forEach((article) => { %>
+      <li>
+        <a class="article-list-row" href="/articles/<%= article.id %>">
+          <% if (article.imageUrl) { %>
+            <img class="article-list-thumb" src="<%= article.imageUrl %>" alt="" />
+          <% } else { %>
+            <span class="article-list-thumb article-list-thumb-empty"></span>
+          <% } %>
+          <span class="article-list-copy">
+            <span class="article-list-title"><%= article.title %></span>
+            <span class="muted-text">
+              by <%= article.author %>
+              <% if (article.publicationDate) { %>
+                on <%= new Date(article.publicationDate).toLocaleDateString() %>
+              <% } %>
+            </span>
+            <span class="article-list-writeup"><%= article.writeup %></span>
+            <% if (article.tags && article.tags.length > 0) { %>
+              <span class="article-tags">
+                <% article.tags.forEach((tag) => { %>
+                  <span class="article-tag"><%= tag %></span>
+                <% }) %>
+              </span>
+            <% } %>
+          </span>
+        </a>
+      </li>
+    <% }) %>
+  </ul>
+<% } %>

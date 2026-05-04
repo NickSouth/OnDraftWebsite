@@ -6,10 +6,29 @@ function service() {
 }
 
 describe("WebsiteService article validation", () => {
+  it("generates a five character alphanumeric article id", async () => {
+    const result = await service().createArticle({
+      title: "Draft Notes",
+      author: "Alice Website",
+      writeup: "A short draft summary.",
+      publicationDate: new Date("2024-01-01"),
+      content: {
+        type: "plainText",
+        text: "A regular article body.",
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok === true) {
+      expect(result.value.id).toMatch(/^[A-Za-z0-9]{5}$/);
+    }
+  });
+
   it("rejects empty plain text article content", async () => {
     const result = await service().createArticle({
       title: "Draft Notes",
       author: "Alice Website",
+      writeup: "A short draft summary.",
       publicationDate: new Date("2024-01-01"),
       content: {
         type: "plainText",
@@ -24,10 +43,46 @@ describe("WebsiteService article validation", () => {
     }
   });
 
+  it("normalizes unique short tags and rejects long writeups", async () => {
+    const created = await service().createArticle({
+      title: "Tagged Notes",
+      author: "Alice Website",
+      writeup: "A short tagged summary.",
+      tags: ["Draft", "draft", "Film Room"],
+      publicationDate: new Date("2024-01-01"),
+      content: {
+        type: "plainText",
+        text: "A regular article body.",
+      },
+    });
+
+    expect(created.ok).toBe(true);
+    if (created.ok === true) {
+      expect(created.value.tags).toEqual(["draft", "film-room"]);
+    }
+
+    const rejected = await service().createArticle({
+      title: "Long Writeup",
+      author: "Alice Website",
+      writeup: "x".repeat(201),
+      publicationDate: new Date("2024-01-01"),
+      content: {
+        type: "plainText",
+        text: "A regular article body.",
+      },
+    });
+
+    expect(rejected.ok).toBe(false);
+    if (rejected.ok === false) {
+      expect(rejected.value.message).toContain("Writeup cannot be more than 200 characters");
+    }
+  });
+
   it("rejects invalid PDF article content metadata", async () => {
     const result = await service().createArticle({
       title: "PDF Notes",
       author: "Alice Website",
+      writeup: "A short PDF summary.",
       publicationDate: new Date("2024-01-01"),
       content: {
         type: "pdf",
@@ -49,9 +104,10 @@ describe("WebsiteService article validation", () => {
     const result = await service().createArticle({
       title: "HTML Notes",
       author: "Alice Website",
+      writeup: "A short HTML summary.",
       publicationDate: new Date("2024-01-01"),
       content: {
-        kind: "html",
+        type: "html",
         body: '<h2>Film Room</h2><p onclick="alert(1)">Safe copy</p><script>alert(1)</script><iframe src="https://example.com"></iframe>',
       },
     });
@@ -59,7 +115,7 @@ describe("WebsiteService article validation", () => {
     expect(result.ok).toBe(true);
     if (result.ok === true) {
       expect(result.value.content).toEqual({
-        kind: "html",
+        type: "html",
         body: "<h2>Film Room</h2><p>Safe copy</p>",
       });
     }
