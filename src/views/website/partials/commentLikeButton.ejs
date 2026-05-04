@@ -1,0 +1,14 @@
+<% const commentLiked = comment.likedByUserIds.includes(likeActorId); %>
+<button
+  id="comment-like-<%= comment.id %>"
+  type="button"
+  class="comment-like-button <%= commentLiked ? "is-liked" : "" %>"
+  aria-label="<%= commentLiked ? "Unlike comment" : "Like comment" %>"
+  aria-pressed="<%= commentLiked ? "true" : "false" %>"
+  hx-post="/comments/<%= comment.id %>/like"
+  hx-target="#comment-like-<%= comment.id %>"
+  hx-swap="outerHTML"
+>
+  <span aria-hidden="true"><%- commentLiked ? "&hearts;" : "&#9825;" %></span>
+  <span><%= comment.likes %></span>
+</button>

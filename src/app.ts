@@ -1,10 +1,11 @@
 import path from "node:path";
-import express, { Request, RequestHandler, Response } from "express";
+import express, { NextFunction, Request, RequestHandler, Response } from "express";
 import session from "express-session";
 import Layouts from "express-ejs-layouts";
 import { IAuthController } from "./auth/AuthController";
 import { IApp } from "./contracts";
 import { IWebsiteController } from "./controller/WebsiteController";
+import { ARTICLE_PDF_MAX_BYTES, articleUpload } from "./uploads/articlePdfUpload";
 import {
   getAuthenticatedUser,
   isAdminSession,
@@ -42,6 +43,15 @@ class ExpressApp implements IApp {
 
   private registerMiddleware(): void {
     this.app.use(express.static(path.join(process.cwd(), "src/static")));
+    this.app.use("/vendor/htmx", express.static(path.join(process.cwd(), "node_modules", "htmx.org", "dist")));
+    this.app.use("/vendor/pdfjs", express.static(path.join(process.cwd(), "node_modules", "pdfjs-dist")));
+    this.app.use(express.static(path.join(process.cwd(), "public"), {
+      setHeaders: (res, filePath) => {
+        if (path.extname(filePath).toLowerCase() === ".pdf") {
+          res.setHeader("Content-Disposition", "inline");
+        }
+      },
+    }));
     this.app.use(
       session({
         name: "website.sid",
@@ -77,6 +87,36 @@ class ExpressApp implements IApp {
       message: "Admin access is required.",
     });
     return false;
+  }
+
+  private handleArticlePdfUpload(req: Request, res: Response, next: NextFunction): void {
+    articleUpload.fields([
+      { name: "pdf", maxCount: 1 },
+      { name: "image", maxCount: 1 },
+    ])(req, res, (err: unknown) => {
+      if (!err) {
+        next();
+        return;
+      }
+
+      const browserSession = recordPageView(sessionStore(req));
+      const message = err instanceof Error && err.name === "MulterError" && err.message === "File too large"
+        ? `PDF uploads must be ${Math.floor(ARTICLE_PDF_MAX_BYTES / 1024 / 1024)} MB or smaller.`
+        : err instanceof Error
+          ? err.message
+          : "Unable to upload the PDF article.";
+
+      res.status(400).render("website/createArticle", {
+        session: browserSession,
+        isAdmin: isAdminSession(browserSession),
+        errorMessage: message,
+        values: req.body ?? {},
+        existingTags: [],
+        heading: "Create Article",
+        formAction: "/articles/preview",
+        saveAction: "/articles",
+      });
+    });
   }
 
   private registerRoutes(): void {
@@ -155,7 +195,15 @@ class ExpressApp implements IApp {
       "/articles",
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
-        await this.controller.showArticles(res, browserSession);
+        await this.controller.showArticles(req, res, browserSession);
+      }),
+    );
+
+    this.app.get(
+      "/articles/filter",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.showFilteredArticles(req, res, browserSession);
       }),
     );
 
@@ -171,24 +219,167 @@ class ExpressApp implements IApp {
       }),
     );
 
-    this.app.post(
-      "/articles",
+    this.app.get(
+      "/articles/new/content-fields",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const contentType = req.query.contentType === "pdf" || req.query.contentType === "html"
+          ? req.query.contentType
+          : "plainText";
+        res.render("website/partials/articleContentFields", {
+          layout: false,
+          values: { contentType },
+        });
+      }),
+    );
+
+    this.app.get(
+      "/articles/:id/edit",
       asyncHandler(async (req, res) => {
         if (!this.requireAdmin(req, res)) {
           return;
         }
 
         const browserSession = recordPageView(sessionStore(req));
+        const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+        await this.controller.showEditArticleForm(res, browserSession, id);
+      }),
+    );
+
+    this.app.post(
+      "/articles",
+      (req, res, next) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        this.handleArticlePdfUpload(req, res, next);
+      },
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
         await this.controller.createArticle(req, res, browserSession);
       }),
     );
 
-    this.app.get(
-      "/articles/:title",
+    this.app.post(
+      "/articles/preview",
+      (req, res, next) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        this.handleArticlePdfUpload(req, res, next);
+      },
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
-        const title = Array.isArray(req.params.title) ? req.params.title[0] : req.params.title;
-        await this.controller.showOneArticle(res, browserSession, title);
+        await this.controller.previewArticle(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/articles/:id/preview",
+      (req, res, next) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        this.handleArticlePdfUpload(req, res, next);
+      },
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.previewArticle(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/articles/:id",
+      (req, res, next) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        this.handleArticlePdfUpload(req, res, next);
+      },
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.updateArticle(req, res, browserSession);
+      }),
+    );
+
+    this.app.delete(
+      "/articles/:id",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.deleteArticle(req, res, browserSession);
+      }),
+    );
+
+    this.app.get(
+      "/articles/:id/preview",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+        await this.controller.showArticlePreview(res, browserSession, id);
+      }),
+    );
+
+    this.app.post(
+      "/articles/:id/like",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.likeArticle(req, res, browserSession);
+      }),
+    );
+
+    this.app.get(
+      "/articles/:id/comments",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.showArticleComments(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/articles/:id/comments",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.commentOnArticle(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/comments/:commentId/like",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.likeComment(req, res, browserSession);
+      }),
+    );
+
+    this.app.delete(
+      "/articles/:id/comments/:commentId",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.deleteComment(req, res, browserSession);
+      }),
+    );
+
+    this.app.get(
+      "/articles/:id",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+        await this.controller.showOneArticle(res, browserSession, id);
       }),
     );
 

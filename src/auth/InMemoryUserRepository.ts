@@ -5,9 +5,9 @@ import type { IUserRecord } from "./User";
 
 export const DEMO_USERS: IUserRecord[] = [
   {
-    id: "user-alice",
-    email: "alice@website.test",
-    displayName: "Alice Website",
+    id: "user-ryan",
+    email: "ryanmcwalter@cheekscast.test",
+    displayName: "Ryan McWalter",
     password: "password123",
   },
   {

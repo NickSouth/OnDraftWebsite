@@ -1,0 +1,61 @@
+<section class="plain-page">
+  <p><a href="<%= editHref || "/articles/new" %>">Back to editor</a></p>
+  <div class="preview-heading">
+    <div>
+      <p class="eyebrow">Preview</p>
+      <h1>Article Preview</h1>
+    </div>
+    <form class="preview-actions" method="post" action="<%= formAction || "/articles" %>">
+      <input type="hidden" name="title" value="<%= article.title %>" />
+      <input type="hidden" name="author" value="<%= article.author %>" />
+      <input type="hidden" name="publicationDate" value="<%= new Date(article.publicationDate).toISOString().slice(0, 10) %>" />
+      <input type="hidden" name="writeup" value="<%= article.writeup %>" />
+      <input type="hidden" name="tags" value="<%= (article.tags || []).join(",") %>" />
+      <input type="hidden" name="contentType" value="<%= article.content.type === "plainText" ? "plainText" : article.content.type %>" />
+      <% if (article.imageUrl) { %>
+        <input type="hidden" name="imageUrl" value="<%= article.imageUrl %>" />
+      <% } %>
+      <% if (article.content.type === "pdf") { %>
+        <input type="hidden" name="pdfUrl" value="<%= article.content.url %>" />
+        <input type="hidden" name="pdfOriginalName" value="<%= article.content.originalName %>" />
+        <input type="hidden" name="pdfSize" value="<%= article.content.size %>" />
+      <% } else if (article.content.type === "html") { %>
+        <input type="hidden" name="content" value="<%= article.content.body %>" />
+      <% } else { %>
+        <input type="hidden" name="content" value="<%= article.content.text %>" />
+      <% } %>
+      <a class="button-link secondary-link" href="<%= editHref || "/articles/new" %>">Edit</a>
+      <button type="submit" name="published" value="false">Save As Draft</button>
+      <button type="submit" name="published" value="true">Publish</button>
+    </form>
+  </div>
+
+  <article class="readable-page preview-article">
+    <header class="article-header">
+      <% if (article.imageUrl) { %>
+        <img class="article-cover-thumb" src="<%= article.imageUrl %>" alt="" />
+      <% } %>
+      <div>
+        <h1><%= article.title %></h1>
+        <p class="muted-text">
+          By <%= article.author %>
+          <% if (article.publicationDate) { %>
+            on <%= new Date(article.publicationDate).toLocaleDateString() %>
+          <% } %>
+        </p>
+      </div>
+    </header>
+
+    <% if (article.content.type === "pdf") { %>
+      <div class="article-pdf-document" data-pdf-url="<%= article.content.url %>">
+        <p class="article-pdf-status muted-text">Loading article...</p>
+        <div class="article-pdf-pages"></div>
+      </div>
+      <script type="module" src="/articlePdf.js"></script>
+    <% } else if (article.content.type === "html") { %>
+      <div class="article-body article-html-body"><%- article.content.body %></div>
+    <% } else { %>
+      <div class="article-body"><%= article.content.text %></div>
+    <% } %>
+  </article>
+</section>

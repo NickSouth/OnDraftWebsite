@@ -1,12 +1,15 @@
 <section class="plain-page form-page">
   <p><a href="/articles">Back to articles</a></p>
-  <h1>Create Article</h1>
+  <% const pageHeading = typeof heading !== "undefined" ? heading : "Create Article"; %>
+  <% const previewAction = typeof formAction !== "undefined" ? formAction : "/articles/preview"; %>
+  <% const draftSaveAction = typeof saveAction !== "undefined" ? saveAction : "/articles"; %>
+  <h1><%= pageHeading %></h1>
 
   <% if (errorMessage) { %>
     <p class="error-message"><%= errorMessage %></p>
   <% } %>
 
-  <form class="website-form" method="post" action="/articles">
+  <form class="website-form" method="post" action="<%= previewAction %>" enctype="multipart/form-data">
     <label>
       Title
       <input name="title" value="<%= values.title || "" %>" required />
@@ -20,13 +23,58 @@
       <input type="date" name="publicationDate" value="<%= values.publicationDate || new Date().toISOString().slice(0, 10) %>" required />
     </label>
     <label>
-      Image URL
-      <input name="imageUrl" value="<%= values.imageUrl || "" %>" />
+      Writeup
+      <textarea name="writeup" maxlength="200" required><%= values.writeup || "" %></textarea>
     </label>
+    <div
+      class="tag-editor"
+      data-existing-tags="<%= JSON.stringify(existingTags || []).replace(/</g, "\\u003c") %>"
+    >
+      <label for="tag-entry">Tags</label>
+      <div class="tag-editor-box">
+        <div class="tag-chip-list" data-tag-list></div>
+        <input id="tag-entry" data-tag-input list="article-tag-suggestions" autocomplete="off" />
+      </div>
+      <input type="hidden" name="tags" value="<%= values.tags || "" %>" data-tag-value />
+      <datalist id="article-tag-suggestions">
+        <% (existingTags || []).forEach((tag) => { %>
+          <option value="<%= tag %>"></option>
+        <% }) %>
+      </datalist>
+    </div>
     <label>
-      Content
-      <textarea name="content" required><%= values.content || "" %></textarea>
+      Article image
+      <input type="file" name="image" accept="image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp" />
     </label>
-    <button type="submit">Create article</button>
+    <% if (values.imageUrl) { %>
+      <input type="hidden" name="imageUrl" value="<%= values.imageUrl %>" />
+    <% } %>
+    <label>
+      Content type
+      <select
+        name="contentType"
+        hx-get="/articles/new/content-fields"
+        hx-trigger="change"
+        hx-target="#article-content-fields"
+        hx-swap="innerHTML"
+      >
+        <option value="plainText" <%= values.contentType === "pdf" || values.contentType === "html" ? "" : "selected" %>>Plain text</option>
+        <option value="html" <%= values.contentType === "html" ? "selected" : "" %>>HTML</option>
+        <option value="pdf" <%= values.contentType === "pdf" ? "selected" : "" %>>PDF</option>
+      </select>
+    </label>
+    <div id="article-content-fields">
+      <%- include("partials/articleContentFields", { values }) %>
+    </div>
+    <% if (values.pdfUrl) { %>
+      <input type="hidden" name="pdfUrl" value="<%= values.pdfUrl %>" />
+      <input type="hidden" name="pdfOriginalName" value="<%= values.pdfOriginalName || "" %>" />
+      <input type="hidden" name="pdfSize" value="<%= values.pdfSize || "" %>" />
+    <% } %>
+    <div class="form-actions">
+      <button type="submit" formaction="<%= draftSaveAction %>" name="published" value="false">Save As Draft</button>
+      <button type="submit">Preview</button>
+    </div>
   </form>
+  <script src="/articleTags.js" defer></script>
 </section>

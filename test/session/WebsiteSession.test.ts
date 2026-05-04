@@ -28,13 +28,13 @@ describe("WebsiteSession", () => {
       store,
       {
         id: "user-alice",
-        email: "alice@website.test",
-        displayName: "Alice Website",
+        email: "ryanmcwalter@cheekscast.test",
+        displayName: "Ryan McWalter",
       },
       new Date("2026-03-15T09:30:00.000Z"),
     );
 
-    expect(signedIn.authenticatedUser?.email).toBe("alice@website.test");
+    expect(signedIn.authenticatedUser?.email).toBe("ryanmcwalter@cheekscast.test");
     expect(signedIn.authenticatedUser).not.toHaveProperty("password");
   });
 });

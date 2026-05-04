@@ -19,7 +19,7 @@ npm run dev
 
 Demo users:
 
-- `alice@website.test` / `password123`
+- `ryanmcwalter@cheekscast.test` / `password123`
 - `bob@website.test` / `password123`
 
 ## Tests

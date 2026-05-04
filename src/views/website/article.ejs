@@ -1,16 +1,38 @@
 <article class="plain-page readable-page">
-  <p><a href="/articles">Back to articles</a></p>
-  <h1><%= article.title %></h1>
-  <p class="muted-text">
-    By <%= article.author %>
-    <% if (article.publicationDate) { %>
-      on <%= new Date(article.publicationDate).toLocaleDateString() %>
+  <div class="article-page-actions">
+    <a href="/articles">Back to articles</a>
+    <% if (isAdmin) { %>
+      <a class="button-link secondary-link" href="/articles/<%= article.id %>/edit">Edit</a>
     <% } %>
-  </p>
+  </div>
+  <header class="article-header">
+    <% if (article.imageUrl) { %>
+      <img class="article-cover-thumb" src="<%= article.imageUrl %>" alt="" />
+    <% } %>
+    <div>
+      <h1><%= article.title %></h1>
+      <p class="muted-text">
+        By <%= article.author %>
+        <% if (article.publicationDate) { %>
+          on <%= new Date(article.publicationDate).toLocaleDateString() %>
+        <% } %>
+      </p>
+    </div>
+  </header>
 
-  <% if (article.imageUrl) { %>
-    <img class="article-image" src="<%= article.imageUrl %>" alt="" />
+  <%- include("partials/articleActions", { article, session, likeActorId }) %>
+
+  <% if (article.content.type === "pdf") { %>
+    <div class="article-pdf-document" data-pdf-url="<%= article.content.url %>">
+      <p class="article-pdf-status muted-text">Loading article...</p>
+      <div class="article-pdf-pages"></div>
+    </div>
+    <script type="module" src="/articlePdf.js"></script>
+  <% } else if (article.content.type === "html") { %>
+    <div class="article-body article-html-body"><%- article.content.body %></div>
+  <% } else { %>
+    <div class="article-body"><%= article.content.text %></div>
   <% } %>
 
-  <div class="article-body"><%= article.content %></div>
+  <%- include("partials/articleComments", { article, session, isAdmin, commentsLimit, likeActorId, errorMessage: null }) %>
 </article>

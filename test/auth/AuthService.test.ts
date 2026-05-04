@@ -6,13 +6,13 @@ describe("AuthService", () => {
     const service = CreateAuthService(CreateInMemoryUserRepository());
 
     const result = await service.authenticate({
-      email: "alice@website.test",
+      email: "ryanmcwalter@cheekscast.test",
       password: "password123",
     });
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.displayName).toBe("Alice Website");
+      expect(result.value.displayName).toBe("Ryan McWalter");
     }
   });
 
@@ -20,7 +20,7 @@ describe("AuthService", () => {
     const service = CreateAuthService(CreateInMemoryUserRepository());
 
     const result = await service.authenticate({
-      email: "alice@website.test",
+      email: "ryanmcwalter@cheekscast.test",
       password: "wrong-password",
     });
 
@@ -39,7 +39,7 @@ describe("AuthService", () => {
       password: "password123",
     });
     const missingPassword = await service.authenticate({
-      email: "alice@website.test",
+      email: "ryanmcwalter@cheekscast.test",
       password: "   ",
     });
 

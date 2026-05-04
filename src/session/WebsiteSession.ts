@@ -123,7 +123,7 @@ export function isAdminSession(session: IWebsiteBrowserSession): boolean {
     return false;
   }
 
-  const adminEmails = (process.env.ADMIN_EMAILS ?? "alice@website.test")
+  const adminEmails = (process.env.ADMIN_EMAILS ?? "ryanmcwalter@cheekscast.test")
     .split(",")
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean);

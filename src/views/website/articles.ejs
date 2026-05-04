@@ -9,16 +9,103 @@
     <% } %>
   </div>
 
-  <% if (articles.length === 0) { %>
-    <p>No articles have been created yet.</p>
-  <% } else { %>
-    <ul class="simple-list">
-      <% articles.forEach((article) => { %>
-        <li>
-          <a href="/articles/<%= encodeURIComponent(article.title) %>"><%= article.title %></a>
-          <span>by <%= article.author %></span>
-        </li>
-      <% }) %>
-    </ul>
+  <% if (isAdmin) { %>
+    <div class="article-status-toggle" aria-label="Article status">
+      <button
+        type="button"
+        class="<%= showingPublished ? "is-active" : "" %>"
+        onclick="document.getElementById('article-status-field').value = 'published'; this.parentElement.querySelectorAll('button').forEach((button) => button.classList.remove('is-active')); this.classList.add('is-active'); htmx.trigger(document.querySelector('.article-filter-form'), 'submit');"
+      >
+        Published
+      </button>
+      <button
+        type="button"
+        class="<%= showingPublished ? "" : "is-active" %>"
+        onclick="document.getElementById('article-status-field').value = 'draft'; this.parentElement.querySelectorAll('button').forEach((button) => button.classList.remove('is-active')); this.classList.add('is-active'); htmx.trigger(document.querySelector('.article-filter-form'), 'submit');"
+      >
+        Unpublished
+      </button>
+    </div>
   <% } %>
+
+  <form
+    class="article-filter-form"
+    hx-get="/articles/filter"
+    hx-target="#articles-results"
+    hx-swap="innerHTML"
+  >
+    <% if (isAdmin) { %>
+      <input id="article-status-field" type="hidden" name="status" value="<%= showingPublished ? "published" : "draft" %>" />
+    <% } %>
+    <div class="article-search-row">
+      <label class="article-search-field">
+        <span>Search</span>
+        <input name="keyword" type="search" placeholder="Search articles" />
+      </label>
+      <button type="submit">Search</button>
+      <button
+        type="button"
+        class="secondary-button"
+        aria-expanded="false"
+        aria-controls="article-filter-panel"
+        onclick="const panel = document.getElementById('article-filter-panel'); const expanded = this.getAttribute('aria-expanded') === 'true'; this.setAttribute('aria-expanded', String(!expanded)); panel.hidden = expanded;"
+      >
+        Filters
+      </button>
+    </div>
+
+    <div class="article-sort-row">
+      <label>
+        Sort by
+        <select id="article-sort-by" name="sortBy" onchange="htmx.trigger(this.form, 'submit');">
+          <option value="date" <%= sortBy === "date" ? "selected" : "" %>>Date</option>
+          <option value="likes" <%= sortBy === "likes" ? "selected" : "" %>>Likes</option>
+          <option value="comments" <%= sortBy === "comments" ? "selected" : "" %>>Comments</option>
+        </select>
+      </label>
+      <label>
+        <select id="article-sort-direction" name="sortDirection" onchange="htmx.trigger(this.form, 'submit');">
+          <option value="desc" <%= sortDirection === "desc" ? "selected" : "" %>>Descending</option>
+          <option value="asc" <%= sortDirection === "asc" ? "selected" : "" %>>Ascending</option>
+        </select>
+      </label>
+    </div>
+
+    <div id="article-filter-panel" class="article-filter-panel" hidden>
+      <label>
+        Author
+        <input name="author" />
+      </label>
+      <label>
+        From
+        <input type="date" name="dateFrom" />
+      </label>
+      <label>
+        To
+        <input type="date" name="dateTo" />
+      </label>
+      <label>
+        Tags
+        <input name="tags" />
+      </label>
+      <div class="article-filter-actions">
+        <button type="submit">Apply filters</button>
+        <button
+          type="button"
+          class="secondary-button"
+          onclick="const status = document.getElementById('article-status-field')?.value || 'published'; this.form.reset(); const statusField = document.getElementById('article-status-field'); if (statusField) statusField.value = status; htmx.trigger(this.form, 'submit');"
+        >
+          Clear
+        </button>
+      </div>
+    </div>
+  </form>
+
+  <div id="articles-results">
+    <% if (articles.length === 0) { %>
+      <p>No articles have been created yet.</p>
+    <% } else { %>
+      <%- include("partials/articleList", { articles, isAdmin, showingPublished }) %>
+    <% } %>
+  </div>
 </section>
