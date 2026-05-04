@@ -12,7 +12,7 @@ async function adminAgent() {
   await agent
     .post("/login")
     .type("form")
-    .send({ email: "alice@website.test", password: "password123" });
+    .send({ email: "ryanmcwalter@cheekscast.test", password: "password123" });
   return agent;
 }
 
@@ -40,7 +40,7 @@ describe("Website HTTP contracts", () => {
     const login = await agent
       .post("/login")
       .type("form")
-      .send({ email: "alice@website.test", password: "password123" });
+      .send({ email: "ryanmcwalter@cheekscast.test", password: "password123" });
 
     expect(login.status).toBe(302);
     expect(login.headers.location).toBe("/");
@@ -49,7 +49,7 @@ describe("Website HTTP contracts", () => {
 
     expect(website.status).toBe(200);
     expect(website.text).toContain("Website Shell");
-    expect(website.text).toContain("Alice Website");
+    expect(website.text).toContain("Ryan McWalter");
   });
 
   it("registers a new user and signs them in", async () => {
@@ -93,7 +93,7 @@ describe("Website HTTP contracts", () => {
       .type("form")
       .send({
         title: "Plain Text Film Room",
-        author: "Alice Website",
+        author: "Ryan McWalter",
         publicationDate: "2024-01-01",
         contentType: "plainText",
         content: "A regular article body.",
@@ -116,7 +116,7 @@ describe("Website HTTP contracts", () => {
       .type("form")
       .send({
         title: "Escaped Plain Text",
-        author: "Alice Website",
+        author: "Ryan McWalter",
         publicationDate: "2024-01-01",
         contentType: "plainText",
         content: "<strong>Not html</strong>",
@@ -139,7 +139,7 @@ describe("Website HTTP contracts", () => {
       .type("form")
       .send({
         title: "HTML Film Room",
-        author: "Alice Website",
+        author: "Ryan McWalter",
         publicationDate: "2024-01-01",
         contentType: "html",
         content: '<h2>Film Room</h2><p onclick="alert(1)">Safe copy</p><script>alert(1)</script><iframe src="https://example.com"></iframe>',
@@ -187,7 +187,7 @@ describe("Website HTTP contracts", () => {
     const create = await agent
       .post("/articles")
       .field("title", "PDF Film Room")
-      .field("author", "Alice Website")
+      .field("author", "Ryan McWalter")
       .field("publicationDate", "2024-01-01")
       .field("contentType", "pdf")
       .attach("pdf", pdf, { filename: "film-room.pdf", contentType: "application/pdf" });
@@ -216,7 +216,7 @@ describe("Website HTTP contracts", () => {
     const create = await agent
       .post("/articles")
       .field("title", "Image Film Room")
-      .field("author", "Alice Website")
+      .field("author", "Ryan McWalter")
       .field("publicationDate", "2024-01-01")
       .field("contentType", "plainText")
       .field("content", "Article with an uploaded image.")
@@ -245,7 +245,7 @@ describe("Website HTTP contracts", () => {
     const create = await agent
       .post("/articles")
       .field("title", "Bad Upload")
-      .field("author", "Alice Website")
+      .field("author", "Ryan McWalter")
       .field("publicationDate", "2024-01-01")
       .field("contentType", "pdf")
       .attach("pdf", Buffer.from("not a pdf"), { filename: "notes.txt", contentType: "text/plain" });
@@ -260,7 +260,7 @@ describe("Website HTTP contracts", () => {
     const create = await agent
       .post("/articles")
       .field("title", "Missing PDF")
-      .field("author", "Alice Website")
+      .field("author", "Ryan McWalter")
       .field("publicationDate", "2024-01-01")
       .field("contentType", "pdf");
 
@@ -275,7 +275,7 @@ describe("Website HTTP contracts", () => {
     const create = await agent
       .post("/articles")
       .field("title", "Large Upload")
-      .field("author", "Alice Website")
+      .field("author", "Ryan McWalter")
       .field("publicationDate", "2024-01-01")
       .field("contentType", "pdf")
       .attach("pdf", oversizedPdf, { filename: "large.pdf", contentType: "application/pdf" });
