@@ -31,6 +31,7 @@ class WebsiteController implements IWebsiteController {
   private mapArticleErrorToStatusCode(error: ArticleError): number {
     switch (error.name) {
       case "ArticleNotFound":
+      case "CommentNotFound":
         return 404;
       case "DuplicateArticle":
         return 409;
