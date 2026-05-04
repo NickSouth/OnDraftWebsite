@@ -192,14 +192,15 @@ class ExpressApp implements IApp {
       "/articles",
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
-        await this.controller.showArticles(res, browserSession);
+        await this.controller.showArticles(req, res, browserSession);
       }),
     );
 
     this.app.get(
       "/articles/filter",
       asyncHandler(async (req, res) => {
-        await this.controller.showFilteredArticles(req, res);
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.showFilteredArticles(req, res, browserSession);
       }),
     );
 
@@ -244,6 +245,21 @@ class ExpressApp implements IApp {
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
         await this.controller.createArticle(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/articles/preview",
+      (req, res, next) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        this.handleArticlePdfUpload(req, res, next);
+      },
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.previewArticle(req, res, browserSession);
       }),
     );
 

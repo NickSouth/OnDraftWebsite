@@ -24,6 +24,37 @@ describe("WebsiteService article validation", () => {
     }
   });
 
+  it("keeps draft articles out of the published article list", async () => {
+    const websiteService = service();
+    const draft = await websiteService.createArticle({
+      title: "Draft Notes",
+      author: "Alice Website",
+      writeup: "A short draft summary.",
+      published: false,
+      publicationDate: new Date("2024-01-01"),
+      content: {
+        type: "plainText",
+        text: "A regular article body.",
+      },
+    });
+
+    expect(draft.ok).toBe(true);
+    if (draft.ok === true) {
+      expect(draft.value.published).toBe(false);
+    }
+
+    const publishedArticles = await websiteService.getArticles();
+    const draftArticles = await websiteService.getArticles(false);
+
+    expect(publishedArticles.ok).toBe(true);
+    expect(draftArticles.ok).toBe(true);
+    if (publishedArticles.ok === true && draftArticles.ok === true) {
+      expect(publishedArticles.value).toHaveLength(0);
+      expect(draftArticles.value).toHaveLength(1);
+      expect(draftArticles.value[0].title).toBe("Draft Notes");
+    }
+  });
+
   it("rejects empty plain text article content", async () => {
     const result = await service().createArticle({
       title: "Draft Notes",

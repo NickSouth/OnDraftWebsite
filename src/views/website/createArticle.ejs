@@ -6,7 +6,7 @@
     <p class="error-message"><%= errorMessage %></p>
   <% } %>
 
-  <form class="website-form" method="post" action="/articles" enctype="multipart/form-data">
+  <form class="website-form" method="post" action="/articles/preview" enctype="multipart/form-data">
     <label>
       Title
       <input name="title" value="<%= values.title || "" %>" required />
@@ -60,7 +60,10 @@
     <div id="article-content-fields">
       <%- include("partials/articleContentFields", { values }) %>
     </div>
-    <button type="submit">Create article</button>
+    <div class="form-actions">
+      <button type="submit" formaction="/articles" name="published" value="false">Save As Draft</button>
+      <button type="submit">Preview</button>
+    </div>
   </form>
   <script src="/articleTags.js" defer></script>
 </section>

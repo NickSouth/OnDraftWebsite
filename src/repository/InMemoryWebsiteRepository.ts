@@ -11,8 +11,8 @@ class InMemoryWebsiteRepository implements IWebsiteRepository {
     return Ok(this.bigBoard);
   }
 
-  async getArticles(): Promise<Result<Article[], ArticleError>> {
-    return Ok(this.articles);
+  async getArticles(published = true): Promise<Result<Article[], ArticleError>> {
+    return Ok(this.articles.filter(article => article.published === published));
   }
 
   async getArticleTags(): Promise<Result<string[], ArticleError>> {
@@ -25,7 +25,8 @@ class InMemoryWebsiteRepository implements IWebsiteRepository {
   }
 
   async getFilteredArticles(filter: ArticleFilter): Promise<Result<Article[], ArticleError>> {
-    const filtered = this.articles.filter((article) => {
+    const published = filter.published ?? true;
+    const filtered = this.articles.filter(article => article.published === published).filter((article) => {
       if (filter.author && !article.author.toLowerCase().includes(filter.author.toLowerCase())) {
         return false;
       }
