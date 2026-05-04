@@ -58,4 +58,14 @@ export type Article = {
   publicationDate: Date;
   content: ArticleContent;
   imageUrl?: string;
+  comments: Comment[];
+  likes: number;
+};
+
+export type Comment = {
+  id: string;
+  userName: string;
+  text: string;
+  createdAt: Date;
+  likes: number;
 };

@@ -1,5 +1,5 @@
 import { Result, Err, Ok } from "../lib/result";
-import { type BigBoard, Article, BigBoardEntry, ArticleFilter } from "../model/WebsiteContent";
+import { type BigBoard, Article, BigBoardEntry, ArticleFilter, Comment } from "../model/WebsiteContent";
 
 export type BigBoardError = 
     | {name: "PlayerNotFound"; message: string} 
@@ -10,12 +10,14 @@ export type BigBoardError =
 
 export type ArticleError = 
     | {name: "ArticleNotFound"; message: string} 
+    | {name: "CommentNotFound"; message: string} 
     | {name: "DuplicateArticle"; message: string}
     | {name: "DatabaseError"; message: string}
     | {name: "ArticleValidationError"; message: string}
     | {name: "UnknownArticleError"; message: string};
 
 export const ArticleNotFound = (message: string): ArticleError => ({ name: "ArticleNotFound", message });
+export const CommentNotFound = (message: string): ArticleError => ({ name: "CommentNotFound", message });
 export const PlayerNotFound = (message: string): BigBoardError => ({ name: "PlayerNotFound", message });
 export const DuplicateArticle = (message: string): ArticleError => ({ name: "DuplicateArticle", message });
 export const DuplicatePlayer = (message: string): BigBoardError => ({ name: "DuplicatePlayer", message });
@@ -36,4 +38,8 @@ export interface IWebsiteRepository {
     getBigBoardEntry(playerName: string): Promise<Result<BigBoardEntry, BigBoardError>>;
     getArticle(id: string): Promise<Result<Article, ArticleError>>;
     getFilteredArticles(filter: ArticleFilter): Promise<Result<Article[], ArticleError>>;
+    commentByArticleId(articleId: string, comment: Comment): Promise<Result<Comment, ArticleError>>;
+    likeByArticleId(articleId: string): Promise<Result<Article, ArticleError>>;
+    likeByCommentId(commentId: string): Promise<Result<Comment, ArticleError>>;
+    deleteComment(commentId: string): Promise<Result<void, ArticleError>>;
 }

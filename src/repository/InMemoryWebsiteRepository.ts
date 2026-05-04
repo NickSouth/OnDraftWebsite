@@ -1,6 +1,6 @@
 import { Err, Ok, Result } from "../lib/result";
-import { Article, ArticleFilter, BigBoard, BigBoardEntry } from "../model/WebsiteContent";
-import { ArticleNotFound, DuplicatePlayer, DuplicateArticle, type ArticleError, type BigBoardError, type IWebsiteRepository, PlayerNotFound } from "./WebsiteRepository";
+import { Article, ArticleFilter, BigBoard, BigBoardEntry, Comment } from "../model/WebsiteContent";
+import { ArticleNotFound, CommentNotFound, DuplicatePlayer, DuplicateArticle, type ArticleError, type BigBoardError, type IWebsiteRepository, PlayerNotFound } from "./WebsiteRepository";
 
 
 class InMemoryWebsiteRepository implements IWebsiteRepository {
@@ -116,6 +116,50 @@ class InMemoryWebsiteRepository implements IWebsiteRepository {
       return Err(ArticleNotFound(`Article with id "${id}" not found.`));
     }
     return Ok(article);
+  }
+
+  async commentByArticleId(articleId: string, comment: Comment): Promise<Result<Comment, ArticleError>> {
+    const article = this.articles.find(a => a.id === articleId);
+    if (!article) {
+      return Err(ArticleNotFound(`Article with id "${articleId}" not found.`));
+    }
+
+    article.comments.push(comment);
+    return Ok(comment);
+  }
+
+  async likeByArticleId(articleId: string): Promise<Result<Article, ArticleError>> {
+    const article = this.articles.find(a => a.id === articleId);
+    if (!article) {
+      return Err(ArticleNotFound(`Article with id "${articleId}" not found.`));
+    }
+
+    article.likes += 1;
+    return Ok(article);
+  }
+
+  async likeByCommentId(commentId: string): Promise<Result<Comment, ArticleError>> {
+    for (const article of this.articles) {
+      const comment = article.comments.find((entry) => entry.id === commentId);
+      if (comment) {
+        comment.likes += 1;
+        return Ok(comment);
+      }
+    }
+
+    return Err(CommentNotFound(`Comment with id "${commentId}" not found.`));
+  }
+
+  async deleteComment(commentId: string): Promise<Result<void, ArticleError>> {
+    for (const article of this.articles) {
+      const commentIndex = article.comments.findIndex((entry) => entry.id === commentId);
+      if (commentIndex !== -1) {
+        article.comments.splice(commentIndex, 1);
+        return Ok(undefined);
+      }
+    }
+
+    return Err(CommentNotFound(`Comment with id "${commentId}" not found.`));
   }
 }
 
