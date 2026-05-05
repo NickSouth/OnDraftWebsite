@@ -23,7 +23,7 @@
       <input type="date" name="publicationDate" value="<%= values.publicationDate || new Date().toISOString().slice(0, 10) %>" required />
     </label>
     <label>
-      Writeup
+      Hook
       <textarea name="writeup" maxlength="200" required><%= values.writeup || "" %></textarea>
     </label>
     <div
@@ -43,7 +43,7 @@
       </datalist>
     </div>
     <label>
-      Article image
+      Thumbnail - leave blank for generic thumbnail
       <input type="file" name="image" accept="image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp" />
     </label>
     <% if (values.imageUrl) { %>
