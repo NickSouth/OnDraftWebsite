@@ -359,6 +359,14 @@ class ExpressApp implements IApp {
     );
 
     this.app.post(
+      "/articles/:id/comments/:commentId/replies",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.commentReply(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
       "/comments/:commentId/like",
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));

@@ -43,4 +43,5 @@ export interface IWebsiteRepository {
     likeByArticleId(articleId: string, userId: string): Promise<Result<Article, ArticleError>>;
     likeByCommentId(commentId: string, userId: string): Promise<Result<Comment, ArticleError>>;
     deleteComment(commentId: string): Promise<Result<void, ArticleError>>;
+    commentReplyByCommentId(commentId: string, reply: Comment): Promise<Result<Comment, ArticleError>>;
 }

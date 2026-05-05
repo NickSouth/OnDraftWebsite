@@ -23,6 +23,7 @@ export interface IWebsiteController {
   likeArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   showArticleComments(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   commentOnArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
+  commentReply(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   likeComment(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   deleteComment(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
   createBigBoardEntry(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void>;
@@ -170,6 +171,21 @@ class WebsiteController implements IWebsiteController {
     }
 
     return Math.max(10, Math.min(100, Math.floor(rawLimit)));
+  }
+
+  private findCommentById(comments: Article["comments"], commentId: string): Article["comments"][number] | undefined {
+    for (const comment of comments) {
+      if (comment.id === commentId) {
+        return comment;
+      }
+
+      const reply = this.findCommentById(comment.replies, commentId);
+      if (reply) {
+        return reply;
+      }
+    }
+
+    return undefined;
   }
 
   private likeActorId(session: IWebsiteBrowserSession): string {
@@ -545,6 +561,31 @@ class WebsiteController implements IWebsiteController {
     await this.showArticleComments(req, res, session);
   }
 
+  async commentReply(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+    const authenticatedUser = session.authenticatedUser;
+    if (!authenticatedUser) {
+      res.status(403).render("website/partials/error", {
+        layout: false,
+        message: "Log in to comment.",
+      });
+      return;
+    }
+
+    const commentId = this.routeParam(req, "commentId");
+    const result = await this.service.commentReplyByCommentId(commentId, {
+      parentCommentId: commentId,
+      userId: authenticatedUser.userId,
+      userName: authenticatedUser.displayName,
+      text: req.body.text,
+    });
+    if (result.ok === false) {
+      res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    await this.showArticleComments(req, res, session);
+  }
+
   async likeComment(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
     const commentId = this.routeParam(req, "commentId");
     const result = await this.service.likeByCommentId(commentId, this.likeActorId(session));
@@ -569,7 +610,7 @@ class WebsiteController implements IWebsiteController {
       return;
     }
 
-    const comment = articleResult.value.comments.find((entry) => entry.id === commentId);
+    const comment = this.findCommentById(articleResult.value.comments, commentId);
     if (!comment) {
       res.status(404).send("Comment not found.");
       return;

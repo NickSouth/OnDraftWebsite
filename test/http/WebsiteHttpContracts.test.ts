@@ -210,6 +210,16 @@ describe("Website HTTP contracts", () => {
 
     const commentId = comment.text.match(/id="comment-([A-Za-z0-9]{8})"/)?.[1];
     expect(commentId).toBeDefined();
+    expect(comment.text).toContain(`/articles/${articleId}/comments/${commentId}/replies`);
+
+    const reply = await reader
+      .post(`/articles/${articleId}/comments/${commentId}/replies`)
+      .type("form")
+      .send({ text: "Agree with this." });
+
+    expect(reply.status).toBe(200);
+    expect(reply.text).toContain("Agree with this.");
+    expect(reply.text).toContain("reply-list");
 
     const likedComment = await anonymous.post(`/comments/${commentId}/like`);
     expect(likedComment.status).toBe(200);

@@ -7,6 +7,31 @@ class InMemoryWebsiteRepository implements IWebsiteRepository {
   private bigBoard: BigBoard = [];
   private articles: Article[] = [];
 
+  private findCommentById(comments: Comment[], commentId: string): Comment | undefined {
+    for (const comment of comments) {
+      if (comment.id === commentId) {
+        return comment;
+      }
+
+      const reply = this.findCommentById(comment.replies, commentId);
+      if (reply) {
+        return reply;
+      }
+    }
+
+    return undefined;
+  }
+
+  private deleteCommentById(comments: Comment[], commentId: string): boolean {
+    const commentIndex = comments.findIndex((entry) => entry.id === commentId);
+    if (commentIndex !== -1) {
+      comments.splice(commentIndex, 1);
+      return true;
+    }
+
+    return comments.some((comment) => this.deleteCommentById(comment.replies, commentId));
+  }
+
   async getBigBoard(): Promise<Result<BigBoard, BigBoardError>> {
     return Ok(this.bigBoard);
   }
@@ -155,6 +180,17 @@ class InMemoryWebsiteRepository implements IWebsiteRepository {
     return Ok(comment);
   }
 
+  async commentReplyByCommentId(commentId: string, reply: Comment): Promise<Result<Comment, ArticleError>> {
+    for (const article of this.articles) {
+      const parentComment = this.findCommentById(article.comments, commentId);
+      if (parentComment) {
+        parentComment.replies.push(reply);
+        return Ok(reply);
+      }
+    }
+    return Err(CommentNotFound(`Comment with id "${commentId}" not found.`));
+  }
+
   private toggleLike(likedByUserIds: string[], userId: string): number {
     const likeIndex = likedByUserIds.indexOf(userId);
     if (likeIndex === -1) {
@@ -178,7 +214,7 @@ class InMemoryWebsiteRepository implements IWebsiteRepository {
 
   async likeByCommentId(commentId: string, userId: string): Promise<Result<Comment, ArticleError>> {
     for (const article of this.articles) {
-      const comment = article.comments.find((entry) => entry.id === commentId);
+      const comment = this.findCommentById(article.comments, commentId);
       if (comment) {
         comment.likes = this.toggleLike(comment.likedByUserIds, userId);
         return Ok(comment);
@@ -190,9 +226,7 @@ class InMemoryWebsiteRepository implements IWebsiteRepository {
 
   async deleteComment(commentId: string): Promise<Result<void, ArticleError>> {
     for (const article of this.articles) {
-      const commentIndex = article.comments.findIndex((entry) => entry.id === commentId);
-      if (commentIndex !== -1) {
-        article.comments.splice(commentIndex, 1);
+      if (this.deleteCommentById(article.comments, commentId)) {
         return Ok(undefined);
       }
     }

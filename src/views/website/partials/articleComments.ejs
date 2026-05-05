@@ -50,7 +50,63 @@
             <% } %>
           </div>
           <p class="comment-text"><%= comment.text %></p>
-          <%- include("commentLikeButton", { comment, likeActorId }) %>
+          <div class="comment-actions">
+            <%- include("commentLikeButton", { comment, likeActorId }) %>
+          </div>
+          <% if (comment.replies && comment.replies.length > 0) { %>
+            <ol class="reply-list">
+              <% comment.replies.forEach((reply) => { %>
+                <li class="reply-item" id="comment-<%= reply.id %>">
+                  <div class="comment-header">
+                    <div>
+                      <strong><%= reply.userName %></strong>
+                      <span class="muted-text"><%= new Date(reply.createdAt).toLocaleString() %></span>
+                    </div>
+                    <% if (isAdmin || reply.userId === session.authenticatedUser?.userId) { %>
+                      <button
+                        type="button"
+                        class="secondary-button"
+                        hx-delete="/articles/<%= article.id %>/comments/<%= reply.id %>?limit=<%= commentsLimit %>"
+                        hx-target="#article-comments-section"
+                        hx-swap="outerHTML"
+                      >
+                        Delete
+                      </button>
+                    <% } %>
+                  </div>
+                  <p class="comment-text"><%= reply.text %></p>
+                  <%- include("commentLikeButton", { comment: reply, likeActorId }) %>
+                </li>
+              <% }) %>
+            </ol>
+          <% } %>
+          <% if (session.authenticatedUser) { %>
+            <div class="reply-thread-actions">
+              <button
+                type="button"
+                class="secondary-button"
+                aria-expanded="false"
+                aria-controls="reply-form-<%= comment.id %>"
+                onclick="const form = document.getElementById('reply-form-<%= comment.id %>'); const expanded = this.getAttribute('aria-expanded') === 'true'; this.setAttribute('aria-expanded', String(!expanded)); form.hidden = expanded;"
+              >
+                Reply
+              </button>
+            </div>
+            <form
+              id="reply-form-<%= comment.id %>"
+              class="comment-form reply-form"
+              hx-post="/articles/<%= article.id %>/comments/<%= comment.id %>/replies?limit=<%= commentsLimit %>"
+              hx-target="#article-comments-section"
+              hx-swap="outerHTML"
+              hidden
+            >
+              <label>
+                Reply
+                <textarea name="text" maxlength="1000" required></textarea>
+              </label>
+              <button type="submit">Post Reply</button>
+            </form>
+          <% } %>
         </li>
       <% }) %>
     </ol>

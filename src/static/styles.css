@@ -473,6 +473,14 @@ textarea {
   margin-bottom: 18px;
 }
 
+.reply-form {
+  margin: 4px 0 0;
+}
+
+.reply-form[hidden] {
+  display: none;
+}
+
 .comment-list {
   display: grid;
   gap: 14px;
@@ -486,6 +494,32 @@ textarea {
   gap: 8px;
   padding-bottom: 14px;
   border-bottom: 1px solid var(--panel-border);
+}
+
+.comment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.reply-thread-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 2px;
+}
+
+.reply-list {
+  display: grid;
+  gap: 10px;
+  margin: 4px 0 0 18px;
+  padding-left: 14px;
+  border-left: 2px solid var(--panel-border);
+}
+
+.reply-item {
+  display: grid;
+  gap: 6px;
 }
 
 .comment-text {

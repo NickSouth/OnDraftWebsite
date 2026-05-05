@@ -47,11 +47,13 @@ export interface BigBoardEntryInput {
 }
 
 export interface CreateCommentInput {
-  articleId: string;
+  articleId?: string;
+  parentCommentId?: string;
   userId: string;
   userName: string;
   text: string;
 }
+
 
 export interface IWebsiteService {
   previewArticle(input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
@@ -71,6 +73,7 @@ export interface IWebsiteService {
   likeByArticleId(articleId: string, userId: string): Promise<Result<Article, ArticleError>>;
   likeByCommentId(commentId: string, userId: string): Promise<Result<Comment, ArticleError>>;
   deleteComment(commentId: string): Promise<Result<void, ArticleError>>;
+  commentReplyByCommentId(commentId: string, reply: CreateCommentInput): Promise<Result<Comment, ArticleError>>;
 }
 
 class WebsiteService implements IWebsiteService {
@@ -250,11 +253,11 @@ class WebsiteService implements IWebsiteService {
   }
 
   private validateCommentInput(input: CreateCommentInput): Result<void, ArticleError> {
-    if (!input.articleId || !input.userId || !input.userName || !input.text) {
-      return Err(ArticleValidationError("Article, user, user name, and comment text are required."));
+    if (!input.userId || !input.userName || !input.text) {
+      return Err(ArticleValidationError("User, user name, and comment text are required."));
     }
-    if (input.articleId.trim() === "" || input.userId.trim() === "" || input.userName.trim() === "" || input.text.trim() === "") {
-      return Err(ArticleValidationError("Article, user, user name, and comment text cannot be empty."));
+    if (input.userId.trim() === "" || input.userName.trim() === "" || input.text.trim() === "") {
+      return Err(ArticleValidationError("User, user name, and comment text cannot be empty."));
     }
     if (input.text.length > COMMENT_TEXT_MAX_LENGTH) {
       return Err(ArticleValidationError(`Comment text cannot be more than ${COMMENT_TEXT_MAX_LENGTH} characters.`));
@@ -442,9 +445,33 @@ class WebsiteService implements IWebsiteService {
       createdAt: new Date(),
       likes: 0,
       likedByUserIds: [],
+      replies: []
     };
+    if (!input.articleId) {
+      return Err(ArticleValidationError("Article id is required for top-level comments."));
+    }
 
     return await this.repository.commentByArticleId(input.articleId.trim(), comment);
+  }
+
+  async commentReplyByCommentId(commentId: string, reply: CreateCommentInput): Promise<Result<Comment, ArticleError>> {
+    const validation = this.validateCommentInput(reply);
+    if (validation.ok === false) {
+      return Err(validation.value);
+    }
+
+    const comment: Comment = {
+      id: this.createCommentId(),
+      userId: reply.userId.trim(),
+      userName: reply.userName.trim(),
+      text: reply.text.trim(),
+      createdAt: new Date(),
+      likes: 0,
+      likedByUserIds: [],
+      replies: []
+    };
+
+    return await this.repository.commentReplyByCommentId(commentId.trim(), comment);
   }
 
   async likeByArticleId(articleId: string, userId: string): Promise<Result<Article, ArticleError>> {

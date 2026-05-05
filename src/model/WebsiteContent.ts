@@ -73,4 +73,5 @@ export type Comment = {
   createdAt: Date;
   likes: number;
   likedByUserIds: string[];
+  replies: Comment[];
 };
