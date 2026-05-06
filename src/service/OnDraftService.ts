@@ -1,7 +1,7 @@
 import { randomInt } from "node:crypto";
 import { Err, Ok, Result } from "../lib/result";
 import sanitizeHtml from "sanitize-html";
-import { Article, ArticleContent, BigBoard, BigBoardEntry, Position, ArticleFilter, Comment } from "../model/OnDraftContent";
+import { Article, ArticleContent, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, Position, ArticleFilter, Comment } from "../model/OnDraftContent";
 import { UnknownArticleError, ArticleError,  BigBoardError, IOnDraftRepository, ArticleValidationError, BigBoardValidationError } from "../repository/OnDraftRepository";
 
 const ARTICLE_PDF_MAX_BYTES = 5 * 1024 * 1024;
@@ -19,6 +19,7 @@ const ARTICLE_TAG_MAX_LENGTH = 24;
 const ARTICLE_TAG_MAX_COUNT = 12;
 const ARTICLE_TAG_PATTERN = /^[a-z0-9-]+$/;
 const COMMENT_TEXT_MAX_LENGTH = 1000;
+const DEFAULT_BIG_BOARD_CREATOR: BigBoardCreator = "Ryan";
 
 export interface CreateArticleInput {
   title: string;
@@ -32,6 +33,8 @@ export interface CreateArticleInput {
 }
 
 export interface BigBoardEntryInput {
+  year?: number;
+  creator?: BigBoardCreator;
   playerName: string;
   position: string;
   school: string;
@@ -62,11 +65,12 @@ export interface IOnDraftService {
   updateArticle(id: string, input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
   createBigBoardEntry(input: BigBoardEntryInput): Promise<Result<BigBoardEntry, BigBoardError>>;
   deleteArticle(id: string): Promise<Result<void, ArticleError>>;
-  deleteBigBoardEntry(playerName: string): Promise<Result<void, BigBoardError>>;
-  getBigBoard(): Promise<Result<BigBoard, BigBoardError>>;
+  deleteBigBoardEntry(year: number | undefined, creator: BigBoardCreator | undefined, playerName: string): Promise<Result<void, BigBoardError>>;
+  getBigBoard(year?: number, creator?: BigBoardCreator): Promise<Result<BigBoard, BigBoardError>>;
+  getBigBoardYears(): Promise<Result<number[], BigBoardError>>;
   getArticles(published?: boolean): Promise<Result<Article[], ArticleError>>;
   getArticleTags(): Promise<Result<string[], ArticleError>>;
-  getBigBoardEntry(playerName: string): Promise<Result<BigBoardEntry, BigBoardError>>;
+  getBigBoardEntry(year: number | undefined, creator: BigBoardCreator | undefined, playerName: string): Promise<Result<BigBoardEntry, BigBoardError>>;
   getArticle(id: string): Promise<Result<Article, ArticleError>>;
   getFilteredArticles(filter: ArticleFilter): Promise<Result<Article[], ArticleError>>;
   commentByArticleId(input: CreateCommentInput): Promise<Result<Comment, ArticleError>>;
@@ -78,6 +82,38 @@ export interface IOnDraftService {
 
 class OnDraftService implements IOnDraftService {
   constructor(private readonly repository: IOnDraftRepository) {}
+
+  private defaultBigBoardYear(): number {
+    return new Date().getFullYear();
+  }
+
+  private normalizeBigBoardYear(year?: number): Result<number, BigBoardError> {
+    const normalizedYear = year ?? this.defaultBigBoardYear();
+    if (!Number.isInteger(normalizedYear) || normalizedYear < 1900 || normalizedYear > 2100) {
+      return Err(BigBoardValidationError("Big board year must be a valid four-digit year."));
+    }
+    return Ok(normalizedYear);
+  }
+
+  private normalizeBigBoardCreator(creator?: BigBoardCreator): Result<BigBoardCreator, BigBoardError> {
+    const normalizedCreator = creator ?? DEFAULT_BIG_BOARD_CREATOR;
+    if (!BIG_BOARD_CREATORS.includes(normalizedCreator)) {
+      return Err(BigBoardValidationError(`Big board creator must be one of: ${BIG_BOARD_CREATORS.join(", ")}`));
+    }
+    return Ok(normalizedCreator);
+  }
+
+  private normalizeBigBoardKey(year?: number, creator?: BigBoardCreator): Result<{ year: number; creator: BigBoardCreator }, BigBoardError> {
+    const normalizedYear = this.normalizeBigBoardYear(year);
+    if (normalizedYear.ok === false) {
+      return Err(normalizedYear.value);
+    }
+    const normalizedCreator = this.normalizeBigBoardCreator(creator);
+    if (normalizedCreator.ok === false) {
+      return Err(normalizedCreator.value);
+    }
+    return Ok({ year: normalizedYear.value, creator: normalizedCreator.value });
+  }
 
   private createArticleId(): string {
     return this.createRandomId(ARTICLE_ID_LENGTH);
@@ -374,6 +410,10 @@ class OnDraftService implements IOnDraftService {
   }
 
   async createBigBoardEntry(input: BigBoardEntryInput): Promise<Result<BigBoardEntry, BigBoardError>> {
+    const key = this.normalizeBigBoardKey(input.year, input.creator);
+    if (key.ok === false) {
+      return Err(key.value);
+    }
     const validation = this.validateBigBoardEntry(input);
     if (validation.ok === false) {
       return Err(validation.value);
@@ -392,7 +432,14 @@ class OnDraftService implements IOnDraftService {
       },
       weight: input.weight
     };
-    const result = await this.repository.createBigBoardEntry(entry);
+    const result = await this.repository.createBigBoardEntry(key.value.year, key.value.creator, entry);
+    if (result.ok === false && result.value.name === "BigBoardNotFound") {
+      const createYearResult = await this.repository.createBigBoardYear(key.value.year);
+      if (createYearResult.ok === false && createYearResult.value.name !== "DuplicateBigBoardYear") {
+        return Err(createYearResult.value);
+      }
+      return await this.repository.createBigBoardEntry(key.value.year, key.value.creator, entry);
+    }
     if (result.ok === false) {
       return Err(result.value);
     }
@@ -403,12 +450,33 @@ class OnDraftService implements IOnDraftService {
     return await this.repository.deleteArticle(id);
   }
 
-  async deleteBigBoardEntry(playerName: string): Promise<Result<void, BigBoardError>> {
-    return await this.repository.deleteBigBoardEntry(playerName);
+  async deleteBigBoardEntry(year: number | undefined, creator: BigBoardCreator | undefined, playerName: string): Promise<Result<void, BigBoardError>> {
+    const key = this.normalizeBigBoardKey(year, creator);
+    if (key.ok === false) {
+      return Err(key.value);
+    }
+    return await this.repository.deleteBigBoardEntry(key.value.year, key.value.creator, playerName);
   }
 
-  async getBigBoard(): Promise<Result<BigBoard, BigBoardError>> {
-    return await this.repository.getBigBoard();
+  async getBigBoard(year?: number, creator?: BigBoardCreator): Promise<Result<BigBoard, BigBoardError>> {
+    const key = this.normalizeBigBoardKey(year, creator);
+    if (key.ok === false) {
+      return Err(key.value);
+    }
+
+    const result = await this.repository.getBigBoard(key.value.year, key.value.creator);
+    if (result.ok === false && result.value.name === "BigBoardNotFound") {
+      const createYearResult = await this.repository.createBigBoardYear(key.value.year);
+      if (createYearResult.ok === false && createYearResult.value.name !== "DuplicateBigBoardYear") {
+        return Err(createYearResult.value);
+      }
+      return await this.repository.getBigBoard(key.value.year, key.value.creator);
+    }
+    return result;
+  }
+
+  async getBigBoardYears(): Promise<Result<number[], BigBoardError>> {
+    return await this.repository.getBigBoardYears();
   }
 
   async getArticles(published = true): Promise<Result<Article[], ArticleError>> {
@@ -419,8 +487,12 @@ class OnDraftService implements IOnDraftService {
     return await this.repository.getArticleTags();
   }
 
-  async getBigBoardEntry(playerName: string): Promise<Result<BigBoardEntry, BigBoardError>> {
-    return await this.repository.getBigBoardEntry(playerName);
+  async getBigBoardEntry(year: number | undefined, creator: BigBoardCreator | undefined, playerName: string): Promise<Result<BigBoardEntry, BigBoardError>> {
+    const key = this.normalizeBigBoardKey(year, creator);
+    if (key.ok === false) {
+      return Err(key.value);
+    }
+    return await this.repository.getBigBoardEntry(key.value.year, key.value.creator, playerName);
   }
 
   async getArticle(id: string): Promise<Result<Article, ArticleError>> {

@@ -395,7 +395,7 @@ class ExpressApp implements IApp {
       "/bigboard",
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
-        await this.controller.showBigBoard(res, browserSession);
+        await this.controller.showBigBoard(req, res, browserSession);
       }),
     );
 

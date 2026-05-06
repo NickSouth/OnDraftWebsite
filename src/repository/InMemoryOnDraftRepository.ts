@@ -1,11 +1,24 @@
 import { Err, Ok, Result } from "../lib/result";
-import { Article, ArticleFilter, BigBoard, BigBoardEntry, Comment } from "../model/OnDraftContent";
-import { ArticleNotFound, CommentNotFound, DuplicatePlayer, DuplicateArticle, type ArticleError, type BigBoardError, type IOnDraftRepository, PlayerNotFound } from "./OnDraftRepository";
+import { Article, ArticleFilter, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, Comment } from "../model/OnDraftContent";
+import { ArticleNotFound, BigBoardNotFound, CommentNotFound, DuplicateBigBoardYear, DuplicatePlayer, DuplicateArticle, type ArticleError, type BigBoardError, type IOnDraftRepository, PlayerNotFound } from "./OnDraftRepository";
 
 
 class InMemoryOnDraftRepository implements IOnDraftRepository {
-  private bigBoard: BigBoard = [];
+  private bigBoards: BigBoard[] = [];
   private articles: Article[] = [];
+  constructor() {
+    this.createBigBoardYearSync(new Date().getFullYear());
+  }
+
+  private findBigBoard(year: number, creator: BigBoardCreator): BigBoard | undefined {
+    return this.bigBoards.find((bigBoard) => bigBoard.year === year && bigBoard.creator === creator);
+  }
+
+  private createBigBoardYearSync(year: number): void {
+    BIG_BOARD_CREATORS.forEach((creator) => {
+      this.bigBoards.push({ year, creator, entries: [] });
+    });
+  }
 
   private findCommentById(comments: Comment[], commentId: string): Comment | undefined {
     for (const comment of comments) {
@@ -32,8 +45,25 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
     return comments.some((comment) => this.deleteCommentById(comment.replies, commentId));
   }
 
-  async getBigBoard(): Promise<Result<BigBoard, BigBoardError>> {
-    return Ok(this.bigBoard);
+  async getBigBoard(year: number, creator: BigBoardCreator): Promise<Result<BigBoard, BigBoardError>> {
+    const bigBoard = this.findBigBoard(year, creator);
+    if (!bigBoard) {
+      return Err(BigBoardNotFound(`Big board for ${year} by ${creator} was not found.`));
+    }
+    return Ok(bigBoard);
+  }
+
+  async createBigBoardYear(year: number): Promise<Result<void, BigBoardError>> {
+    if (this.bigBoards.find((bb) => bb.year === year)) {
+      return Err(DuplicateBigBoardYear(`Big boards for ${year} already exist.`));
+    }
+    this.createBigBoardYearSync(year);
+    return Ok(undefined);
+  }
+
+  async getBigBoardYears(): Promise<Result<number[], BigBoardError>> {
+    const years = new Set(this.bigBoards.map((bigBoard) => bigBoard.year));
+    return Ok([...years].sort((first, second) => second - first));
   }
 
   async getArticles(published = true): Promise<Result<Article[], ArticleError>> {
@@ -118,11 +148,15 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
     return Ok(article);
   }
 
-  async createBigBoardEntry(entry: BigBoardEntry): Promise<Result<BigBoardEntry, BigBoardError>> {
-    if (this.bigBoard.find(e => e.playerName === entry.playerName)) {
-      return Err(DuplicatePlayer(`Player with name "${entry.playerName}" already exists in the big board.`));
+  async createBigBoardEntry(year: number, creator: BigBoardCreator, entry: BigBoardEntry): Promise<Result<BigBoardEntry, BigBoardError>> {
+    const bigBoard = this.findBigBoard(year, creator);
+    if (!bigBoard) {
+      return Err(BigBoardNotFound(`Big board for ${year} by ${creator} was not found.`));
     }
-    this.bigBoard.push(entry);
+    if (bigBoard.entries.find(e => e.playerName === entry.playerName)) {
+      return Err(DuplicatePlayer(`Player with name "${entry.playerName}" already exists in the ${year} ${creator} big board.`));
+    }
+    bigBoard.entries.push(entry);
     return Ok(entry);
   }
 
@@ -135,19 +169,27 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
     return Ok(undefined);
   }
 
-  async deleteBigBoardEntry(playerName: string): Promise<Result<void, BigBoardError>> {
-    const index = this.bigBoard.findIndex(e => e.playerName === playerName);
-    if (index === -1) {
-      return Err(PlayerNotFound(`Player with name "${playerName}" not found in the big board.`));
+  async deleteBigBoardEntry(year: number, creator: BigBoardCreator, playerName: string): Promise<Result<void, BigBoardError>> {
+    const bigBoard = this.findBigBoard(year, creator);
+    if (!bigBoard) {
+      return Err(BigBoardNotFound(`Big board for ${year} by ${creator} was not found.`));
     }
-    this.bigBoard.splice(index, 1);
+    const index = bigBoard.entries.findIndex(e => e.playerName === playerName);
+    if (index === -1) {
+      return Err(PlayerNotFound(`Player with name "${playerName}" not found in the ${year} ${creator} big board.`));
+    }
+    bigBoard.entries.splice(index, 1);
     return Ok(undefined);
   }
 
-  async getBigBoardEntry(playerName: string): Promise<Result<BigBoardEntry, BigBoardError>> {
-    const entry = this.bigBoard.find(e => e.playerName === playerName);
+  async getBigBoardEntry(year: number, creator: BigBoardCreator, playerName: string): Promise<Result<BigBoardEntry, BigBoardError>> {
+    const bigBoard = this.findBigBoard(year, creator);
+    if (!bigBoard) {
+      return Err(BigBoardNotFound(`Big board for ${year} by ${creator} was not found.`));
+    }
+    const entry = bigBoard.entries.find(e => e.playerName === playerName);
     if (!entry) {
-      return Err(PlayerNotFound(`Player with name "${playerName}" not found in the big board.`));
+      return Err(PlayerNotFound(`Player with name "${playerName}" not found in the ${year} ${creator} big board.`));
     }
     return Ok(entry);
   }
