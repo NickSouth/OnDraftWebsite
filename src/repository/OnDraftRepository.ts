@@ -52,9 +52,12 @@ export interface IOnDraftRepository {
     getArticleTags(): Promise<Result<string[], ArticleError>>;
     createArticle(article: Article): Promise<Result<Article, ArticleError>>;
     createBigBoardEntry(year: number, creator: BigBoardCreator, entry: BigBoardEntry): Promise<Result<BigBoardEntry, BigBoardError>>;
+    updateBigBoardEntry(year: number, creator: BigBoardCreator, entry: BigBoardEntry): Promise<Result<BigBoardEntry, BigBoardError>>;
+    replaceBigBoardEntries(year: number, creator: BigBoardCreator, entries: BigBoardEntry[]): Promise<Result<BigBoard, BigBoardError>>;
     deleteArticle(id: string): Promise<Result<void, ArticleError>>;
     deleteBigBoardEntry(year: number, creator: BigBoardCreator, playerName: string): Promise<Result<void, BigBoardError>>;
     getBigBoardEntry(year: number, creator: BigBoardCreator, playerName: string): Promise<Result<BigBoardEntry, BigBoardError>>;
+    getBigBoardEntryById(year: number, creator: BigBoardCreator, entryId: string): Promise<Result<BigBoardEntry, BigBoardError>>;
     getArticle(id: string): Promise<Result<Article, ArticleError>>;
     getFilteredArticles(filter: ArticleFilter): Promise<Result<Article[], ArticleError>>;
     updateArticle(article: Article): Promise<Result<Article, ArticleError>>;

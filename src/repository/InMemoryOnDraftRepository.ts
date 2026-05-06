@@ -154,11 +154,33 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
     if (!bigBoard) {
       return Err(BigBoardNotFound(`Big board for ${year} by ${creator} was not found.`));
     }
-    if (bigBoard.entries.find(e => e.playerName === entry.playerName)) {
-      return Err(DuplicatePlayer(`Player with name "${entry.playerName}" already exists in the ${year} ${creator} big board.`));
+    if (bigBoard.entries.find(e => e.id === entry.id)) {
+      return Err(DuplicatePlayer(`Big board entry with id "${entry.id}" already exists in the ${year} ${creator} big board.`));
     }
     bigBoard.entries.push(entry);
     return Ok(entry);
+  }
+
+  async updateBigBoardEntry(year: number, creator: BigBoardCreator, entry: BigBoardEntry): Promise<Result<BigBoardEntry, BigBoardError>> {
+    const bigBoard = this.findBigBoard(year, creator);
+    if (!bigBoard) {
+      return Err(BigBoardNotFound(`Big board for ${year} by ${creator} was not found.`));
+    }
+    const index = bigBoard.entries.findIndex(e => e.id === entry.id);
+    if (index === -1) {
+      return Err(PlayerNotFound(`Big board entry with id "${entry.id}" was not found in the ${year} ${creator} big board.`));
+    }
+    bigBoard.entries[index] = entry;
+    return Ok(entry);
+  }
+
+  async replaceBigBoardEntries(year: number, creator: BigBoardCreator, entries: BigBoardEntry[]): Promise<Result<BigBoard, BigBoardError>> {
+    const bigBoard = this.findBigBoard(year, creator);
+    if (!bigBoard) {
+      return Err(BigBoardNotFound(`Big board for ${year} by ${creator} was not found.`));
+    }
+    bigBoard.entries = entries;
+    return Ok(bigBoard);
   }
 
   async deleteArticle(id: string): Promise<Result<void, ArticleError>> {
@@ -191,6 +213,18 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
     const entry = bigBoard.entries.find(e => e.playerName === playerName);
     if (!entry) {
       return Err(PlayerNotFound(`Player with name "${playerName}" not found in the ${year} ${creator} big board.`));
+    }
+    return Ok(entry);
+  }
+
+  async getBigBoardEntryById(year: number, creator: BigBoardCreator, entryId: string): Promise<Result<BigBoardEntry, BigBoardError>> {
+    const bigBoard = this.findBigBoard(year, creator);
+    if (!bigBoard) {
+      return Err(BigBoardNotFound(`Big board for ${year} by ${creator} was not found.`));
+    }
+    const entry = bigBoard.entries.find(e => e.id === entryId);
+    if (!entry) {
+      return Err(PlayerNotFound(`Big board entry with id "${entryId}" was not found in the ${year} ${creator} big board.`));
     }
     return Ok(entry);
   }

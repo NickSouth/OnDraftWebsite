@@ -236,3 +236,182 @@ describe("OnDraftService article validation", () => {
     }
   });
 });
+
+describe("OnDraftService big board editing", () => {
+  it("saves blank draft rows without publishing them", async () => {
+    const ondraftService = service();
+
+    const saved = await ondraftService.saveBigBoardEntries({
+      year: 2026,
+      creator: "Ryan",
+      entries: [{}],
+    });
+
+    expect(saved.ok).toBe(true);
+    if (saved.ok === true) {
+      expect(saved.value.entries).toHaveLength(1);
+      expect(saved.value.entries[0].playerInfoPublished).toBe(false);
+      expect(saved.value.entries[0].writeupPublished).toBe(false);
+    }
+  });
+
+  it("publishes player info only after canonical position and rank validation passes", async () => {
+    const ondraftService = service();
+
+    const saved = await ondraftService.saveBigBoardEntries({
+      year: 2026,
+      creator: "Ryan",
+      entries: [
+        {
+          playerName: "Edge Prospect",
+          school: "OnDraft State",
+          position: "DE",
+          rank: 1,
+          posRank: 1,
+          height: { feet: 6, inches: 4 },
+          weight: 260,
+        },
+      ],
+    });
+
+    expect(saved.ok).toBe(true);
+    if (saved.ok === false) {
+      return;
+    }
+
+    const rejected = await ondraftService.publishBigBoardEntryPlayerInfo(2026, "Ryan", saved.value.entries[0].id);
+    expect(rejected.ok).toBe(false);
+    if (rejected.ok === false) {
+      expect(rejected.value.message).toContain("Player name, school, position, height, weight, rank, and position rank are required");
+    }
+
+    const corrected = await ondraftService.saveBigBoardEntries({
+      year: 2026,
+      creator: "Ryan",
+      entries: [
+        {
+          ...saved.value.entries[0],
+          position: "EDGE",
+        },
+      ],
+    });
+    expect(corrected.ok).toBe(true);
+    if (corrected.ok === false) {
+      return;
+    }
+
+    const published = await ondraftService.publishBigBoardEntryPlayerInfo(2026, "Ryan", corrected.value.entries[0].id);
+    expect(published.ok).toBe(true);
+    if (published.ok === true) {
+      expect(published.value.playerInfoPublished).toBe(true);
+    }
+  });
+
+  it("rejects duplicate published overall ranks and same-position position ranks", async () => {
+    const ondraftService = service();
+
+    const saved = await ondraftService.saveBigBoardEntries({
+      year: 2026,
+      creator: "Ryan",
+      entries: [
+        {
+          playerName: "Quarterback One",
+          school: "OnDraft",
+          position: "QB",
+          rank: 1,
+          posRank: 1,
+          height: { feet: 6, inches: 2 },
+          weight: 220,
+        },
+        {
+          playerName: "Quarterback Two",
+          school: "OnDraft",
+          position: "QB",
+          rank: 1,
+          posRank: 1,
+          height: { feet: 6, inches: 3 },
+          weight: 225,
+        },
+      ],
+    });
+
+    expect(saved.ok).toBe(true);
+    if (saved.ok === false) {
+      return;
+    }
+
+    const first = await ondraftService.publishBigBoardEntryPlayerInfo(2026, "Ryan", saved.value.entries[0].id);
+    expect(first.ok).toBe(true);
+
+    const second = await ondraftService.publishBigBoardEntryPlayerInfo(2026, "Ryan", saved.value.entries[1].id);
+    expect(second.ok).toBe(false);
+    if (second.ok === false) {
+      expect(second.value.message).toContain("Overall rank 1 is already used");
+    }
+  });
+
+  it("unpublishes only the edited section of a saved row", async () => {
+    const ondraftService = service();
+    const created = await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Ryan",
+      playerName: "Published Player",
+      school: "OnDraft",
+      position: "WR",
+      rank: 3,
+      posRank: 1,
+      height: { feet: 6, inches: 1 },
+      weight: 205,
+      strengths: "Separation",
+      weaknesses: "Play strength",
+      rundown: "Ready to contribute early.",
+      writeupPublished: true,
+    });
+
+    expect(created.ok).toBe(true);
+    if (created.ok === false) {
+      return;
+    }
+
+    const changedSchool = await ondraftService.saveBigBoardEntries({
+      year: 2026,
+      creator: "Ryan",
+      entries: [
+        {
+          ...created.value,
+          school: "Updated OnDraft",
+        },
+      ],
+    });
+
+    expect(changedSchool.ok).toBe(true);
+    if (changedSchool.ok === true) {
+      expect(changedSchool.value.entries[0].playerInfoPublished).toBe(false);
+      expect(changedSchool.value.entries[0].writeupPublished).toBe(true);
+    }
+
+    const republished = await ondraftService.publishBigBoardEntryPlayerInfo(2026, "Ryan", created.value.id);
+    expect(republished.ok).toBe(true);
+
+    const changedWriteup = await ondraftService.saveBigBoardEntries({
+      year: 2026,
+      creator: "Ryan",
+      entries: [
+        {
+          ...created.value,
+          school: "Updated OnDraft",
+          writeup: {
+            ...created.value.writeup,
+            rundown: "Updated rundown.",
+          },
+        },
+      ],
+    });
+
+    expect(changedWriteup.ok).toBe(true);
+    if (changedWriteup.ok === true) {
+      expect(changedWriteup.value.entries[0].playerInfoPublished).toBe(true);
+      expect(changedWriteup.value.entries[0].writeupPublished).toBe(false);
+    }
+  });
+});
