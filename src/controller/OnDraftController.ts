@@ -1,11 +1,11 @@
 import type { Request, Response } from "express";
 import type { IOnDraftBrowserSession } from "../session/OnDraftSession";
 import { isAdminSession } from "../session/OnDraftSession";
-import type { CreateArticleInput, IOnDraftService } from "../service/OnDraftService";
+import type { BigBoardEditableEntryInput, CreateArticleInput, IOnDraftService, SaveBigBoardEntriesInput } from "../service/OnDraftService";
 import type { ILoggingService } from "../service/LoggingService";
 import { ArticleError, BigBoardError, ForumPostError } from "../repository/OnDraftRepository";
 import { publicArticleUploadUrl } from "../uploads/articlePdfUpload";
-import { BIG_BOARD_CREATORS, type Article, type ArticleContent, type ArticleFilter, type BigBoardCreator, type ForumPost, type ForumPostFilter } from "../model/OnDraftContent";
+import { BIG_BOARD_CREATORS, POSITIONS, type Article, type ArticleContent, type ArticleFilter, type BigBoard, type BigBoardCreator, type ForumPost, type ForumPostFilter } from "../model/OnDraftContent";
 
 export interface IOnDraftController {
   showHome(res: Response, session: IOnDraftBrowserSession): Promise<void>;
@@ -14,6 +14,7 @@ export interface IOnDraftController {
   showHotTakes(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showFilteredHotTakes(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  showEditBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showOneArticle(res: Response, session: IOnDraftBrowserSession, id: string): Promise<void>;
   showCreateArticleForm(res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showEditArticleForm(res: Response, session: IOnDraftBrowserSession, id: string): Promise<void>;
@@ -33,6 +34,10 @@ export interface IOnDraftController {
   commentOnHotTake(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   deleteHotTake(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   createBigBoardEntry(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  saveBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  autosaveBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  publishBigBoardPlayerInfo(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  publishBigBoardWriteup(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   deleteArticle(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   deleteBigBoardEntry(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void>;
 }
@@ -104,6 +109,90 @@ class OnDraftController implements IOnDraftController {
     }
     const year = Number(value);
     return Number.isInteger(year) ? year : undefined;
+  }
+
+  private parseOptionalNumber(value: unknown): number | null {
+    if (typeof value !== "string" && typeof value !== "number") {
+      return null;
+    }
+    if (typeof value === "string" && value.trim() === "") {
+      return null;
+    }
+    const normalized = Number(value);
+    return Number.isFinite(normalized) ? normalized : null;
+  }
+
+  private formString(value: unknown): string {
+    return typeof value === "string" ? value : "";
+  }
+
+  private formBoolean(value: unknown): boolean {
+    return value === "true" || value === "on";
+  }
+
+  private parseHeightLabel(value: unknown): { feet: number; inches: number } | null {
+    if (typeof value !== "string" || value.trim() === "") {
+      return null;
+    }
+    const match = value.match(/^(\d+)-(\d+)$/);
+    if (!match) {
+      return null;
+    }
+    return {
+      feet: Number(match[1]),
+      inches: Number(match[2]),
+    };
+  }
+
+  private formEntries(rawEntries: unknown): Record<string, unknown>[] {
+    if (Array.isArray(rawEntries)) {
+      return rawEntries.filter((entry): entry is Record<string, unknown> => typeof entry === "object" && entry !== null);
+    }
+    if (typeof rawEntries === "object" && rawEntries !== null) {
+      return Object.keys(rawEntries)
+        .sort((first, second) => Number(first) - Number(second))
+        .map((key) => (rawEntries as Record<string, unknown>)[key])
+        .filter((entry): entry is Record<string, unknown> => typeof entry === "object" && entry !== null);
+    }
+    return [];
+  }
+
+  private buildBigBoardEntriesInput(req: Request): SaveBigBoardEntriesInput {
+    const entries: BigBoardEditableEntryInput[] = this.formEntries(req.body.entries).map((entry) => {
+      const height = typeof entry.height === "object" && entry.height !== null
+        ? entry.height as Record<string, unknown>
+        : {};
+      const heightFeet = this.parseOptionalNumber(height.feet);
+      const heightInches = this.parseOptionalNumber(height.inches);
+      const heightLabel = this.parseHeightLabel(entry.heightLabel);
+
+      return {
+        id: this.formString(entry.id),
+        playerName: this.formString(entry.playerName),
+        school: this.formString(entry.school),
+        position: this.formString(entry.position),
+        rank: this.parseOptionalNumber(entry.rank),
+        posRank: this.parseOptionalNumber(entry.posRank),
+        height: heightLabel ?? (heightFeet === null && heightInches === null ? null : { feet: heightFeet ?? 0, inches: heightInches ?? 0 }),
+        weight: this.parseOptionalNumber(entry.weight),
+        strengths: this.formString(entry.strengths),
+        weaknesses: this.formString(entry.weaknesses),
+        rundown: this.formString(entry.rundown),
+        notes: this.formString(entry.notes),
+        playerInfoPublished: this.formBoolean(entry.playerInfoPublished),
+        writeupPublished: this.formBoolean(entry.writeupPublished),
+      };
+    });
+
+    return {
+      year: this.parseBigBoardYear(req.body.year),
+      creator: this.parseBigBoardCreator(req.body.creator),
+      entries,
+    };
+  }
+
+  private bigBoardEditHref(board: BigBoard): string {
+    return `/bigboard/edit?year=${board.year}&creator=${encodeURIComponent(board.creator)}`;
   }
 
   private articleUpload(req: Request, fieldName: "pdf" | "image"): Express.Multer.File | undefined {
@@ -459,7 +548,9 @@ class OnDraftController implements IOnDraftController {
       res.status(this.mapBigBoardErrorToStatusCode(yearsResult.value)).send(yearsResult.value.message);
       return;
     }
-    const rankedBigBoard = [...result.value.entries].sort((a, b) => a.rank - b.rank);
+    const rankedBigBoard = [...result.value.entries]
+      .filter((entry) => entry.playerInfoPublished)
+      .sort((a, b) => (a.rank ?? Number.MAX_SAFE_INTEGER) - (b.rank ?? Number.MAX_SAFE_INTEGER));
     const viewModel = {
       session,
       isAdmin: isAdminSession(session),
@@ -473,6 +564,59 @@ class OnDraftController implements IOnDraftController {
       return;
     }
     res.render("ondraft/bigboard", viewModel);
+  }
+
+  private async renderBigBoardEditor(
+    res: Response,
+    session: IOnDraftBrowserSession,
+    board: BigBoard,
+    errorMessage: string | null = null,
+    statusMessage: string | null = null,
+    statusCode = 200,
+  ): Promise<void> {
+    const yearsResult = await this.service.getBigBoardYears();
+    if (yearsResult.ok === false) {
+      res.status(this.mapBigBoardErrorToStatusCode(yearsResult.value)).send(yearsResult.value.message);
+      return;
+    }
+
+    const sortedEntries = [...board.entries].sort((a, b) => {
+      const firstRank = a.rank ?? Number.MAX_SAFE_INTEGER;
+      const secondRank = b.rank ?? Number.MAX_SAFE_INTEGER;
+      return firstRank - secondRank || a.playerName.localeCompare(b.playerName);
+    });
+
+    res.status(statusCode).render("ondraft/editBigBoard", {
+      session,
+      isAdmin: isAdminSession(session),
+      board: { ...board, entries: sortedEntries },
+      years: yearsResult.value,
+      creators: BIG_BOARD_CREATORS,
+      positions: POSITIONS,
+      errorMessage,
+      statusMessage,
+    });
+  }
+
+  private renderBigBoardSaveStatus(res: Response, message: string, isError = false, statusCode = 200): void {
+    res.status(statusCode).render("ondraft/partials/bigBoardSaveStatus", {
+      layout: false,
+      message,
+      isError,
+    });
+  }
+
+  async showEditBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Rendering edit big board page");
+    const selectedYear = this.parseBigBoardYear(req.query.year);
+    const selectedCreator = this.parseBigBoardCreator(req.query.creator);
+    const result = await this.service.getBigBoard(selectedYear, selectedCreator);
+    if (result.ok === false) {
+      res.status(this.mapBigBoardErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    await this.renderBigBoardEditor(res, session, result.value);
   }
 
   async showOneArticle(res: Response, session: IOnDraftBrowserSession, id: string): Promise<void> {
@@ -930,6 +1074,95 @@ class OnDraftController implements IOnDraftController {
       return;
     }
     res.redirect(`/bigboard?year=${input.year}&creator=${input.creator ?? "Ryan"}`);
+  }
+
+  async saveBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Saving big board edits");
+    const input = this.buildBigBoardEntriesInput(req);
+    const result = await this.service.saveBigBoardEntries(input);
+    if (result.ok === false) {
+      const board = await this.service.getBigBoard(input.year, input.creator);
+      if (board.ok === true) {
+        await this.renderBigBoardEditor(res, session, board.value, result.value.message, null, this.mapBigBoardErrorToStatusCode(result.value));
+        return;
+      }
+      res.status(this.mapBigBoardErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    if (req.body.action === "exit") {
+      res.redirect(`/bigboard?year=${result.value.year}&creator=${encodeURIComponent(result.value.creator)}`);
+      return;
+    }
+
+    await this.renderBigBoardEditor(res, session, result.value, null, "Saved.");
+  }
+
+  async autosaveBigBoard(req: Request, res: Response, _session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Autosaving big board edits");
+    const result = await this.service.saveBigBoardEntries(this.buildBigBoardEntriesInput(req));
+    if (result.ok === false) {
+      this.renderBigBoardSaveStatus(res, result.value.message, true, 200);
+      return;
+    }
+
+    this.renderBigBoardSaveStatus(res, "Autosaved.");
+  }
+
+  private async saveThenPublishBigBoardEntry(
+    req: Request,
+    res: Response,
+    session: IOnDraftBrowserSession,
+    publish: (year: number | undefined, creator: BigBoardCreator | undefined, entryId: string) => Promise<{ ok: true; value: unknown } | { ok: false; value: BigBoardError }>,
+    successMessage: string,
+  ): Promise<void> {
+    const input = this.buildBigBoardEntriesInput(req);
+    const saved = await this.service.saveBigBoardEntries(input);
+    const entryId = this.formString(req.body.entryId);
+    if (saved.ok === false) {
+      const board = await this.service.getBigBoard(input.year, input.creator);
+      if (board.ok === true) {
+        await this.renderBigBoardEditor(res, session, board.value, saved.value.message, null, this.mapBigBoardErrorToStatusCode(saved.value));
+        return;
+      }
+      res.status(this.mapBigBoardErrorToStatusCode(saved.value)).send(saved.value.message);
+      return;
+    }
+
+    const published = await publish(input.year, input.creator, entryId);
+    const updatedBoard = await this.service.getBigBoard(input.year, input.creator);
+    if (updatedBoard.ok === false) {
+      res.status(this.mapBigBoardErrorToStatusCode(updatedBoard.value)).send(updatedBoard.value.message);
+      return;
+    }
+    if (published.ok === false) {
+      await this.renderBigBoardEditor(res, session, updatedBoard.value, published.value.message, null, this.mapBigBoardErrorToStatusCode(published.value));
+      return;
+    }
+
+    await this.renderBigBoardEditor(res, session, updatedBoard.value, null, successMessage);
+  }
+
+  async publishBigBoardPlayerInfo(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Publishing big board player info");
+    await this.saveThenPublishBigBoardEntry(
+      req,
+      res,
+      session,
+      (year, creator, entryId) => this.service.publishBigBoardEntryPlayerInfo(year, creator, entryId),
+      "Player info published.",
+    );
+  }
+
+  async publishBigBoardWriteup(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Publishing big board writeup");
+    await this.saveThenPublishBigBoardEntry(
+      req,
+      res,
+      session,
+      (year, creator, entryId) => this.service.publishBigBoardEntryWriteup(year, creator, entryId),
+      "Writeup published.",
+    );
   }
 
   async deleteArticle(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void> {

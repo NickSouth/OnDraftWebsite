@@ -376,7 +376,7 @@ class OnDraftService implements IOnDraftService {
     if (!POSITIONS.includes(entry.position as Position)) {
       return Err(BigBoardValidationError(`Position must be one of: ${POSITIONS.join(", ")}`));
     }
-    if (entry.height.feet < 0 || entry.height.inches < 0 || entry.height.inches >= 12) {
+    if (entry.height.feet <= 0 || entry.height.inches < 0 || entry.height.inches >= 12) {
       return Err(BigBoardValidationError("Height must be a valid feet/inches combination."));
     }
     if (entry.weight <= 0) {
@@ -652,10 +652,8 @@ class OnDraftService implements IOnDraftService {
     const entries = input.entries.map((entryInput) => {
       const existing = entryInput.id ? existingById.get(entryInput.id) : undefined;
       const next = this.normalizeBigBoardEntry(entryInput, existing);
-      if (existing) {
-        next.playerInfoPublished = existing.playerInfoPublished && !this.playerInfoChanged(existing, next);
-        next.writeupPublished = existing.writeupPublished && !this.writeupChanged(existing, next);
-      }
+      next.playerInfoPublished = entryInput.playerInfoPublished ?? false;
+      next.writeupPublished = entryInput.writeupPublished ?? false;
       return next;
     });
 

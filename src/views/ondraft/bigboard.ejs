@@ -7,7 +7,7 @@
     <div id="big-board-heading-actions" class="big-board-heading-actions">
       <%- include("partials/bigBoardControls", { board, years, creators }) %>
       <% if (isAdmin) { %>
-        <a class="button-link" href="/bigboard/new">Create entry</a>
+        <a class="button-link" href="/bigboard/edit?year=<%= board.year %>&creator=<%= board.creator %>">Edit board</a>
       <% } %>
     </div>
   </div>

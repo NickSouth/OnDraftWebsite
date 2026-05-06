@@ -10,9 +10,27 @@
             <span><%= entry.position %><%= entry.posRank ? entry.posRank : "" %> &middot; <%= entry.school %></span>
           </div>
           <p>
-            Age <%= entry.age %> &middot; <%= entry.height.feet %>'<%= entry.height.inches %>" &middot; <%= entry.weight %> lbs
+            <%= entry.height.feet %>'<%= entry.height.inches %>" &middot; <%= entry.weight %> lbs
           </p>
-          <p><%= entry.writeup %></p>
+          <% if (entry.writeupPublished) { %>
+            <details class="big-board-writeup">
+              <summary>Writeup</summary>
+              <div class="big-board-writeup-grid">
+                <section>
+                  <h3>Strengths</h3>
+                  <p><%= entry.writeup.strengths %></p>
+                </section>
+                <section>
+                  <h3>Weaknesses</h3>
+                  <p><%= entry.writeup.weaknesses %></p>
+                </section>
+                <section>
+                  <h3>Rundown</h3>
+                  <p><%= entry.writeup.rundown %></p>
+                </section>
+              </div>
+            </details>
+          <% } %>
         </li>
       <% }) %>
     </ol>

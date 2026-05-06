@@ -350,7 +350,7 @@ describe("OnDraftService big board editing", () => {
     }
   });
 
-  it("unpublishes only the edited section of a saved row", async () => {
+  it("saves independent publication checkbox state for each section", async () => {
     const ondraftService = service();
     const created = await ondraftService.createBigBoardEntry({
       year: 2026,
@@ -380,6 +380,8 @@ describe("OnDraftService big board editing", () => {
         {
           ...created.value,
           school: "Updated OnDraft",
+          playerInfoPublished: false,
+          writeupPublished: true,
         },
       ],
     });
@@ -400,6 +402,8 @@ describe("OnDraftService big board editing", () => {
         {
           ...created.value,
           school: "Updated OnDraft",
+          playerInfoPublished: true,
+          writeupPublished: false,
           writeup: {
             ...created.value.writeup,
             rundown: "Updated rundown.",

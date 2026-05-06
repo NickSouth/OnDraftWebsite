@@ -98,6 +98,111 @@ describe("OnDraft HTTP contracts", () => {
     expect(hotTakes.text).toContain("Log in");
   });
 
+  it("lets admins edit board rows and publish player info separately from writeups", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+
+    const emptyBoard = await agent.get("/bigboard");
+    expect(emptyBoard.status).toBe(200);
+    expect(emptyBoard.text).toContain("Edit board");
+    expect(emptyBoard.text).not.toContain("Create entry");
+
+    const editor = await agent.get("/bigboard/edit?year=2026&creator=Ryan");
+    expect(editor.status).toBe(200);
+    expect(editor.text).toContain("Edit Big Board");
+    expect(editor.text).toContain("Add player");
+    expect(editor.text).toContain("Player Pub");
+    expect(editor.text).toContain("Writeup Pub");
+
+    const draft = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": "entry-1",
+        "entries[0][playerName]": "Hidden Prospect",
+        "entries[0][school]": "OnDraft State",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2",
+        "entries[0][weight]": "220",
+        "entries[0][strengths]": "Pocket movement",
+        "entries[0][weaknesses]": "Pressure answers",
+        "entries[0][rundown]": "Starter traits.",
+        "entries[0][notes]": "Private eval note.",
+      });
+
+    expect(draft.status).toBe(200);
+    expect(draft.text).toContain("Saved.");
+
+    const hiddenPublicBoard = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
+    expect(hiddenPublicBoard.status).toBe(200);
+    expect(hiddenPublicBoard.text).not.toContain("Hidden Prospect");
+
+    const publishInfo = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": "entry-1",
+        "entries[0][playerName]": "Hidden Prospect",
+        "entries[0][school]": "OnDraft State",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2",
+        "entries[0][weight]": "220",
+        "entries[0][strengths]": "Pocket movement",
+        "entries[0][weaknesses]": "Pressure answers",
+        "entries[0][rundown]": "Starter traits.",
+        "entries[0][notes]": "Private eval note.",
+        "entries[0][playerInfoPublished]": "true",
+      });
+
+    expect(publishInfo.status).toBe(200);
+    expect(publishInfo.text).toContain("Saved.");
+
+    const visibleWithoutWriteup = await agent.get("/bigboard?year=2026&creator=Ryan");
+    expect(visibleWithoutWriteup.status).toBe(200);
+    expect(visibleWithoutWriteup.text).toContain("Hidden Prospect");
+    expect(visibleWithoutWriteup.text).not.toContain("Starter traits.");
+    expect(visibleWithoutWriteup.text).not.toContain("Private eval note.");
+
+    const publishWriteup = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": "entry-1",
+        "entries[0][playerName]": "Hidden Prospect",
+        "entries[0][school]": "OnDraft State",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2",
+        "entries[0][weight]": "220",
+        "entries[0][strengths]": "Pocket movement",
+        "entries[0][weaknesses]": "Pressure answers",
+        "entries[0][rundown]": "Starter traits.",
+        "entries[0][notes]": "Private eval note.",
+        "entries[0][playerInfoPublished]": "true",
+        "entries[0][writeupPublished]": "true",
+      });
+
+    expect(publishWriteup.status).toBe(200);
+    expect(publishWriteup.text).toContain("Saved.");
+
+    const visibleWithWriteup = await agent.get("/bigboard?year=2026&creator=Ryan");
+    expect(visibleWithWriteup.status).toBe(200);
+    expect(visibleWithWriteup.text).toContain("Starter traits.");
+    expect(visibleWithWriteup.text).toContain("Pocket movement");
+    expect(visibleWithWriteup.text).not.toContain("Private eval note.");
+  });
+
   it("supports hot take posting, filtering, liking, commenting, and owner deletion", async () => {
     const agent = await adminAgent();
 

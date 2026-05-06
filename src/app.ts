@@ -440,6 +440,66 @@ class ExpressApp implements IApp {
     );
 
     this.app.get(
+      "/bigboard/edit",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.showEditBigBoard(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/bigboard/edit",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.saveBigBoard(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/bigboard/edit/autosave",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.autosaveBigBoard(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/bigboard/edit/publish-player-info",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.publishBigBoardPlayerInfo(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/bigboard/edit/publish-writeup",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.publishBigBoardWriteup(req, res, browserSession);
+      }),
+    );
+
+    this.app.get(
       "/bigboard",
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
