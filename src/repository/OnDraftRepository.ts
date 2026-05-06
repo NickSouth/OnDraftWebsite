@@ -47,6 +47,7 @@ export const UnknownBigBoardError = (message: string): BigBoardError => ({ name:
 export interface IOnDraftRepository {
     getBigBoard(year: number, creator: BigBoardCreator): Promise<Result<BigBoard, BigBoardError>>;
     createBigBoardYear(year: number): Promise<Result<void, BigBoardError>>;
+    deleteBigBoardYear(year: number): Promise<Result<void, BigBoardError>>;
     getBigBoardYears(): Promise<Result<number[], BigBoardError>>;
     getArticles(published?: boolean): Promise<Result<Article[], ArticleError>>;
     getArticleTags(): Promise<Result<string[], ArticleError>>;

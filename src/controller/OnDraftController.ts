@@ -34,6 +34,8 @@ export interface IOnDraftController {
   commentOnHotTake(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   deleteHotTake(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   createBigBoardEntry(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  createBigBoardYear(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  deleteBigBoardYear(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   saveBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   autosaveBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   publishBigBoardPlayerInfo(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
@@ -1074,6 +1076,57 @@ class OnDraftController implements IOnDraftController {
       return;
     }
     res.redirect(`/bigboard?year=${input.year}&creator=${input.creator ?? "Ryan"}`);
+  }
+
+  async createBigBoardYear(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Creating big board year");
+    const year = this.parseBigBoardYear(req.body.year);
+    const creator = this.parseBigBoardCreator(req.body.creator) ?? "Ryan";
+    const result = await this.service.createBigBoardYear(year);
+    if (result.ok === false) {
+      const board = await this.service.getBigBoard(undefined, creator);
+      if (board.ok === true) {
+        await this.renderBigBoardEditor(res, session, board.value, result.value.message, null, this.mapBigBoardErrorToStatusCode(result.value));
+        return;
+      }
+      res.status(this.mapBigBoardErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    res.redirect(`/bigboard/edit?year=${year}&creator=${encodeURIComponent(creator)}`);
+  }
+
+  async deleteBigBoardYear(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Deleting big board year");
+    const year = this.parseBigBoardYear(req.body.year);
+    const creator = this.parseBigBoardCreator(req.body.creator) ?? "Ryan";
+    const result = await this.service.deleteBigBoardYear(year);
+    if (result.ok === false) {
+      const board = await this.service.getBigBoard(undefined, creator);
+      if (board.ok === true) {
+        await this.renderBigBoardEditor(res, session, board.value, result.value.message, null, this.mapBigBoardErrorToStatusCode(result.value));
+        return;
+      }
+      res.status(this.mapBigBoardErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    const yearsResult = await this.service.getBigBoardYears();
+    if (yearsResult.ok === false) {
+      res.status(this.mapBigBoardErrorToStatusCode(yearsResult.value)).send(yearsResult.value.message);
+      return;
+    }
+
+    const nextYear = yearsResult.value[0] ?? new Date().getFullYear();
+    if (yearsResult.value.length === 0) {
+      const createDefaultYear = await this.service.createBigBoardYear(nextYear);
+      if (createDefaultYear.ok === false && createDefaultYear.value.name !== "DuplicateBigBoardYear") {
+        res.status(this.mapBigBoardErrorToStatusCode(createDefaultYear.value)).send(createDefaultYear.value.message);
+        return;
+      }
+    }
+
+    res.redirect(`/bigboard/edit?year=${nextYear}&creator=${encodeURIComponent(creator)}`);
   }
 
   async saveBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {

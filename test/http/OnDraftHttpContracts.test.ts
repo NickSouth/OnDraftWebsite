@@ -111,8 +111,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(editor.status).toBe(200);
     expect(editor.text).toContain("Edit Big Board");
     expect(editor.text).toContain("Add player");
-    expect(editor.text).toContain("Player Pub");
-    expect(editor.text).toContain("Writeup Pub");
+    expect(editor.text).toContain("Publish");
 
     const draft = await agent
       .post("/bigboard/edit")
@@ -201,6 +200,51 @@ describe("OnDraft HTTP contracts", () => {
     expect(visibleWithWriteup.text).toContain("Starter traits.");
     expect(visibleWithWriteup.text).toContain("Pocket movement");
     expect(visibleWithWriteup.text).not.toContain("Private eval note.");
+  });
+
+  it("lets admins create a new big board year from the editor", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+
+    const editor = await agent.get("/bigboard/edit");
+    expect(editor.status).toBe(200);
+    expect(editor.text).toContain("Create draft class");
+
+    const createYear = await agent
+      .post("/bigboard/years")
+      .type("form")
+      .send({ year: "2027", creator: "Aleks" });
+
+    expect(createYear.status).toBe(302);
+    expect(createYear.headers.location).toBe("/bigboard/edit?year=2027&creator=Aleks");
+
+    const newYearEditor = await agent.get(createYear.headers.location);
+    expect(newYearEditor.status).toBe(200);
+    expect(newYearEditor.text).toContain("2027 Aleks");
+    expect(newYearEditor.text).toContain('<option value="2027" selected>2027</option>');
+    expect(newYearEditor.text).toContain("Are you sure? This will delete all boards from that year");
+  });
+
+  it("lets admins delete a big board year from the editor", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+
+    await agent
+      .post("/bigboard/years")
+      .type("form")
+      .send({ year: "2027", creator: "Ryan" });
+
+    const deleteYear = await agent
+      .post("/bigboard/years/delete")
+      .type("form")
+      .send({ year: "2027", creator: "Ryan" });
+
+    expect(deleteYear.status).toBe(302);
+    expect(deleteYear.headers.location).toBe("/bigboard/edit?year=2026&creator=Ryan");
+
+    const editor = await agent.get(deleteYear.headers.location);
+    expect(editor.status).toBe(200);
+    expect(editor.text).not.toContain('<option value="2027"');
   });
 
   it("supports hot take posting, filtering, liking, commenting, and owner deletion", async () => {

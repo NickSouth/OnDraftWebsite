@@ -107,6 +107,8 @@ export interface IOnDraftService {
   deleteArticle(id: string): Promise<Result<void, ArticleError>>;
   deleteBigBoardEntry(year: number | undefined, creator: BigBoardCreator | undefined, playerName: string): Promise<Result<void, BigBoardError>>;
   getBigBoard(year?: number, creator?: BigBoardCreator): Promise<Result<BigBoard, BigBoardError>>;
+  createBigBoardYear(year: number | undefined): Promise<Result<void, BigBoardError>>;
+  deleteBigBoardYear(year: number | undefined): Promise<Result<void, BigBoardError>>;
   getBigBoardYears(): Promise<Result<number[], BigBoardError>>;
   getArticles(published?: boolean): Promise<Result<Article[], ArticleError>>;
   getArticleTags(): Promise<Result<string[], ArticleError>>;
@@ -738,6 +740,22 @@ class OnDraftService implements IOnDraftService {
 
   async getBigBoardYears(): Promise<Result<number[], BigBoardError>> {
     return await this.repository.getBigBoardYears();
+  }
+
+  async createBigBoardYear(year: number | undefined): Promise<Result<void, BigBoardError>> {
+    const normalizedYear = this.normalizeBigBoardYear(year);
+    if (normalizedYear.ok === false) {
+      return Err(normalizedYear.value);
+    }
+    return await this.repository.createBigBoardYear(normalizedYear.value);
+  }
+
+  async deleteBigBoardYear(year: number | undefined): Promise<Result<void, BigBoardError>> {
+    const normalizedYear = this.normalizeBigBoardYear(year);
+    if (normalizedYear.ok === false) {
+      return Err(normalizedYear.value);
+    }
+    return await this.repository.deleteBigBoardYear(normalizedYear.value);
   }
 
   async getArticles(published = true): Promise<Result<Article[], ArticleError>> {

@@ -17,32 +17,52 @@
       <h1>Edit Big Board</h1>
     </div>
     <div class="big-board-heading-actions">
-      <form class="big-board-controls" method="get" action="/bigboard/edit">
-        <label class="big-board-year-control">
-          <span>Year</span>
-          <select name="year" onchange="this.form.submit();">
-            <% years.forEach((year) => { %>
-              <option value="<%= year %>" <%= board.year === year ? "selected" : "" %>><%= year %></option>
-            <% }) %>
-          </select>
-        </label>
-        <input type="hidden" name="creator" value="<%= board.creator %>" />
-        <div class="creator-toggle" aria-label="Board creator">
-          <% creators.forEach((creator) => { %>
-            <button
-              type="button"
-              class="<%= board.creator === creator ? "is-active" : "" %>"
-              aria-pressed="<%= board.creator === creator ? "true" : "false" %>"
-              onclick="this.form.creator.value = '<%= creator %>'; this.form.submit();"
-            >
-              <%= creator %>
-            </button>
-          <% }) %>
+      <div class="board-class-tools">
+        <div class="board-class-selector-row">
+          <form class="big-board-controls" method="get" action="/bigboard/edit">
+            <label class="big-board-year-control">
+              <span>Draft Class</span>
+              <select name="year" onchange="this.form.submit();">
+                <% years.forEach((year) => { %>
+                  <option value="<%= year %>" <%= board.year === year ? "selected" : "" %>><%= year %></option>
+                <% }) %>
+              </select>
+            </label>
+            <input type="hidden" name="creator" value="<%= board.creator %>" />
+            <div class="creator-toggle" aria-label="Board creator">
+              <% creators.forEach((creator) => { %>
+                <button
+                  type="button"
+                  class="<%= board.creator === creator ? "is-active" : "" %>"
+                  aria-pressed="<%= board.creator === creator ? "true" : "false" %>"
+                  onclick="this.form.creator.value = '<%= creator %>'; this.form.submit();"
+                >
+                  <%= creator %>
+                </button>
+              <% }) %>
+            </div>
+          </form>
         </div>
-      </form>
-      <a class="button-link secondary-link" href="/bigboard?year=<%= board.year %>&creator=<%= board.creator %>">View board</a>
+        <form class="create-board-year-form" method="post" action="/bigboard/years">
+          <span>Create draft class</span>
+          <input type="hidden" name="creator" value="<%= board.creator %>" />
+          <input type="number" name="year" min="1900" max="2100" placeholder="Year" required />
+          <button type="submit" class="secondary-button">Create</button>
+        </form>
+      </div>
     </div>
   </div>
+
+  <form
+    id="delete-board-year-form"
+    class="delete-board-year-form"
+    method="post"
+    action="/bigboard/years/delete"
+    onsubmit="return confirm('Are you sure? This will delete all boards from that year');"
+  >
+    <input type="hidden" name="year" value="<%= board.year %>" />
+    <input type="hidden" name="creator" value="<%= board.creator %>" />
+  </form>
 
   <% if (errorMessage) { %>
     <p class="error-message"><%= errorMessage %></p>
@@ -66,10 +86,6 @@
       <div>
         <strong><%= board.year %> <%= board.creator %></strong>
         <span id="big-board-save-status" class="save-status"><%= statusMessage || "" %></span>
-      </div>
-      <div class="form-actions">
-        <button type="submit" class="secondary-button">Save</button>
-        <button type="submit" name="action" value="exit">Save and exit</button>
       </div>
     </div>
 
@@ -156,6 +172,18 @@
     </div>
     <div class="board-editor-bottom-actions">
       <button type="button" class="secondary-button" data-add-player>Add player</button>
+      <div class="board-editor-bottom-save-actions">
+        <button type="submit" class="secondary-button">Save</button>
+        <button type="submit" name="action" value="exit">Save and exit</button>
+        <button
+          type="submit"
+          form="delete-board-year-form"
+          class="danger-button delete-board-year-button"
+          aria-label="Delete <%= board.year %> draft class"
+        >
+          Delete <%= board.year %>
+        </button>
+      </div>
     </div>
   </form>
 

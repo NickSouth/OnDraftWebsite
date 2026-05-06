@@ -62,6 +62,15 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
     return Ok(undefined);
   }
 
+  async deleteBigBoardYear(year: number): Promise<Result<void, BigBoardError>> {
+    const startingLength = this.bigBoards.length;
+    this.bigBoards = this.bigBoards.filter((bigBoard) => bigBoard.year !== year);
+    if (this.bigBoards.length === startingLength) {
+      return Err(BigBoardNotFound(`Big boards for ${year} were not found.`));
+    }
+    return Ok(undefined);
+  }
+
   async getBigBoardYears(): Promise<Result<number[], BigBoardError>> {
     const years = new Set(this.bigBoards.map((bigBoard) => bigBoard.year));
     return Ok([...years].sort((first, second) => second - first));
