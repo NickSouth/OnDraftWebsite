@@ -8,23 +8,33 @@ export type BigBoard = {
   entries: BigBoardEntry[];
 };
 
-export type Position = "QB" | "RB" | "WR" | "TE" | "K" | "OT" | "OG" | "C" | "DE" | "DT" | "LB" | "CB" | "S";
+export const POSITIONS = ["QB", "RB", "WR", "TE", "OT", "IOL", "EDGE", "IDL", "LB", "CB", "S"] as const;
+export type Position = typeof POSITIONS[number];
 
 export type Height = {
   feet: number;
   inches: number;
 };
 
+export type BigBoardWriteup = {
+  strengths: string;
+  weaknesses: string;
+  rundown: string;
+};
+
 export type BigBoardEntry = {
+  id: string;
   playerName: string;
-  position: Position;
+  position: Position | "";
   school: string;
-  rank: number;
-  posRank: number;
-  writeup: string;
-  age: number;
-  height: Height;
-  weight: number;
+  rank: number | null;
+  posRank: number | null;
+  height: Height | null;
+  weight: number | null;
+  playerInfoPublished: boolean;
+  writeup: BigBoardWriteup;
+  writeupPublished: boolean;
+  notes: string;
 };
 
 export type ArticleFilter = {

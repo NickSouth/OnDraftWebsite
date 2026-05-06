@@ -47,14 +47,18 @@ export const UnknownBigBoardError = (message: string): BigBoardError => ({ name:
 export interface IOnDraftRepository {
     getBigBoard(year: number, creator: BigBoardCreator): Promise<Result<BigBoard, BigBoardError>>;
     createBigBoardYear(year: number): Promise<Result<void, BigBoardError>>;
+    deleteBigBoardYear(year: number): Promise<Result<void, BigBoardError>>;
     getBigBoardYears(): Promise<Result<number[], BigBoardError>>;
     getArticles(published?: boolean): Promise<Result<Article[], ArticleError>>;
     getArticleTags(): Promise<Result<string[], ArticleError>>;
     createArticle(article: Article): Promise<Result<Article, ArticleError>>;
     createBigBoardEntry(year: number, creator: BigBoardCreator, entry: BigBoardEntry): Promise<Result<BigBoardEntry, BigBoardError>>;
+    updateBigBoardEntry(year: number, creator: BigBoardCreator, entry: BigBoardEntry): Promise<Result<BigBoardEntry, BigBoardError>>;
+    replaceBigBoardEntries(year: number, creator: BigBoardCreator, entries: BigBoardEntry[]): Promise<Result<BigBoard, BigBoardError>>;
     deleteArticle(id: string): Promise<Result<void, ArticleError>>;
     deleteBigBoardEntry(year: number, creator: BigBoardCreator, playerName: string): Promise<Result<void, BigBoardError>>;
     getBigBoardEntry(year: number, creator: BigBoardCreator, playerName: string): Promise<Result<BigBoardEntry, BigBoardError>>;
+    getBigBoardEntryById(year: number, creator: BigBoardCreator, entryId: string): Promise<Result<BigBoardEntry, BigBoardError>>;
     getArticle(id: string): Promise<Result<Article, ArticleError>>;
     getFilteredArticles(filter: ArticleFilter): Promise<Result<Article[], ArticleError>>;
     updateArticle(article: Article): Promise<Result<Article, ArticleError>>;

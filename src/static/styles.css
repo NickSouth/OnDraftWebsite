@@ -28,7 +28,8 @@ body {
 a,
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
@@ -40,6 +41,14 @@ textarea {
 main {
   max-width: 1040px;
   margin: 0 auto;
+}
+
+.page-shell:has(.board-editor-page) {
+  width: min(1760px, 100%);
+}
+
+main:has(.board-editor-page) {
+  max-width: none;
 }
 
 .main-nav {
@@ -444,6 +453,25 @@ textarea {
   margin-bottom: 6px;
 }
 
+.big-board-writeup {
+  margin-top: 8px;
+}
+
+.big-board-writeup summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.big-board-writeup-grid {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.big-board-writeup-grid p {
+  white-space: pre-wrap;
+}
+
 .readable-page {
   max-width: 760px;
 }
@@ -755,6 +783,195 @@ textarea {
 .ondraft-form {
   display: grid;
   gap: 10px;
+}
+
+.board-editor-page {
+  max-width: none;
+}
+
+.board-editor-form {
+  display: grid;
+  gap: 12px;
+}
+
+.board-class-tools {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+}
+
+.board-class-selector-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.delete-board-year-form {
+  display: none;
+}
+
+.delete-board-year-button {
+  min-height: 42px;
+  padding: 10px 14px;
+  font-weight: 700;
+}
+
+.create-board-year-form {
+  display: grid;
+  gap: 6px;
+  width: 148px;
+  justify-self: end;
+  padding: 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  background: #f6f6f6;
+}
+
+.create-board-year-form span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.create-board-year-form input,
+.create-board-year-form button {
+  min-height: 32px;
+  padding: 5px 8px;
+  font-size: 0.9rem;
+}
+
+.board-editor-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.board-editor-bottom-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.board-editor-bottom-save-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  align-items: center;
+}
+
+.save-status {
+  display: inline-flex;
+  margin-left: 10px;
+  color: var(--success);
+}
+
+.save-status-error {
+  color: var(--danger);
+}
+
+.board-editor-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+}
+
+.board-editor-table {
+  width: 100%;
+  min-width: 1380px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  background: #ffffff;
+}
+
+.board-editor-table th,
+.board-editor-table td {
+  vertical-align: top;
+  padding: 0;
+  border-bottom: 1px solid var(--panel-border);
+  border-right: 1px solid var(--panel-border);
+}
+
+.board-editor-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 8px;
+  background: #f6f6f6;
+  text-align: left;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.board-editor-table th:last-child,
+.board-editor-table td:last-child {
+  border-right: 0;
+}
+
+.board-editor-table th:nth-child(1) { width: 62px; }
+.board-editor-table th:nth-child(2) { width: 170px; }
+.board-editor-table th:nth-child(3) { width: 128px; }
+.board-editor-table th:nth-child(4) { width: 72px; }
+.board-editor-table th:nth-child(5) { width: 82px; }
+.board-editor-table th:nth-child(6) { width: 72px; }
+.board-editor-table th:nth-child(7) { width: 76px; }
+.board-editor-table th:nth-child(8),
+.board-editor-table th:nth-child(12) { width: 64px; }
+.board-editor-table th:nth-child(9),
+.board-editor-table th:nth-child(10),
+.board-editor-table th:nth-child(11) { width: 195px; }
+.board-editor-table th:nth-child(13) { width: 180px; }
+
+.board-editor-table input,
+.board-editor-table select,
+.board-editor-table textarea {
+  width: 100%;
+  min-height: 42px;
+  padding: 8px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.board-editor-table textarea {
+  min-height: 86px;
+  resize: vertical;
+}
+
+.board-editor-table input:focus,
+.board-editor-table select:focus,
+.board-editor-table textarea:focus {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid rgba(37, 99, 235, 0.22);
+  border-color: transparent;
+}
+
+.board-editor-table ::placeholder {
+  color: #9ca3af;
+}
+
+.board-editor-publish-cell {
+  padding: 0 !important;
+  text-align: center;
+}
+
+.publish-state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 42px;
+  color: var(--muted);
+}
+
+.publish-state input {
+  width: auto;
 }
 
 .toolbar {

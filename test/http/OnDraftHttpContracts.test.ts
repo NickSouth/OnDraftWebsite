@@ -98,6 +98,155 @@ describe("OnDraft HTTP contracts", () => {
     expect(hotTakes.text).toContain("Log in");
   });
 
+  it("lets admins edit board rows and publish player info separately from writeups", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+
+    const emptyBoard = await agent.get("/bigboard");
+    expect(emptyBoard.status).toBe(200);
+    expect(emptyBoard.text).toContain("Edit board");
+    expect(emptyBoard.text).not.toContain("Create entry");
+
+    const editor = await agent.get("/bigboard/edit?year=2026&creator=Ryan");
+    expect(editor.status).toBe(200);
+    expect(editor.text).toContain("Edit Big Board");
+    expect(editor.text).toContain("Add player");
+    expect(editor.text).toContain("Publish");
+
+    const draft = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": "entry-1",
+        "entries[0][playerName]": "Hidden Prospect",
+        "entries[0][school]": "OnDraft State",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2",
+        "entries[0][weight]": "220",
+        "entries[0][strengths]": "Pocket movement",
+        "entries[0][weaknesses]": "Pressure answers",
+        "entries[0][rundown]": "Starter traits.",
+        "entries[0][notes]": "Private eval note.",
+      });
+
+    expect(draft.status).toBe(200);
+    expect(draft.text).toContain("Saved.");
+
+    const hiddenPublicBoard = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
+    expect(hiddenPublicBoard.status).toBe(200);
+    expect(hiddenPublicBoard.text).not.toContain("Hidden Prospect");
+
+    const publishInfo = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": "entry-1",
+        "entries[0][playerName]": "Hidden Prospect",
+        "entries[0][school]": "OnDraft State",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2",
+        "entries[0][weight]": "220",
+        "entries[0][strengths]": "Pocket movement",
+        "entries[0][weaknesses]": "Pressure answers",
+        "entries[0][rundown]": "Starter traits.",
+        "entries[0][notes]": "Private eval note.",
+        "entries[0][playerInfoPublished]": "true",
+      });
+
+    expect(publishInfo.status).toBe(200);
+    expect(publishInfo.text).toContain("Saved.");
+
+    const visibleWithoutWriteup = await agent.get("/bigboard?year=2026&creator=Ryan");
+    expect(visibleWithoutWriteup.status).toBe(200);
+    expect(visibleWithoutWriteup.text).toContain("Hidden Prospect");
+    expect(visibleWithoutWriteup.text).not.toContain("Starter traits.");
+    expect(visibleWithoutWriteup.text).not.toContain("Private eval note.");
+
+    const publishWriteup = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": "entry-1",
+        "entries[0][playerName]": "Hidden Prospect",
+        "entries[0][school]": "OnDraft State",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2",
+        "entries[0][weight]": "220",
+        "entries[0][strengths]": "Pocket movement",
+        "entries[0][weaknesses]": "Pressure answers",
+        "entries[0][rundown]": "Starter traits.",
+        "entries[0][notes]": "Private eval note.",
+        "entries[0][playerInfoPublished]": "true",
+        "entries[0][writeupPublished]": "true",
+      });
+
+    expect(publishWriteup.status).toBe(200);
+    expect(publishWriteup.text).toContain("Saved.");
+
+    const visibleWithWriteup = await agent.get("/bigboard?year=2026&creator=Ryan");
+    expect(visibleWithWriteup.status).toBe(200);
+    expect(visibleWithWriteup.text).toContain("Starter traits.");
+    expect(visibleWithWriteup.text).toContain("Pocket movement");
+    expect(visibleWithWriteup.text).not.toContain("Private eval note.");
+  });
+
+  it("lets admins create a new big board year from the editor", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+
+    const editor = await agent.get("/bigboard/edit");
+    expect(editor.status).toBe(200);
+    expect(editor.text).toContain("Create draft class");
+
+    const createYear = await agent
+      .post("/bigboard/years")
+      .type("form")
+      .send({ year: "2027", creator: "Aleks" });
+
+    expect(createYear.status).toBe(302);
+    expect(createYear.headers.location).toBe("/bigboard/edit?year=2027&creator=Aleks");
+
+    const newYearEditor = await agent.get(createYear.headers.location);
+    expect(newYearEditor.status).toBe(200);
+    expect(newYearEditor.text).toContain("2027 Aleks");
+    expect(newYearEditor.text).toContain('<option value="2027" selected>2027</option>');
+    expect(newYearEditor.text).toContain("Are you sure? This will delete all boards from that year");
+  });
+
+  it("lets admins delete a big board year from the editor", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+
+    await agent
+      .post("/bigboard/years")
+      .type("form")
+      .send({ year: "2027", creator: "Ryan" });
+
+    const deleteYear = await agent
+      .post("/bigboard/years/delete")
+      .type("form")
+      .send({ year: "2027", creator: "Ryan" });
+
+    expect(deleteYear.status).toBe(302);
+    expect(deleteYear.headers.location).toBe("/bigboard/edit?year=2026&creator=Ryan");
+
+    const editor = await agent.get(deleteYear.headers.location);
+    expect(editor.status).toBe(200);
+    expect(editor.text).not.toContain('<option value="2027"');
+  });
+
   it("supports hot take posting, filtering, liking, commenting, and owner deletion", async () => {
     const agent = await adminAgent();
 

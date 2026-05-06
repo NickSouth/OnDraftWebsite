@@ -1,7 +1,7 @@
 import { randomInt } from "node:crypto";
 import { Err, Ok, Result } from "../lib/result";
 import sanitizeHtml from "sanitize-html";
-import { Article, ArticleContent, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, Position, ArticleFilter, Comment, ForumPost, ForumPostFilter } from "../model/OnDraftContent";
+import { Article, ArticleContent, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, BigBoardWriteup, Height, POSITIONS, Position, ArticleFilter, Comment, ForumPost, ForumPostFilter } from "../model/OnDraftContent";
 import { UnknownArticleError, UnknownForumPostError, ArticleError,  BigBoardError, IOnDraftRepository, ArticleValidationError, BigBoardValidationError, ForumPostError, ForumPostValidationError } from "../repository/OnDraftRepository";
 
 const ARTICLE_PDF_MAX_BYTES = 5 * 1024 * 1024;
@@ -9,6 +9,7 @@ const ARTICLE_ID_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy
 const ARTICLE_ID_LENGTH = 5;
 const ARTICLE_ID_MAX_ATTEMPTS = 10;
 const COMMENT_ID_LENGTH = 8;
+const BIG_BOARD_ENTRY_ID_LENGTH = 8;
 const DEFAULT_ARTICLE_IMAGE_URLS = [
   "/images/article-defaults/football.png",
   "/images/article-defaults/helmet.png",
@@ -36,18 +37,48 @@ export interface CreateArticleInput {
 export interface BigBoardEntryInput {
   year?: number;
   creator?: BigBoardCreator;
+  id?: string;
   playerName: string;
   position: string;
   school: string;
   rank: number;
   posRank: number;
-  writeup: string;
-  age: number;
+  writeup?: string;
+  strengths?: string;
+  weaknesses?: string;
+  rundown?: string;
+  notes?: string;
   height: {
     feet: number;
     inches: number;
   };
   weight: number;
+  playerInfoPublished?: boolean;
+  writeupPublished?: boolean;
+}
+
+export interface BigBoardEditableEntryInput {
+  id?: string;
+  playerName?: string;
+  position?: string;
+  school?: string;
+  rank?: number | string | null;
+  posRank?: number | string | null;
+  height?: Height | null;
+  weight?: number | string | null;
+  writeup?: Partial<BigBoardWriteup> | string;
+  strengths?: string;
+  weaknesses?: string;
+  rundown?: string;
+  notes?: string;
+  playerInfoPublished?: boolean;
+  writeupPublished?: boolean;
+}
+
+export interface SaveBigBoardEntriesInput {
+  year?: number;
+  creator?: BigBoardCreator;
+  entries: BigBoardEditableEntryInput[];
 }
 
 export interface CreateCommentInput {
@@ -70,9 +101,14 @@ export interface IOnDraftService {
   previewUpdatedArticle(id: string, input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
   updateArticle(id: string, input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
   createBigBoardEntry(input: BigBoardEntryInput): Promise<Result<BigBoardEntry, BigBoardError>>;
+  saveBigBoardEntries(input: SaveBigBoardEntriesInput): Promise<Result<BigBoard, BigBoardError>>;
+  publishBigBoardEntryPlayerInfo(year: number | undefined, creator: BigBoardCreator | undefined, entryId: string): Promise<Result<BigBoardEntry, BigBoardError>>;
+  publishBigBoardEntryWriteup(year: number | undefined, creator: BigBoardCreator | undefined, entryId: string): Promise<Result<BigBoardEntry, BigBoardError>>;
   deleteArticle(id: string): Promise<Result<void, ArticleError>>;
   deleteBigBoardEntry(year: number | undefined, creator: BigBoardCreator | undefined, playerName: string): Promise<Result<void, BigBoardError>>;
   getBigBoard(year?: number, creator?: BigBoardCreator): Promise<Result<BigBoard, BigBoardError>>;
+  createBigBoardYear(year: number | undefined): Promise<Result<void, BigBoardError>>;
+  deleteBigBoardYear(year: number | undefined): Promise<Result<void, BigBoardError>>;
   getBigBoardYears(): Promise<Result<number[], BigBoardError>>;
   getArticles(published?: boolean): Promise<Result<Article[], ArticleError>>;
   getArticleTags(): Promise<Result<string[], ArticleError>>;
@@ -134,6 +170,10 @@ class OnDraftService implements IOnDraftService {
 
   private createCommentId(): string {
     return this.createRandomId(COMMENT_ID_LENGTH);
+  }
+
+  private createBigBoardEntryId(): string {
+    return this.createRandomId(BIG_BOARD_ENTRY_ID_LENGTH);
   }
 
   private defaultArticleImageUrl(): string {
@@ -278,27 +318,145 @@ class OnDraftService implements IOnDraftService {
     return this.validateArticleContent(input.content);
   }
 
-  private validateBigBoardEntry(input: BigBoardEntryInput): Result<void, BigBoardError> {
-    const validPositions = ["QB", "RB", "WR", "TE", "K", "OT", "OG", "C", "DE", "DT", "LB", "CB", "S"];
-    if (!input.playerName || !input.position || !input.school || !input.writeup) {
-      return Err(BigBoardValidationError("Player name, position, school, and writeup are required."));
+  private normalizeNullableInteger(value: number | string | null | undefined): number | null {
+    if (value === null || value === undefined || value === "") {
+      return null;
     }
-    if (input.playerName.trim() === "" || input.school.trim() === "" || input.writeup.trim() === "") {
-      return Err(BigBoardValidationError("Player name, school, and writeup cannot be empty."));
+    const normalized = typeof value === "number" ? value : Number(value);
+    return Number.isInteger(normalized) ? normalized : null;
+  }
+
+  private normalizeHeight(height: Height | null | undefined): Height | null {
+    if (!height) {
+      return null;
     }
-    if (!validPositions.includes(input.position)) {
-      return Err(BigBoardValidationError(`Position must be one of: ${validPositions.join(", ")}`));
+    const feet = this.normalizeNullableInteger(height.feet);
+    const inches = this.normalizeNullableInteger(height.inches);
+    if (feet === null || inches === null) {
+      return null;
     }
-    if (input.age <= 0) {
-      return Err(BigBoardValidationError("Age must be a positive number."));
+    return { feet, inches };
+  }
+
+  private normalizeBigBoardWriteup(input: BigBoardEntryInput | BigBoardEditableEntryInput): BigBoardWriteup {
+    if (typeof input.writeup === "object" && input.writeup !== null) {
+      return {
+        strengths: input.writeup.strengths?.trim() ?? "",
+        weaknesses: input.writeup.weaknesses?.trim() ?? "",
+        rundown: input.writeup.rundown?.trim() ?? "",
+      };
     }
-    if (input.height.feet < 0 || input.height.inches < 0 || input.height.inches >= 12) {
+
+    return {
+      strengths: input.strengths?.trim() ?? "",
+      weaknesses: input.weaknesses?.trim() ?? "",
+      rundown: input.rundown?.trim() ?? (typeof input.writeup === "string" ? input.writeup.trim() : ""),
+    };
+  }
+
+  private normalizeBigBoardEntry(input: BigBoardEditableEntryInput, existing?: BigBoardEntry): BigBoardEntry {
+    return {
+      id: input.id?.trim() || existing?.id || this.createBigBoardEntryId(),
+      playerName: input.playerName?.trim() ?? existing?.playerName ?? "",
+      position: POSITIONS.includes(input.position as Position) ? input.position as Position : "",
+      school: input.school?.trim() ?? existing?.school ?? "",
+      rank: this.normalizeNullableInteger(input.rank),
+      posRank: this.normalizeNullableInteger(input.posRank),
+      height: this.normalizeHeight(input.height),
+      weight: this.normalizeNullableInteger(input.weight),
+      playerInfoPublished: existing?.playerInfoPublished ?? false,
+      writeup: this.normalizeBigBoardWriteup(input),
+      writeupPublished: existing?.writeupPublished ?? false,
+      notes: input.notes?.trim() ?? existing?.notes ?? "",
+    };
+  }
+
+  private validatePlayerInfoForPublication(entry: BigBoardEntry): Result<void, BigBoardError> {
+    if (!entry.playerName || !entry.school || !entry.position || !entry.height || entry.weight === null || entry.rank === null || entry.posRank === null) {
+      return Err(BigBoardValidationError("Player name, school, position, height, weight, rank, and position rank are required before publishing player info."));
+    }
+    if (!POSITIONS.includes(entry.position as Position)) {
+      return Err(BigBoardValidationError(`Position must be one of: ${POSITIONS.join(", ")}`));
+    }
+    if (entry.height.feet <= 0 || entry.height.inches < 0 || entry.height.inches >= 12) {
       return Err(BigBoardValidationError("Height must be a valid feet/inches combination."));
     }
-    if (input.weight <= 0) {
-      return Err(BigBoardValidationError("Weight must be a positive number."));
+    if (entry.weight <= 0) {
+      return Err(BigBoardValidationError("Weight must be a positive number in pounds."));
+    }
+    if (entry.rank <= 0 || entry.posRank <= 0) {
+      return Err(BigBoardValidationError("Rank and position rank must be positive integers."));
     }
     return Ok(undefined);
+  }
+
+  private validateWriteupForPublication(entry: BigBoardEntry): Result<void, BigBoardError> {
+    if (!entry.writeup.strengths || !entry.writeup.weaknesses || !entry.writeup.rundown) {
+      return Err(BigBoardValidationError("Strengths, weaknesses, and rundown are required before publishing a player writeup."));
+    }
+    return Ok(undefined);
+  }
+
+  private validatePublishedBigBoardEntries(entries: BigBoardEntry[]): Result<void, BigBoardError> {
+    const entryIds = new Set<string>();
+    const publishedPlayerInfo = entries.filter((entry) => entry.playerInfoPublished);
+    const ranks = new Map<number, string>();
+    const positionRanks = new Map<string, string>();
+
+    for (const entry of entries) {
+      if (entryIds.has(entry.id)) {
+        return Err(BigBoardValidationError(`Big board entry id "${entry.id}" is duplicated.`));
+      }
+      entryIds.add(entry.id);
+    }
+
+    for (const entry of publishedPlayerInfo) {
+      const playerInfoValidation = this.validatePlayerInfoForPublication(entry);
+      if (playerInfoValidation.ok === false) {
+        return Err(playerInfoValidation.value);
+      }
+      if (entry.rank !== null) {
+        const existing = ranks.get(entry.rank);
+        if (existing && existing !== entry.id) {
+          return Err(BigBoardValidationError(`Overall rank ${entry.rank} is already used by another player.`));
+        }
+        ranks.set(entry.rank, entry.id);
+      }
+      if (entry.position && entry.posRank !== null) {
+        const positionRankKey = `${entry.position}:${entry.posRank}`;
+        const existing = positionRanks.get(positionRankKey);
+        if (existing && existing !== entry.id) {
+          return Err(BigBoardValidationError(`${entry.position}${entry.posRank} is already used by another player at the same position.`));
+        }
+        positionRanks.set(positionRankKey, entry.id);
+      }
+    }
+
+    for (const entry of entries.filter((entry) => entry.writeupPublished)) {
+      const writeupValidation = this.validateWriteupForPublication(entry);
+      if (writeupValidation.ok === false) {
+        return Err(writeupValidation.value);
+      }
+    }
+
+    return Ok(undefined);
+  }
+
+  private playerInfoChanged(existing: BigBoardEntry, next: BigBoardEntry): boolean {
+    return existing.playerName !== next.playerName ||
+      existing.school !== next.school ||
+      existing.position !== next.position ||
+      existing.rank !== next.rank ||
+      existing.posRank !== next.posRank ||
+      existing.weight !== next.weight ||
+      existing.height?.feet !== next.height?.feet ||
+      existing.height?.inches !== next.height?.inches;
+  }
+
+  private writeupChanged(existing: BigBoardEntry, next: BigBoardEntry): boolean {
+    return existing.writeup.strengths !== next.writeup.strengths ||
+      existing.writeup.weaknesses !== next.writeup.weaknesses ||
+      existing.writeup.rundown !== next.writeup.rundown;
   }
 
   private validateCommentInput(input: CreateCommentInput): Result<void, ArticleError> {
@@ -453,36 +611,102 @@ class OnDraftService implements IOnDraftService {
     if (key.ok === false) {
       return Err(key.value);
     }
-    const validation = this.validateBigBoardEntry(input);
-    if (validation.ok === false) {
-      return Err(validation.value);
-    }
-    const entry: BigBoardEntry = {
-      playerName: input.playerName,
-      position: input.position as Position,
-      school: input.school,
-      rank: input.rank,
-      posRank: input.posRank,
-      writeup: input.writeup,
-      age: input.age,
-      height: {
-        feet: input.height.feet,
-        inches: input.height.inches
-      },
-      weight: input.weight
-    };
-    const result = await this.repository.createBigBoardEntry(key.value.year, key.value.creator, entry);
-    if (result.ok === false && result.value.name === "BigBoardNotFound") {
+    const entry = this.normalizeBigBoardEntry(input);
+    entry.playerInfoPublished = input.playerInfoPublished ?? true;
+    entry.writeupPublished = input.writeupPublished ?? false;
+
+    let board = await this.repository.getBigBoard(key.value.year, key.value.creator);
+    if (board.ok === false && board.value.name === "BigBoardNotFound") {
       const createYearResult = await this.repository.createBigBoardYear(key.value.year);
       if (createYearResult.ok === false && createYearResult.value.name !== "DuplicateBigBoardYear") {
         return Err(createYearResult.value);
       }
-      return await this.repository.createBigBoardEntry(key.value.year, key.value.creator, entry);
+      board = await this.repository.getBigBoard(key.value.year, key.value.creator);
     }
+    if (board.ok === false) {
+      return Err(board.value);
+    }
+
+    const validation = this.validatePublishedBigBoardEntries([...board.value.entries, entry]);
+    if (validation.ok === false) {
+      return Err(validation.value);
+    }
+
+    const result = await this.repository.createBigBoardEntry(key.value.year, key.value.creator, entry);
     if (result.ok === false) {
       return Err(result.value);
     }
     return Ok(result.value);
+  }
+
+  async saveBigBoardEntries(input: SaveBigBoardEntriesInput): Promise<Result<BigBoard, BigBoardError>> {
+    const key = this.normalizeBigBoardKey(input.year, input.creator);
+    if (key.ok === false) {
+      return Err(key.value);
+    }
+
+    const existingBoard = await this.getBigBoard(key.value.year, key.value.creator);
+    if (existingBoard.ok === false) {
+      return Err(existingBoard.value);
+    }
+
+    const existingById = new Map(existingBoard.value.entries.map((entry) => [entry.id, entry]));
+    const entries = input.entries.map((entryInput) => {
+      const existing = entryInput.id ? existingById.get(entryInput.id) : undefined;
+      const next = this.normalizeBigBoardEntry(entryInput, existing);
+      next.playerInfoPublished = entryInput.playerInfoPublished ?? false;
+      next.writeupPublished = entryInput.writeupPublished ?? false;
+      return next;
+    });
+
+    const validation = this.validatePublishedBigBoardEntries(entries);
+    if (validation.ok === false) {
+      return Err(validation.value);
+    }
+
+    return await this.repository.replaceBigBoardEntries(key.value.year, key.value.creator, entries);
+  }
+
+  async publishBigBoardEntryPlayerInfo(year: number | undefined, creator: BigBoardCreator | undefined, entryId: string): Promise<Result<BigBoardEntry, BigBoardError>> {
+    const key = this.normalizeBigBoardKey(year, creator);
+    if (key.ok === false) {
+      return Err(key.value);
+    }
+
+    const board = await this.getBigBoard(key.value.year, key.value.creator);
+    if (board.ok === false) {
+      return Err(board.value);
+    }
+    const entry = board.value.entries.find((candidate) => candidate.id === entryId);
+    if (!entry) {
+      return Err(BigBoardValidationError(`Big board entry with id "${entryId}" was not found.`));
+    }
+    const next = { ...entry, playerInfoPublished: true };
+    const validation = this.validatePublishedBigBoardEntries(board.value.entries.map((candidate) => candidate.id === entryId ? next : candidate));
+    if (validation.ok === false) {
+      return Err(validation.value);
+    }
+    return await this.repository.updateBigBoardEntry(key.value.year, key.value.creator, next);
+  }
+
+  async publishBigBoardEntryWriteup(year: number | undefined, creator: BigBoardCreator | undefined, entryId: string): Promise<Result<BigBoardEntry, BigBoardError>> {
+    const key = this.normalizeBigBoardKey(year, creator);
+    if (key.ok === false) {
+      return Err(key.value);
+    }
+
+    const entry = await this.repository.getBigBoardEntryById(key.value.year, key.value.creator, entryId);
+    if (entry.ok === false) {
+      return Err(entry.value);
+    }
+    const validation = this.validateWriteupForPublication(entry.value);
+    if (validation.ok === false) {
+      return Err(validation.value);
+    }
+    return await this.repository.updateBigBoardEntry(key.value.year, key.value.creator, {
+      ...entry.value,
+      writeupPublished: true,
+    });
   }
 
   async deleteArticle(id: string): Promise<Result<void, ArticleError>> {
@@ -516,6 +740,22 @@ class OnDraftService implements IOnDraftService {
 
   async getBigBoardYears(): Promise<Result<number[], BigBoardError>> {
     return await this.repository.getBigBoardYears();
+  }
+
+  async createBigBoardYear(year: number | undefined): Promise<Result<void, BigBoardError>> {
+    const normalizedYear = this.normalizeBigBoardYear(year);
+    if (normalizedYear.ok === false) {
+      return Err(normalizedYear.value);
+    }
+    return await this.repository.createBigBoardYear(normalizedYear.value);
+  }
+
+  async deleteBigBoardYear(year: number | undefined): Promise<Result<void, BigBoardError>> {
+    const normalizedYear = this.normalizeBigBoardYear(year);
+    if (normalizedYear.ok === false) {
+      return Err(normalizedYear.value);
+    }
+    return await this.repository.deleteBigBoardYear(normalizedYear.value);
   }
 
   async getArticles(published = true): Promise<Result<Article[], ArticleError>> {
