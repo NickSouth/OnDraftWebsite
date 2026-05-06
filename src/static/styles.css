@@ -144,6 +144,63 @@ textarea {
   margin-bottom: 18px;
 }
 
+.big-board-heading {
+  align-items: flex-start;
+}
+
+.big-board-heading-actions,
+.big-board-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.big-board-year-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.big-board-year-control span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.big-board-year-control select {
+  width: auto;
+  min-width: 86px;
+  padding: 8px 28px 8px 10px;
+}
+
+.creator-toggle {
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  background: #ffffff;
+}
+
+.creator-toggle button {
+  min-width: 72px;
+  padding: 7px 10px;
+  border-color: transparent;
+  background: #ffffff;
+  color: var(--accent-strong);
+}
+
+.creator-toggle button:hover {
+  background: #eef4ff;
+}
+
+.creator-toggle button.is-active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+}
+
 .home-actions {
   display: flex;
   flex-wrap: wrap;

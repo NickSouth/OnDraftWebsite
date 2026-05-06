@@ -1,0 +1,20 @@
+<div id="big-board-results">
+  <% if (bigBoard.length === 0) { %>
+    <p>No draft board entries have been created yet.</p>
+  <% } else { %>
+    <ol class="ranking-list">
+      <% bigBoard.forEach((entry) => { %>
+        <li>
+          <div>
+            <strong><%= entry.rank %>. <%= entry.playerName %></strong>
+            <span><%= entry.position %><%= entry.posRank ? entry.posRank : "" %> &middot; <%= entry.school %></span>
+          </div>
+          <p>
+            Age <%= entry.age %> &middot; <%= entry.height.feet %>'<%= entry.height.inches %>" &middot; <%= entry.weight %> lbs
+          </p>
+          <p><%= entry.writeup %></p>
+        </li>
+      <% }) %>
+    </ol>
+  <% } %>
+</div>

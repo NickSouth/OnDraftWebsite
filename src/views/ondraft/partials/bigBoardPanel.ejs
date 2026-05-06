@@ -1,0 +1,7 @@
+<div id="big-board-heading-actions" class="big-board-heading-actions" hx-swap-oob="true">
+  <%- include("bigBoardControls", { board, years, creators }) %>
+  <% if (isAdmin) { %>
+    <a class="button-link" href="/bigboard/new">Create entry</a>
+  <% } %>
+</div>
+<%- include("bigBoardResults", { bigBoard }) %>

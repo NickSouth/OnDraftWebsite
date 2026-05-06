@@ -1,5 +1,12 @@
 export interface IOnDraftContent {}
-export type BigBoard = BigBoardEntry[];
+export const BIG_BOARD_CREATORS = ["Ryan", "Aleks"] as const;
+export type BigBoardCreator = typeof BIG_BOARD_CREATORS[number];
+
+export type BigBoard = {
+  year: number;
+  creator: BigBoardCreator;
+  entries: BigBoardEntry[];
+};
 
 export type Position = "QB" | "RB" | "WR" | "TE" | "K" | "OT" | "OG" | "C" | "DE" | "DT" | "LB" | "CB" | "S";
 

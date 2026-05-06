@@ -5,13 +5,13 @@ import type { CreateArticleInput, IOnDraftService } from "../service/OnDraftServ
 import type { ILoggingService } from "../service/LoggingService";
 import { ArticleError, BigBoardError } from "../repository/OnDraftRepository";
 import { publicArticleUploadUrl } from "../uploads/articlePdfUpload";
-import type { Article, ArticleContent, ArticleFilter } from "../model/OnDraftContent";
+import { BIG_BOARD_CREATORS, type Article, type ArticleContent, type ArticleFilter, type BigBoardCreator } from "../model/OnDraftContent";
 
 export interface IOnDraftController {
   showHome(res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showArticles(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showFilteredArticles(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
-  showBigBoard(res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  showBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showOneArticle(res: Response, session: IOnDraftBrowserSession, id: string): Promise<void>;
   showCreateArticleForm(res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showEditArticleForm(res: Response, session: IOnDraftBrowserSession, id: string): Promise<void>;
@@ -55,9 +55,11 @@ class OnDraftController implements IOnDraftController {
 
   private mapBigBoardErrorToStatusCode(error: BigBoardError): number {
     switch (error.name) {
+      case "BigBoardNotFound":
       case "PlayerNotFound":
         return 404;
       case "DuplicatePlayer":
+      case "DuplicateBigBoardYear":
         return 409;
       case "BigBoardValidationError":
         return 400;
@@ -66,6 +68,20 @@ class OnDraftController implements IOnDraftController {
       default:
         return 500;
     }
+  }
+
+  private parseBigBoardCreator(value: unknown): BigBoardCreator | undefined {
+    return typeof value === "string" && BIG_BOARD_CREATORS.includes(value as BigBoardCreator)
+      ? value as BigBoardCreator
+      : undefined;
+  }
+
+  private parseBigBoardYear(value: unknown): number | undefined {
+    if (typeof value !== "string" || value.trim() === "") {
+      return undefined;
+    }
+    const year = Number(value);
+    return Number.isInteger(year) ? year : undefined;
   }
 
   private articleUpload(req: Request, fieldName: "pdf" | "image"): Express.Multer.File | undefined {
@@ -327,16 +343,36 @@ class OnDraftController implements IOnDraftController {
     });
   }
 
-  async showBigBoard(res: Response, session: IOnDraftBrowserSession): Promise<void> {
+  async showBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
     this.logger.info("Rendering big board page");
-    const result = await this.service.getBigBoard();
+    const selectedYear = this.parseBigBoardYear(req.query.year);
+    const selectedCreator = this.parseBigBoardCreator(req.query.creator);
+    const result = await this.service.getBigBoard(selectedYear, selectedCreator);
     if (result.ok === false) {
       this.logger.error("Failed to load big board" + { error: result.value });
       res.status(this.mapBigBoardErrorToStatusCode(result.value)).send(result.value.message);
       return;
     }
-    const rankedBigBoard = [...result.value].sort((a, b) => a.rank - b.rank);
-    res.render("ondraft/bigboard", { session, isAdmin: isAdminSession(session), bigBoard: rankedBigBoard });
+    const yearsResult = await this.service.getBigBoardYears();
+    if (yearsResult.ok === false) {
+      this.logger.error("Failed to load big board years" + { error: yearsResult.value });
+      res.status(this.mapBigBoardErrorToStatusCode(yearsResult.value)).send(yearsResult.value.message);
+      return;
+    }
+    const rankedBigBoard = [...result.value.entries].sort((a, b) => a.rank - b.rank);
+    const viewModel = {
+      session,
+      isAdmin: isAdminSession(session),
+      bigBoard: rankedBigBoard,
+      board: result.value,
+      years: yearsResult.value,
+      creators: BIG_BOARD_CREATORS,
+    };
+    if (req.get("HX-Request") === "true") {
+      res.render("ondraft/partials/bigBoardPanel", { ...viewModel, layout: false });
+      return;
+    }
+    res.render("ondraft/bigboard", viewModel);
   }
 
   async showOneArticle(res: Response, session: IOnDraftBrowserSession, id: string): Promise<void> {
@@ -420,7 +456,11 @@ class OnDraftController implements IOnDraftController {
       session,
       isAdmin: isAdminSession(session),
       errorMessage: null,
-      values: {},
+      values: {
+        year: new Date().getFullYear(),
+        creator: "Ryan",
+      },
+      creators: BIG_BOARD_CREATORS,
     });
   }
 
@@ -634,6 +674,8 @@ class OnDraftController implements IOnDraftController {
   async createBigBoardEntry(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void> {
     this.logger.info("Creating new big board entry");
     const input = {
+      year: Number(req.body.year),
+      creator: this.parseBigBoardCreator(req.body.creator),
       playerName: req.body.playerName,
       position: req.body.position,
       school: req.body.school,
@@ -655,10 +697,11 @@ class OnDraftController implements IOnDraftController {
         isAdmin: isAdminSession(session),
         errorMessage: result.value.message,
         values: req.body,
+        creators: BIG_BOARD_CREATORS,
       });
       return;
     }
-    res.redirect("/bigboard");
+    res.redirect(`/bigboard?year=${input.year}&creator=${input.creator ?? "Ryan"}`);
   }
 
   async deleteArticle(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void> {
@@ -676,7 +719,9 @@ class OnDraftController implements IOnDraftController {
   async deleteBigBoardEntry(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void> {
     this.logger.info("Deleting big board entry");
     const playerName = req.params.playerName;
-    const result = await this.service.deleteBigBoardEntry(playerName);
+    const year = this.parseBigBoardYear(req.query.year);
+    const creator = this.parseBigBoardCreator(req.query.creator);
+    const result = await this.service.deleteBigBoardEntry(year, creator, playerName);
     if (result.ok === false) {
       this.logger.error(`Failed to delete big board entry for player "${playerName}" ` + { error: result.value });
       res.status(this.mapBigBoardErrorToStatusCode(result.value)).send(result.value.message);
