@@ -1,8 +1,8 @@
 import { randomInt } from "node:crypto";
 import { Err, Ok, Result } from "../lib/result";
 import sanitizeHtml from "sanitize-html";
-import { Article, ArticleContent, BigBoard, BigBoardEntry, Position, ArticleFilter, Comment } from "../model/WebsiteContent";
-import { UnknownArticleError, ArticleError,  BigBoardError, IWebsiteRepository, ArticleValidationError, BigBoardValidationError } from "../repository/WebsiteRepository";
+import { Article, ArticleContent, BigBoard, BigBoardEntry, Position, ArticleFilter, Comment } from "../model/OnDraftContent";
+import { UnknownArticleError, ArticleError,  BigBoardError, IOnDraftRepository, ArticleValidationError, BigBoardValidationError } from "../repository/OnDraftRepository";
 
 const ARTICLE_PDF_MAX_BYTES = 5 * 1024 * 1024;
 const ARTICLE_ID_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -55,7 +55,7 @@ export interface CreateCommentInput {
 }
 
 
-export interface IWebsiteService {
+export interface IOnDraftService {
   previewArticle(input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
   createArticle(input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
   previewUpdatedArticle(id: string, input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
@@ -76,8 +76,8 @@ export interface IWebsiteService {
   commentReplyByCommentId(commentId: string, reply: CreateCommentInput): Promise<Result<Comment, ArticleError>>;
 }
 
-class WebsiteService implements IWebsiteService {
-  constructor(private readonly repository: IWebsiteRepository) {}
+class OnDraftService implements IOnDraftService {
+  constructor(private readonly repository: IOnDraftRepository) {}
 
   private createArticleId(): string {
     return this.createRandomId(ARTICLE_ID_LENGTH);
@@ -505,6 +505,6 @@ class WebsiteService implements IWebsiteService {
   }
 }
 
-export function CreateWebsiteService(repository: IWebsiteRepository): IWebsiteService {
-  return new WebsiteService(repository);
+export function CreateOnDraftService(repository: IOnDraftRepository): IOnDraftService {
+  return new OnDraftService(repository);
 }

@@ -1,15 +1,15 @@
-import { CreateInMemoryWebsiteRepository } from "../../src/repository/InMemoryWebsiteRepository";
-import { CreateWebsiteService } from "../../src/service/WebsiteService";
+import { CreateInMemoryOnDraftRepository } from "../../src/repository/InMemoryOnDraftRepository";
+import { CreateOnDraftService } from "../../src/service/OnDraftService";
 
 function service() {
-  return CreateWebsiteService(CreateInMemoryWebsiteRepository());
+  return CreateOnDraftService(CreateInMemoryOnDraftRepository());
 }
 
-describe("WebsiteService article validation", () => {
+describe("OnDraftService article validation", () => {
   it("generates a five character alphanumeric article id", async () => {
     const result = await service().createArticle({
       title: "Draft Notes",
-      author: "Alice Website",
+      author: "Alice OnDraft",
       writeup: "A short draft summary.",
       publicationDate: new Date("2024-01-01"),
       content: {
@@ -27,7 +27,7 @@ describe("WebsiteService article validation", () => {
   it("assigns a default football thumbnail when no article image is provided", async () => {
     const result = await service().createArticle({
       title: "Default Image Notes",
-      author: "Alice Website",
+      author: "Alice OnDraft",
       writeup: "A short default image summary.",
       publicationDate: new Date("2024-01-01"),
       content: {
@@ -43,10 +43,10 @@ describe("WebsiteService article validation", () => {
   });
 
   it("keeps draft articles out of the published article list", async () => {
-    const websiteService = service();
-    const draft = await websiteService.createArticle({
+    const ondraftService = service();
+    const draft = await ondraftService.createArticle({
       title: "Draft Notes",
-      author: "Alice Website",
+      author: "Alice OnDraft",
       writeup: "A short draft summary.",
       published: false,
       publicationDate: new Date("2024-01-01"),
@@ -61,8 +61,8 @@ describe("WebsiteService article validation", () => {
       expect(draft.value.published).toBe(false);
     }
 
-    const publishedArticles = await websiteService.getArticles();
-    const draftArticles = await websiteService.getArticles(false);
+    const publishedArticles = await ondraftService.getArticles();
+    const draftArticles = await ondraftService.getArticles(false);
 
     expect(publishedArticles.ok).toBe(true);
     expect(draftArticles.ok).toBe(true);
@@ -74,10 +74,10 @@ describe("WebsiteService article validation", () => {
   });
 
   it("adds comments, likes articles, likes comments, and deletes comments", async () => {
-    const websiteService = service();
-    const created = await websiteService.createArticle({
+    const ondraftService = service();
+    const created = await ondraftService.createArticle({
       title: "Discussion Notes",
-      author: "Alice Website",
+      author: "Alice OnDraft",
       writeup: "A short discussion summary.",
       publicationDate: new Date("2024-01-01"),
       content: {
@@ -91,19 +91,19 @@ describe("WebsiteService article validation", () => {
       return;
     }
 
-    const likedArticle = await websiteService.likeByArticleId(created.value.id, "reader-1");
+    const likedArticle = await ondraftService.likeByArticleId(created.value.id, "reader-1");
     expect(likedArticle.ok).toBe(true);
     if (likedArticle.ok === true) {
       expect(likedArticle.value.likes).toBe(1);
     }
 
-    const unlikedArticle = await websiteService.likeByArticleId(created.value.id, "reader-1");
+    const unlikedArticle = await ondraftService.likeByArticleId(created.value.id, "reader-1");
     expect(unlikedArticle.ok).toBe(true);
     if (unlikedArticle.ok === true) {
       expect(unlikedArticle.value.likes).toBe(0);
     }
 
-    const comment = await websiteService.commentByArticleId({
+    const comment = await ondraftService.commentByArticleId({
       articleId: created.value.id,
       userId: "reader-1",
       userName: "Reader One",
@@ -117,22 +117,22 @@ describe("WebsiteService article validation", () => {
     expect(comment.value.id).toMatch(/^[A-Za-z0-9]{8}$/);
     expect(comment.value.likes).toBe(0);
 
-    const likedComment = await websiteService.likeByCommentId(comment.value.id, "reader-1");
+    const likedComment = await ondraftService.likeByCommentId(comment.value.id, "reader-1");
     expect(likedComment.ok).toBe(true);
     if (likedComment.ok === true) {
       expect(likedComment.value.likes).toBe(1);
     }
 
-    const unlikedComment = await websiteService.likeByCommentId(comment.value.id, "reader-1");
+    const unlikedComment = await ondraftService.likeByCommentId(comment.value.id, "reader-1");
     expect(unlikedComment.ok).toBe(true);
     if (unlikedComment.ok === true) {
       expect(unlikedComment.value.likes).toBe(0);
     }
 
-    const deleted = await websiteService.deleteComment(comment.value.id);
+    const deleted = await ondraftService.deleteComment(comment.value.id);
     expect(deleted.ok).toBe(true);
 
-    const deletedAgain = await websiteService.deleteComment(comment.value.id);
+    const deletedAgain = await ondraftService.deleteComment(comment.value.id);
     expect(deletedAgain.ok).toBe(false);
     if (deletedAgain.ok === false) {
       expect(deletedAgain.value.name).toBe("CommentNotFound");
@@ -142,7 +142,7 @@ describe("WebsiteService article validation", () => {
   it("rejects empty plain text article content", async () => {
     const result = await service().createArticle({
       title: "Draft Notes",
-      author: "Alice Website",
+      author: "Alice OnDraft",
       writeup: "A short draft summary.",
       publicationDate: new Date("2024-01-01"),
       content: {
@@ -161,7 +161,7 @@ describe("WebsiteService article validation", () => {
   it("normalizes unique short tags and rejects long writeups", async () => {
     const created = await service().createArticle({
       title: "Tagged Notes",
-      author: "Alice Website",
+      author: "Alice OnDraft",
       writeup: "A short tagged summary.",
       tags: ["Draft", "draft", "Film Room"],
       publicationDate: new Date("2024-01-01"),
@@ -178,7 +178,7 @@ describe("WebsiteService article validation", () => {
 
     const rejected = await service().createArticle({
       title: "Long Writeup",
-      author: "Alice Website",
+      author: "Alice OnDraft",
       writeup: "x".repeat(201),
       publicationDate: new Date("2024-01-01"),
       content: {
@@ -196,7 +196,7 @@ describe("WebsiteService article validation", () => {
   it("rejects invalid PDF article content metadata", async () => {
     const result = await service().createArticle({
       title: "PDF Notes",
-      author: "Alice Website",
+      author: "Alice OnDraft",
       writeup: "A short PDF summary.",
       publicationDate: new Date("2024-01-01"),
       content: {
@@ -218,7 +218,7 @@ describe("WebsiteService article validation", () => {
   it("sanitizes HTML article content before saving", async () => {
     const result = await service().createArticle({
       title: "HTML Notes",
-      author: "Alice Website",
+      author: "Alice OnDraft",
       writeup: "A short HTML summary.",
       publicationDate: new Date("2024-01-01"),
       content: {

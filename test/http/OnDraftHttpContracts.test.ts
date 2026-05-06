@@ -12,16 +12,16 @@ async function adminAgent() {
   await agent
     .post("/login")
     .type("form")
-    .send({ email: "ryanmcwalter@cheekscast.test", password: "password123" });
+    .send({ email: "ryanmcwalter@ondraft.test", password: "password123" });
   return agent;
 }
 
-async function loginAdminAgent(website: ReturnType<typeof app>) {
-  const agent = request.agent(website);
+async function loginAdminAgent(ondraft: ReturnType<typeof app>) {
+  const agent = request.agent(ondraft);
   await agent
     .post("/login")
     .type("form")
-    .send({ email: "ryanmcwalter@cheekscast.test", password: "password123" });
+    .send({ email: "ryanmcwalter@ondraft.test", password: "password123" });
   return agent;
 }
 
@@ -34,7 +34,7 @@ function removeUploadedAssetsFromHtml(html: string) {
   }
 }
 
-describe("Website HTTP contracts", () => {
+describe("OnDraft HTTP contracts", () => {
   it("renders the home page for anonymous visitors", async () => {
     const response = await request(app()).get("/");
 
@@ -49,16 +49,16 @@ describe("Website HTTP contracts", () => {
     const login = await agent
       .post("/login")
       .type("form")
-      .send({ email: "ryanmcwalter@cheekscast.test", password: "password123" });
+      .send({ email: "ryanmcwalter@ondraft.test", password: "password123" });
 
     expect(login.status).toBe(302);
     expect(login.headers.location).toBe("/");
 
-    const website = await agent.get("/");
+    const ondraft = await agent.get("/");
 
-    expect(website.status).toBe(200);
-    expect(website.text).toContain("Website Shell");
-    expect(website.text).toContain("Ryan McWalter");
+    expect(ondraft.status).toBe(200);
+    expect(ondraft.text).toContain("OnDraft");
+    expect(ondraft.text).toContain("Ryan McWalter");
   });
 
   it("registers a new user and signs them in", async () => {
@@ -69,24 +69,24 @@ describe("Website HTTP contracts", () => {
       .type("form")
       .send({
         displayName: "New Analyst",
-        email: "analyst@website.test",
+        email: "analyst@ondraft.test",
         password: "password123",
       });
 
     expect(register.status).toBe(302);
     expect(register.headers.location).toBe("/");
 
-    const website = await agent.get("/");
+    const ondraft = await agent.get("/");
 
-    expect(website.status).toBe(200);
-    expect(website.text).toContain("New Analyst");
+    expect(ondraft.status).toBe(200);
+    expect(ondraft.text).toContain("New Analyst");
   });
 
   it("allows anonymous visitors to view articles and the big board", async () => {
-    const website = app();
+    const ondraft = app();
 
-    const articles = await request(website).get("/articles");
-    const bigBoard = await request(website).get("/bigboard");
+    const articles = await request(ondraft).get("/articles");
+    const bigBoard = await request(ondraft).get("/bigboard");
 
     expect(articles.status).toBe(200);
     expect(articles.text).toContain("Articles");
@@ -151,8 +151,8 @@ describe("Website HTTP contracts", () => {
   });
 
   it("supports article likes and authenticated HTMX comments", async () => {
-    const website = app();
-    const admin = await loginAdminAgent(website);
+    const ondraft = app();
+    const admin = await loginAdminAgent(ondraft);
 
     const create = await admin
       .post("/articles")
@@ -170,7 +170,7 @@ describe("Website HTTP contracts", () => {
     const articlePath = create.headers.location;
     const articleId = articlePath.split("/").pop();
 
-    const anonymous = request.agent(website);
+    const anonymous = request.agent(ondraft);
     const like = await anonymous.post(`/articles/${articleId}/like`);
     expect(like.status).toBe(200);
     expect(like.text).toContain(">1</span>");
@@ -183,19 +183,19 @@ describe("Website HTTP contracts", () => {
     expect(likeAgain.status).toBe(200);
     expect(likeAgain.text).toContain(">1</span>");
 
-    const anonymousComment = await request(website)
+    const anonymousComment = await request(ondraft)
       .post(`/articles/${articleId}/comments`)
       .type("form")
       .send({ text: "Anonymous comment." });
     expect(anonymousComment.status).toBe(403);
 
-    const reader = request.agent(website);
+    const reader = request.agent(ondraft);
     await reader
       .post("/register")
       .type("form")
       .send({
         displayName: "Reader One",
-        email: "reader@website.test",
+        email: "reader@ondraft.test",
         password: "password123",
       });
 
@@ -231,7 +231,7 @@ describe("Website HTTP contracts", () => {
 
     await anonymous.post(`/comments/${commentId}/like`);
 
-    const articles = await request(website).get("/articles");
+    const articles = await request(ondraft).get("/articles");
     expect(articles.status).toBe(200);
     expect(articles.text).toContain("1 likes");
     expect(articles.text).toContain("1 comments");
@@ -242,8 +242,8 @@ describe("Website HTTP contracts", () => {
   });
 
   it("lets admins delete any comment and pages comments ten at a time", async () => {
-    const website = app();
-    const admin = await loginAdminAgent(website);
+    const ondraft = app();
+    const admin = await loginAdminAgent(ondraft);
 
     const create = await admin
       .post("/articles")
@@ -258,13 +258,13 @@ describe("Website HTTP contracts", () => {
       });
 
     const articleId = create.headers.location.split("/").pop();
-    const reader = request.agent(website);
+    const reader = request.agent(ondraft);
     await reader
       .post("/register")
       .type("form")
       .send({
         displayName: "Many Comments",
-        email: "many-comments@website.test",
+        email: "many-comments@ondraft.test",
         password: "password123",
       });
 
@@ -275,13 +275,13 @@ describe("Website HTTP contracts", () => {
         .send({ text: `Comment ${index}` });
     }
 
-    const firstPage = await request(website).get(`/articles/${articleId}/comments`);
+    const firstPage = await request(ondraft).get(`/articles/${articleId}/comments`);
     expect(firstPage.status).toBe(200);
     expect(firstPage.text).toContain("Comment 10");
     expect(firstPage.text).not.toContain("Comment 11");
     expect(firstPage.text).toContain("Show More");
 
-    const secondPage = await request(website).get(`/articles/${articleId}/comments?limit=20`);
+    const secondPage = await request(ondraft).get(`/articles/${articleId}/comments?limit=20`);
     expect(secondPage.status).toBe(200);
     expect(secondPage.text).toContain("Comment 11");
 
@@ -295,8 +295,8 @@ describe("Website HTTP contracts", () => {
   });
 
   it("sorts filtered article results by date, likes, and comments", async () => {
-    const website = app();
-    const admin = await loginAdminAgent(website);
+    const ondraft = app();
+    const admin = await loginAdminAgent(ondraft);
 
     const older = await admin
       .post("/articles")
@@ -323,25 +323,25 @@ describe("Website HTTP contracts", () => {
 
     const olderId = older.headers.location.split("/").pop();
     const newerId = newer.headers.location.split("/").pop();
-    await request(website).post(`/articles/${olderId}/like`);
+    await request(ondraft).post(`/articles/${olderId}/like`);
     await admin
       .post(`/articles/${newerId}/comments`)
       .type("form")
       .send({ text: "Newer comment." });
 
-    const articlesPage = await request(website).get("/articles");
+    const articlesPage = await request(ondraft).get("/articles");
     expect(articlesPage.status).toBe(200);
     expect(articlesPage.text).toContain('name="sortBy"');
     expect(articlesPage.text).toContain('name="sortDirection"');
     expect(articlesPage.text).toContain("htmx.trigger(this.form, 'submit')");
 
-    const dateAsc = await request(website).get("/articles/filter?sortBy=date&sortDirection=asc");
+    const dateAsc = await request(ondraft).get("/articles/filter?sortBy=date&sortDirection=asc");
     expect(dateAsc.text.indexOf("Older Sort Article")).toBeLessThan(dateAsc.text.indexOf("Newer Sort Article"));
 
-    const likesDesc = await request(website).get("/articles/filter?sortBy=likes&sortDirection=desc");
+    const likesDesc = await request(ondraft).get("/articles/filter?sortBy=likes&sortDirection=desc");
     expect(likesDesc.text.indexOf("Older Sort Article")).toBeLessThan(likesDesc.text.indexOf("Newer Sort Article"));
 
-    const commentsDesc = await request(website).get("/articles/filter?sortBy=comments&sortDirection=desc");
+    const commentsDesc = await request(ondraft).get("/articles/filter?sortBy=comments&sortDirection=desc");
     expect(commentsDesc.text.indexOf("Newer Sort Article")).toBeLessThan(commentsDesc.text.indexOf("Older Sort Article"));
   });
 

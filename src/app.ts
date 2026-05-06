@@ -4,15 +4,15 @@ import session from "express-session";
 import Layouts from "express-ejs-layouts";
 import { IAuthController } from "./auth/AuthController";
 import { IApp } from "./contracts";
-import { IWebsiteController } from "./controller/WebsiteController";
+import { IOnDraftController } from "./controller/OnDraftController";
 import { ARTICLE_PDF_MAX_BYTES, articleUpload } from "./uploads/articlePdfUpload";
 import {
   getAuthenticatedUser,
   isAdminSession,
   recordPageView,
-  touchWebsiteSession,
-  WebsiteSessionStore,
-} from "./session/WebsiteSession";
+  touchOnDraftSession,
+  OnDraftSessionStore,
+} from "./session/OnDraftSession";
 import { ILoggingService } from "./service/LoggingService";
 
 type AsyncRequestHandler = RequestHandler;
@@ -23,15 +23,15 @@ function asyncHandler(fn: AsyncRequestHandler) {
   };
 }
 
-function sessionStore(req: Request): WebsiteSessionStore {
-  return req.session as WebsiteSessionStore;
+function sessionStore(req: Request): OnDraftSessionStore {
+  return req.session as OnDraftSessionStore;
 }
 
 class ExpressApp implements IApp {
   private readonly app: express.Express;
 
   constructor(
-    private readonly controller: IWebsiteController,
+    private readonly controller: IOnDraftController,
     private readonly authController: IAuthController,
     private readonly logger: ILoggingService,
   ) {
@@ -54,8 +54,8 @@ class ExpressApp implements IApp {
     }));
     this.app.use(
       session({
-        name: "website.sid",
-        secret: process.env.SESSION_SECRET ?? "cheekscast-template-secret",
+        name: "ondraft.sid",
+        secret: process.env.SESSION_SECRET ?? "ondraft-template-secret",
         resave: false,
         saveUninitialized: false,
         cookie: {
@@ -76,14 +76,14 @@ class ExpressApp implements IApp {
 
   private requireAdmin(req: Request, res: Response): boolean {
     const store = sessionStore(req);
-    const browserSession = touchWebsiteSession(store);
+    const browserSession = touchOnDraftSession(store);
 
     if (isAdminSession(browserSession)) {
       return true;
     }
 
     this.logger.warn("Blocked non-admin request to an admin route");
-    res.status(403).render("website/partials/error", {
+    res.status(403).render("ondraft/partials/error", {
       message: "Admin access is required.",
     });
     return false;
@@ -106,7 +106,7 @@ class ExpressApp implements IApp {
           ? err.message
           : "Unable to upload the PDF article.";
 
-      res.status(400).render("website/createArticle", {
+      res.status(400).render("ondraft/createArticle", {
         session: browserSession,
         isAdmin: isAdminSession(browserSession),
         errorMessage: message,
@@ -229,7 +229,7 @@ class ExpressApp implements IApp {
         const contentType = req.query.contentType === "pdf" || req.query.contentType === "html"
           ? req.query.contentType
           : "plainText";
-        res.render("website/partials/articleContentFields", {
+        res.render("ondraft/partials/articleContentFields", {
           layout: false,
           values: { contentType },
         });
@@ -426,7 +426,7 @@ class ExpressApp implements IApp {
     this.app.use((err: unknown, _req: Request, res: Response, _next: (value?: unknown) => void) => {
       const message = err instanceof Error ? err.message : "Unexpected server error.";
       this.logger.error(message);
-      res.status(500).render("website/partials/error", {
+      res.status(500).render("ondraft/partials/error", {
         message: "Unexpected server error.",
         layout: false,
       });
@@ -439,7 +439,7 @@ class ExpressApp implements IApp {
 }
 
 export function CreateApp(
-  controller: IWebsiteController,
+  controller: IOnDraftController,
   authController: IAuthController,
   logger: ILoggingService,
 ): IApp {

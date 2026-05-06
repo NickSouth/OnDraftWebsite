@@ -1,5 +1,5 @@
 import { Result, Err, Ok } from "../lib/result";
-import { type BigBoard, Article, BigBoardEntry, ArticleFilter, Comment } from "../model/WebsiteContent";
+import { type BigBoard, Article, BigBoardEntry, ArticleFilter, Comment } from "../model/OnDraftContent";
 
 export type BigBoardError = 
     | {name: "PlayerNotFound"; message: string} 
@@ -27,7 +27,7 @@ export const BigBoardValidationError = (message: string): BigBoardError => ({ na
 export const UnknownArticleError = (message: string): ArticleError => ({ name: "UnknownArticleError", message });
 export const UnknownBigBoardError = (message: string): BigBoardError => ({ name: "UnknownBigBoardError", message });
 
-export interface IWebsiteRepository {
+export interface IOnDraftRepository {
     getBigBoard(): Promise<Result<BigBoard, BigBoardError>>;
     getArticles(published?: boolean): Promise<Result<Article[], ArticleError>>;
     getArticleTags(): Promise<Result<string[], ArticleError>>;

@@ -6,7 +6,7 @@ describe("AuthService", () => {
     const service = CreateAuthService(CreateInMemoryUserRepository());
 
     const result = await service.authenticate({
-      email: "ryanmcwalter@cheekscast.test",
+      email: "ryanmcwalter@ondraft.test",
       password: "password123",
     });
 
@@ -20,7 +20,7 @@ describe("AuthService", () => {
     const service = CreateAuthService(CreateInMemoryUserRepository());
 
     const result = await service.authenticate({
-      email: "ryanmcwalter@cheekscast.test",
+      email: "ryanmcwalter@ondraft.test",
       password: "wrong-password",
     });
 
@@ -39,7 +39,7 @@ describe("AuthService", () => {
       password: "password123",
     });
     const missingPassword = await service.authenticate({
-      email: "ryanmcwalter@cheekscast.test",
+      email: "ryanmcwalter@ondraft.test",
       password: "   ",
     });
 
@@ -58,13 +58,13 @@ describe("AuthService", () => {
 
     const result = await service.register({
       displayName: "Draft Analyst",
-      email: "draft@website.test",
+      email: "draft@ondraft.test",
       password: "password123",
     });
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.email).toBe("draft@website.test");
+      expect(result.value.email).toBe("draft@ondraft.test");
       expect(result.value.displayName).toBe("Draft Analyst");
     }
   });

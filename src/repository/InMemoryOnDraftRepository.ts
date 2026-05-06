@@ -1,9 +1,9 @@
 import { Err, Ok, Result } from "../lib/result";
-import { Article, ArticleFilter, BigBoard, BigBoardEntry, Comment } from "../model/WebsiteContent";
-import { ArticleNotFound, CommentNotFound, DuplicatePlayer, DuplicateArticle, type ArticleError, type BigBoardError, type IWebsiteRepository, PlayerNotFound } from "./WebsiteRepository";
+import { Article, ArticleFilter, BigBoard, BigBoardEntry, Comment } from "../model/OnDraftContent";
+import { ArticleNotFound, CommentNotFound, DuplicatePlayer, DuplicateArticle, type ArticleError, type BigBoardError, type IOnDraftRepository, PlayerNotFound } from "./OnDraftRepository";
 
 
-class InMemoryWebsiteRepository implements IWebsiteRepository {
+class InMemoryOnDraftRepository implements IOnDraftRepository {
   private bigBoard: BigBoard = [];
   private articles: Article[] = [];
 
@@ -235,6 +235,6 @@ class InMemoryWebsiteRepository implements IWebsiteRepository {
   }
 }
 
-export function CreateInMemoryWebsiteRepository(): IWebsiteRepository {
-  return new InMemoryWebsiteRepository();
+export function CreateInMemoryOnDraftRepository(): IOnDraftRepository {
+  return new InMemoryOnDraftRepository();
 }

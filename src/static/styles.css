@@ -663,7 +663,7 @@ textarea {
   color: var(--muted);
 }
 
-.website-form {
+.ondraft-form {
   display: grid;
   gap: 10px;
 }

@@ -1,4 +1,4 @@
-export interface IWebsiteContent {}
+export interface IOnDraftContent {}
 export type BigBoard = BigBoardEntry[];
 
 export type Position = "QB" | "RB" | "WR" | "TE" | "K" | "OT" | "OG" | "C" | "DE" | "DT" | "LB" | "CB" | "S";

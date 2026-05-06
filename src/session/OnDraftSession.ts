@@ -9,7 +9,7 @@ export interface IAuthenticatedUserSession {
   signedInAt: string;
 }
 
-export interface IWebsiteBrowserSession {
+export interface IOnDraftBrowserSession {
   browserId: string;
   browserLabel: string;
   visitCount: number;
@@ -18,19 +18,19 @@ export interface IWebsiteBrowserSession {
   authenticatedUser: IAuthenticatedUserSession | null;
 }
 
-export type WebsiteSessionStore = Session &
+export type OnDraftSessionStore = Session &
   Partial<SessionData> & {
-    website?: IWebsiteBrowserSession;
+    ondraft?: IOnDraftBrowserSession;
   };
 
 function createBrowserLabel(browserId: string): string {
   return `Browser ${browserId.slice(0, 4).toUpperCase()}`;
 }
 
-export function createInitialWebsiteSession(
+export function createInitialOnDraftSession(
   now: Date = new Date(),
   browserId: string = randomUUID(),
-): IWebsiteBrowserSession {
+): IOnDraftBrowserSession {
   const timestamp = now.toISOString();
 
   return {
@@ -43,46 +43,46 @@ export function createInitialWebsiteSession(
   };
 }
 
-function ensureWebsiteSession(
-  store: WebsiteSessionStore,
+function ensureOnDraftSession(
+  store: OnDraftSessionStore,
   now: Date = new Date(),
-): IWebsiteBrowserSession {
-  if (!store.website) {
-    store.website = createInitialWebsiteSession(now);
+): IOnDraftBrowserSession {
+  if (!store.ondraft) {
+    store.ondraft = createInitialOnDraftSession(now);
   }
 
-  return store.website;
+  return store.ondraft;
 }
 
-function snapshotSession(session: IWebsiteBrowserSession): IWebsiteBrowserSession {
+function snapshotSession(session: IOnDraftBrowserSession): IOnDraftBrowserSession {
   return { ...session };
 }
 
 export function recordPageView(
-  store: WebsiteSessionStore,
+  store: OnDraftSessionStore,
   now: Date = new Date(),
-): IWebsiteBrowserSession {
-  const session = ensureWebsiteSession(store, now);
+): IOnDraftBrowserSession {
+  const session = ensureOnDraftSession(store, now);
   session.visitCount += 1;
   session.lastSeenAt = now.toISOString();
   return snapshotSession(session);
 }
 
-export function touchWebsiteSession(
-  store: WebsiteSessionStore,
+export function touchOnDraftSession(
+  store: OnDraftSessionStore,
   now: Date = new Date(),
-): IWebsiteBrowserSession {
-  const session = ensureWebsiteSession(store, now);
+): IOnDraftBrowserSession {
+  const session = ensureOnDraftSession(store, now);
   session.lastSeenAt = now.toISOString();
   return snapshotSession(session);
 }
 
 export function signInAuthenticatedUser(
-  store: WebsiteSessionStore,
+  store: OnDraftSessionStore,
   user: IAuthenticatedUser,
   now: Date = new Date(),
-): IWebsiteBrowserSession {
-  const session = ensureWebsiteSession(store, now);
+): IOnDraftBrowserSession {
+  const session = ensureOnDraftSession(store, now);
   session.authenticatedUser = {
     userId: user.id,
     email: user.email,
@@ -94,36 +94,36 @@ export function signInAuthenticatedUser(
 }
 
 export function signOutAuthenticatedUser(
-  store: WebsiteSessionStore,
+  store: OnDraftSessionStore,
   now: Date = new Date(),
-): IWebsiteBrowserSession {
-  const session = ensureWebsiteSession(store, now);
+): IOnDraftBrowserSession {
+  const session = ensureOnDraftSession(store, now);
   session.authenticatedUser = null;
   session.lastSeenAt = now.toISOString();
   return snapshotSession(session);
 }
 
 export function getAuthenticatedUser(
-  store: WebsiteSessionStore,
+  store: OnDraftSessionStore,
   now: Date = new Date(),
 ): IAuthenticatedUserSession | null {
-  return ensureWebsiteSession(store, now).authenticatedUser;
+  return ensureOnDraftSession(store, now).authenticatedUser;
 }
 
 export function isAuthenticatedSession(
-  store: WebsiteSessionStore,
+  store: OnDraftSessionStore,
   now: Date = new Date(),
 ): boolean {
   return getAuthenticatedUser(store, now) !== null;
 }
 
-export function isAdminSession(session: IWebsiteBrowserSession): boolean {
+export function isAdminSession(session: IOnDraftBrowserSession): boolean {
   const email = session.authenticatedUser?.email;
   if (!email) {
     return false;
   }
 
-  const adminEmails = (process.env.ADMIN_EMAILS ?? "ryanmcwalter@cheekscast.test")
+  const adminEmails = (process.env.ADMIN_EMAILS ?? "ryanmcwalter@ondraft.test")
     .split(",")
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean);

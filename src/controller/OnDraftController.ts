@@ -1,39 +1,39 @@
 import type { Request, Response } from "express";
-import type { IWebsiteBrowserSession } from "../session/WebsiteSession";
-import { isAdminSession } from "../session/WebsiteSession";
-import type { CreateArticleInput, IWebsiteService } from "../service/WebsiteService";
+import type { IOnDraftBrowserSession } from "../session/OnDraftSession";
+import { isAdminSession } from "../session/OnDraftSession";
+import type { CreateArticleInput, IOnDraftService } from "../service/OnDraftService";
 import type { ILoggingService } from "../service/LoggingService";
-import { ArticleError, BigBoardError } from "../repository/WebsiteRepository";
+import { ArticleError, BigBoardError } from "../repository/OnDraftRepository";
 import { publicArticleUploadUrl } from "../uploads/articlePdfUpload";
-import type { Article, ArticleContent, ArticleFilter } from "../model/WebsiteContent";
+import type { Article, ArticleContent, ArticleFilter } from "../model/OnDraftContent";
 
-export interface IWebsiteController {
-  showHome(res: Response, session: IWebsiteBrowserSession): Promise<void>;
-  showArticles(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
-  showFilteredArticles(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
-  showBigBoard(res: Response, session: IWebsiteBrowserSession): Promise<void>;
-  showOneArticle(res: Response, session: IWebsiteBrowserSession, id: string): Promise<void>;
-  showCreateArticleForm(res: Response, session: IWebsiteBrowserSession): Promise<void>;
-  showEditArticleForm(res: Response, session: IWebsiteBrowserSession, id: string): Promise<void>;
-  showArticlePreview(res: Response, session: IWebsiteBrowserSession, id: string): Promise<void>;
-  showCreateBigBoardEntryForm(res: Response, session: IWebsiteBrowserSession): Promise<void>;
-  previewArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
-  createArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
-  updateArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
-  likeArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
-  showArticleComments(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
-  commentOnArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
-  commentReply(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
-  likeComment(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
-  deleteComment(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void>;
-  createBigBoardEntry(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void>;
-  deleteArticle(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void>;
-  deleteBigBoardEntry(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void>;
+export interface IOnDraftController {
+  showHome(res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  showArticles(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  showFilteredArticles(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  showBigBoard(res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  showOneArticle(res: Response, session: IOnDraftBrowserSession, id: string): Promise<void>;
+  showCreateArticleForm(res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  showEditArticleForm(res: Response, session: IOnDraftBrowserSession, id: string): Promise<void>;
+  showArticlePreview(res: Response, session: IOnDraftBrowserSession, id: string): Promise<void>;
+  showCreateBigBoardEntryForm(res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  previewArticle(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  createArticle(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  updateArticle(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  likeArticle(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  showArticleComments(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  commentOnArticle(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  commentReply(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  likeComment(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  deleteComment(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  createBigBoardEntry(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  deleteArticle(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  deleteBigBoardEntry(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void>;
 }
 
-class WebsiteController implements IWebsiteController {
+class OnDraftController implements IOnDraftController {
   constructor(
-    private readonly service: IWebsiteService,
+    private readonly service: IOnDraftService,
     private readonly logger: ILoggingService,
   ) {}
 
@@ -97,7 +97,7 @@ class WebsiteController implements IWebsiteController {
     return isNaN(date.getTime()) ? undefined : date;
   }
 
-  private articleStatus(req: Request, session: IWebsiteBrowserSession): boolean {
+  private articleStatus(req: Request, session: IOnDraftBrowserSession): boolean {
     if (!isAdminSession(session)) {
       return true;
     }
@@ -114,7 +114,7 @@ class WebsiteController implements IWebsiteController {
     return this.queryString(req, "sortDirection") === "asc" ? "asc" : "desc";
   }
 
-  private buildArticleFilter(req: Request, session: IWebsiteBrowserSession): ArticleFilter {
+  private buildArticleFilter(req: Request, session: IOnDraftBrowserSession): ArticleFilter {
     const keyword = this.queryString(req, "keyword");
     const author = this.queryString(req, "author");
     const dateFrom = this.queryDate(req, "dateFrom");
@@ -188,7 +188,7 @@ class WebsiteController implements IWebsiteController {
     return undefined;
   }
 
-  private likeActorId(session: IWebsiteBrowserSession): string {
+  private likeActorId(session: IOnDraftBrowserSession): string {
     return session.authenticatedUser?.userId ?? session.browserId;
   }
 
@@ -253,12 +253,12 @@ class WebsiteController implements IWebsiteController {
     };
   }
 
-  async showHome(res: Response, session: IWebsiteBrowserSession): Promise<void> {
-    this.logger.info("Rendering website home page");
-    res.render("website/index", { session, isAdmin: isAdminSession(session) });
+  async showHome(res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Rendering ondraft home page");
+    res.render("ondraft/index", { session, isAdmin: isAdminSession(session) });
   }
 
-  async showArticles(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+  async showArticles(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
     this.logger.info("Rendering articles page");
     const showingPublished = this.articleStatus(req, session);
     const result = await this.service.getFilteredArticles(this.buildArticleFilter(req, session));
@@ -267,7 +267,7 @@ class WebsiteController implements IWebsiteController {
       res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
       return;
     }
-    res.render("website/articles", {
+    res.render("ondraft/articles", {
       session,
       isAdmin: isAdminSession(session),
       articles: result.value,
@@ -297,8 +297,8 @@ class WebsiteController implements IWebsiteController {
     };
   }
 
-  private renderArticlePreview(res: Response, session: IWebsiteBrowserSession, article: Article): void {
-    res.render("website/articlePreview", {
+  private renderArticlePreview(res: Response, session: IOnDraftBrowserSession, article: Article): void {
+    res.render("ondraft/articlePreview", {
       session,
       isAdmin: isAdminSession(session),
       article,
@@ -309,7 +309,7 @@ class WebsiteController implements IWebsiteController {
     });
   }
 
-  async showFilteredArticles(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+  async showFilteredArticles(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
     this.logger.info("Rendering filtered articles");
     const showingPublished = this.articleStatus(req, session);
     const result = await this.service.getFilteredArticles(this.buildArticleFilter(req, session));
@@ -319,7 +319,7 @@ class WebsiteController implements IWebsiteController {
       return;
     }
 
-    res.render("website/partials/articleList", {
+    res.render("ondraft/partials/articleList", {
       layout: false,
       articles: result.value,
       showingPublished,
@@ -327,7 +327,7 @@ class WebsiteController implements IWebsiteController {
     });
   }
 
-  async showBigBoard(res: Response, session: IWebsiteBrowserSession): Promise<void> {
+  async showBigBoard(res: Response, session: IOnDraftBrowserSession): Promise<void> {
     this.logger.info("Rendering big board page");
     const result = await this.service.getBigBoard();
     if (result.ok === false) {
@@ -336,10 +336,10 @@ class WebsiteController implements IWebsiteController {
       return;
     }
     const rankedBigBoard = [...result.value].sort((a, b) => a.rank - b.rank);
-    res.render("website/bigboard", { session, isAdmin: isAdminSession(session), bigBoard: rankedBigBoard });
+    res.render("ondraft/bigboard", { session, isAdmin: isAdminSession(session), bigBoard: rankedBigBoard });
   }
 
-  async showOneArticle(res: Response, session: IWebsiteBrowserSession, id: string): Promise<void> {
+  async showOneArticle(res: Response, session: IOnDraftBrowserSession, id: string): Promise<void> {
     this.logger.info(`Rendering article page for "${id}"`);
     const result = await this.service.getArticle(id);
     if (result.ok === false) {
@@ -351,7 +351,7 @@ class WebsiteController implements IWebsiteController {
       res.status(404).send("Article not found.");
       return;
     }
-    res.render("website/article", {
+    res.render("ondraft/article", {
       session,
       isAdmin: isAdminSession(session),
       article: result.value,
@@ -360,8 +360,8 @@ class WebsiteController implements IWebsiteController {
     });
   }
 
-  private renderArticleActions(res: Response, article: Article, session: IWebsiteBrowserSession): void {
-    res.render("website/partials/articleActions", {
+  private renderArticleActions(res: Response, article: Article, session: IOnDraftBrowserSession): void {
+    res.render("ondraft/partials/articleActions", {
       layout: false,
       article,
       session,
@@ -369,9 +369,9 @@ class WebsiteController implements IWebsiteController {
     });
   }
 
-  async showCreateArticleForm(res: Response, session: IWebsiteBrowserSession): Promise<void> {
+  async showCreateArticleForm(res: Response, session: IOnDraftBrowserSession): Promise<void> {
     this.logger.info("Rendering create article page");
-    res.render("website/createArticle", {
+    res.render("ondraft/createArticle", {
       session,
       isAdmin: isAdminSession(session),
       errorMessage: null,
@@ -383,7 +383,7 @@ class WebsiteController implements IWebsiteController {
     });
   }
 
-  async showEditArticleForm(res: Response, session: IWebsiteBrowserSession, id: string): Promise<void> {
+  async showEditArticleForm(res: Response, session: IOnDraftBrowserSession, id: string): Promise<void> {
     this.logger.info(`Rendering edit article page for "${id}"`);
     const result = await this.service.getArticle(id);
     if (result.ok === false) {
@@ -391,7 +391,7 @@ class WebsiteController implements IWebsiteController {
       return;
     }
 
-    res.render("website/createArticle", {
+    res.render("ondraft/createArticle", {
       session,
       isAdmin: isAdminSession(session),
       errorMessage: null,
@@ -403,7 +403,7 @@ class WebsiteController implements IWebsiteController {
     });
   }
 
-  async showArticlePreview(res: Response, session: IWebsiteBrowserSession, id: string): Promise<void> {
+  async showArticlePreview(res: Response, session: IOnDraftBrowserSession, id: string): Promise<void> {
     this.logger.info(`Rendering article preview page for "${id}"`);
     const result = await this.service.getArticle(id);
     if (result.ok === false) {
@@ -414,9 +414,9 @@ class WebsiteController implements IWebsiteController {
     this.renderArticlePreview(res, session, result.value);
   }
 
-  async showCreateBigBoardEntryForm(res: Response, session: IWebsiteBrowserSession): Promise<void> {
+  async showCreateBigBoardEntryForm(res: Response, session: IOnDraftBrowserSession): Promise<void> {
     this.logger.info("Rendering create big board entry page");
-    res.render("website/createBigBoardEntry", {
+    res.render("ondraft/createBigBoardEntry", {
       session,
       isAdmin: isAdminSession(session),
       errorMessage: null,
@@ -424,7 +424,7 @@ class WebsiteController implements IWebsiteController {
     });
   }
 
-  async previewArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+  async previewArticle(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
     this.logger.info("Previewing new article");
     const input = this.buildArticleInput(req, false);
     const id = req.params.id;
@@ -433,7 +433,7 @@ class WebsiteController implements IWebsiteController {
       : await this.service.previewArticle(input);
     if (result.ok === false) {
       this.logger.error("Failed to preview article" + { error: result.value });
-      res.status(this.mapArticleErrorToStatusCode(result.value)).render("website/createArticle", {
+      res.status(this.mapArticleErrorToStatusCode(result.value)).render("ondraft/createArticle", {
         session,
         isAdmin: isAdminSession(session),
         errorMessage: result.value.message,
@@ -449,13 +449,13 @@ class WebsiteController implements IWebsiteController {
     this.renderArticlePreview(res, session, result.value);
   }
 
-  async createArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+  async createArticle(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
     this.logger.info("Creating new article");
     const input = this.buildArticleInput(req, req.body.published === "false" ? false : true);
     const result = await this.service.createArticle(input);
     if (result.ok === false) {
       this.logger.error("Failed to create article" + { error: result.value });
-      res.status(this.mapArticleErrorToStatusCode(result.value)).render("website/createArticle", {
+      res.status(this.mapArticleErrorToStatusCode(result.value)).render("ondraft/createArticle", {
         session,
         isAdmin: isAdminSession(session),
         errorMessage: result.value.message,
@@ -467,13 +467,13 @@ class WebsiteController implements IWebsiteController {
     res.redirect(result.value.published ? `/articles/${result.value.id}` : "/articles?status=draft");
   }
 
-  async updateArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+  async updateArticle(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
     this.logger.info("Updating article");
     const id = this.routeParam(req, "id");
     const input = this.buildArticleInput(req, req.body.published === "false" ? false : true);
     const result = await this.service.updateArticle(id, input);
     if (result.ok === false) {
-      res.status(this.mapArticleErrorToStatusCode(result.value)).render("website/createArticle", {
+      res.status(this.mapArticleErrorToStatusCode(result.value)).render("ondraft/createArticle", {
         session,
         isAdmin: isAdminSession(session),
         errorMessage: result.value.message,
@@ -489,7 +489,7 @@ class WebsiteController implements IWebsiteController {
     res.redirect(result.value.published ? `/articles/${result.value.id}` : "/articles?status=draft");
   }
 
-  async likeArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+  async likeArticle(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
     const articleId = this.routeParam(req, "id");
     const result = await this.service.likeByArticleId(articleId, this.likeActorId(session));
     if (result.ok === false) {
@@ -500,7 +500,7 @@ class WebsiteController implements IWebsiteController {
     this.renderArticleActions(res, result.value, session);
   }
 
-  async showArticleComments(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+  async showArticleComments(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
     const articleId = this.routeParam(req, "id");
     const result = await this.service.getArticle(articleId);
     if (result.ok === false) {
@@ -508,7 +508,7 @@ class WebsiteController implements IWebsiteController {
       return;
     }
 
-    res.render("website/partials/articleComments", {
+    res.render("ondraft/partials/articleComments", {
       layout: false,
       article: result.value,
       session,
@@ -519,10 +519,10 @@ class WebsiteController implements IWebsiteController {
     });
   }
 
-  async commentOnArticle(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+  async commentOnArticle(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
     const authenticatedUser = session.authenticatedUser;
     if (!authenticatedUser) {
-      res.status(403).render("website/partials/error", {
+      res.status(403).render("ondraft/partials/error", {
         layout: false,
         message: "Log in to comment.",
       });
@@ -542,7 +542,7 @@ class WebsiteController implements IWebsiteController {
         const statusCode = result.value.name === "ArticleValidationError"
           ? 200
           : this.mapArticleErrorToStatusCode(result.value);
-        res.status(statusCode).render("website/partials/articleComments", {
+        res.status(statusCode).render("ondraft/partials/articleComments", {
           layout: false,
           article: articleResult.value,
           session,
@@ -561,10 +561,10 @@ class WebsiteController implements IWebsiteController {
     await this.showArticleComments(req, res, session);
   }
 
-  async commentReply(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+  async commentReply(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
     const authenticatedUser = session.authenticatedUser;
     if (!authenticatedUser) {
-      res.status(403).render("website/partials/error", {
+      res.status(403).render("ondraft/partials/error", {
         layout: false,
         message: "Log in to comment.",
       });
@@ -586,7 +586,7 @@ class WebsiteController implements IWebsiteController {
     await this.showArticleComments(req, res, session);
   }
 
-  async likeComment(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+  async likeComment(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
     const commentId = this.routeParam(req, "commentId");
     const result = await this.service.likeByCommentId(commentId, this.likeActorId(session));
     if (result.ok === false) {
@@ -594,14 +594,14 @@ class WebsiteController implements IWebsiteController {
       return;
     }
 
-    res.render("website/partials/commentLikeButton", {
+    res.render("ondraft/partials/commentLikeButton", {
       layout: false,
       comment: result.value,
       likeActorId: this.likeActorId(session),
     });
   }
 
-  async deleteComment(req: Request, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+  async deleteComment(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
     const articleId = this.routeParam(req, "id");
     const commentId = this.routeParam(req, "commentId");
     const articleResult = await this.service.getArticle(articleId);
@@ -631,7 +631,7 @@ class WebsiteController implements IWebsiteController {
     await this.showArticleComments(req, res, session);
   }
 
-  async createBigBoardEntry(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+  async createBigBoardEntry(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void> {
     this.logger.info("Creating new big board entry");
     const input = {
       playerName: req.body.playerName,
@@ -650,7 +650,7 @@ class WebsiteController implements IWebsiteController {
     const result = await this.service.createBigBoardEntry(input);
     if (result.ok === false) {
       this.logger.error("Failed to create big board entry" + {error: result.value });
-      res.status(this.mapBigBoardErrorToStatusCode(result.value)).render("website/createBigBoardEntry", {
+      res.status(this.mapBigBoardErrorToStatusCode(result.value)).render("ondraft/createBigBoardEntry", {
         session,
         isAdmin: isAdminSession(session),
         errorMessage: result.value.message,
@@ -661,7 +661,7 @@ class WebsiteController implements IWebsiteController {
     res.redirect("/bigboard");
   }
 
-  async deleteArticle(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+  async deleteArticle(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void> {
     this.logger.info("Deleting article");
     const id = req.params.id;
     const result = await this.service.deleteArticle(id);
@@ -673,7 +673,7 @@ class WebsiteController implements IWebsiteController {
     res.status(200).send("");
   }
 
-  async deleteBigBoardEntry(req: any, res: Response, session: IWebsiteBrowserSession): Promise<void> {
+  async deleteBigBoardEntry(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void> {
     this.logger.info("Deleting big board entry");
     const playerName = req.params.playerName;
     const result = await this.service.deleteBigBoardEntry(playerName);
@@ -685,9 +685,9 @@ class WebsiteController implements IWebsiteController {
   }
 }
 
-export function CreateWebsiteController(
-  service: IWebsiteService,
+export function CreateOnDraftController(
+  service: IOnDraftService,
   logger: ILoggingService,
-): IWebsiteController {
-  return new WebsiteController(service, logger);
+): IOnDraftController {
+  return new OnDraftController(service, logger);
 }

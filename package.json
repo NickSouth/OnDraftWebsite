@@ -1,7 +1,7 @@
 {
-  "name": "cheekscast-website",
+  "name": "ondraft",
   "version": "1.0.0",
-  "description": "A CheeksCast website template with authentication.",
+  "description": "OnDraft: beer-flavored NFL draft coverage with authentication.",
   "main": "index.js",
   "scripts": {
     "dev": "npm run build && node dist/server.js",
