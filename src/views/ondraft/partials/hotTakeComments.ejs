@@ -1,0 +1,38 @@
+<section id="hot-take-comments-<%= post.id %>" class="hot-take-comments">
+  <% if (errorMessage) { %>
+    <p class="error-message"><%= errorMessage %></p>
+  <% } %>
+
+  <% if (post.comments.length > 0) { %>
+    <ol class="reply-list hot-take-comment-list">
+      <% post.comments.forEach((comment) => { %>
+        <li class="reply-item">
+          <div class="comment-header">
+            <div>
+              <strong><%= comment.userName %></strong>
+              <span class="muted-text"><%= new Date(comment.createdAt).toLocaleString() %></span>
+            </div>
+          </div>
+          <p class="comment-text"><%= comment.text %></p>
+        </li>
+      <% }) %>
+    </ol>
+  <% } %>
+
+  <% if (session.authenticatedUser) { %>
+    <form
+      class="comment-form reply-form hot-take-comment-form"
+      hx-post="/hottakes/<%= post.id %>/comments"
+      hx-target="#hot-take-comments-<%= post.id %>"
+      hx-swap="outerHTML"
+    >
+      <label>
+        Comment
+        <textarea name="text" maxlength="1000" required></textarea>
+      </label>
+      <button type="submit">Post Comment</button>
+    </form>
+  <% } else { %>
+    <p class="muted-text"><a href="/login">Log in</a> to comment.</p>
+  <% } %>
+</section>

@@ -200,6 +200,54 @@ class ExpressApp implements IApp {
     );
 
     this.app.get(
+      "/hottakes",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.showHotTakes(req, res, browserSession);
+      }),
+    );
+
+    this.app.get(
+      "/hottakes/filter",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.showFilteredHotTakes(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/hottakes",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.createHotTake(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/hottakes/:id/like",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.likeHotTake(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/hottakes/:id/comments",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.commentOnHotTake(req, res, browserSession);
+      }),
+    );
+
+    this.app.delete(
+      "/hottakes/:id",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.deleteHotTake(req, res, browserSession);
+      }),
+    );
+
+    this.app.get(
       "/articles/filter",
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));

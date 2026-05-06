@@ -516,6 +516,38 @@ textarea {
   border-top: 1px solid var(--panel-border);
 }
 
+.hot-take-composer {
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.hot-take-list {
+  margin-top: 18px;
+}
+
+.hot-take-item {
+  gap: 10px;
+}
+
+.hot-take-content {
+  margin-bottom: 0;
+  white-space: pre-wrap;
+}
+
+.hot-take-comments {
+  display: grid;
+  gap: 10px;
+}
+
+.hot-take-comment-list {
+  margin-top: 2px;
+}
+
+.hot-take-comment-form {
+  margin-top: 0;
+}
+
 .section-heading,
 .comment-header {
   display: flex;

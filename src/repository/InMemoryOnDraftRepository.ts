@@ -1,11 +1,12 @@
 import { Err, Ok, Result } from "../lib/result";
-import { Article, ArticleFilter, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, Comment } from "../model/OnDraftContent";
-import { ArticleNotFound, BigBoardNotFound, CommentNotFound, DuplicateBigBoardYear, DuplicatePlayer, DuplicateArticle, type ArticleError, type BigBoardError, type IOnDraftRepository, PlayerNotFound } from "./OnDraftRepository";
+import { Article, ArticleFilter, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, Comment, ForumPost, ForumPostFilter } from "../model/OnDraftContent";
+import { ArticleNotFound, BigBoardNotFound, CommentNotFound, DuplicateBigBoardYear, DuplicatePlayer, DuplicateArticle, DuplicateForumPost, type ArticleError, type BigBoardError, type IOnDraftRepository, PlayerNotFound, ForumPostError, ForumPostNotFound } from "./OnDraftRepository";
 
 
 class InMemoryOnDraftRepository implements IOnDraftRepository {
   private bigBoards: BigBoard[] = [];
   private articles: Article[] = [];
+  private forumPosts: ForumPost[] = [];
   constructor() {
     this.createBigBoardYearSync(new Date().getFullYear());
   }
@@ -274,6 +275,94 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
     }
 
     return Err(CommentNotFound(`Comment with id "${commentId}" not found.`));
+  }
+
+  async createForumPost(post: ForumPost): Promise<Result<ForumPost, ForumPostError>> {
+    if (this.forumPosts.find((existingPost) => existingPost.id === post.id)) {
+      return Err(DuplicateForumPost(`Hot take with id "${post.id}" already exists.`));
+    }
+    this.forumPosts.push(post);
+    return Ok(post);
+  }
+
+  async getForumPosts(): Promise<Result<ForumPost[], ForumPostError>> {
+    return Ok([...this.forumPosts].sort((first, second) => second.createdAt.getTime() - first.createdAt.getTime()));
+  }
+
+  async getForumPost(postId: string): Promise<Result<ForumPost, ForumPostError>> {
+    const post = this.forumPosts.find(p => p.id === postId);
+    if (!post) {
+      return Err(ForumPostNotFound(`Hot take with id "${postId}" not found.`));
+    }
+    return Ok(post);
+  }
+
+  async likeByForumPostId(postId: string, userId: string): Promise<Result<ForumPost, ForumPostError>> {
+    const post = this.forumPosts.find(p => p.id === postId);
+    if (!post) {
+      return Err(ForumPostNotFound(`Hot take with id "${postId}" not found.`));
+    }
+    post.likes = this.toggleLike(post.likedByUserIds, userId);
+    return Ok(post);
+  }
+
+  async commentByForumPostId(postId: string, comment: Comment): Promise<Result<Comment, ForumPostError>> {
+    const post = this.forumPosts.find(p => p.id === postId);
+    if (!post) {
+      return Err(ForumPostNotFound(`Hot take with id "${postId}" not found.`));
+    }
+    post.comments.push(comment);
+    return Ok(comment);
+  }
+
+  async getFilteredForumPosts(filter: ForumPostFilter): Promise<Result<ForumPost[], ForumPostError>> {
+    const filtered = this.forumPosts.filter((post) => {
+      if (filter.userId && post.userId !== filter.userId) {
+        return false;
+      }
+      if (filter.keyword) {
+        const keyword = filter.keyword.toLowerCase();
+        const searchText = `${post.userName} ${post.content} ${post.comments.map((comment) => comment.text).join(" ")}`;
+        if (!searchText.toLowerCase().includes(keyword)) {
+          return false;
+        }
+      }
+      if (filter.dateRange) {
+        const createdAt = post.createdAt.getTime();
+        if (createdAt < filter.dateRange.from.getTime() || createdAt > filter.dateRange.to.getTime()) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    const sortBy = filter.sortBy ?? "date";
+    const direction = filter.sortDirection === "asc" ? 1 : -1;
+    const sorted = [...filtered].sort((first, second) => {
+      const firstValue = sortBy === "likes"
+        ? first.likes
+        : sortBy === "comments"
+          ? first.comments.length
+          : first.createdAt.getTime();
+      const secondValue = sortBy === "likes"
+        ? second.likes
+        : sortBy === "comments"
+          ? second.comments.length
+          : second.createdAt.getTime();
+
+      return (firstValue - secondValue) * direction;
+    });
+
+    return Ok(sorted);
+  }
+
+  async deleteForumPost(postId: string): Promise<Result<void, ForumPostError>> {
+    const index = this.forumPosts.findIndex(p => p.id === postId);
+    if (index === -1) {
+      return Err(ForumPostNotFound(`Hot take with id "${postId}" not found.`));
+    }
+    this.forumPosts.splice(index, 1);
+    return Ok(undefined);
   }
 }
 

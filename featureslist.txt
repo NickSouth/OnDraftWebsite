@@ -8,3 +8,18 @@ About Us page with links and stuff
 Bookmarking posts by users
 Verified account checkmarks for admins
 Automatic Content Moderation for comments and forums
+
+
+
+DraftBoard Fields:
+ - Player Name
+ - school
+ - Position
+ - Height/Weight
+ - Overall Rank
+ - Position Rank
+ - Writeup (dropdown)
+    - Strengths
+    - Weaknesses
+    - Run Down
+ - Notes (admin only)

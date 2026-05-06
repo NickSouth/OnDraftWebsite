@@ -3,14 +3,16 @@ import type { IOnDraftBrowserSession } from "../session/OnDraftSession";
 import { isAdminSession } from "../session/OnDraftSession";
 import type { CreateArticleInput, IOnDraftService } from "../service/OnDraftService";
 import type { ILoggingService } from "../service/LoggingService";
-import { ArticleError, BigBoardError } from "../repository/OnDraftRepository";
+import { ArticleError, BigBoardError, ForumPostError } from "../repository/OnDraftRepository";
 import { publicArticleUploadUrl } from "../uploads/articlePdfUpload";
-import { BIG_BOARD_CREATORS, type Article, type ArticleContent, type ArticleFilter, type BigBoardCreator } from "../model/OnDraftContent";
+import { BIG_BOARD_CREATORS, type Article, type ArticleContent, type ArticleFilter, type BigBoardCreator, type ForumPost, type ForumPostFilter } from "../model/OnDraftContent";
 
 export interface IOnDraftController {
   showHome(res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showArticles(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showFilteredArticles(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  showHotTakes(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  showFilteredHotTakes(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showOneArticle(res: Response, session: IOnDraftBrowserSession, id: string): Promise<void>;
   showCreateArticleForm(res: Response, session: IOnDraftBrowserSession): Promise<void>;
@@ -26,6 +28,10 @@ export interface IOnDraftController {
   commentReply(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   likeComment(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   deleteComment(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  createHotTake(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  likeHotTake(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  commentOnHotTake(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  deleteHotTake(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   createBigBoardEntry(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   deleteArticle(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   deleteBigBoardEntry(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void>;
@@ -62,6 +68,22 @@ class OnDraftController implements IOnDraftController {
       case "DuplicateBigBoardYear":
         return 409;
       case "BigBoardValidationError":
+        return 400;
+      case "DatabaseError":
+        return 500;
+      default:
+        return 500;
+    }
+  }
+
+  private mapForumPostErrorToStatusCode(error: ForumPostError): number {
+    switch (error.name) {
+      case "ForumPostNotFound":
+      case "CommentNotFound":
+        return 404;
+      case "DuplicateForumPost":
+        return 409;
+      case "ForumPostValidationError":
         return 400;
       case "DatabaseError":
         return 500;
@@ -130,6 +152,15 @@ class OnDraftController implements IOnDraftController {
     return this.queryString(req, "sortDirection") === "asc" ? "asc" : "desc";
   }
 
+  private forumPostSortBy(req: Request): ForumPostFilter["sortBy"] {
+    const sortBy = this.queryString(req, "sortBy");
+    return sortBy === "likes" || sortBy === "comments" ? sortBy : "date";
+  }
+
+  private forumPostSortDirection(req: Request): ForumPostFilter["sortDirection"] {
+    return this.queryString(req, "sortDirection") === "asc" ? "asc" : "desc";
+  }
+
   private buildArticleFilter(req: Request, session: IOnDraftBrowserSession): ArticleFilter {
     const keyword = this.queryString(req, "keyword");
     const author = this.queryString(req, "author");
@@ -156,6 +187,28 @@ class OnDraftController implements IOnDraftController {
     }
     if (dateFrom || dateTo) {
       filter.publicationDateRange = {
+        from: dateFrom ?? new Date(0),
+        to: dateTo ?? new Date(),
+      };
+    }
+
+    return filter;
+  }
+
+  private buildForumPostFilter(req: Request): ForumPostFilter {
+    const keyword = this.queryString(req, "keyword");
+    const dateFrom = this.queryDate(req, "dateFrom");
+    const dateTo = this.queryDate(req, "dateTo");
+
+    const filter: ForumPostFilter = {
+      sortBy: this.forumPostSortBy(req),
+      sortDirection: this.forumPostSortDirection(req),
+    };
+    if (keyword) {
+      filter.keyword = keyword;
+    }
+    if (dateFrom || dateTo) {
+      filter.dateRange = {
         from: dateFrom ?? new Date(0),
         to: dateTo ?? new Date(),
       };
@@ -202,6 +255,10 @@ class OnDraftController implements IOnDraftController {
     }
 
     return undefined;
+  }
+
+  private canDeleteForumPost(post: ForumPost, session: IOnDraftBrowserSession): boolean {
+    return isAdminSession(session) || post.userId === session.authenticatedUser?.userId;
   }
 
   private likeActorId(session: IOnDraftBrowserSession): string {
@@ -341,6 +398,49 @@ class OnDraftController implements IOnDraftController {
       showingPublished,
       isAdmin: isAdminSession(session),
     });
+  }
+
+  private renderHotTakeList(res: Response, posts: ForumPost[], session: IOnDraftBrowserSession, errorMessage: string | null = null): void {
+    res.render("ondraft/partials/hotTakeList", {
+      layout: false,
+      posts,
+      session,
+      isAdmin: isAdminSession(session),
+      likeActorId: this.likeActorId(session),
+      errorMessage,
+    });
+  }
+
+  async showHotTakes(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Rendering hot takes page");
+    const result = await this.service.getFilteredForumPosts(this.buildForumPostFilter(req));
+    if (result.ok === false) {
+      this.logger.error("Failed to load hot takes" + { error: result.value });
+      res.status(this.mapForumPostErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    res.render("ondraft/hotTakes", {
+      session,
+      isAdmin: isAdminSession(session),
+      posts: result.value,
+      sortBy: this.forumPostSortBy(req),
+      sortDirection: this.forumPostSortDirection(req),
+      likeActorId: this.likeActorId(session),
+      errorMessage: null,
+      values: {},
+    });
+  }
+
+  async showFilteredHotTakes(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Rendering filtered hot takes");
+    const result = await this.service.getFilteredForumPosts(this.buildForumPostFilter(req));
+    if (result.ok === false) {
+      res.status(this.mapForumPostErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    this.renderHotTakeList(res, result.value, session);
   }
 
   async showBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
@@ -669,6 +769,134 @@ class OnDraftController implements IOnDraftController {
     }
 
     await this.showArticleComments(req, res, session);
+  }
+
+  async createHotTake(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    const authenticatedUser = session.authenticatedUser;
+    if (!authenticatedUser) {
+      res.set("HX-Retarget", "#hot-take-composer");
+      res.status(403).render("ondraft/partials/hotTakeComposer", {
+        layout: false,
+        session,
+        errorMessage: "Log in to post a hot take.",
+        values: req.body,
+      });
+      return;
+    }
+
+    const result = await this.service.createForumPost({
+      userId: authenticatedUser.userId,
+      userName: authenticatedUser.displayName,
+      content: req.body.content,
+    });
+    if (result.ok === false) {
+      res.set("HX-Retarget", "#hot-take-composer");
+      res.status(result.value.name === "ForumPostValidationError" ? 200 : this.mapForumPostErrorToStatusCode(result.value))
+        .render("ondraft/partials/hotTakeComposer", {
+          layout: false,
+          session,
+          errorMessage: result.value.message,
+          values: req.body,
+        });
+      return;
+    }
+
+    const postsResult = await this.service.getFilteredForumPosts(this.buildForumPostFilter(req));
+    if (postsResult.ok === false) {
+      res.status(this.mapForumPostErrorToStatusCode(postsResult.value)).send(postsResult.value.message);
+      return;
+    }
+
+    res.render("ondraft/partials/hotTakeCreateResponse", {
+      layout: false,
+      posts: postsResult.value,
+      session,
+      isAdmin: isAdminSession(session),
+      likeActorId: this.likeActorId(session),
+      errorMessage: null,
+      values: {},
+    });
+  }
+
+  async likeHotTake(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    const postId = this.routeParam(req, "id");
+    const result = await this.service.likeByForumPostId(postId, this.likeActorId(session));
+    if (result.ok === false) {
+      res.status(this.mapForumPostErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    res.render("ondraft/partials/hotTakeActions", {
+      layout: false,
+      post: result.value,
+      likeActorId: this.likeActorId(session),
+    });
+  }
+
+  async commentOnHotTake(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    const authenticatedUser = session.authenticatedUser;
+    if (!authenticatedUser) {
+      res.status(403).render("ondraft/partials/error", {
+        layout: false,
+        message: "Log in to comment.",
+      });
+      return;
+    }
+
+    const postId = this.routeParam(req, "id");
+    const result = await this.service.commentByForumPostId(postId, {
+      userId: authenticatedUser.userId,
+      userName: authenticatedUser.displayName,
+      text: req.body.text,
+    });
+    if (result.ok === false) {
+      const postResult = await this.service.getForumPost(postId);
+      if (postResult.ok === true) {
+        res.status(result.value.name === "ForumPostValidationError" ? 200 : this.mapForumPostErrorToStatusCode(result.value))
+          .render("ondraft/partials/hotTakeComments", {
+            layout: false,
+            post: postResult.value,
+            session,
+            errorMessage: result.value.message,
+          });
+        return;
+      }
+      res.status(this.mapForumPostErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    const postResult = await this.service.getForumPost(postId);
+    if (postResult.ok === false) {
+      res.status(this.mapForumPostErrorToStatusCode(postResult.value)).send(postResult.value.message);
+      return;
+    }
+    res.render("ondraft/partials/hotTakeComments", {
+      layout: false,
+      post: postResult.value,
+      session,
+      errorMessage: null,
+    });
+  }
+
+  async deleteHotTake(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    const postId = this.routeParam(req, "id");
+    const postResult = await this.service.getForumPost(postId);
+    if (postResult.ok === false) {
+      res.status(this.mapForumPostErrorToStatusCode(postResult.value)).send(postResult.value.message);
+      return;
+    }
+    if (!this.canDeleteForumPost(postResult.value, session)) {
+      res.status(403).send("You can only delete your own hot takes.");
+      return;
+    }
+
+    const result = await this.service.deleteForumPost(postId);
+    if (result.ok === false) {
+      res.status(this.mapForumPostErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    res.status(200).send("");
   }
 
   async createBigBoardEntry(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void> {
