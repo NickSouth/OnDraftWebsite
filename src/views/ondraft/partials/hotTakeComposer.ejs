@@ -1,0 +1,25 @@
+<div id="hot-take-composer" class="hot-take-composer" <% if (typeof outOfBand !== "undefined" && outOfBand) { %>hx-swap-oob="true"<% } %>>
+  <% if (session.authenticatedUser) { %>
+    <% if (errorMessage) { %>
+      <p class="error-message"><%= errorMessage %></p>
+    <% } %>
+    <form
+      class="comment-form"
+      hx-post="/hottakes"
+      hx-include="#hot-take-filter-form"
+      hx-target="#hot-take-list"
+      hx-swap="outerHTML"
+    >
+      <label>
+        Add a hot take
+        <textarea name="content" maxlength="300" required><%= values.content || "" %></textarea>
+      </label>
+      <div class="form-actions">
+        <button type="submit">Post Hot Take</button>
+        <span class="muted-text">300 characters max</span>
+      </div>
+    </form>
+  <% } else { %>
+    <p class="muted-text"><a href="/login">Log in</a> to post a hot take.</p>
+  <% } %>
+</div>

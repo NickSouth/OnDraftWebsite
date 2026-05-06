@@ -87,11 +87,55 @@ describe("OnDraft HTTP contracts", () => {
 
     const articles = await request(ondraft).get("/articles");
     const bigBoard = await request(ondraft).get("/bigboard");
+    const hotTakes = await request(ondraft).get("/hottakes");
 
     expect(articles.status).toBe(200);
     expect(articles.text).toContain("Articles");
     expect(bigBoard.status).toBe(200);
     expect(bigBoard.text).toContain("Big Board");
+    expect(hotTakes.status).toBe(200);
+    expect(hotTakes.text).toContain("Hot Takes");
+    expect(hotTakes.text).toContain("Log in");
+  });
+
+  it("supports hot take posting, filtering, liking, commenting, and owner deletion", async () => {
+    const agent = await adminAgent();
+
+    const create = await agent
+      .post("/hottakes")
+      .type("form")
+      .set("HX-Request", "true")
+      .send({ content: "Never draft a round-one long snapper." });
+
+    expect(create.status).toBe(200);
+    expect(create.text).toContain("Never draft a round-one long snapper.");
+    expect(create.text).toContain("hx-swap-oob");
+
+    const postId = create.text.match(/id="hot-take-([A-Za-z0-9]{5})"/)?.[1];
+    expect(postId).toBeTruthy();
+
+    const filtered = await agent.get("/hottakes/filter?keyword=long%20snapper&sortBy=likes");
+    expect(filtered.status).toBe(200);
+    expect(filtered.text).toContain("Never draft a round-one long snapper.");
+
+    const like = await agent
+      .post(`/hottakes/${postId}/like`)
+      .set("HX-Request", "true");
+    expect(like.status).toBe(200);
+    expect(like.text).toContain(">1<");
+
+    const comment = await agent
+      .post(`/hottakes/${postId}/comments`)
+      .type("form")
+      .set("HX-Request", "true")
+      .send({ text: "Counterpoint: special teams matter." });
+    expect(comment.status).toBe(200);
+    expect(comment.text).toContain("Counterpoint: special teams matter.");
+
+    const remove = await agent
+      .delete(`/hottakes/${postId}`)
+      .set("HX-Request", "true");
+    expect(remove.status).toBe(200);
   });
 
   it("keeps plain text article creation working", async () => {

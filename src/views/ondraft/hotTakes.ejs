@@ -1,0 +1,53 @@
+<section class="plain-page">
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">OnDraft</p>
+      <h1>Hot Takes</h1>
+    </div>
+  </div>
+
+  <%- include("partials/hotTakeComposer", { session, errorMessage, values }) %>
+
+  <form
+    id="hot-take-filter-form"
+    class="article-filter-form"
+    hx-get="/hottakes/filter"
+    hx-target="#hot-take-list"
+    hx-swap="outerHTML"
+  >
+    <div class="article-search-row">
+      <label class="article-search-field">
+        <span>Search</span>
+        <input name="keyword" type="search" placeholder="Search hot takes" />
+      </label>
+      <button type="submit">Search</button>
+      <button
+        type="button"
+        class="secondary-button"
+        onclick="this.form.reset(); htmx.trigger(this.form, 'submit');"
+      >
+        Clear
+      </button>
+    </div>
+
+    <div class="article-sort-row">
+      <label>
+        Sort by
+        <select name="sortBy" onchange="htmx.trigger(this.form, 'submit');">
+          <option value="date" <%= sortBy === "date" ? "selected" : "" %>>Date</option>
+          <option value="likes" <%= sortBy === "likes" ? "selected" : "" %>>Likes</option>
+          <option value="comments" <%= sortBy === "comments" ? "selected" : "" %>>Comments</option>
+        </select>
+      </label>
+      <label>
+        Direction
+        <select name="sortDirection" onchange="htmx.trigger(this.form, 'submit');">
+          <option value="desc" <%= sortDirection === "desc" ? "selected" : "" %>>Descending</option>
+          <option value="asc" <%= sortDirection === "asc" ? "selected" : "" %>>Ascending</option>
+        </select>
+      </label>
+    </div>
+  </form>
+
+  <%- include("partials/hotTakeList", { posts, session, isAdmin, likeActorId, errorMessage: null }) %>
+</section>

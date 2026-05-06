@@ -72,6 +72,25 @@ export type Article = {
   likedByUserIds: string[];
 };
 
+export type ForumPost = {
+  id: string;
+  userId: string;
+  userName: string;
+  content: string;
+  createdAt: Date;
+  likes: number;
+  likedByUserIds: string[];
+  comments: Comment[];
+};
+
+export type ForumPostFilter = {
+  userId?: string;
+  keyword?: string;
+  sortBy?: "date" | "likes" | "comments";
+  sortDirection?: "asc" | "desc";
+  dateRange?: { from: Date; to: Date };
+};
+
 export type Comment = {
   id: string;
   userId: string;

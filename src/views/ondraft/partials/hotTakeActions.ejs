@@ -1,0 +1,19 @@
+<div class="article-actions" id="hot-take-actions-<%= post.id %>">
+  <% const postLiked = post.likedByUserIds.includes(likeActorId); %>
+  <button
+    type="button"
+    class="icon-button <%= postLiked ? "is-liked" : "" %>"
+    aria-label="<%= postLiked ? "Unlike hot take" : "Like hot take" %>"
+    aria-pressed="<%= postLiked ? "true" : "false" %>"
+    hx-post="/hottakes/<%= post.id %>/like"
+    hx-target="#hot-take-actions-<%= post.id %>"
+    hx-swap="outerHTML"
+  >
+    <span aria-hidden="true"><%- postLiked ? "&hearts;" : "&#9825;" %></span>
+    <span><%= post.likes %></span>
+  </button>
+  <span class="icon-link">
+    <span aria-hidden="true">&#9634;</span>
+    <span><%= post.comments.length %></span>
+  </span>
+</div>

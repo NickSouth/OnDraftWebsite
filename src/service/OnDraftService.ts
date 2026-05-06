@@ -1,8 +1,8 @@
 import { randomInt } from "node:crypto";
 import { Err, Ok, Result } from "../lib/result";
 import sanitizeHtml from "sanitize-html";
-import { Article, ArticleContent, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, Position, ArticleFilter, Comment } from "../model/OnDraftContent";
-import { UnknownArticleError, ArticleError,  BigBoardError, IOnDraftRepository, ArticleValidationError, BigBoardValidationError } from "../repository/OnDraftRepository";
+import { Article, ArticleContent, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, Position, ArticleFilter, Comment, ForumPost, ForumPostFilter } from "../model/OnDraftContent";
+import { UnknownArticleError, UnknownForumPostError, ArticleError,  BigBoardError, IOnDraftRepository, ArticleValidationError, BigBoardValidationError, ForumPostError, ForumPostValidationError } from "../repository/OnDraftRepository";
 
 const ARTICLE_PDF_MAX_BYTES = 5 * 1024 * 1024;
 const ARTICLE_ID_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -20,6 +20,7 @@ const ARTICLE_TAG_MAX_COUNT = 12;
 const ARTICLE_TAG_PATTERN = /^[a-z0-9-]+$/;
 const COMMENT_TEXT_MAX_LENGTH = 1000;
 const DEFAULT_BIG_BOARD_CREATOR: BigBoardCreator = "Ryan";
+const HOT_TAKE_MAX_LENGTH = 300;
 
 export interface CreateArticleInput {
   title: string;
@@ -57,6 +58,11 @@ export interface CreateCommentInput {
   text: string;
 }
 
+export interface ForumPostInput {
+  content: string;
+  userId: string;
+  userName: string;
+}
 
 export interface IOnDraftService {
   previewArticle(input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
@@ -78,6 +84,13 @@ export interface IOnDraftService {
   likeByCommentId(commentId: string, userId: string): Promise<Result<Comment, ArticleError>>;
   deleteComment(commentId: string): Promise<Result<void, ArticleError>>;
   commentReplyByCommentId(commentId: string, reply: CreateCommentInput): Promise<Result<Comment, ArticleError>>;
+  createForumPost(input: ForumPostInput): Promise<Result<ForumPost, ForumPostError>>;
+  getForumPosts(): Promise<Result<ForumPost[], ForumPostError>>;
+  getForumPost(postId: string): Promise<Result<ForumPost, ForumPostError>>;
+  likeByForumPostId(postId: string, userId: string): Promise<Result<ForumPost, ForumPostError>>;
+  commentByForumPostId(postId: string, comment: CreateCommentInput): Promise<Result<Comment, ForumPostError>>;
+  getFilteredForumPosts(filter: ForumPostFilter): Promise<Result<ForumPost[], ForumPostError>>;
+  deleteForumPost(postId: string): Promise<Result<void, ForumPostError>>;
 }
 
 class OnDraftService implements IOnDraftService {
@@ -297,6 +310,32 @@ class OnDraftService implements IOnDraftService {
     }
     if (input.text.length > COMMENT_TEXT_MAX_LENGTH) {
       return Err(ArticleValidationError(`Comment text cannot be more than ${COMMENT_TEXT_MAX_LENGTH} characters.`));
+    }
+    return Ok(undefined);
+  }
+
+  private validateForumPostInput(input: ForumPostInput): Result<void, ForumPostError> {
+    if (!input.userId || !input.userName || !input.content) {
+      return Err(ForumPostValidationError("User and hot take content are required."));
+    }
+    if (input.userId.trim() === "" || input.userName.trim() === "" || input.content.trim() === "") {
+      return Err(ForumPostValidationError("Hot take content cannot be empty."));
+    }
+    if (input.content.trim().length > HOT_TAKE_MAX_LENGTH) {
+      return Err(ForumPostValidationError(`Hot takes cannot be more than ${HOT_TAKE_MAX_LENGTH} characters.`));
+    }
+    return Ok(undefined);
+  }
+
+  private validateForumCommentInput(input: CreateCommentInput): Result<void, ForumPostError> {
+    if (!input.userId || !input.userName || !input.text) {
+      return Err(ForumPostValidationError("User, user name, and comment text are required."));
+    }
+    if (input.userId.trim() === "" || input.userName.trim() === "" || input.text.trim() === "") {
+      return Err(ForumPostValidationError("User, user name, and comment text cannot be empty."));
+    }
+    if (input.text.length > COMMENT_TEXT_MAX_LENGTH) {
+      return Err(ForumPostValidationError(`Comment text cannot be more than ${COMMENT_TEXT_MAX_LENGTH} characters.`));
     }
     return Ok(undefined);
   }
@@ -574,6 +613,95 @@ class OnDraftService implements IOnDraftService {
     }
 
     return await this.repository.deleteComment(commentId.trim());
+  }
+
+  async createForumPost(input: ForumPostInput): Promise<Result<ForumPost, ForumPostError>> {
+    const prepared: ForumPostInput = {
+      content: typeof input.content === "string" ? input.content.trim() : input.content,
+      userId: typeof input.userId === "string" ? input.userId.trim() : input.userId,
+      userName: typeof input.userName === "string" ? input.userName.trim() : input.userName,
+    };
+    const validation = this.validateForumPostInput(prepared);
+    if (validation.ok === false) {
+      return Err(validation.value);
+    }
+
+    for (let attempt = 0; attempt < ARTICLE_ID_MAX_ATTEMPTS; attempt += 1) {
+      const post: ForumPost = {
+        id: this.createRandomId(ARTICLE_ID_LENGTH),
+        userId: prepared.userId,
+        userName: prepared.userName,
+        content: prepared.content,
+        createdAt: new Date(),
+        likes: 0,
+        likedByUserIds: [],
+        comments: [],
+      };
+      const result = await this.repository.createForumPost(post);
+      if (result.ok === true) {
+        return Ok(result.value);
+      }
+      if (result.value.name !== "DuplicateForumPost") {
+        return Err(result.value);
+      }
+    }
+
+    return Err(UnknownForumPostError("Unable to generate a unique hot take id."));
+  }
+
+  async getForumPosts(): Promise<Result<ForumPost[], ForumPostError>> {
+    return await this.repository.getForumPosts();
+  }
+
+  async getForumPost(postId: string): Promise<Result<ForumPost, ForumPostError>> {
+    if (!postId || postId.trim() === "") {
+      return Err(ForumPostValidationError("Hot take id is required."));
+    }
+    return await this.repository.getForumPost(postId.trim());
+  }
+
+  async likeByForumPostId(postId: string, userId: string): Promise<Result<ForumPost, ForumPostError>> {
+    if (!postId || postId.trim() === "") {
+      return Err(ForumPostValidationError("Hot take id is required."));
+    }
+    if (!userId || userId.trim() === "") {
+      return Err(ForumPostValidationError("User id is required."));
+    }
+    return await this.repository.likeByForumPostId(postId.trim(), userId.trim());
+  }
+
+  async commentByForumPostId(postId: string, input: CreateCommentInput): Promise<Result<Comment, ForumPostError>> {
+    if (!postId || postId.trim() === "") {
+      return Err(ForumPostValidationError("Hot take id is required."));
+    }
+    const validation = this.validateForumCommentInput(input);
+    if (validation.ok === false) {
+      return Err(validation.value);
+    }
+
+    const comment: Comment = {
+      id: this.createCommentId(),
+      userId: input.userId.trim(),
+      userName: input.userName.trim(),
+      text: input.text.trim(),
+      createdAt: new Date(),
+      likes: 0,
+      likedByUserIds: [],
+      replies: [],
+    };
+
+    return await this.repository.commentByForumPostId(postId.trim(), comment);
+  }
+
+  async getFilteredForumPosts(filter: ForumPostFilter): Promise<Result<ForumPost[], ForumPostError>> {
+    return await this.repository.getFilteredForumPosts(filter);
+  }
+
+  async deleteForumPost(postId: string): Promise<Result<void, ForumPostError>> {
+    if (!postId || postId.trim() === "") {
+      return Err(ForumPostValidationError("Hot take id is required."));
+    }
+    return await this.repository.deleteForumPost(postId.trim());
   }
 }
 
