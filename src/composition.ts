@@ -3,9 +3,9 @@ import { CreateAuthService } from "./auth/AuthService";
 import { CreateInMemoryUserRepository } from "./auth/InMemoryUserRepository";
 import { CreateApp } from "./app";
 import type { IApp } from "./contracts";
-import { CreateWebsiteController } from "./controller/WebsiteController";
-import { CreateInMemoryWebsiteRepository } from "./repository/InMemoryWebsiteRepository";
-import { CreateWebsiteService } from "./service/WebsiteService";
+import { CreateOnDraftController } from "./controller/OnDraftController";
+import { CreateInMemoryOnDraftRepository } from "./repository/InMemoryOnDraftRepository";
+import { CreateOnDraftService } from "./service/OnDraftService";
 import { CreateLoggingService } from "./service/LoggingService";
 import type { ILoggingService } from "./service/LoggingService";
 
@@ -15,12 +15,12 @@ export function createComposedApp(
 ): IApp {
   const resolvedLogger = logger ?? CreateLoggingService();
 
-  const repository = CreateInMemoryWebsiteRepository();
+  const repository = CreateInMemoryOnDraftRepository();
 
-  const service = CreateWebsiteService(repository);
+  const service = CreateOnDraftService(repository);
   const authUsers = CreateInMemoryUserRepository();
   const authService = CreateAuthService(authUsers);
   const authController = CreateAuthController(authService, resolvedLogger);
-  const controller = CreateWebsiteController(service, resolvedLogger);
+  const controller = CreateOnDraftController(service, resolvedLogger);
   return CreateApp(controller, authController, resolvedLogger);
 }

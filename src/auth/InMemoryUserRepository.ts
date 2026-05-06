@@ -6,14 +6,14 @@ import type { IUserRecord } from "./User";
 export const DEMO_USERS: IUserRecord[] = [
   {
     id: "user-ryan",
-    email: "ryanmcwalter@cheekscast.test",
+    email: "ryanmcwalter@ondraft.test",
     displayName: "Ryan McWalter",
     password: "password123",
   },
   {
     id: "user-bob",
-    email: "bob@website.test",
-    displayName: "Bob Website",
+    email: "bob@ondraft.test",
+    displayName: "Bob OnDraft",
     password: "password123",
   },
 ];

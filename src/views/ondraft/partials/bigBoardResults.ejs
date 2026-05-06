@@ -1,0 +1,38 @@
+<div id="big-board-results">
+  <% if (bigBoard.length === 0) { %>
+    <p>No draft board entries have been created yet.</p>
+  <% } else { %>
+    <ol class="ranking-list">
+      <% bigBoard.forEach((entry) => { %>
+        <li>
+          <div>
+            <strong><%= entry.rank %>. <%= entry.playerName %></strong>
+            <span><%= entry.position %><%= entry.posRank ? entry.posRank : "" %> &middot; <%= entry.school %></span>
+          </div>
+          <p>
+            <%= entry.height.feet %>'<%= entry.height.inches %>" &middot; <%= entry.weight %> lbs
+          </p>
+          <% if (entry.writeupPublished) { %>
+            <details class="big-board-writeup">
+              <summary>Writeup</summary>
+              <div class="big-board-writeup-grid">
+                <section>
+                  <h3>Strengths</h3>
+                  <p><%= entry.writeup.strengths %></p>
+                </section>
+                <section>
+                  <h3>Weaknesses</h3>
+                  <p><%= entry.writeup.weaknesses %></p>
+                </section>
+                <section>
+                  <h3>Rundown</h3>
+                  <p><%= entry.writeup.rundown %></p>
+                </section>
+              </div>
+            </details>
+          <% } %>
+        </li>
+      <% }) %>
+    </ol>
+  <% } %>
+</div>

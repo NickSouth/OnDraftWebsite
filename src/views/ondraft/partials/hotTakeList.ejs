@@ -1,0 +1,37 @@
+<div id="hot-take-list" class="hot-take-list">
+  <% if (errorMessage) { %>
+    <p class="error-message"><%= errorMessage %></p>
+  <% } %>
+
+  <% if (posts.length === 0) { %>
+    <p class="muted-text">No hot takes yet.</p>
+  <% } else { %>
+    <ol class="comment-list">
+      <% posts.forEach((post) => { %>
+        <li id="hot-take-<%= post.id %>" class="comment-item hot-take-item">
+          <div class="comment-header">
+            <div>
+              <strong><%= post.userName %></strong>
+              <span class="muted-text"><%= new Date(post.createdAt).toLocaleString() %></span>
+            </div>
+            <% if (isAdmin || post.userId === session.authenticatedUser?.userId) { %>
+              <button
+                type="button"
+                class="secondary-button"
+                hx-delete="/hottakes/<%= post.id %>"
+                hx-confirm="Delete this hot take?"
+                hx-target="#hot-take-<%= post.id %>"
+                hx-swap="outerHTML"
+              >
+                Delete
+              </button>
+            <% } %>
+          </div>
+          <p class="hot-take-content"><%= post.content %></p>
+          <%- include("hotTakeActions", { post, likeActorId }) %>
+          <%- include("hotTakeComments", { post, session, errorMessage: null }) %>
+        </li>
+      <% }) %>
+    </ol>
+  <% } %>
+</div>

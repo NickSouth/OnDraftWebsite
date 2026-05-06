@@ -10,7 +10,7 @@ export class HttpServer implements IServer {
 
     expressApp.listen(port, () => {
       // eslint-disable-next-line no-console
-      console.log(`CheeksCast website running on http://localhost:${port}`);
+      console.log(`OnDraft running on http://localhost:${port}`);
     });
   }
 }

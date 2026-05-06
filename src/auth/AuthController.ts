@@ -3,31 +3,31 @@ import {
   getAuthenticatedUser,
   signInAuthenticatedUser,
   signOutAuthenticatedUser,
-  touchWebsiteSession,
-  type IWebsiteBrowserSession,
-  type WebsiteSessionStore,
-} from "../session/WebsiteSession";
+  touchOnDraftSession,
+  type IOnDraftBrowserSession,
+  type OnDraftSessionStore,
+} from "../session/OnDraftSession";
 import type { ILoggingService } from "../service/LoggingService";
 import type { IAuthService } from "./AuthService";
 import type { AuthError } from "./errors";
 
 export interface IAuthController {
-  showLogin(res: Response, session: IWebsiteBrowserSession, pageError?: string | null): Promise<void>;
-  showRegister(res: Response, session: IWebsiteBrowserSession, pageError?: string | null): Promise<void>;
+  showLogin(res: Response, session: IOnDraftBrowserSession, pageError?: string | null): Promise<void>;
+  showRegister(res: Response, session: IOnDraftBrowserSession, pageError?: string | null): Promise<void>;
   loginFromForm(
     res: Response,
     email: string,
     password: string,
-    store: WebsiteSessionStore,
+    store: OnDraftSessionStore,
   ): Promise<void>;
   registerFromForm(
     res: Response,
     displayName: string,
     email: string,
     password: string,
-    store: WebsiteSessionStore,
+    store: OnDraftSessionStore,
   ): Promise<void>;
-  logoutFromForm(res: Response, store: WebsiteSessionStore): Promise<void>;
+  logoutFromForm(res: Response, store: OnDraftSessionStore): Promise<void>;
 }
 
 class AuthController implements IAuthController {
@@ -45,7 +45,7 @@ class AuthController implements IAuthController {
 
   async showLogin(
     res: Response,
-    session: IWebsiteBrowserSession,
+    session: IOnDraftBrowserSession,
     pageError: string | null = null,
   ): Promise<void> {
     res.render("auth/login", { pageError, session });
@@ -53,7 +53,7 @@ class AuthController implements IAuthController {
 
   async showRegister(
     res: Response,
-    session: IWebsiteBrowserSession,
+    session: IOnDraftBrowserSession,
     pageError: string | null = null,
   ): Promise<void> {
     res.render("auth/register", { pageError, session });
@@ -63,9 +63,9 @@ class AuthController implements IAuthController {
     res: Response,
     email: string,
     password: string,
-    store: WebsiteSessionStore,
+    store: OnDraftSessionStore,
   ): Promise<void> {
-    const session = touchWebsiteSession(store);
+    const session = touchOnDraftSession(store);
     const result = await this.service.authenticate({ email, password });
 
     if (result.ok === false) {
@@ -88,9 +88,9 @@ class AuthController implements IAuthController {
     displayName: string,
     email: string,
     password: string,
-    store: WebsiteSessionStore,
+    store: OnDraftSessionStore,
   ): Promise<void> {
-    const session = touchWebsiteSession(store);
+    const session = touchOnDraftSession(store);
     const result = await this.service.register({ displayName, email, password });
 
     if (result.ok === false) {
@@ -108,7 +108,7 @@ class AuthController implements IAuthController {
     res.redirect("/");
   }
 
-  async logoutFromForm(res: Response, store: WebsiteSessionStore): Promise<void> {
+  async logoutFromForm(res: Response, store: OnDraftSessionStore): Promise<void> {
     const currentUser = getAuthenticatedUser(store);
 
     if (currentUser) {

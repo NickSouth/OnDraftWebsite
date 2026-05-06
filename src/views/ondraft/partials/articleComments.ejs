@@ -1,0 +1,126 @@
+<section id="article-comments-section" class="article-comments-section">
+  <div class="section-heading">
+    <h2>Comments</h2>
+    <p class="muted-text"><%= article.comments.length %> total</p>
+  </div>
+
+  <% if (errorMessage) { %>
+    <p class="error-message"><%= errorMessage %></p>
+  <% } %>
+
+  <% if (session.authenticatedUser) { %>
+    <form
+      class="comment-form"
+      hx-post="/articles/<%= article.id %>/comments?limit=<%= commentsLimit %>"
+      hx-target="#article-comments-section"
+      hx-swap="outerHTML"
+    >
+      <label>
+        Add a comment
+        <textarea name="text" maxlength="1000" required></textarea>
+      </label>
+      <button type="submit">Post Comment</button>
+    </form>
+  <% } else { %>
+    <p class="muted-text"><a href="/login">Log in</a> to comment.</p>
+  <% } %>
+
+  <% const visibleComments = article.comments.slice(0, commentsLimit); %>
+  <% if (visibleComments.length === 0) { %>
+    <p class="muted-text">No comments yet.</p>
+  <% } else { %>
+    <ol class="comment-list">
+      <% visibleComments.forEach((comment) => { %>
+        <li class="comment-item" id="comment-<%= comment.id %>">
+          <div class="comment-header">
+            <div>
+              <strong><%= comment.userName %></strong>
+              <span class="muted-text"><%= new Date(comment.createdAt).toLocaleString() %></span>
+            </div>
+            <% if (isAdmin || comment.userId === session.authenticatedUser?.userId) { %>
+              <button
+                type="button"
+                class="secondary-button"
+                hx-delete="/articles/<%= article.id %>/comments/<%= comment.id %>?limit=<%= commentsLimit %>"
+                hx-target="#article-comments-section"
+                hx-swap="outerHTML"
+              >
+                Delete
+              </button>
+            <% } %>
+          </div>
+          <p class="comment-text"><%= comment.text %></p>
+          <div class="comment-actions">
+            <%- include("commentLikeButton", { comment, likeActorId }) %>
+          </div>
+          <% if (comment.replies && comment.replies.length > 0) { %>
+            <ol class="reply-list">
+              <% comment.replies.forEach((reply) => { %>
+                <li class="reply-item" id="comment-<%= reply.id %>">
+                  <div class="comment-header">
+                    <div>
+                      <strong><%= reply.userName %></strong>
+                      <span class="muted-text"><%= new Date(reply.createdAt).toLocaleString() %></span>
+                    </div>
+                    <% if (isAdmin || reply.userId === session.authenticatedUser?.userId) { %>
+                      <button
+                        type="button"
+                        class="secondary-button"
+                        hx-delete="/articles/<%= article.id %>/comments/<%= reply.id %>?limit=<%= commentsLimit %>"
+                        hx-target="#article-comments-section"
+                        hx-swap="outerHTML"
+                      >
+                        Delete
+                      </button>
+                    <% } %>
+                  </div>
+                  <p class="comment-text"><%= reply.text %></p>
+                  <%- include("commentLikeButton", { comment: reply, likeActorId }) %>
+                </li>
+              <% }) %>
+            </ol>
+          <% } %>
+          <% if (session.authenticatedUser) { %>
+            <div class="reply-thread-actions">
+              <button
+                type="button"
+                class="secondary-button"
+                aria-expanded="false"
+                aria-controls="reply-form-<%= comment.id %>"
+                onclick="const form = document.getElementById('reply-form-<%= comment.id %>'); const expanded = this.getAttribute('aria-expanded') === 'true'; this.setAttribute('aria-expanded', String(!expanded)); form.hidden = expanded;"
+              >
+                Reply
+              </button>
+            </div>
+            <form
+              id="reply-form-<%= comment.id %>"
+              class="comment-form reply-form"
+              hx-post="/articles/<%= article.id %>/comments/<%= comment.id %>/replies?limit=<%= commentsLimit %>"
+              hx-target="#article-comments-section"
+              hx-swap="outerHTML"
+              hidden
+            >
+              <label>
+                Reply
+                <textarea name="text" maxlength="1000" required></textarea>
+              </label>
+              <button type="submit">Post Reply</button>
+            </form>
+          <% } %>
+        </li>
+      <% }) %>
+    </ol>
+  <% } %>
+
+  <% if (article.comments.length > commentsLimit) { %>
+    <button
+      type="button"
+      class="secondary-button show-more-comments"
+      hx-get="/articles/<%= article.id %>/comments?limit=<%= commentsLimit + 10 %>"
+      hx-target="#article-comments-section"
+      hx-swap="outerHTML"
+    >
+      Show More
+    </button>
+  <% } %>
+</section>

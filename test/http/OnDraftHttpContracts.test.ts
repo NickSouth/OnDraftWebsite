@@ -12,16 +12,16 @@ async function adminAgent() {
   await agent
     .post("/login")
     .type("form")
-    .send({ email: "ryanmcwalter@cheekscast.test", password: "password123" });
+    .send({ email: "ryanmcwalter@ondraft.test", password: "password123" });
   return agent;
 }
 
-async function loginAdminAgent(website: ReturnType<typeof app>) {
-  const agent = request.agent(website);
+async function loginAdminAgent(ondraft: ReturnType<typeof app>) {
+  const agent = request.agent(ondraft);
   await agent
     .post("/login")
     .type("form")
-    .send({ email: "ryanmcwalter@cheekscast.test", password: "password123" });
+    .send({ email: "ryanmcwalter@ondraft.test", password: "password123" });
   return agent;
 }
 
@@ -34,7 +34,7 @@ function removeUploadedAssetsFromHtml(html: string) {
   }
 }
 
-describe("Website HTTP contracts", () => {
+describe("OnDraft HTTP contracts", () => {
   it("renders the home page for anonymous visitors", async () => {
     const response = await request(app()).get("/");
 
@@ -49,16 +49,16 @@ describe("Website HTTP contracts", () => {
     const login = await agent
       .post("/login")
       .type("form")
-      .send({ email: "ryanmcwalter@cheekscast.test", password: "password123" });
+      .send({ email: "ryanmcwalter@ondraft.test", password: "password123" });
 
     expect(login.status).toBe(302);
     expect(login.headers.location).toBe("/");
 
-    const website = await agent.get("/");
+    const ondraft = await agent.get("/");
 
-    expect(website.status).toBe(200);
-    expect(website.text).toContain("Website Shell");
-    expect(website.text).toContain("Ryan McWalter");
+    expect(ondraft.status).toBe(200);
+    expect(ondraft.text).toContain("OnDraft");
+    expect(ondraft.text).toContain("Ryan McWalter");
   });
 
   it("registers a new user and signs them in", async () => {
@@ -69,29 +69,222 @@ describe("Website HTTP contracts", () => {
       .type("form")
       .send({
         displayName: "New Analyst",
-        email: "analyst@website.test",
+        email: "analyst@ondraft.test",
         password: "password123",
       });
 
     expect(register.status).toBe(302);
     expect(register.headers.location).toBe("/");
 
-    const website = await agent.get("/");
+    const ondraft = await agent.get("/");
 
-    expect(website.status).toBe(200);
-    expect(website.text).toContain("New Analyst");
+    expect(ondraft.status).toBe(200);
+    expect(ondraft.text).toContain("New Analyst");
   });
 
   it("allows anonymous visitors to view articles and the big board", async () => {
-    const website = app();
+    const ondraft = app();
 
-    const articles = await request(website).get("/articles");
-    const bigBoard = await request(website).get("/bigboard");
+    const articles = await request(ondraft).get("/articles");
+    const bigBoard = await request(ondraft).get("/bigboard");
+    const hotTakes = await request(ondraft).get("/hottakes");
 
     expect(articles.status).toBe(200);
     expect(articles.text).toContain("Articles");
     expect(bigBoard.status).toBe(200);
     expect(bigBoard.text).toContain("Big Board");
+    expect(hotTakes.status).toBe(200);
+    expect(hotTakes.text).toContain("Hot Takes");
+    expect(hotTakes.text).toContain("Log in");
+  });
+
+  it("lets admins edit board rows and publish player info separately from writeups", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+
+    const emptyBoard = await agent.get("/bigboard");
+    expect(emptyBoard.status).toBe(200);
+    expect(emptyBoard.text).toContain("Edit board");
+    expect(emptyBoard.text).not.toContain("Create entry");
+
+    const editor = await agent.get("/bigboard/edit?year=2026&creator=Ryan");
+    expect(editor.status).toBe(200);
+    expect(editor.text).toContain("Edit Big Board");
+    expect(editor.text).toContain("Add player");
+    expect(editor.text).toContain("Publish");
+
+    const draft = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": "entry-1",
+        "entries[0][playerName]": "Hidden Prospect",
+        "entries[0][school]": "OnDraft State",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2",
+        "entries[0][weight]": "220",
+        "entries[0][strengths]": "Pocket movement",
+        "entries[0][weaknesses]": "Pressure answers",
+        "entries[0][rundown]": "Starter traits.",
+        "entries[0][notes]": "Private eval note.",
+      });
+
+    expect(draft.status).toBe(200);
+    expect(draft.text).toContain("Saved.");
+
+    const hiddenPublicBoard = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
+    expect(hiddenPublicBoard.status).toBe(200);
+    expect(hiddenPublicBoard.text).not.toContain("Hidden Prospect");
+
+    const publishInfo = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": "entry-1",
+        "entries[0][playerName]": "Hidden Prospect",
+        "entries[0][school]": "OnDraft State",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2",
+        "entries[0][weight]": "220",
+        "entries[0][strengths]": "Pocket movement",
+        "entries[0][weaknesses]": "Pressure answers",
+        "entries[0][rundown]": "Starter traits.",
+        "entries[0][notes]": "Private eval note.",
+        "entries[0][playerInfoPublished]": "true",
+      });
+
+    expect(publishInfo.status).toBe(200);
+    expect(publishInfo.text).toContain("Saved.");
+
+    const visibleWithoutWriteup = await agent.get("/bigboard?year=2026&creator=Ryan");
+    expect(visibleWithoutWriteup.status).toBe(200);
+    expect(visibleWithoutWriteup.text).toContain("Hidden Prospect");
+    expect(visibleWithoutWriteup.text).not.toContain("Starter traits.");
+    expect(visibleWithoutWriteup.text).not.toContain("Private eval note.");
+
+    const publishWriteup = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": "entry-1",
+        "entries[0][playerName]": "Hidden Prospect",
+        "entries[0][school]": "OnDraft State",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2",
+        "entries[0][weight]": "220",
+        "entries[0][strengths]": "Pocket movement",
+        "entries[0][weaknesses]": "Pressure answers",
+        "entries[0][rundown]": "Starter traits.",
+        "entries[0][notes]": "Private eval note.",
+        "entries[0][playerInfoPublished]": "true",
+        "entries[0][writeupPublished]": "true",
+      });
+
+    expect(publishWriteup.status).toBe(200);
+    expect(publishWriteup.text).toContain("Saved.");
+
+    const visibleWithWriteup = await agent.get("/bigboard?year=2026&creator=Ryan");
+    expect(visibleWithWriteup.status).toBe(200);
+    expect(visibleWithWriteup.text).toContain("Starter traits.");
+    expect(visibleWithWriteup.text).toContain("Pocket movement");
+    expect(visibleWithWriteup.text).not.toContain("Private eval note.");
+  });
+
+  it("lets admins create a new big board year from the editor", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+
+    const editor = await agent.get("/bigboard/edit");
+    expect(editor.status).toBe(200);
+    expect(editor.text).toContain("Create draft class");
+
+    const createYear = await agent
+      .post("/bigboard/years")
+      .type("form")
+      .send({ year: "2027", creator: "Aleks" });
+
+    expect(createYear.status).toBe(302);
+    expect(createYear.headers.location).toBe("/bigboard/edit?year=2027&creator=Aleks");
+
+    const newYearEditor = await agent.get(createYear.headers.location);
+    expect(newYearEditor.status).toBe(200);
+    expect(newYearEditor.text).toContain("2027 Aleks");
+    expect(newYearEditor.text).toContain('<option value="2027" selected>2027</option>');
+    expect(newYearEditor.text).toContain("Are you sure? This will delete all boards from that year");
+  });
+
+  it("lets admins delete a big board year from the editor", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+
+    await agent
+      .post("/bigboard/years")
+      .type("form")
+      .send({ year: "2027", creator: "Ryan" });
+
+    const deleteYear = await agent
+      .post("/bigboard/years/delete")
+      .type("form")
+      .send({ year: "2027", creator: "Ryan" });
+
+    expect(deleteYear.status).toBe(302);
+    expect(deleteYear.headers.location).toBe("/bigboard/edit?year=2026&creator=Ryan");
+
+    const editor = await agent.get(deleteYear.headers.location);
+    expect(editor.status).toBe(200);
+    expect(editor.text).not.toContain('<option value="2027"');
+  });
+
+  it("supports hot take posting, filtering, liking, commenting, and owner deletion", async () => {
+    const agent = await adminAgent();
+
+    const create = await agent
+      .post("/hottakes")
+      .type("form")
+      .set("HX-Request", "true")
+      .send({ content: "Never draft a round-one long snapper." });
+
+    expect(create.status).toBe(200);
+    expect(create.text).toContain("Never draft a round-one long snapper.");
+    expect(create.text).toContain("hx-swap-oob");
+
+    const postId = create.text.match(/id="hot-take-([A-Za-z0-9]{5})"/)?.[1];
+    expect(postId).toBeTruthy();
+
+    const filtered = await agent.get("/hottakes/filter?keyword=long%20snapper&sortBy=likes");
+    expect(filtered.status).toBe(200);
+    expect(filtered.text).toContain("Never draft a round-one long snapper.");
+
+    const like = await agent
+      .post(`/hottakes/${postId}/like`)
+      .set("HX-Request", "true");
+    expect(like.status).toBe(200);
+    expect(like.text).toContain(">1<");
+
+    const comment = await agent
+      .post(`/hottakes/${postId}/comments`)
+      .type("form")
+      .set("HX-Request", "true")
+      .send({ text: "Counterpoint: special teams matter." });
+    expect(comment.status).toBe(200);
+    expect(comment.text).toContain("Counterpoint: special teams matter.");
+
+    const remove = await agent
+      .delete(`/hottakes/${postId}`)
+      .set("HX-Request", "true");
+    expect(remove.status).toBe(200);
   });
 
   it("keeps plain text article creation working", async () => {
@@ -151,8 +344,8 @@ describe("Website HTTP contracts", () => {
   });
 
   it("supports article likes and authenticated HTMX comments", async () => {
-    const website = app();
-    const admin = await loginAdminAgent(website);
+    const ondraft = app();
+    const admin = await loginAdminAgent(ondraft);
 
     const create = await admin
       .post("/articles")
@@ -170,7 +363,7 @@ describe("Website HTTP contracts", () => {
     const articlePath = create.headers.location;
     const articleId = articlePath.split("/").pop();
 
-    const anonymous = request.agent(website);
+    const anonymous = request.agent(ondraft);
     const like = await anonymous.post(`/articles/${articleId}/like`);
     expect(like.status).toBe(200);
     expect(like.text).toContain(">1</span>");
@@ -183,19 +376,19 @@ describe("Website HTTP contracts", () => {
     expect(likeAgain.status).toBe(200);
     expect(likeAgain.text).toContain(">1</span>");
 
-    const anonymousComment = await request(website)
+    const anonymousComment = await request(ondraft)
       .post(`/articles/${articleId}/comments`)
       .type("form")
       .send({ text: "Anonymous comment." });
     expect(anonymousComment.status).toBe(403);
 
-    const reader = request.agent(website);
+    const reader = request.agent(ondraft);
     await reader
       .post("/register")
       .type("form")
       .send({
         displayName: "Reader One",
-        email: "reader@website.test",
+        email: "reader@ondraft.test",
         password: "password123",
       });
 
@@ -210,6 +403,16 @@ describe("Website HTTP contracts", () => {
 
     const commentId = comment.text.match(/id="comment-([A-Za-z0-9]{8})"/)?.[1];
     expect(commentId).toBeDefined();
+    expect(comment.text).toContain(`/articles/${articleId}/comments/${commentId}/replies`);
+
+    const reply = await reader
+      .post(`/articles/${articleId}/comments/${commentId}/replies`)
+      .type("form")
+      .send({ text: "Agree with this." });
+
+    expect(reply.status).toBe(200);
+    expect(reply.text).toContain("Agree with this.");
+    expect(reply.text).toContain("reply-list");
 
     const likedComment = await anonymous.post(`/comments/${commentId}/like`);
     expect(likedComment.status).toBe(200);
@@ -221,7 +424,7 @@ describe("Website HTTP contracts", () => {
 
     await anonymous.post(`/comments/${commentId}/like`);
 
-    const articles = await request(website).get("/articles");
+    const articles = await request(ondraft).get("/articles");
     expect(articles.status).toBe(200);
     expect(articles.text).toContain("1 likes");
     expect(articles.text).toContain("1 comments");
@@ -232,8 +435,8 @@ describe("Website HTTP contracts", () => {
   });
 
   it("lets admins delete any comment and pages comments ten at a time", async () => {
-    const website = app();
-    const admin = await loginAdminAgent(website);
+    const ondraft = app();
+    const admin = await loginAdminAgent(ondraft);
 
     const create = await admin
       .post("/articles")
@@ -248,13 +451,13 @@ describe("Website HTTP contracts", () => {
       });
 
     const articleId = create.headers.location.split("/").pop();
-    const reader = request.agent(website);
+    const reader = request.agent(ondraft);
     await reader
       .post("/register")
       .type("form")
       .send({
         displayName: "Many Comments",
-        email: "many-comments@website.test",
+        email: "many-comments@ondraft.test",
         password: "password123",
       });
 
@@ -265,13 +468,13 @@ describe("Website HTTP contracts", () => {
         .send({ text: `Comment ${index}` });
     }
 
-    const firstPage = await request(website).get(`/articles/${articleId}/comments`);
+    const firstPage = await request(ondraft).get(`/articles/${articleId}/comments`);
     expect(firstPage.status).toBe(200);
     expect(firstPage.text).toContain("Comment 10");
     expect(firstPage.text).not.toContain("Comment 11");
     expect(firstPage.text).toContain("Show More");
 
-    const secondPage = await request(website).get(`/articles/${articleId}/comments?limit=20`);
+    const secondPage = await request(ondraft).get(`/articles/${articleId}/comments?limit=20`);
     expect(secondPage.status).toBe(200);
     expect(secondPage.text).toContain("Comment 11");
 
@@ -285,8 +488,8 @@ describe("Website HTTP contracts", () => {
   });
 
   it("sorts filtered article results by date, likes, and comments", async () => {
-    const website = app();
-    const admin = await loginAdminAgent(website);
+    const ondraft = app();
+    const admin = await loginAdminAgent(ondraft);
 
     const older = await admin
       .post("/articles")
@@ -313,25 +516,25 @@ describe("Website HTTP contracts", () => {
 
     const olderId = older.headers.location.split("/").pop();
     const newerId = newer.headers.location.split("/").pop();
-    await request(website).post(`/articles/${olderId}/like`);
+    await request(ondraft).post(`/articles/${olderId}/like`);
     await admin
       .post(`/articles/${newerId}/comments`)
       .type("form")
       .send({ text: "Newer comment." });
 
-    const articlesPage = await request(website).get("/articles");
+    const articlesPage = await request(ondraft).get("/articles");
     expect(articlesPage.status).toBe(200);
     expect(articlesPage.text).toContain('name="sortBy"');
     expect(articlesPage.text).toContain('name="sortDirection"');
     expect(articlesPage.text).toContain("htmx.trigger(this.form, 'submit')");
 
-    const dateAsc = await request(website).get("/articles/filter?sortBy=date&sortDirection=asc");
+    const dateAsc = await request(ondraft).get("/articles/filter?sortBy=date&sortDirection=asc");
     expect(dateAsc.text.indexOf("Older Sort Article")).toBeLessThan(dateAsc.text.indexOf("Newer Sort Article"));
 
-    const likesDesc = await request(website).get("/articles/filter?sortBy=likes&sortDirection=desc");
+    const likesDesc = await request(ondraft).get("/articles/filter?sortBy=likes&sortDirection=desc");
     expect(likesDesc.text.indexOf("Older Sort Article")).toBeLessThan(likesDesc.text.indexOf("Newer Sort Article"));
 
-    const commentsDesc = await request(website).get("/articles/filter?sortBy=comments&sortDirection=desc");
+    const commentsDesc = await request(ondraft).get("/articles/filter?sortBy=comments&sortDirection=desc");
     expect(commentsDesc.text.indexOf("Newer Sort Article")).toBeLessThan(commentsDesc.text.indexOf("Older Sort Article"));
   });
 

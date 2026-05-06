@@ -1,13 +1,13 @@
-# CheeksCast Website
+# OnDraft
 
-TypeScript website for CheeksCast (Ryan McWalter and Aleks Ryabinkin).
+TypeScript app for OnDraft, a beer-and-NFL-draft themed site.
 
 The app currently includes:
 
 - Express, EJS layouts, and static CSS,
 - login, logout, and in-memory registration,
-- a protected `/website` shell,
-- empty website controller, service, and repository layers wired through composition.
+- an OnDraft home, articles, and big board,
+- OnDraft controller, service, repository, model, and session layers wired through composition.
 
 ## Run
 
@@ -19,8 +19,8 @@ npm run dev
 
 Demo users:
 
-- `ryanmcwalter@cheekscast.test` / `password123`
-- `bob@website.test` / `password123`
+- `ryanmcwalter@ondraft.test` / `password123`
+- `bob@ondraft.test` / `password123`
 
 ## Tests
 

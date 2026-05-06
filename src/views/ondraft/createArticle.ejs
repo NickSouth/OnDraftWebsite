@@ -9,7 +9,7 @@
     <p class="error-message"><%= errorMessage %></p>
   <% } %>
 
-  <form class="website-form" method="post" action="<%= previewAction %>" enctype="multipart/form-data">
+  <form class="ondraft-form" method="post" action="<%= previewAction %>" enctype="multipart/form-data">
     <label>
       Title
       <input name="title" value="<%= values.title || "" %>" required />

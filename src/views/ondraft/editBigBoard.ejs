@@ -1,0 +1,295 @@
+<%
+  const heightOptions = [];
+  for (let feet = 5; feet <= 7; feet += 1) {
+    for (let inches = 0; inches <= 11; inches += 1) {
+      if (feet === 7 && inches > 0) {
+        continue;
+      }
+      heightOptions.push({ value: `${feet}-${inches}`, label: `${feet}'${inches}"` });
+    }
+  }
+%>
+
+<section class="plain-page board-editor-page">
+  <div class="page-heading big-board-heading">
+    <div>
+      <p class="eyebrow">Admin</p>
+      <h1>Edit Big Board</h1>
+    </div>
+    <div class="big-board-heading-actions">
+      <div class="board-class-tools">
+        <div class="board-class-selector-row">
+          <form class="big-board-controls" method="get" action="/bigboard/edit">
+            <label class="big-board-year-control">
+              <span>Draft Class</span>
+              <select name="year" onchange="this.form.submit();">
+                <% years.forEach((year) => { %>
+                  <option value="<%= year %>" <%= board.year === year ? "selected" : "" %>><%= year %></option>
+                <% }) %>
+              </select>
+            </label>
+            <input type="hidden" name="creator" value="<%= board.creator %>" />
+            <div class="creator-toggle" aria-label="Board creator">
+              <% creators.forEach((creator) => { %>
+                <button
+                  type="button"
+                  class="<%= board.creator === creator ? "is-active" : "" %>"
+                  aria-pressed="<%= board.creator === creator ? "true" : "false" %>"
+                  onclick="this.form.creator.value = '<%= creator %>'; this.form.submit();"
+                >
+                  <%= creator %>
+                </button>
+              <% }) %>
+            </div>
+          </form>
+        </div>
+        <form class="create-board-year-form" method="post" action="/bigboard/years">
+          <span>Create draft class</span>
+          <input type="hidden" name="creator" value="<%= board.creator %>" />
+          <input type="number" name="year" min="1900" max="2100" placeholder="Year" required />
+          <button type="submit" class="secondary-button">Create</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <form
+    id="delete-board-year-form"
+    class="delete-board-year-form"
+    method="post"
+    action="/bigboard/years/delete"
+    onsubmit="return confirm('Are you sure? This will delete all boards from that year');"
+  >
+    <input type="hidden" name="year" value="<%= board.year %>" />
+    <input type="hidden" name="creator" value="<%= board.creator %>" />
+  </form>
+
+  <% if (errorMessage) { %>
+    <p class="error-message"><%= errorMessage %></p>
+  <% } %>
+
+  <form
+    id="big-board-editor-form"
+    class="board-editor-form"
+    method="post"
+    action="/bigboard/edit"
+    hx-post="/bigboard/edit/autosave"
+    hx-trigger="change delay:900ms, every 20s"
+    hx-target="#big-board-save-status"
+    hx-swap="innerHTML"
+  >
+    <input type="hidden" name="year" value="<%= board.year %>" />
+    <input type="hidden" name="creator" value="<%= board.creator %>" />
+    <input id="big-board-entry-id" type="hidden" name="entryId" value="" />
+
+    <div class="board-editor-toolbar">
+      <div>
+        <strong><%= board.year %> <%= board.creator %></strong>
+        <span id="big-board-save-status" class="save-status"><%= statusMessage || "" %></span>
+      </div>
+    </div>
+
+    <div class="board-editor-table-wrap">
+      <table class="board-editor-table">
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Player</th>
+            <th>School</th>
+            <th>Position</th>
+            <th>Height</th>
+            <th>Weight</th>
+            <th>Pos Rank</th>
+            <th>Publish</th>
+            <th>Strengths</th>
+            <th>Weaknesses</th>
+            <th>Rundown</th>
+            <th>Publish</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody id="board-editor-rows">
+          <% board.entries.forEach((entry, index) => { %>
+            <tr class="board-editor-row">
+              <td>
+                <input type="number" name="entries[<%= index %>][rank]" min="1" step="1" value="<%= entry.rank ?? "" %>" placeholder="Rank" data-publish-section="player" />
+              </td>
+              <td>
+                <input type="hidden" name="entries[<%= index %>][id]" value="<%= entry.id %>" data-entry-id />
+                <input name="entries[<%= index %>][playerName]" value="<%= entry.playerName %>" placeholder="Player name" data-publish-section="player" />
+              </td>
+              <td><input name="entries[<%= index %>][school]" value="<%= entry.school %>" placeholder="School" data-publish-section="player" /></td>
+              <td>
+                <select name="entries[<%= index %>][position]" data-publish-section="player">
+                  <option value="">Pos</option>
+                  <% positions.forEach((position) => { %>
+                    <option value="<%= position %>" <%= entry.position === position ? "selected" : "" %>><%= position %></option>
+                  <% }) %>
+                </select>
+              </td>
+              <td>
+                <select name="entries[<%= index %>][heightLabel]" data-publish-section="player">
+                  <option value="">Height</option>
+                  <% heightOptions.forEach((height) => { %>
+                    <option value="<%= height.value %>" <%= entry.height && entry.height.feet + "-" + entry.height.inches === height.value ? "selected" : "" %>><%= height.label %></option>
+                  <% }) %>
+                </select>
+              </td>
+              <td><input type="number" name="entries[<%= index %>][weight]" min="1" step="1" value="<%= entry.weight ?? "" %>" placeholder="lbs" data-publish-section="player" /></td>
+              <td>
+                <input type="number" name="entries[<%= index %>][posRank]" min="1" step="1" value="<%= entry.posRank ?? "" %>" placeholder="Pos rank" data-publish-section="player" />
+              </td>
+              <td class="board-editor-publish-cell">
+                <label class="publish-state" title="Player info published">
+                  <input
+                    type="checkbox"
+                    name="entries[<%= index %>][playerInfoPublished]"
+                    value="true"
+                    data-player-publish
+                    <%= entry.playerInfoPublished ? "checked" : "" %>
+                  />
+                </label>
+              </td>
+              <td><textarea name="entries[<%= index %>][strengths]" placeholder="Strengths" data-publish-section="writeup"><%= entry.writeup.strengths %></textarea></td>
+              <td><textarea name="entries[<%= index %>][weaknesses]" placeholder="Weaknesses" data-publish-section="writeup"><%= entry.writeup.weaknesses %></textarea></td>
+              <td><textarea name="entries[<%= index %>][rundown]" placeholder="Rundown" data-publish-section="writeup"><%= entry.writeup.rundown %></textarea></td>
+              <td class="board-editor-publish-cell">
+                <label class="publish-state" title="Writeup published">
+                  <input
+                    type="checkbox"
+                    name="entries[<%= index %>][writeupPublished]"
+                    value="true"
+                    data-writeup-publish
+                    <%= entry.writeupPublished ? "checked" : "" %>
+                  />
+                </label>
+              </td>
+              <td><textarea name="entries[<%= index %>][notes]" placeholder="Notes"><%= entry.notes %></textarea></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <div class="board-editor-bottom-actions">
+      <button type="button" class="secondary-button" data-add-player>Add player</button>
+      <div class="board-editor-bottom-save-actions">
+        <button type="submit" class="secondary-button">Save</button>
+        <button type="submit" name="action" value="exit">Save and exit</button>
+        <button
+          type="submit"
+          form="delete-board-year-form"
+          class="danger-button delete-board-year-button"
+          aria-label="Delete <%= board.year %> draft class"
+        >
+          Delete <%= board.year %>
+        </button>
+      </div>
+    </div>
+  </form>
+
+  <template id="board-editor-row-template">
+    <tr class="board-editor-row">
+      <td><input type="number" data-field="rank" min="1" step="1" placeholder="Rank" data-publish-section="player" /></td>
+      <td>
+        <input type="hidden" data-field="id" data-entry-id />
+        <input data-field="playerName" placeholder="Player name" data-publish-section="player" />
+      </td>
+      <td><input data-field="school" placeholder="School" data-publish-section="player" /></td>
+      <td>
+        <select data-field="position" data-publish-section="player">
+          <option value="">Pos</option>
+          <% positions.forEach((position) => { %>
+            <option value="<%= position %>"><%= position %></option>
+          <% }) %>
+        </select>
+      </td>
+      <td>
+        <select data-field="heightLabel" data-publish-section="player">
+          <option value="">Height</option>
+          <% heightOptions.forEach((height) => { %>
+            <option value="<%= height.value %>"><%= height.label %></option>
+          <% }) %>
+        </select>
+      </td>
+      <td><input type="number" data-field="weight" min="1" step="1" placeholder="lbs" data-publish-section="player" /></td>
+      <td><input type="number" data-field="posRank" min="1" step="1" placeholder="Pos rank" data-publish-section="player" /></td>
+      <td class="board-editor-publish-cell">
+        <label class="publish-state" title="Player info published"><input type="checkbox" data-field="playerInfoPublished" value="true" data-player-publish /></label>
+      </td>
+      <td><textarea data-field="strengths" placeholder="Strengths" data-publish-section="writeup"></textarea></td>
+      <td><textarea data-field="weaknesses" placeholder="Weaknesses" data-publish-section="writeup"></textarea></td>
+      <td><textarea data-field="rundown" placeholder="Rundown" data-publish-section="writeup"></textarea></td>
+      <td class="board-editor-publish-cell">
+        <label class="publish-state" title="Writeup published"><input type="checkbox" data-field="writeupPublished" value="true" data-writeup-publish /></label>
+      </td>
+      <td><textarea data-field="notes" placeholder="Notes"></textarea></td>
+    </tr>
+  </template>
+</section>
+
+<script>
+  (() => {
+    const rows = document.querySelector("#board-editor-rows");
+    const template = document.querySelector("#board-editor-row-template");
+    const entryIdInput = document.querySelector("#big-board-entry-id");
+    const form = document.querySelector("#big-board-editor-form");
+
+    function nextIndex() {
+      return rows.querySelectorAll("tr").length;
+    }
+
+    function entryId() {
+      if (window.crypto && window.crypto.randomUUID) {
+        return window.crypto.randomUUID();
+      }
+      return `draft-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    }
+
+    function wireRow(row, index, id) {
+      row.querySelectorAll("[data-field]").forEach((field) => {
+        field.name = `entries[${index}][${field.dataset.field}]`;
+        if (field.dataset.field === "id") {
+          field.value = id;
+        }
+      });
+      row.querySelectorAll("[data-publish-entry]").forEach((button) => {
+        button.dataset.publishEntry = id;
+      });
+    }
+
+    document.querySelector("[data-add-player]")?.addEventListener("click", () => {
+      const id = entryId();
+      const row = template.content.firstElementChild.cloneNode(true);
+      wireRow(row, nextIndex(), id);
+      rows.append(row);
+      row.querySelector("input:not([type='hidden'])")?.focus();
+    });
+
+    form?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-publish-entry]");
+      if (!button) {
+        return;
+      }
+      const row = button.closest("tr");
+      const rowId = button.dataset.publishEntry || row?.querySelector("[data-entry-id]")?.value || "";
+      entryIdInput.value = rowId;
+    });
+
+    function clearPublishState(event) {
+      const field = event.target.closest("[data-publish-section]");
+      if (!field) {
+        return;
+      }
+      const row = field.closest("tr");
+      const checkbox = field.dataset.publishSection === "player"
+        ? row?.querySelector("[data-player-publish]")
+        : row?.querySelector("[data-writeup-publish]");
+      if (checkbox) {
+        checkbox.checked = false;
+      }
+    }
+
+    form?.addEventListener("input", clearPublishState);
+    form?.addEventListener("change", clearPublishState);
+  })();
+</script>

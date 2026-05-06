@@ -6,7 +6,19 @@
     <p class="error-message"><%= errorMessage %></p>
   <% } %>
 
-  <form class="website-form" method="post" action="/bigboard">
+  <form class="ondraft-form" method="post" action="/bigboard">
+    <label>
+      Year
+      <input type="number" name="year" min="1900" max="2100" value="<%= values.year || "" %>" required />
+    </label>
+    <label>
+      Board
+      <select name="creator" required>
+        <% creators.forEach((creator) => { %>
+          <option value="<%= creator %>" <%= values.creator === creator ? "selected" : "" %>><%= creator %></option>
+        <% }) %>
+      </select>
+    </label>
     <label>
       Player name
       <input name="playerName" value="<%= values.playerName || "" %>" required />

@@ -1,0 +1,31 @@
+<form
+  id="big-board-controls"
+  class="big-board-controls"
+  method="get"
+  action="/bigboard"
+  hx-get="/bigboard"
+  hx-target="#big-board-results"
+  hx-swap="outerHTML"
+>
+  <label class="big-board-year-control">
+    <span>Year</span>
+    <select name="year" onchange="htmx.trigger(this.form, 'submit');">
+      <% years.forEach((year) => { %>
+        <option value="<%= year %>" <%= board.year === year ? "selected" : "" %>><%= year %></option>
+      <% }) %>
+    </select>
+  </label>
+  <input type="hidden" name="creator" value="<%= board.creator %>" />
+  <div class="creator-toggle" aria-label="Board creator">
+    <% creators.forEach((creator) => { %>
+      <button
+        type="button"
+        class="<%= board.creator === creator ? "is-active" : "" %>"
+        aria-pressed="<%= board.creator === creator ? "true" : "false" %>"
+        onclick="this.form.creator.value = '<%= creator %>'; htmx.trigger(this.form, 'submit');"
+      >
+        <%= creator %>
+      </button>
+    <% }) %>
+  </div>
+</form>

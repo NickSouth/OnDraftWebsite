@@ -1,6 +1,6 @@
 <section class="plain-page">
-  <p class="eyebrow">CheeksCast</p>
-  <h1>Website Shell</h1>
+  <p class="eyebrow">OnDraft</p>
+  <h1>OnDraft</h1>
   <% if (session.authenticatedUser) { %>
     <p class="welcome-note">
       Signed in as <strong><%= session.authenticatedUser.displayName %></strong>
@@ -9,6 +9,7 @@
   <% } %>
   <div class="home-actions">
     <a class="button-link" href="/articles">View articles</a>
+    <a class="button-link" href="/hottakes">OnDraft Hot Takes</a>
     <a class="button-link" href="/bigboard">View draft board</a>
   </div>
 </section>
