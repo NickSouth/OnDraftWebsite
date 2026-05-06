@@ -1,0 +1,10 @@
+Here are features I plan to implement for the website:
+
+Registration email verification
+Mailing list on registration
+OnDraft HotTakes Forum where users can post their takes
+Video Integration in the articles section
+About Us page with links and stuff
+Bookmarking posts by users
+Verified account checkmarks for admins
+Automatic Content Moderation for comments and forums
