@@ -166,21 +166,34 @@ textarea {
   gap: 10px;
 }
 
-.big-board-year-control {
+.big-board-year-control,
+.big-board-filter-control {
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
 
-.big-board-year-control span {
+.big-board-year-control span,
+.big-board-filter-control span {
   color: var(--muted);
   font-size: 0.9rem;
 }
 
-.big-board-year-control select {
+.big-board-year-control select,
+.big-board-filter-control select {
   width: auto;
   min-width: 86px;
   padding: 8px 28px 8px 10px;
+}
+
+.big-board-filter-control select {
+  min-width: 132px;
+}
+
+.big-board-filter-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .creator-toggle {

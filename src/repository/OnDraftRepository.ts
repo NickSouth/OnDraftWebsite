@@ -1,5 +1,5 @@
 import { Result } from "../lib/result";
-import { type BigBoard, Article, BigBoardCreator, BigBoardEntry, ArticleFilter, Comment, ForumPost, ForumPostFilter } from "../model/OnDraftContent";
+import { type BigBoard, Article, BigBoardCreator, BigBoardEntry, ArticleFilter, Comment, ForumPost, ForumPostFilter, DraftBoardFilter } from "../model/OnDraftContent";
 
 export type BigBoardError = 
     | {name: "BigBoardNotFound"; message: string}
@@ -45,9 +45,10 @@ export const UnknownArticleError = (message: string): ArticleError => ({ name: "
 export const UnknownBigBoardError = (message: string): BigBoardError => ({ name: "UnknownBigBoardError", message });
 
 export interface IOnDraftRepository {
-    getBigBoard(year: number, creator: BigBoardCreator): Promise<Result<BigBoard, BigBoardError>>;
+    getBigBoard(year: number, creator: BigBoardCreator, filter?: DraftBoardFilter): Promise<Result<BigBoard, BigBoardError>>;
     createBigBoardYear(year: number): Promise<Result<void, BigBoardError>>;
     deleteBigBoardYear(year: number): Promise<Result<void, BigBoardError>>;
+    getSavedSchools(year: number): Promise<Result<string[], BigBoardError>>;
     getBigBoardYears(): Promise<Result<number[], BigBoardError>>;
     getArticles(published?: boolean): Promise<Result<Article[], ArticleError>>;
     getArticleTags(): Promise<Result<string[], ArticleError>>;

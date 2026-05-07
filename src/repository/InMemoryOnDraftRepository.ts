@@ -1,5 +1,5 @@
 import { Err, Ok, Result } from "../lib/result";
-import { Article, ArticleFilter, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, Comment, ForumPost, ForumPostFilter } from "../model/OnDraftContent";
+import { Article, ArticleFilter, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, Comment, DraftBoardFilter, ForumPost, ForumPostFilter } from "../model/OnDraftContent";
 import { ArticleNotFound, BigBoardNotFound, CommentNotFound, DuplicateBigBoardYear, DuplicatePlayer, DuplicateArticle, DuplicateForumPost, type ArticleError, type BigBoardError, type IOnDraftRepository, PlayerNotFound, ForumPostError, ForumPostNotFound } from "./OnDraftRepository";
 
 
@@ -46,12 +46,36 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
     return comments.some((comment) => this.deleteCommentById(comment.replies, commentId));
   }
 
-  async getBigBoard(year: number, creator: BigBoardCreator): Promise<Result<BigBoard, BigBoardError>> {
+  async getSavedSchools(year: number): Promise<Result<string[], BigBoardError>> {
+    const schools = new Set<string>();
+    this.bigBoards.forEach((bigBoard) => {
+      if (bigBoard.year === year) {
+        bigBoard.entries.forEach((entry) => {
+          schools.add(entry.school);
+        });
+      }
+    });
+    return Ok([...schools].sort((a, b) => a.localeCompare(b)));
+  }
+
+  async getBigBoard(year: number, creator: BigBoardCreator, filter?: DraftBoardFilter): Promise<Result<BigBoard, BigBoardError>> {
     const bigBoard = this.findBigBoard(year, creator);
     if (!bigBoard) {
       return Err(BigBoardNotFound(`Big board for ${year} by ${creator} was not found.`));
     }
-    return Ok(bigBoard);
+    let entries = [...bigBoard.entries];
+    if (filter) {
+      entries = entries.filter((entry) => {
+        if (filter.position && entry.position !== filter.position) {
+          return false;
+        }
+        if (filter.school && entry.school.toLowerCase() !== filter.school.toLowerCase()) {
+          return false;
+        }
+        return true;
+      });
+    }
+    return Ok({ ...bigBoard, entries });
   }
 
   async createBigBoardYear(year: number): Promise<Result<void, BigBoardError>> {

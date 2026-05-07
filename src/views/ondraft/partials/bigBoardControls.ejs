@@ -28,4 +28,36 @@
       </button>
     <% }) %>
   </div>
+  <label class="big-board-filter-control">
+    <span>Position</span>
+    <select name="position">
+      <option value="" <%= !filters.position ? "selected" : "" %>>All</option>
+      <% positions.forEach((position) => { %>
+        <option value="<%= position %>" <%= filters.position === position ? "selected" : "" %>><%= position %></option>
+      <% }) %>
+    </select>
+  </label>
+  <label class="big-board-filter-control">
+    <span>School</span>
+    <select name="school">
+      <option value="" <%= !filters.school ? "selected" : "" %>>All</option>
+      <% schools.forEach((school) => { %>
+        <option value="<%= school %>" <%= filters.school === school ? "selected" : "" %>><%= school %></option>
+      <% }) %>
+    </select>
+  </label>
+  <div class="big-board-filter-actions">
+    <button type="submit">Apply filters</button>
+    <% if (filters.position || filters.school) { %>
+      <a
+        class="button-link secondary-link"
+        href="/bigboard?year=<%= board.year %>&creator=<%= encodeURIComponent(board.creator) %>"
+        hx-get="/bigboard?year=<%= board.year %>&creator=<%= encodeURIComponent(board.creator) %>"
+        hx-target="#big-board-results"
+        hx-swap="outerHTML"
+      >
+        Reset
+      </a>
+    <% } %>
+  </div>
 </form>

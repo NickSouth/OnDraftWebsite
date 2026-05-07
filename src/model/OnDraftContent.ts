@@ -101,6 +101,11 @@ export type ForumPostFilter = {
   dateRange?: { from: Date; to: Date };
 };
 
+export type DraftBoardFilter = {
+  position?: Position;
+  school?: string;
+}
+
 export type Comment = {
   id: string;
   userId: string;

@@ -7,6 +7,11 @@ import { ArticleError, BigBoardError, ForumPostError } from "../repository/OnDra
 import { publicArticleUploadUrl } from "../uploads/articlePdfUpload";
 import { BIG_BOARD_CREATORS, POSITIONS, type Article, type ArticleContent, type ArticleFilter, type BigBoard, type BigBoardCreator, type ForumPost, type ForumPostFilter } from "../model/OnDraftContent";
 
+export interface DraftBoardFilterInput {
+  school?: string;
+  position?: string;
+}
+
 export interface IOnDraftController {
   showHome(res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showArticles(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
@@ -42,6 +47,7 @@ export interface IOnDraftController {
   publishBigBoardWriteup(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   deleteArticle(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   deleteBigBoardEntry(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  getSavedSchools(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
 }
 
 class OnDraftController implements IOnDraftController {
@@ -534,11 +540,42 @@ class OnDraftController implements IOnDraftController {
     this.renderHotTakeList(res, result.value, session);
   }
 
+  async getSavedSchools(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    const year = this.parseBigBoardYear(req.query.year);
+    if (!year) {
+      res.status(400).send("Invalid or missing year parameter.");
+      return;
+    }
+    const result = await this.service.getSavedSchools(year);
+    if (result.ok === false) {
+      res.status(this.mapBigBoardErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+    res.json(result.value);
+  }
+
+  private buildBigBoardFilter(req: Request): DraftBoardFilterInput | undefined {
+    const school = this.queryString(req, "school");
+    const position = this.queryString(req, "position");
+    if (!school && !position) {
+      return undefined;
+    }
+    const filter: DraftBoardFilterInput = {};
+    if (school) {
+      filter.school = school;
+    }
+    if (position) {
+      filter.position = position;
+    }
+    return filter;
+  }
+
   async showBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
     this.logger.info("Rendering big board page");
     const selectedYear = this.parseBigBoardYear(req.query.year);
     const selectedCreator = this.parseBigBoardCreator(req.query.creator);
-    const result = await this.service.getBigBoard(selectedYear, selectedCreator);
+    const filter = this.buildBigBoardFilter(req);
+    const result = await this.service.getBigBoard(selectedYear, selectedCreator, filter);
     if (result.ok === false) {
       this.logger.error("Failed to load big board" + { error: result.value });
       res.status(this.mapBigBoardErrorToStatusCode(result.value)).send(result.value.message);
@@ -548,6 +585,12 @@ class OnDraftController implements IOnDraftController {
     if (yearsResult.ok === false) {
       this.logger.error("Failed to load big board years" + { error: yearsResult.value });
       res.status(this.mapBigBoardErrorToStatusCode(yearsResult.value)).send(yearsResult.value.message);
+      return;
+    }
+    const schoolsResult = await this.service.getSavedSchools(result.value.year);
+    if (schoolsResult.ok === false) {
+      this.logger.error("Failed to load big board schools" + { error: schoolsResult.value });
+      res.status(this.mapBigBoardErrorToStatusCode(schoolsResult.value)).send(schoolsResult.value.message);
       return;
     }
     const rankedBigBoard = [...result.value.entries]
@@ -560,6 +603,9 @@ class OnDraftController implements IOnDraftController {
       board: result.value,
       years: yearsResult.value,
       creators: BIG_BOARD_CREATORS,
+      positions: POSITIONS,
+      schools: schoolsResult.value,
+      filters: filter ?? {},
     };
     if (req.get("HX-Request") === "true") {
       res.render("ondraft/partials/bigBoardPanel", { ...viewModel, layout: false });

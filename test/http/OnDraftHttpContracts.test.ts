@@ -202,6 +202,71 @@ describe("OnDraft HTTP contracts", () => {
     expect(visibleWithWriteup.text).not.toContain("Private eval note.");
   });
 
+  it("renders big board position and school filters and applies them through htmx", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+
+    const save = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": "entry-qb",
+        "entries[0][playerName]": "Quarterback Prospect",
+        "entries[0][school]": "OnDraft State",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2",
+        "entries[0][weight]": "220",
+        "entries[0][playerInfoPublished]": "true",
+        "entries[1][id]": "entry-wr",
+        "entries[1][playerName]": "Receiver Prospect",
+        "entries[1][school]": "Mock Tech",
+        "entries[1][position]": "WR",
+        "entries[1][rank]": "2",
+        "entries[1][posRank]": "1",
+        "entries[1][heightLabel]": "6-1",
+        "entries[1][weight]": "205",
+        "entries[1][playerInfoPublished]": "true",
+      });
+
+    expect(save.status).toBe(200);
+
+    const fullBoard = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
+    expect(fullBoard.status).toBe(200);
+    expect(fullBoard.text).toContain('<select name="position">');
+    expect(fullBoard.text).toContain('<option value="" selected>All</option>');
+    expect(fullBoard.text).toContain('<option value="QB"');
+    expect(fullBoard.text).toContain('<option value="OnDraft State"');
+    expect(fullBoard.text).toContain('<option value="Mock Tech"');
+    expect(fullBoard.text).toContain("Apply filters");
+    expect(fullBoard.text).not.toContain("Reset");
+
+    const filteredBoard = await request(ondraft)
+      .get("/bigboard?year=2026&creator=Ryan&position=QB&school=OnDraft%20State")
+      .set("HX-Request", "true");
+
+    expect(filteredBoard.status).toBe(200);
+    expect(filteredBoard.text).toContain('hx-swap-oob="true"');
+    expect(filteredBoard.text).toContain("Quarterback Prospect");
+    expect(filteredBoard.text).not.toContain("Receiver Prospect");
+    expect(filteredBoard.text).toContain('<option value="QB" selected>QB</option>');
+    expect(filteredBoard.text).toContain('<option value="OnDraft State" selected>OnDraft State</option>');
+    expect(filteredBoard.text).toContain("Reset");
+    expect(filteredBoard.text).toContain('hx-get="/bigboard?year=2026&creator=Ryan"');
+
+    const resetBoard = await request(ondraft)
+      .get("/bigboard?year=2026&creator=Ryan")
+      .set("HX-Request", "true");
+
+    expect(resetBoard.status).toBe(200);
+    expect(resetBoard.text).toContain("Quarterback Prospect");
+    expect(resetBoard.text).toContain("Receiver Prospect");
+    expect(resetBoard.text).not.toContain("Reset");
+  });
+
   it("lets admins create a new big board year from the editor", async () => {
     const ondraft = app();
     const agent = await loginAdminAgent(ondraft);

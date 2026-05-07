@@ -238,6 +238,48 @@ describe("OnDraftService article validation", () => {
 });
 
 describe("OnDraftService big board editing", () => {
+  it("filters big board entries by position and school without mutating the saved board", async () => {
+    const ondraftService = service();
+
+    await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Ryan",
+      playerName: "Quarterback Prospect",
+      school: "OnDraft State",
+      position: "QB",
+      rank: 1,
+      posRank: 1,
+      height: { feet: 6, inches: 2 },
+      weight: 220,
+    });
+    await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Ryan",
+      playerName: "Receiver Prospect",
+      school: "Mock Tech",
+      position: "WR",
+      rank: 2,
+      posRank: 1,
+      height: { feet: 6, inches: 1 },
+      weight: 205,
+    });
+
+    const filtered = await ondraftService.getBigBoard(2026, "Ryan", { position: "QB", school: "OnDraft State" });
+    expect(filtered.ok).toBe(true);
+    if (filtered.ok === true) {
+      expect(filtered.value.entries.map((entry) => entry.playerName)).toEqual(["Quarterback Prospect"]);
+    }
+
+    const unfiltered = await ondraftService.getBigBoard(2026, "Ryan");
+    expect(unfiltered.ok).toBe(true);
+    if (unfiltered.ok === true) {
+      expect(unfiltered.value.entries.map((entry) => entry.playerName)).toEqual([
+        "Quarterback Prospect",
+        "Receiver Prospect",
+      ]);
+    }
+  });
+
   it("saves blank draft rows without publishing them", async () => {
     const ondraftService = service();
 
