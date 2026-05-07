@@ -3,6 +3,8 @@ export interface IUserRecord {
   email: string;
   displayName: string;
   password: string;
+  role: Role;
+  preferences: UserPreferences;
 }
 
 export interface IAuthenticatedUser {
@@ -18,3 +20,15 @@ export function toAuthenticatedUser(user: IUserRecord): IAuthenticatedUser {
     displayName: user.displayName,
   };
 }
+
+export type Role = "admin" | "user";
+
+export type Bookmark = 
+  | { type: "article"; articleId: string }
+  | { type: "forumPost"; forumPostId: string }
+
+export type UserPreferences = {
+  theme: "light" | "dark";
+  fontSize: "small" | "medium" | "large";
+  bookmarks: Bookmark[];
+};

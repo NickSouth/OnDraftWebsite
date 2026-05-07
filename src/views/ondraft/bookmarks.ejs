@@ -1,0 +1,42 @@
+<section class="plain-page">
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">OnDraft</p>
+      <h1>Bookmarks</h1>
+    </div>
+  </div>
+
+  <% if (requireLogin) { %>
+    <p class="muted-text"><a href="/login">Log in</a> to view your bookmarks.</p>
+  <% } else if (bookmarkedArticles.length === 0 && bookmarkedForumPosts.length === 0) { %>
+    <p class="muted-text">No bookmarks yet.</p>
+  <% } else { %>
+    <% if (bookmarkedArticles.length > 0) { %>
+      <section class="bookmark-section">
+        <h2>Articles</h2>
+        <ul class="simple-list bookmark-list">
+          <% bookmarkedArticles.forEach((article) => { %>
+            <li>
+              <a href="/articles/<%= article.id %>"><%= article.title %></a>
+              <span class="muted-text">by <%= article.author %></span>
+            </li>
+          <% }) %>
+        </ul>
+      </section>
+    <% } %>
+
+    <% if (bookmarkedForumPosts.length > 0) { %>
+      <section class="bookmark-section">
+        <h2>Hot Takes</h2>
+        <ul class="simple-list bookmark-list">
+          <% bookmarkedForumPosts.forEach((post) => { %>
+            <li>
+              <a href="/hottakes#hot-take-<%= post.id %>"><%= post.content %></a>
+              <span class="muted-text">by <%= post.userName %></span>
+            </li>
+          <% }) %>
+        </ul>
+      </section>
+    <% } %>
+  <% } %>
+</section>

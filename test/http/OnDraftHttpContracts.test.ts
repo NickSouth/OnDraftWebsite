@@ -352,6 +352,78 @@ describe("OnDraft HTTP contracts", () => {
     expect(remove.status).toBe(200);
   });
 
+  it("lets signed-in users bookmark articles and hot takes from htmx pin buttons", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+
+    const home = await agent.get("/");
+    expect(home.status).toBe(200);
+    expect(home.text).toContain('href="/bookmarks"');
+
+    const createArticle = await agent
+      .post("/articles")
+      .type("form")
+      .send({
+        title: "Bookmarkable Article",
+        author: "Ryan McWalter",
+        writeup: "A short bookmark summary.",
+        tags: "draft",
+        publicationDate: "2024-01-01",
+        contentType: "plainText",
+        content: "A regular article body.",
+      });
+    expect(createArticle.status).toBe(302);
+    const articleId = createArticle.headers.location.match(/\/articles\/([A-Za-z0-9]{5})/)?.[1];
+    expect(articleId).toBeTruthy();
+
+    const articles = await agent.get("/articles");
+    expect(articles.status).toBe(200);
+    expect(articles.text).toContain(`hx-post="/articles/${articleId}/bookmark"`);
+    expect(articles.text).toContain("Bookmarkable Article");
+
+    const bookmarkArticle = await agent
+      .post(`/articles/${articleId}/bookmark`)
+      .set("HX-Request", "true");
+    expect(bookmarkArticle.status).toBe(200);
+    expect(bookmarkArticle.text).toContain("is-bookmarked");
+    expect(bookmarkArticle.text).toContain("Remove article bookmark");
+
+    const createHotTake = await agent
+      .post("/hottakes")
+      .type("form")
+      .set("HX-Request", "true")
+      .send({ content: "Bookmark this hot take." });
+    expect(createHotTake.status).toBe(200);
+    const postId = createHotTake.text.match(/id="hot-take-([A-Za-z0-9]{5})"/)?.[1];
+    expect(postId).toBeTruthy();
+    expect(createHotTake.text).toContain(`hx-post="/hottakes/${postId}/bookmark"`);
+
+    const bookmarkHotTake = await agent
+      .post(`/hottakes/${postId}/bookmark`)
+      .set("HX-Request", "true");
+    expect(bookmarkHotTake.status).toBe(200);
+    expect(bookmarkHotTake.text).toContain("is-bookmarked");
+    expect(bookmarkHotTake.text).toContain("Remove forum post bookmark");
+
+    const bookmarks = await agent.get("/bookmarks");
+    expect(bookmarks.status).toBe(200);
+    expect(bookmarks.text).toContain("Bookmarkable Article");
+    expect(bookmarks.text).toContain(`/articles/${articleId}`);
+    expect(bookmarks.text).toContain("Bookmark this hot take.");
+    expect(bookmarks.text).toContain(`/hottakes#hot-take-${postId}`);
+
+    const removeArticleBookmark = await agent
+      .post(`/articles/${articleId}/bookmark`)
+      .set("HX-Request", "true");
+    expect(removeArticleBookmark.status).toBe(200);
+    expect(removeArticleBookmark.text).not.toContain("is-bookmarked");
+
+    const updatedBookmarks = await agent.get("/bookmarks");
+    expect(updatedBookmarks.status).toBe(200);
+    expect(updatedBookmarks.text).not.toContain("Bookmarkable Article");
+    expect(updatedBookmarks.text).toContain("Bookmark this hot take.");
+  });
+
   it("keeps plain text article creation working", async () => {
     const agent = await adminAgent();
 

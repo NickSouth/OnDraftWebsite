@@ -6,6 +6,7 @@ import type { IApp } from "./contracts";
 import { CreateOnDraftController } from "./controller/OnDraftController";
 import { CreateInMemoryOnDraftRepository } from "./repository/InMemoryOnDraftRepository";
 import { CreateOnDraftService } from "./service/OnDraftService";
+import { CreateUserPreferenceService } from "./service/UserPreferenceService";
 import { CreateLoggingService } from "./service/LoggingService";
 import type { ILoggingService } from "./service/LoggingService";
 
@@ -19,8 +20,9 @@ export function createComposedApp(
 
   const service = CreateOnDraftService(repository);
   const authUsers = CreateInMemoryUserRepository();
+  const userPreferences = CreateUserPreferenceService(authUsers);
   const authService = CreateAuthService(authUsers);
   const authController = CreateAuthController(authService, resolvedLogger);
-  const controller = CreateOnDraftController(service, resolvedLogger);
+  const controller = CreateOnDraftController(service, userPreferences, resolvedLogger);
   return CreateApp(controller, authController, resolvedLogger);
 }

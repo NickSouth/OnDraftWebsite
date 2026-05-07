@@ -200,6 +200,14 @@ class ExpressApp implements IApp {
     );
 
     this.app.get(
+      "/bookmarks",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.showBookmarks(req, res, browserSession);
+      }),
+    );
+
+    this.app.get(
       "/hottakes",
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
@@ -228,6 +236,14 @@ class ExpressApp implements IApp {
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
         await this.controller.likeHotTake(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/hottakes/:id/bookmark",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.toggleForumPostBookmark(req, res, browserSession);
       }),
     );
 
@@ -387,6 +403,14 @@ class ExpressApp implements IApp {
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
         await this.controller.likeArticle(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/articles/:id/bookmark",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.toggleArticleBookmark(req, res, browserSession);
       }),
     );
 

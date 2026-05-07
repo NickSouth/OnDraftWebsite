@@ -16,4 +16,7 @@
     <span aria-hidden="true">&#9634;</span>
     <span><%= article.comments.length %></span>
   </a>
+  <% if (session.authenticatedUser) { %>
+    <%- include("bookmarkButton", { bookmark: { type: "article", articleId: article.id }, bookmarked: articleBookmarked }) %>
+  <% } %>
 </div>

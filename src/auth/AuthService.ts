@@ -90,6 +90,12 @@ class AuthService implements IAuthService {
       displayName,
       email,
       password,
+      role: "user",
+      preferences: {
+        theme: "light",
+        fontSize: "small",
+        bookmarks: [],
+      },
     });
 
     if (created.ok === false) {

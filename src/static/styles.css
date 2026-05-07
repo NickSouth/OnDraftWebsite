@@ -278,6 +278,12 @@ textarea {
   align-items: center;
 }
 
+.article-list-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .article-list-row {
   display: grid;
   grid-template-columns: 108px minmax(0, 1fr);
@@ -1054,6 +1060,26 @@ button.comment-like-button:hover {
 .comment-like-button.is-liked {
   border-color: var(--accent);
   background: #f6f6f6;
+}
+
+.bookmark-button {
+  min-width: 40px;
+}
+
+.bookmark-button.is-bookmarked {
+  border-color: var(--accent);
+  background: #f6f6f6;
+}
+
+.bookmark-section {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.bookmark-list a {
+  color: var(--accent-strong);
+  font-weight: 600;
 }
 
 .secondary-button {

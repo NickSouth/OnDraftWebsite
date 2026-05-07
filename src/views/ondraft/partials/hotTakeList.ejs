@@ -28,7 +28,7 @@
             <% } %>
           </div>
           <p class="hot-take-content"><%= post.content %></p>
-          <%- include("hotTakeActions", { post, likeActorId }) %>
+          <%- include("hotTakeActions", { post, session, likeActorId, postBookmarked: bookmarkedForumPostIds.includes(post.id) }) %>
           <%- include("hotTakeComments", { post, session, errorMessage: null }) %>
         </li>
       <% }) %>

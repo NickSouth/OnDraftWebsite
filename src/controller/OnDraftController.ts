@@ -2,10 +2,12 @@ import type { Request, Response } from "express";
 import type { IOnDraftBrowserSession } from "../session/OnDraftSession";
 import { isAdminSession } from "../session/OnDraftSession";
 import type { BigBoardEditableEntryInput, CreateArticleInput, IOnDraftService, SaveBigBoardEntriesInput } from "../service/OnDraftService";
+import type { IUserPreferenceService, UserPreferenceError } from "../service/UserPreferenceService";
 import type { ILoggingService } from "../service/LoggingService";
 import { ArticleError, BigBoardError, ForumPostError } from "../repository/OnDraftRepository";
 import { publicArticleUploadUrl } from "../uploads/articlePdfUpload";
 import { BIG_BOARD_CREATORS, POSITIONS, type Article, type ArticleContent, type ArticleFilter, type BigBoard, type BigBoardCreator, type ForumPost, type ForumPostFilter } from "../model/OnDraftContent";
+import type { Bookmark } from "../auth/User";
 
 export interface DraftBoardFilterInput {
   school?: string;
@@ -16,6 +18,7 @@ export interface IOnDraftController {
   showHome(res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showArticles(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showFilteredArticles(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  showBookmarks(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showHotTakes(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showFilteredHotTakes(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
@@ -29,6 +32,8 @@ export interface IOnDraftController {
   createArticle(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   updateArticle(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   likeArticle(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  toggleArticleBookmark(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  toggleForumPostBookmark(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showArticleComments(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   commentOnArticle(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   commentReply(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
@@ -53,6 +58,7 @@ export interface IOnDraftController {
 class OnDraftController implements IOnDraftController {
   constructor(
     private readonly service: IOnDraftService,
+    private readonly userPreferences: IUserPreferenceService,
     private readonly logger: ILoggingService,
   ) {}
 
@@ -99,6 +105,18 @@ class OnDraftController implements IOnDraftController {
       case "ForumPostValidationError":
         return 400;
       case "DatabaseError":
+        return 500;
+      default:
+        return 500;
+    }
+  }
+
+  private mapUserPreferenceErrorToStatusCode(error: UserPreferenceError): number {
+    switch (error.name) {
+      case "UserNotFound":
+        return 404;
+      case "DatabaseError":
+      case "UnknownUserPreferenceError":
         return 500;
       default:
         return 500;
@@ -362,6 +380,58 @@ class OnDraftController implements IOnDraftController {
     return session.authenticatedUser?.userId ?? session.browserId;
   }
 
+  private async bookmarkedArticleIds(session: IOnDraftBrowserSession): Promise<string[]> {
+    const userId = session.authenticatedUser?.userId;
+    if (!userId) {
+      return [];
+    }
+
+    const result = await this.userPreferences.getUserBookmarks(userId);
+    if (result.ok === false) {
+      this.logger.warn(`Unable to load article bookmarks: ${result.value.message}`);
+      return [];
+    }
+
+    return result.value
+      .filter((bookmark): bookmark is Extract<Bookmark, { type: "article" }> => bookmark.type === "article")
+      .map((bookmark) => bookmark.articleId);
+  }
+
+  private async bookmarkedForumPostIds(session: IOnDraftBrowserSession): Promise<string[]> {
+    const userId = session.authenticatedUser?.userId;
+    if (!userId) {
+      return [];
+    }
+
+    const result = await this.userPreferences.getUserBookmarks(userId);
+    if (result.ok === false) {
+      this.logger.warn(`Unable to load forum post bookmarks: ${result.value.message}`);
+      return [];
+    }
+
+    return result.value
+      .filter((bookmark): bookmark is Extract<Bookmark, { type: "forumPost" }> => bookmark.type === "forumPost")
+      .map((bookmark) => bookmark.forumPostId);
+  }
+
+  private requireAuthenticatedUser(res: Response, session: IOnDraftBrowserSession): string | null {
+    const userId = session.authenticatedUser?.userId;
+    if (userId) {
+      return userId;
+    }
+
+    res.status(401).send("Log in to bookmark OnDraft content.");
+    return null;
+  }
+
+  private renderBookmarkButton(res: Response, bookmark: Bookmark, bookmarked: boolean): void {
+    res.render("ondraft/partials/bookmarkButton", {
+      layout: false,
+      bookmark,
+      bookmarked,
+    });
+  }
+
   private async getArticleTagSuggestions(): Promise<string[]> {
     const result = await this.service.getArticleTags();
     return result.ok === true ? result.value : [];
@@ -444,6 +514,7 @@ class OnDraftController implements IOnDraftController {
       showingPublished,
       sortBy: this.articleSortBy(req),
       sortDirection: this.articleSortDirection(req),
+      bookmarkedArticleIds: await this.bookmarkedArticleIds(session),
     });
   }
 
@@ -494,16 +565,64 @@ class OnDraftController implements IOnDraftController {
       articles: result.value,
       showingPublished,
       isAdmin: isAdminSession(session),
+      session,
+      bookmarkedArticleIds: await this.bookmarkedArticleIds(session),
     });
   }
 
-  private renderHotTakeList(res: Response, posts: ForumPost[], session: IOnDraftBrowserSession, errorMessage: string | null = null): void {
+  async showBookmarks(_req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Rendering bookmarks page");
+    const userId = session.authenticatedUser?.userId;
+    if (!userId) {
+      res.render("ondraft/bookmarks", {
+        session,
+        isAdmin: isAdminSession(session),
+        requireLogin: true,
+        bookmarkedArticles: [],
+        bookmarkedForumPosts: [],
+      });
+      return;
+    }
+
+    const bookmarksResult = await this.userPreferences.getUserBookmarks(userId);
+    if (bookmarksResult.ok === false) {
+      res.status(this.mapUserPreferenceErrorToStatusCode(bookmarksResult.value)).send(bookmarksResult.value.message);
+      return;
+    }
+
+    const bookmarkedArticles: Article[] = [];
+    const bookmarkedForumPosts: ForumPost[] = [];
+    for (const bookmark of bookmarksResult.value) {
+      if (bookmark.type === "article") {
+        const article = await this.service.getArticle(bookmark.articleId);
+        if (article.ok === true && article.value.published) {
+          bookmarkedArticles.push(article.value);
+        }
+      } else {
+        const post = await this.service.getForumPost(bookmark.forumPostId);
+        if (post.ok === true) {
+          bookmarkedForumPosts.push(post.value);
+        }
+      }
+    }
+
+    res.render("ondraft/bookmarks", {
+      session,
+      isAdmin: isAdminSession(session),
+      requireLogin: false,
+      bookmarkedArticles,
+      bookmarkedForumPosts,
+    });
+  }
+
+  private async renderHotTakeList(res: Response, posts: ForumPost[], session: IOnDraftBrowserSession, errorMessage: string | null = null): Promise<void> {
     res.render("ondraft/partials/hotTakeList", {
       layout: false,
       posts,
       session,
       isAdmin: isAdminSession(session),
       likeActorId: this.likeActorId(session),
+      bookmarkedForumPostIds: await this.bookmarkedForumPostIds(session),
       errorMessage,
     });
   }
@@ -524,6 +643,7 @@ class OnDraftController implements IOnDraftController {
       sortBy: this.forumPostSortBy(req),
       sortDirection: this.forumPostSortDirection(req),
       likeActorId: this.likeActorId(session),
+      bookmarkedForumPostIds: await this.bookmarkedForumPostIds(session),
       errorMessage: null,
       values: {},
     });
@@ -537,7 +657,7 @@ class OnDraftController implements IOnDraftController {
       return;
     }
 
-    this.renderHotTakeList(res, result.value, session);
+    await this.renderHotTakeList(res, result.value, session);
   }
 
   async getSavedSchools(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
@@ -685,15 +805,17 @@ class OnDraftController implements IOnDraftController {
       article: result.value,
       commentsLimit: 10,
       likeActorId: this.likeActorId(session),
+      articleBookmarked: (await this.bookmarkedArticleIds(session)).includes(result.value.id),
     });
   }
 
-  private renderArticleActions(res: Response, article: Article, session: IOnDraftBrowserSession): void {
+  private async renderArticleActions(res: Response, article: Article, session: IOnDraftBrowserSession): Promise<void> {
     res.render("ondraft/partials/articleActions", {
       layout: false,
       article,
       session,
       likeActorId: this.likeActorId(session),
+      articleBookmarked: (await this.bookmarkedArticleIds(session)).includes(article.id),
     });
   }
 
@@ -829,7 +951,30 @@ class OnDraftController implements IOnDraftController {
       return;
     }
 
-    this.renderArticleActions(res, result.value, session);
+    await this.renderArticleActions(res, result.value, session);
+  }
+
+  async toggleArticleBookmark(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    const userId = this.requireAuthenticatedUser(res, session);
+    if (!userId) {
+      return;
+    }
+
+    const articleId = this.routeParam(req, "id");
+    const article = await this.service.getArticle(articleId);
+    if (article.ok === false) {
+      res.status(this.mapArticleErrorToStatusCode(article.value)).send(article.value.message);
+      return;
+    }
+
+    const bookmark: Bookmark = { type: "article", articleId };
+    const result = await this.userPreferences.toggleBookmark(userId, bookmark);
+    if (result.ok === false) {
+      res.status(this.mapUserPreferenceErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    this.renderBookmarkButton(res, bookmark, result.value);
   }
 
   async showArticleComments(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
@@ -1005,6 +1150,7 @@ class OnDraftController implements IOnDraftController {
       session,
       isAdmin: isAdminSession(session),
       likeActorId: this.likeActorId(session),
+      bookmarkedForumPostIds: await this.bookmarkedForumPostIds(session),
       errorMessage: null,
       values: {},
     });
@@ -1022,7 +1168,31 @@ class OnDraftController implements IOnDraftController {
       layout: false,
       post: result.value,
       likeActorId: this.likeActorId(session),
+      postBookmarked: (await this.bookmarkedForumPostIds(session)).includes(result.value.id),
     });
+  }
+
+  async toggleForumPostBookmark(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    const userId = this.requireAuthenticatedUser(res, session);
+    if (!userId) {
+      return;
+    }
+
+    const postId = this.routeParam(req, "id");
+    const post = await this.service.getForumPost(postId);
+    if (post.ok === false) {
+      res.status(this.mapForumPostErrorToStatusCode(post.value)).send(post.value.message);
+      return;
+    }
+
+    const bookmark: Bookmark = { type: "forumPost", forumPostId: postId };
+    const result = await this.userPreferences.toggleBookmark(userId, bookmark);
+    if (result.ok === false) {
+      res.status(this.mapUserPreferenceErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    this.renderBookmarkButton(res, bookmark, result.value);
   }
 
   async commentOnHotTake(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
@@ -1292,7 +1462,8 @@ class OnDraftController implements IOnDraftController {
 
 export function CreateOnDraftController(
   service: IOnDraftService,
+  userPreferences: IUserPreferenceService,
   logger: ILoggingService,
 ): IOnDraftController {
-  return new OnDraftController(service, logger);
+  return new OnDraftController(service, userPreferences, logger);
 }

@@ -16,4 +16,7 @@
     <span aria-hidden="true">&#9634;</span>
     <span><%= post.comments.length %></span>
   </span>
+  <% if (typeof session !== "undefined" && session.authenticatedUser) { %>
+    <%- include("bookmarkButton", { bookmark: { type: "forumPost", forumPostId: post.id }, bookmarked: postBookmarked }) %>
+  <% } %>
 </div>

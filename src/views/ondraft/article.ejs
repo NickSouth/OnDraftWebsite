@@ -20,7 +20,7 @@
     </div>
   </header>
 
-  <%- include("partials/articleActions", { article, session, likeActorId }) %>
+  <%- include("partials/articleActions", { article, session, likeActorId, articleBookmarked }) %>
 
   <% if (article.content.type === "pdf") { %>
     <div class="article-pdf-document" data-pdf-url="<%= article.content.url %>">

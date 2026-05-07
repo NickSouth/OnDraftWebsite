@@ -1,8 +1,14 @@
 import { CreateInMemoryOnDraftRepository } from "../../src/repository/InMemoryOnDraftRepository";
+import { CreateInMemoryUserRepository } from "../../src/auth/InMemoryUserRepository";
 import { CreateOnDraftService } from "../../src/service/OnDraftService";
+import { CreateUserPreferenceService } from "../../src/service/UserPreferenceService";
 
 function service() {
   return CreateOnDraftService(CreateInMemoryOnDraftRepository());
+}
+
+function userPreferenceService() {
+  return CreateUserPreferenceService(CreateInMemoryUserRepository());
 }
 
 describe("OnDraftService article validation", () => {
@@ -458,6 +464,36 @@ describe("OnDraftService big board editing", () => {
     if (changedWriteup.ok === true) {
       expect(changedWriteup.value.entries[0].playerInfoPublished).toBe(true);
       expect(changedWriteup.value.entries[0].writeupPublished).toBe(false);
+    }
+  });
+});
+
+describe("UserPreferenceService bookmarks", () => {
+  it("toggles article and forum post bookmarks for a user", async () => {
+    const preferences = userPreferenceService();
+
+    const articleOn = await preferences.toggleBookmark("user-bob", { type: "article", articleId: "article-1" });
+    const forumPostOn = await preferences.toggleBookmark("user-bob", { type: "forumPost", forumPostId: "post-1" });
+
+    expect(articleOn).toEqual({ ok: true, value: true });
+    expect(forumPostOn).toEqual({ ok: true, value: true });
+
+    const bookmarks = await preferences.getUserBookmarks("user-bob");
+    expect(bookmarks.ok).toBe(true);
+    if (bookmarks.ok === true) {
+      expect(bookmarks.value).toEqual([
+        { type: "article", articleId: "article-1" },
+        { type: "forumPost", forumPostId: "post-1" },
+      ]);
+    }
+
+    const articleOff = await preferences.toggleBookmark("user-bob", { type: "article", articleId: "article-1" });
+    expect(articleOff).toEqual({ ok: true, value: false });
+
+    const updated = await preferences.getUserBookmarks("user-bob");
+    expect(updated.ok).toBe(true);
+    if (updated.ok === true) {
+      expect(updated.value).toEqual([{ type: "forumPost", forumPostId: "post-1" }]);
     }
   });
 });
