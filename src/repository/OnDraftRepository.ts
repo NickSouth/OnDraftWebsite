@@ -79,4 +79,5 @@ export interface IOnDraftRepository {
     getYoutubeVideos(): Promise<Result<Video[], ArticleError>>;
     filterYoutubeVideos(query: VideoQuery): Promise<Result<Video[], ArticleError>>;
     updateYoutubeVideoStats(videoId: string, stats: { thumbnailUrl?: string; viewCount?: number; youtubeStatsFetchedAt: Date }): Promise<Result<Video, ArticleError>>;
+    getTags(): Promise<Result<string[], ArticleError>>;
 }

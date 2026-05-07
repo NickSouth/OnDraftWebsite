@@ -8,6 +8,8 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
   private articles: Article[] = [];
   private forumPosts: ForumPost[] = [];
   private videos: Video[] = [];
+  private tagList: Set<string> = new Set();
+
   constructor() {
     this.createBigBoardYearSync(new Date().getFullYear());
   }
@@ -180,6 +182,7 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
       return Err(DuplicateArticle(`Article with id "${article.id}" already exists.`));
     }
     this.articles.push(article);
+    this.tagList = new Set([...this.tagList, ...(article.tags ?? [])]);
     return Ok(article);
   }
 
@@ -223,6 +226,15 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
       return Err(ArticleNotFound(`Article with id "${id}" not found.`));
     }
     this.articles.splice(index, 1);
+    const article = this.articles[index];
+    if (article && article.tags) {
+      article.tags.forEach((tag) => {
+        const tagExistsInOtherArticles = this.articles.some((a) => a !== article && a.tags?.includes(tag));
+        if (!tagExistsInOtherArticles) {
+          this.tagList.delete(tag);
+        }
+      });
+    }
     return Ok(undefined);
   }
 
@@ -438,6 +450,7 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
       return Err(DuplicateArticle(`YouTube video with id "${video.videoId}" already exists.`));
     }
     this.videos.push(video);
+    this.tagList = new Set([...this.tagList, ...(video.tags ?? [])]);
     return Ok(video);
   }
 
@@ -493,6 +506,10 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
     };
     this.videos[videoIndex] = updated;
     return Ok(updated);
+  }
+
+  async getTags(): Promise<Result<string[], ArticleError>> {
+    return Ok([...this.tagList].sort((a, b) => a.localeCompare(b)));
   }
 }
 

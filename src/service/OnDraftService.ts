@@ -172,6 +172,7 @@ export interface IOnDraftService {
   getYoutubeVideos(): Promise<Result<Video[], ArticleError>>;
   filterYoutubeVideos(query: VideoQuery): Promise<Result<Video[], ArticleError>>;
   updateYoutubeVideoStats(videoId: string, stats: { thumbnailUrl?: string; viewCount?: number; youtubeStatsFetchedAt: Date }): Promise<Result<Video, ArticleError>>;
+  getTags(): Promise<Result<string[], ArticleError>>;
 }
 
 class OnDraftService implements IOnDraftService {
@@ -1146,6 +1147,10 @@ class OnDraftService implements IOnDraftService {
       return Err(ArticleValidationError("YouTube video id is required."));
     }
     return await this.repository.updateYoutubeVideoStats(videoId.trim(), stats);
+  }
+
+  async getTags(): Promise<Result<string[], ArticleError>> {
+    return await this.repository.getTags();
   }
 }
 
