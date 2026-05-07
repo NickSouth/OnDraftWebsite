@@ -1,10 +1,15 @@
 import { CreateInMemoryOnDraftRepository } from "../../src/repository/InMemoryOnDraftRepository";
 import { CreateInMemoryUserRepository } from "../../src/auth/InMemoryUserRepository";
-import { CreateOnDraftService } from "../../src/service/OnDraftService";
+import { CreateOnDraftService, parseYoutubeVideoId } from "../../src/service/OnDraftService";
 import { CreateUserPreferenceService } from "../../src/service/UserPreferenceService";
+import { IYoutubeVideoStatsService } from "../../src/service/YoutubeVideoStatsService";
 
 function service() {
   return CreateOnDraftService(CreateInMemoryOnDraftRepository());
+}
+
+function serviceWithYoutubeStats(youtubeStats: IYoutubeVideoStatsService) {
+  return CreateOnDraftService(CreateInMemoryOnDraftRepository(), youtubeStats);
 }
 
 function userPreferenceService() {
@@ -494,6 +499,65 @@ describe("UserPreferenceService bookmarks", () => {
     expect(updated.ok).toBe(true);
     if (updated.ok === true) {
       expect(updated.value).toEqual([{ type: "forumPost", forumPostId: "post-1" }]);
+    }
+  });
+});
+
+describe("OnDraftService YouTube videos", () => {
+  it("parses normal and short YouTube URLs and rejects invalid links", () => {
+    expect(parseYoutubeVideoId("https://www.youtube.com/watch?v=dQw4w9WgXcQ")).toEqual({ ok: true, value: "dQw4w9WgXcQ" });
+    expect(parseYoutubeVideoId("https://youtu.be/dQw4w9WgXcQ?t=42")).toEqual({ ok: true, value: "dQw4w9WgXcQ" });
+
+    const invalid = parseYoutubeVideoId("https://example.com/watch?v=dQw4w9WgXcQ");
+    expect(invalid.ok).toBe(false);
+    if (invalid.ok === false) {
+      expect(invalid.value.name).toBe("ArticleValidationError");
+    }
+  });
+
+  it("creates videos, refreshes cached stats, and filters by keyword and tags", async () => {
+    const statsService: IYoutubeVideoStatsService = {
+      async fetchVideoStats(videoIds) {
+        return {
+          ok: true,
+          value: new Map(videoIds.map((videoId) => [videoId, {
+            videoId,
+            thumbnailUrl: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+            viewCount: videoId === "dQw4w9WgXcQ" ? 25 : 10,
+          }])),
+        };
+      },
+    };
+    const ondraftService = serviceWithYoutubeStats(statsService);
+
+    const first = await ondraftService.createYoutubeVideo({
+      youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      title: "Quarterback Film",
+      description: "A look at QB processing.",
+      tags: ["Film Room", "QB"],
+    });
+    const second = await ondraftService.createYoutubeVideo({
+      youtubeUrl: "https://youtu.be/oHg5SJYRHA0",
+      title: "Receiver Notes",
+      description: "A look at releases.",
+      tags: ["Film Room", "WR"],
+    });
+
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+
+    const filtered = await ondraftService.filterYoutubeVideos({ keyword: "quarterback", tags: ["film-room"] });
+    expect(filtered.ok).toBe(true);
+    if (filtered.ok === true) {
+      expect(filtered.value.map((video) => video.title)).toEqual(["Quarterback Film"]);
+      expect(filtered.value[0].thumbnailUrl).toContain("maxresdefault");
+      expect(filtered.value[0].viewCount).toBe(25);
+    }
+
+    const popularity = await ondraftService.filterYoutubeVideos({ sortBy: "popularity", sortDirection: "desc" });
+    expect(popularity.ok).toBe(true);
+    if (popularity.ok === true) {
+      expect(popularity.value.map((video) => video.title)).toEqual(["Quarterback Film", "Receiver Notes"]);
     }
   });
 });

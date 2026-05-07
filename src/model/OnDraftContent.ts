@@ -116,3 +116,23 @@ export type Comment = {
   likedByUserIds: string[];
   replies: Comment[];
 };
+
+export type Video = {
+  youtubeUrl: string;
+  title: string;
+  description: string;
+  videoId: string;
+  tags: string[];
+  createdAt: Date;
+  updatedAt: Date;
+  thumbnailUrl?: string;
+  viewCount?: number;
+  youtubeStatsFetchedAt?: Date;
+}
+
+export type VideoQuery = {
+  keyword?: string;
+  tags?: string[];
+  sortBy?: "date" | "popularity";
+  sortDirection?: "asc" | "desc";
+}

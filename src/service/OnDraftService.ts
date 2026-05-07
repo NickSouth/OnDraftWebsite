@@ -1,9 +1,10 @@
 import { randomInt } from "node:crypto";
 import { Err, Ok, Result } from "../lib/result";
 import sanitizeHtml from "sanitize-html";
-import { Article, ArticleContent, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, BigBoardWriteup, Height, POSITIONS, Position, ArticleFilter, Comment, ForumPost, ForumPostFilter, DraftBoardFilter } from "../model/OnDraftContent";
+import { Article, ArticleContent, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, BigBoardWriteup, Height, POSITIONS, Position, ArticleFilter, Comment, ForumPost, ForumPostFilter, DraftBoardFilter, Video, VideoQuery } from "../model/OnDraftContent";
 import { UnknownArticleError, UnknownForumPostError, ArticleError,  BigBoardError, IOnDraftRepository, ArticleValidationError, BigBoardValidationError, ForumPostError, ForumPostValidationError } from "../repository/OnDraftRepository";
 import { DraftBoardFilterInput } from "../controller/OnDraftController";
+import { IYoutubeVideoStatsService } from "./YoutubeVideoStatsService";
 
 const ARTICLE_PDF_MAX_BYTES = 5 * 1024 * 1024;
 const ARTICLE_ID_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -23,6 +24,37 @@ const ARTICLE_TAG_PATTERN = /^[a-z0-9-]+$/;
 const COMMENT_TEXT_MAX_LENGTH = 1000;
 const DEFAULT_BIG_BOARD_CREATOR: BigBoardCreator = "Ryan";
 const HOT_TAKE_MAX_LENGTH = 300;
+const VIDEO_DESCRIPTION_MAX_LENGTH = 500;
+const YOUTUBE_STATS_TTL_MS = 6 * 60 * 60 * 1000;
+
+export function parseYoutubeVideoId(youtubeUrl: string): Result<string, ArticleError> {
+  let parsed: URL;
+  try {
+    parsed = new URL(youtubeUrl.trim());
+  } catch {
+    return Err(ArticleValidationError("Enter a valid YouTube URL."));
+  }
+
+  const hostname = parsed.hostname.toLowerCase().replace(/^www\./, "");
+  let videoId = "";
+  if (hostname === "youtu.be") {
+    videoId = parsed.pathname.split("/").filter(Boolean)[0] ?? "";
+  } else if (hostname === "youtube.com" || hostname === "m.youtube.com" || hostname === "music.youtube.com") {
+    if (parsed.pathname === "/watch") {
+      videoId = parsed.searchParams.get("v") ?? "";
+    } else {
+      const parts = parsed.pathname.split("/").filter(Boolean);
+      if (parts[0] === "embed" || parts[0] === "shorts") {
+        videoId = parts[1] ?? "";
+      }
+    }
+  }
+
+  if (!/^[A-Za-z0-9_-]{11}$/.test(videoId)) {
+    return Err(ArticleValidationError("Enter a valid YouTube video URL."));
+  }
+  return Ok(videoId);
+}
 
 export interface CreateArticleInput {
   title: string;
@@ -96,6 +128,13 @@ export interface ForumPostInput {
   userName: string;
 }
 
+export interface CreateYoutubeVideoInput {
+  youtubeUrl: string;
+  title: string;
+  description: string;
+  tags?: string[];
+}
+
 export interface IOnDraftService {
   previewArticle(input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
   createArticle(input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
@@ -129,10 +168,17 @@ export interface IOnDraftService {
   getFilteredForumPosts(filter: ForumPostFilter): Promise<Result<ForumPost[], ForumPostError>>;
   deleteForumPost(postId: string): Promise<Result<void, ForumPostError>>;
   getSavedSchools(year: number): Promise<Result<string[], BigBoardError>>;
+  createYoutubeVideo(input: CreateYoutubeVideoInput): Promise<Result<Video, ArticleError>>;
+  getYoutubeVideos(): Promise<Result<Video[], ArticleError>>;
+  filterYoutubeVideos(query: VideoQuery): Promise<Result<Video[], ArticleError>>;
+  updateYoutubeVideoStats(videoId: string, stats: { thumbnailUrl?: string; viewCount?: number; youtubeStatsFetchedAt: Date }): Promise<Result<Video, ArticleError>>;
 }
 
 class OnDraftService implements IOnDraftService {
-  constructor(private readonly repository: IOnDraftRepository) {}
+  constructor(
+    private readonly repository: IOnDraftRepository,
+    private readonly youtubeStats?: IYoutubeVideoStatsService,
+  ) {}
 
   private defaultBigBoardYear(): number {
     return new Date().getFullYear();
@@ -518,6 +564,75 @@ class OnDraftService implements IOnDraftService {
       return Err(ForumPostValidationError(`Comment text cannot be more than ${COMMENT_TEXT_MAX_LENGTH} characters.`));
     }
     return Ok(undefined);
+  }
+
+  private validateYoutubeVideoInput(input: CreateYoutubeVideoInput): Result<void, ArticleError> {
+    if (!input.youtubeUrl || !input.title || !input.description) {
+      return Err(ArticleValidationError("YouTube URL, title, and description are required."));
+    }
+    if (input.youtubeUrl.trim() === "" || input.title.trim() === "" || input.description.trim() === "") {
+      return Err(ArticleValidationError("YouTube URL, title, and description cannot be empty."));
+    }
+    if (input.description.trim().length > VIDEO_DESCRIPTION_MAX_LENGTH) {
+      return Err(ArticleValidationError(`Video descriptions cannot be more than ${VIDEO_DESCRIPTION_MAX_LENGTH} characters.`));
+    }
+    return this.validateArticleTags(input.tags ?? []);
+  }
+
+  private prepareYoutubeVideoInput(input: CreateYoutubeVideoInput): Result<CreateYoutubeVideoInput & { videoId: string }, ArticleError> {
+    const normalized: CreateYoutubeVideoInput = {
+      youtubeUrl: input.youtubeUrl.trim(),
+      title: input.title.trim(),
+      description: input.description.trim(),
+      tags: this.normalizeArticleTags(input.tags),
+    };
+    const validation = this.validateYoutubeVideoInput(normalized);
+    if (validation.ok === false) {
+      return Err(validation.value);
+    }
+    const videoId = parseYoutubeVideoId(normalized.youtubeUrl);
+    if (videoId.ok === false) {
+      return Err(videoId.value);
+    }
+    return Ok({ ...normalized, videoId: videoId.value });
+  }
+
+  private youtubeStatsAreStale(video: Video, now = new Date()): boolean {
+    if (!video.youtubeStatsFetchedAt) {
+      return true;
+    }
+    return now.getTime() - new Date(video.youtubeStatsFetchedAt).getTime() > YOUTUBE_STATS_TTL_MS;
+  }
+
+  private async refreshStaleYoutubeStats(videos: Video[]): Promise<boolean> {
+    if (!this.youtubeStats) {
+      return false;
+    }
+
+    const staleVideoIds = videos
+      .filter((video) => this.youtubeStatsAreStale(video))
+      .map((video) => video.videoId);
+    if (staleVideoIds.length === 0) {
+      return false;
+    }
+
+    const stats = await this.youtubeStats.fetchVideoStats(staleVideoIds);
+    if (stats.ok === false || stats.value.size === 0) {
+      return false;
+    }
+
+    let updated = false;
+    for (const [videoId, videoStats] of stats.value) {
+      const result = await this.repository.updateYoutubeVideoStats(videoId, {
+        thumbnailUrl: videoStats.thumbnailUrl,
+        viewCount: videoStats.viewCount,
+        youtubeStatsFetchedAt: new Date(),
+      });
+      if (result.ok === true) {
+        updated = true;
+      }
+    }
+    return updated;
   }
   
   private prepareArticleInput(input: CreateArticleInput): Result<CreateArticleInput, ArticleError> {
@@ -969,8 +1084,71 @@ class OnDraftService implements IOnDraftService {
     }
     return await this.repository.deleteForumPost(postId.trim());
   }
+
+  async createYoutubeVideo(input: CreateYoutubeVideoInput): Promise<Result<Video, ArticleError>> {
+    const prepared = this.prepareYoutubeVideoInput(input);
+    if (prepared.ok === false) {
+      return Err(prepared.value);
+    }
+
+    let thumbnailUrl: string | undefined;
+    let viewCount: number | undefined;
+    let youtubeStatsFetchedAt: Date | undefined;
+    if (this.youtubeStats) {
+      const stats = await this.youtubeStats.fetchVideoStats([prepared.value.videoId]);
+      if (stats.ok === true) {
+        const videoStats = stats.value.get(prepared.value.videoId);
+        if (videoStats) {
+          thumbnailUrl = videoStats.thumbnailUrl;
+          viewCount = videoStats.viewCount;
+          youtubeStatsFetchedAt = new Date();
+        }
+      }
+    }
+
+    const now = new Date();
+    const video: Video = {
+      youtubeUrl: prepared.value.youtubeUrl,
+      title: prepared.value.title,
+      description: prepared.value.description,
+      videoId: prepared.value.videoId,
+      tags: prepared.value.tags ?? [],
+      createdAt: now,
+      updatedAt: now,
+      thumbnailUrl,
+      viewCount,
+      youtubeStatsFetchedAt,
+    };
+
+    return await this.repository.createYoutubeVideo(video);
+  }
+
+  async getYoutubeVideos(): Promise<Result<Video[], ArticleError>> {
+    const result = await this.repository.getYoutubeVideos();
+    if (result.ok === false) {
+      return Err(result.value);
+    }
+    const refreshed = await this.refreshStaleYoutubeStats(result.value);
+    return refreshed ? await this.repository.getYoutubeVideos() : result;
+  }
+
+  async filterYoutubeVideos(query: VideoQuery): Promise<Result<Video[], ArticleError>> {
+    const result = await this.repository.filterYoutubeVideos(query);
+    if (result.ok === false) {
+      return Err(result.value);
+    }
+    const refreshed = await this.refreshStaleYoutubeStats(result.value);
+    return refreshed ? await this.repository.filterYoutubeVideos(query) : result;
+  }
+
+  async updateYoutubeVideoStats(videoId: string, stats: { thumbnailUrl?: string; viewCount?: number; youtubeStatsFetchedAt: Date }): Promise<Result<Video, ArticleError>> {
+    if (!videoId || videoId.trim() === "") {
+      return Err(ArticleValidationError("YouTube video id is required."));
+    }
+    return await this.repository.updateYoutubeVideoStats(videoId.trim(), stats);
+  }
 }
 
-export function CreateOnDraftService(repository: IOnDraftRepository): IOnDraftService {
-  return new OnDraftService(repository);
+export function CreateOnDraftService(repository: IOnDraftRepository, youtubeStats?: IYoutubeVideoStatsService): IOnDraftService {
+  return new OnDraftService(repository, youtubeStats);
 }

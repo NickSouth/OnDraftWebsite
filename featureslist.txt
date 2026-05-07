@@ -1,6 +1,6 @@
 Here are features I plan to implement for the website:
 
-Bookmarking posts by users
+Bookmarking posts by users <>
 Videos Page for hyperlinks to YouTube
 Registration email verification
 Mailing list on registration

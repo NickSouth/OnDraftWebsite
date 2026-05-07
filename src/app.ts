@@ -208,6 +208,38 @@ class ExpressApp implements IApp {
     );
 
     this.app.get(
+      "/videos",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.showVideos(req, res, browserSession);
+      }),
+    );
+
+    this.app.get(
+      "/videos/new",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.showCreateVideoForm(res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/videos",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.createYoutubeVideo(req, res, browserSession);
+      }),
+    );
+
+    this.app.get(
       "/hottakes",
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));

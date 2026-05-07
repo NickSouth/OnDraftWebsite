@@ -7,6 +7,7 @@ import { CreateOnDraftController } from "./controller/OnDraftController";
 import { CreateInMemoryOnDraftRepository } from "./repository/InMemoryOnDraftRepository";
 import { CreateOnDraftService } from "./service/OnDraftService";
 import { CreateUserPreferenceService } from "./service/UserPreferenceService";
+import { CreateYoutubeVideoStatsService } from "./service/YoutubeVideoStatsService";
 import { CreateLoggingService } from "./service/LoggingService";
 import type { ILoggingService } from "./service/LoggingService";
 
@@ -18,7 +19,8 @@ export function createComposedApp(
 
   const repository = CreateInMemoryOnDraftRepository();
 
-  const service = CreateOnDraftService(repository);
+  const youtubeStats = CreateYoutubeVideoStatsService();
+  const service = CreateOnDraftService(repository, youtubeStats);
   const authUsers = CreateInMemoryUserRepository();
   const userPreferences = CreateUserPreferenceService(authUsers);
   const authService = CreateAuthService(authUsers);

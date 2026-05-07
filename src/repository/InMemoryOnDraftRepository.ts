@@ -1,5 +1,5 @@
 import { Err, Ok, Result } from "../lib/result";
-import { Article, ArticleFilter, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, Comment, DraftBoardFilter, ForumPost, ForumPostFilter } from "../model/OnDraftContent";
+import { Article, ArticleFilter, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, Comment, DraftBoardFilter, ForumPost, ForumPostFilter, Video, VideoQuery } from "../model/OnDraftContent";
 import { ArticleNotFound, BigBoardNotFound, CommentNotFound, DuplicateBigBoardYear, DuplicatePlayer, DuplicateArticle, DuplicateForumPost, type ArticleError, type BigBoardError, type IOnDraftRepository, PlayerNotFound, ForumPostError, ForumPostNotFound } from "./OnDraftRepository";
 
 
@@ -7,6 +7,7 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
   private bigBoards: BigBoard[] = [];
   private articles: Article[] = [];
   private forumPosts: ForumPost[] = [];
+  private videos: Video[] = [];
   constructor() {
     this.createBigBoardYearSync(new Date().getFullYear());
   }
@@ -430,6 +431,68 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
     }
     this.forumPosts.splice(index, 1);
     return Ok(undefined);
+  }
+
+  async createYoutubeVideo(video: Video): Promise<Result<Video, ArticleError>> {
+    if (this.videos.find((existing) => existing.videoId === video.videoId)) {
+      return Err(DuplicateArticle(`YouTube video with id "${video.videoId}" already exists.`));
+    }
+    this.videos.push(video);
+    return Ok(video);
+  }
+
+  async getYoutubeVideos(): Promise<Result<Video[], ArticleError>> {
+    return Ok([...this.videos].sort((first, second) => second.createdAt.getTime() - first.createdAt.getTime()));
+  }
+
+  async filterYoutubeVideos(query: VideoQuery): Promise<Result<Video[], ArticleError>> {
+    const filtered = this.videos.filter((video) => {
+      if (query.keyword) {
+        const keyword = query.keyword.toLowerCase();
+        const searchText = `${video.title} ${video.description} ${video.tags.join(" ")}`;
+        if (!searchText.toLowerCase().includes(keyword)) {
+          return false;
+        }
+      }
+
+      if (query.tags && query.tags.length > 0) {
+        const videoTags = video.tags.map((tag) => tag.toLowerCase());
+        const requiredTags = query.tags.map((tag) => tag.toLowerCase());
+        if (!requiredTags.every((tag) => videoTags.includes(tag))) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    const sortBy = query.sortBy ?? "date";
+    const direction = query.sortDirection === "asc" ? 1 : -1;
+    const sorted = [...filtered].sort((first, second) => {
+      const firstValue = sortBy === "popularity" ? first.viewCount ?? 0 : first.createdAt.getTime();
+      const secondValue = sortBy === "popularity" ? second.viewCount ?? 0 : second.createdAt.getTime();
+
+      return (firstValue - secondValue) * direction;
+    });
+
+    return Ok(sorted);
+  }
+
+  async updateYoutubeVideoStats(videoId: string, stats: { thumbnailUrl?: string; viewCount?: number; youtubeStatsFetchedAt: Date }): Promise<Result<Video, ArticleError>> {
+    const videoIndex = this.videos.findIndex((video) => video.videoId === videoId);
+    if (videoIndex === -1) {
+      return Err(ArticleNotFound(`YouTube video with id "${videoId}" not found.`));
+    }
+
+    const updated: Video = {
+      ...this.videos[videoIndex],
+      thumbnailUrl: stats.thumbnailUrl ?? this.videos[videoIndex].thumbnailUrl,
+      viewCount: stats.viewCount ?? this.videos[videoIndex].viewCount,
+      youtubeStatsFetchedAt: stats.youtubeStatsFetchedAt,
+      updatedAt: new Date(),
+    };
+    this.videos[videoIndex] = updated;
+    return Ok(updated);
   }
 }
 

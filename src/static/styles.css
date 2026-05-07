@@ -437,6 +437,10 @@ textarea {
   align-items: end;
 }
 
+.video-filter-row {
+  grid-template-columns: minmax(160px, 1fr) minmax(140px, 180px) minmax(140px, 180px) auto;
+}
+
 .article-search-field {
   display: grid;
   gap: 6px;
@@ -1080,6 +1084,62 @@ button.comment-like-button:hover {
 .bookmark-list a {
   color: var(--accent-strong);
   font-weight: 600;
+}
+
+.video-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.video-card {
+  display: grid;
+  grid-template-columns: 148px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  border-bottom: 1px solid var(--panel-border);
+  padding-bottom: 12px;
+}
+
+.video-thumb {
+  display: block;
+  width: 148px;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  object-fit: cover;
+  background: #f6f6f6;
+}
+
+.video-card-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.video-card-copy h2,
+.video-card-copy p {
+  margin-bottom: 0;
+}
+
+.video-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+@media (max-width: 560px) {
+  .video-card {
+    grid-template-columns: 108px minmax(0, 1fr);
+  }
+
+  .video-thumb {
+    width: 108px;
+  }
+
+  .video-card-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 
 .secondary-button {

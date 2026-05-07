@@ -424,6 +424,70 @@ describe("OnDraft HTTP contracts", () => {
     expect(updatedBookmarks.text).toContain("Bookmark this hot take.");
   });
 
+  it("lets admins create YouTube videos and renders the public videos page with filters", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+
+    const home = await request(ondraft).get("/");
+    expect(home.status).toBe(200);
+    expect(home.text).toContain('href="/videos"');
+
+    const form = await agent.get("/videos/new");
+    expect(form.status).toBe(200);
+    expect(form.text).toContain("Add YouTube Video");
+
+    const invalid = await agent
+      .post("/videos")
+      .type("form")
+      .send({
+        youtubeUrl: "https://example.com/not-youtube",
+        title: "Bad Link",
+        description: "This should not save.",
+        tags: "draft",
+      });
+    expect(invalid.status).toBe(400);
+    expect(invalid.text).toContain("Enter a valid YouTube video URL");
+
+    const first = await agent
+      .post("/videos")
+      .type("form")
+      .send({
+        youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        title: "Quarterback Film",
+        description: "A look at quarterback processing.",
+        tags: "film-room,qb",
+      });
+    expect(first.status).toBe(302);
+    expect(first.headers.location).toBe("/videos");
+
+    const second = await agent
+      .post("/videos")
+      .type("form")
+      .send({
+        youtubeUrl: "https://youtu.be/oHg5SJYRHA0",
+        title: "Receiver Notes",
+        description: "A look at receiver releases.",
+        tags: "film-room,wr",
+      });
+    expect(second.status).toBe(302);
+
+    const videos = await request(ondraft).get("/videos");
+    expect(videos.status).toBe(200);
+    expect(videos.text).toContain("Quarterback Film");
+    expect(videos.text).toContain("Receiver Notes");
+    expect(videos.text).toContain("https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg");
+    expect(videos.text).toContain("Views unavailable");
+    expect(videos.text).not.toContain("YOUTUBE_API_KEY");
+
+    const filtered = await request(ondraft).get("/videos?keyword=quarterback&tags=film-room&sortBy=date&sortDirection=asc");
+    expect(filtered.status).toBe(200);
+    expect(filtered.text).toContain("Quarterback Film");
+    expect(filtered.text).not.toContain("Receiver Notes");
+    expect(filtered.text).toContain('value="quarterback"');
+    expect(filtered.text).toContain('value="film-room"');
+    expect(filtered.text).toContain('<option value="asc" selected>Ascending</option>');
+  });
+
   it("keeps plain text article creation working", async () => {
     const agent = await adminAgent();
 

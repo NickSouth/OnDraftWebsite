@@ -1,12 +1,12 @@
 import type { Request, Response } from "express";
 import type { IOnDraftBrowserSession } from "../session/OnDraftSession";
 import { isAdminSession } from "../session/OnDraftSession";
-import type { BigBoardEditableEntryInput, CreateArticleInput, IOnDraftService, SaveBigBoardEntriesInput } from "../service/OnDraftService";
+import type { BigBoardEditableEntryInput, CreateArticleInput, CreateYoutubeVideoInput, IOnDraftService, SaveBigBoardEntriesInput } from "../service/OnDraftService";
 import type { IUserPreferenceService, UserPreferenceError } from "../service/UserPreferenceService";
 import type { ILoggingService } from "../service/LoggingService";
 import { ArticleError, BigBoardError, ForumPostError } from "../repository/OnDraftRepository";
 import { publicArticleUploadUrl } from "../uploads/articlePdfUpload";
-import { BIG_BOARD_CREATORS, POSITIONS, type Article, type ArticleContent, type ArticleFilter, type BigBoard, type BigBoardCreator, type ForumPost, type ForumPostFilter } from "../model/OnDraftContent";
+import { BIG_BOARD_CREATORS, POSITIONS, type Article, type ArticleContent, type ArticleFilter, type BigBoard, type BigBoardCreator, type ForumPost, type ForumPostFilter, type VideoQuery } from "../model/OnDraftContent";
 import type { Bookmark } from "../auth/User";
 
 export interface DraftBoardFilterInput {
@@ -19,6 +19,8 @@ export interface IOnDraftController {
   showArticles(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showFilteredArticles(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showBookmarks(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  showVideos(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  showCreateVideoForm(res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showHotTakes(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showFilteredHotTakes(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
@@ -30,6 +32,7 @@ export interface IOnDraftController {
   showCreateBigBoardEntryForm(res: Response, session: IOnDraftBrowserSession): Promise<void>;
   previewArticle(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   createArticle(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  createYoutubeVideo(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   updateArticle(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   likeArticle(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   toggleArticleBookmark(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
@@ -276,6 +279,14 @@ class OnDraftController implements IOnDraftController {
     return this.queryString(req, "sortDirection") === "asc" ? "asc" : "desc";
   }
 
+  private videoSortBy(req: Request): VideoQuery["sortBy"] {
+    return this.queryString(req, "sortBy") === "popularity" ? "popularity" : "date";
+  }
+
+  private videoSortDirection(req: Request): VideoQuery["sortDirection"] {
+    return this.queryString(req, "sortDirection") === "asc" ? "asc" : "desc";
+  }
+
   private buildArticleFilter(req: Request, session: IOnDraftBrowserSession): ArticleFilter {
     const keyword = this.queryString(req, "keyword");
     const author = this.queryString(req, "author");
@@ -330,6 +341,26 @@ class OnDraftController implements IOnDraftController {
     }
 
     return filter;
+  }
+
+  private buildVideoQuery(req: Request): VideoQuery {
+    const keyword = this.queryString(req, "keyword");
+    const tags = this.queryString(req, "tags")
+      ?.split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+
+    const query: VideoQuery = {
+      sortBy: this.videoSortBy(req),
+      sortDirection: this.videoSortDirection(req),
+    };
+    if (keyword) {
+      query.keyword = keyword;
+    }
+    if (tags && tags.length > 0) {
+      query.tags = tags;
+    }
+    return query;
   }
 
   private parseArticleTags(rawTags: unknown): string[] {
@@ -493,6 +524,15 @@ class OnDraftController implements IOnDraftController {
     };
   }
 
+  private buildYoutubeVideoInput(req: Request): CreateYoutubeVideoInput {
+    return {
+      youtubeUrl: req.body.youtubeUrl,
+      title: req.body.title,
+      description: req.body.description,
+      tags: this.parseArticleTags(req.body.tags),
+    };
+  }
+
   async showHome(res: Response, session: IOnDraftBrowserSession): Promise<void> {
     this.logger.info("Rendering ondraft home page");
     res.render("ondraft/index", { session, isAdmin: isAdminSession(session) });
@@ -515,6 +555,29 @@ class OnDraftController implements IOnDraftController {
       sortBy: this.articleSortBy(req),
       sortDirection: this.articleSortDirection(req),
       bookmarkedArticleIds: await this.bookmarkedArticleIds(session),
+    });
+  }
+
+  async showVideos(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Rendering videos page");
+    const query = this.buildVideoQuery(req);
+    const result = await this.service.filterYoutubeVideos(query);
+    if (result.ok === false) {
+      this.logger.error("Failed to load videos" + { error: result.value });
+      res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    res.render("ondraft/videos", {
+      session,
+      isAdmin: isAdminSession(session),
+      videos: result.value,
+      values: {
+        keyword: this.queryString(req, "keyword") ?? "",
+        tags: this.queryString(req, "tags") ?? "",
+        sortBy: this.videoSortBy(req),
+        sortDirection: this.videoSortDirection(req),
+      },
     });
   }
 
@@ -833,6 +896,16 @@ class OnDraftController implements IOnDraftController {
     });
   }
 
+  async showCreateVideoForm(res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Rendering create video page");
+    res.render("ondraft/createVideo", {
+      session,
+      isAdmin: isAdminSession(session),
+      errorMessage: null,
+      values: {},
+    });
+  }
+
   async showEditArticleForm(res: Response, session: IOnDraftBrowserSession, id: string): Promise<void> {
     this.logger.info(`Rendering edit article page for "${id}"`);
     const result = await this.service.getArticle(id);
@@ -919,6 +992,23 @@ class OnDraftController implements IOnDraftController {
       return;
     }
     res.redirect(result.value.published ? `/articles/${result.value.id}` : "/articles?status=draft");
+  }
+
+  async createYoutubeVideo(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Creating YouTube video");
+    const result = await this.service.createYoutubeVideo(this.buildYoutubeVideoInput(req));
+    if (result.ok === false) {
+      this.logger.error("Failed to create YouTube video" + { error: result.value });
+      res.status(this.mapArticleErrorToStatusCode(result.value)).render("ondraft/createVideo", {
+        session,
+        isAdmin: isAdminSession(session),
+        errorMessage: result.value.message,
+        values: req.body,
+      });
+      return;
+    }
+
+    res.redirect("/videos");
   }
 
   async updateArticle(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {

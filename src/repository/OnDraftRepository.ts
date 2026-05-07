@@ -1,5 +1,5 @@
 import { Result } from "../lib/result";
-import { type BigBoard, Article, BigBoardCreator, BigBoardEntry, ArticleFilter, Comment, ForumPost, ForumPostFilter, DraftBoardFilter } from "../model/OnDraftContent";
+import { type BigBoard, Article, BigBoardCreator, BigBoardEntry, ArticleFilter, Comment, ForumPost, ForumPostFilter, DraftBoardFilter, Video, VideoQuery, } from "../model/OnDraftContent";
 
 export type BigBoardError = 
     | {name: "BigBoardNotFound"; message: string}
@@ -75,4 +75,8 @@ export interface IOnDraftRepository {
     commentByForumPostId(postId: string, comment: Comment): Promise<Result<Comment, ForumPostError>>;
     getFilteredForumPosts(filter: ForumPostFilter): Promise<Result<ForumPost[], ForumPostError>>;
     deleteForumPost(postId: string): Promise<Result<void, ForumPostError>>;
+    createYoutubeVideo(video: Video): Promise<Result<Video, ArticleError>>;
+    getYoutubeVideos(): Promise<Result<Video[], ArticleError>>;
+    filterYoutubeVideos(query: VideoQuery): Promise<Result<Video[], ArticleError>>;
+    updateYoutubeVideoStats(videoId: string, stats: { thumbnailUrl?: string; viewCount?: number; youtubeStatsFetchedAt: Date }): Promise<Result<Video, ArticleError>>;
 }
