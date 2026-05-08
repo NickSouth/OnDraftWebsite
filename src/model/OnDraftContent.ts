@@ -1,5 +1,5 @@
 export interface IOnDraftContent {}
-export const BIG_BOARD_CREATORS = ["Ryan", "Aleks"] as const;
+export const BIG_BOARD_CREATORS = ["Ryan", "Aleks", "Consensus"] as const;
 export type BigBoardCreator = typeof BIG_BOARD_CREATORS[number];
 
 export type BigBoard = {
@@ -35,6 +35,7 @@ export type BigBoardEntry = {
   writeup: BigBoardWriteup;
   writeupPublished: boolean;
   notes: string;
+  bigDiscrepency?: boolean;
 };
 
 export type ArticleFilter = {
@@ -136,3 +137,25 @@ export type VideoQuery = {
   sortBy?: "date" | "popularity";
   sortDirection?: "asc" | "desc";
 }
+
+export type ConsensusBigBoard = {
+  year: number;
+  entries: ConsensusBigBoardEntry[];
+};
+
+export type ConsensusBigBoardEntry = {
+  playerName: string;
+  position: Position;
+  school: string;
+  rank: number | null;
+  posRank: number | null;
+  height: Height | null;
+  weight: number | null;
+  writeup?: ConsensusWriteup;
+  bigDiscrepency: boolean;
+};
+
+export type ConsensusWriteup = {
+  ryanWriteup: string;
+  aleksWriteup: string;
+};

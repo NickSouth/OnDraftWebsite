@@ -511,6 +511,9 @@ describe("OnDraft HTTP contracts", () => {
 
     expect(article.status).toBe(200);
     expect(article.text).toContain("A regular article body.");
+    expect(article.text).toContain('class="icon-button article-share-button"');
+    expect(article.text).toContain('data-share-url="/articles/');
+    expect(article.text).toContain("Share");
 
     const articles = await agent.get("/articles");
 
@@ -568,6 +571,7 @@ describe("OnDraft HTTP contracts", () => {
     const like = await anonymous.post(`/articles/${articleId}/like`);
     expect(like.status).toBe(200);
     expect(like.text).toContain(">1</span>");
+    expect(like.text).toContain(`data-share-url="/articles/${articleId}"`);
 
     const unlike = await anonymous.post(`/articles/${articleId}/like`);
     expect(unlike.status).toBe(200);

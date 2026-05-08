@@ -62,7 +62,9 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
   }
 
   async getBigBoard(year: number, creator: BigBoardCreator, filter?: DraftBoardFilter): Promise<Result<BigBoard, BigBoardError>> {
-    const bigBoard = this.findBigBoard(year, creator);
+    const bigBoard = creator === "Consensus"
+      ? this.generateConsensusBigBoard(year)
+      : this.findBigBoard(year, creator);
     if (!bigBoard) {
       return Err(BigBoardNotFound(`Big board for ${year} by ${creator} was not found.`));
     }
@@ -79,6 +81,62 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
       });
     }
     return Ok({ ...bigBoard, entries });
+  }
+
+  private generateConsensusBigBoard(year: number): BigBoard {
+    const ryanBoard = this.findBigBoard(year, "Ryan");
+    const aleksBoard = this.findBigBoard(year, "Aleks");
+    const entriesByPlayer = new Map<string, { Ryan?: BigBoardEntry; Aleks?: BigBoardEntry }>();
+
+    ryanBoard?.entries.forEach((entry) => {
+      entriesByPlayer.set(entry.playerName, {
+        ...entriesByPlayer.get(entry.playerName),
+        Ryan: entry,
+      });
+    });
+    aleksBoard?.entries.forEach((entry) => {
+      entriesByPlayer.set(entry.playerName, {
+        ...entriesByPlayer.get(entry.playerName),
+        Aleks: entry,
+      });
+    });
+
+    const average = (values: Array<number | null | undefined>): number | null => {
+      const rankedValues = values.filter((value): value is number => typeof value === "number");
+      if (rankedValues.length === 0) {
+        return null;
+      }
+      return rankedValues.reduce((sum, value) => sum + value, 0) / rankedValues.length;
+    };
+
+    const consensusEntries: BigBoardEntry[] = [...entriesByPlayer.values()].map(({ Ryan, Aleks }) => {
+      const sourceOfTruth = Ryan ?? Aleks;
+      if (!sourceOfTruth) {
+        throw new Error("Consensus entry cannot be created without a source player.");
+      }
+
+      const rank = average([Ryan?.rank, Aleks?.rank]);
+      const posRank = average([Ryan?.posRank, Aleks?.posRank]);
+      const rankDiscrepency = typeof Ryan?.rank === "number" && typeof Aleks?.rank === "number"
+        ? Math.abs(Ryan.rank - Aleks.rank)
+        : 0;
+
+      return {
+        ...sourceOfTruth,
+        id: `consensus-${sourceOfTruth.id}`,
+        rank,
+        posRank,
+        bigDiscrepency: rankDiscrepency > 10,
+      };
+    }).sort((first, second) => {
+      const firstRank = first.rank ?? Number.MAX_SAFE_INTEGER;
+      const secondRank = second.rank ?? Number.MAX_SAFE_INTEGER;
+      return firstRank - secondRank ||
+        (first.posRank ?? Number.MAX_SAFE_INTEGER) - (second.posRank ?? Number.MAX_SAFE_INTEGER) ||
+        first.playerName.localeCompare(second.playerName);
+    });
+
+    return { year, creator: "Consensus", entries: consensusEntries };
   }
 
   async createBigBoardYear(year: number): Promise<Result<void, BigBoardError>> {

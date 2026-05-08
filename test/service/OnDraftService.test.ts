@@ -291,6 +291,83 @@ describe("OnDraftService big board editing", () => {
     }
   });
 
+  it("generates a consensus board from Ryan and Aleks rankings using Ryan player info as the source of truth", async () => {
+    const ondraftService = service();
+
+    await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Ryan",
+      playerName: "Quarterback Prospect",
+      school: "Ryan State",
+      position: "QB",
+      rank: 1,
+      posRank: 1,
+      height: { feet: 6, inches: 2 },
+      weight: 220,
+    });
+    await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Aleks",
+      playerName: "Quarterback Prospect",
+      school: "Aleks Tech",
+      position: "WR",
+      rank: 13,
+      posRank: 3,
+      height: { feet: 5, inches: 11 },
+      weight: 185,
+    });
+    await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Ryan",
+      playerName: "Edge Prospect",
+      school: "OnDraft State",
+      position: "EDGE",
+      rank: 4,
+      posRank: 1,
+      height: { feet: 6, inches: 4 },
+      weight: 255,
+    });
+    await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Aleks",
+      playerName: "Edge Prospect",
+      school: "OnDraft State",
+      position: "EDGE",
+      rank: 6,
+      posRank: 2,
+      height: { feet: 6, inches: 4 },
+      weight: 255,
+    });
+
+    const consensus = await ondraftService.getBigBoard(2026, "Consensus");
+
+    expect(consensus.ok).toBe(true);
+    if (consensus.ok === true) {
+      expect(consensus.value.entries.map((entry) => entry.playerName)).toEqual([
+        "Edge Prospect",
+        "Quarterback Prospect",
+      ]);
+
+      const quarterback = consensus.value.entries.find((entry) => entry.playerName === "Quarterback Prospect");
+      expect(quarterback).toMatchObject({
+        school: "Ryan State",
+        position: "QB",
+        rank: 7,
+        posRank: 2,
+        height: { feet: 6, inches: 2 },
+        weight: 220,
+        bigDiscrepency: true,
+      });
+
+      const edge = consensus.value.entries.find((entry) => entry.playerName === "Edge Prospect");
+      expect(edge).toMatchObject({
+        rank: 5,
+        posRank: 1.5,
+        bigDiscrepency: false,
+      });
+    }
+  });
+
   it("saves blank draft rows without publishing them", async () => {
     const ondraftService = service();
 

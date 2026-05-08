@@ -16,6 +16,16 @@
     <span aria-hidden="true">&#9634;</span>
     <span><%= article.comments.length %></span>
   </a>
+  <button
+    type="button"
+    class="icon-button article-share-button"
+    aria-label="Share article"
+    data-share-title="<%= article.title %>"
+    data-share-url="/articles/<%= article.id %>"
+  >
+    <span aria-hidden="true">&#x21AA;</span>
+    <span>Share</span>
+  </button>
   <% if (session.authenticatedUser) { %>
     <%- include("bookmarkButton", { bookmark: { type: "article", articleId: article.id }, bookmarked: articleBookmarked }) %>
   <% } %>

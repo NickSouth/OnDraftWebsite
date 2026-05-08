@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { Err, Ok } from '../src/lib/result'
 
 describe('result helpers', () => {
@@ -9,5 +10,10 @@ describe('result helpers', () => {
   it('creates Err results', () => {
     const result = Err('error')
     expect(result).toEqual({ ok: false, value: 'error' })
+  })
+
+  it("loads the article share script with the Web Share API", () => {
+    const script = fs.readFileSync("src/static/articleShare.js", "utf8");
+    expect(script).toContain("navigator.share");
   })
 })
