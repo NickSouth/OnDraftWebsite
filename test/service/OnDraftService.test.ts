@@ -338,6 +338,29 @@ describe("OnDraftService big board editing", () => {
       height: { feet: 6, inches: 4 },
       weight: 255,
     });
+    await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Ryan",
+      playerName: "Tackle Prospect",
+      school: "Published U",
+      position: "OT",
+      rank: 10,
+      posRank: 2,
+      height: { feet: 6, inches: 6 },
+      weight: 315,
+    });
+    await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Aleks",
+      playerName: "Tackle Prospect",
+      school: "Private U",
+      position: "IOL",
+      rank: 30,
+      posRank: 8,
+      height: { feet: 6, inches: 3 },
+      weight: 295,
+      playerInfoPublished: false,
+    });
 
     const consensus = await ondraftService.getBigBoard(2026, "Consensus");
 
@@ -346,6 +369,7 @@ describe("OnDraftService big board editing", () => {
       expect(consensus.value.entries.map((entry) => entry.playerName)).toEqual([
         "Edge Prospect",
         "Quarterback Prospect",
+        "Tackle Prospect",
       ]);
 
       const quarterback = consensus.value.entries.find((entry) => entry.playerName === "Quarterback Prospect");
@@ -363,6 +387,15 @@ describe("OnDraftService big board editing", () => {
       expect(edge).toMatchObject({
         rank: 5,
         posRank: 1.5,
+        bigDiscrepency: false,
+      });
+
+      const tackle = consensus.value.entries.find((entry) => entry.playerName === "Tackle Prospect");
+      expect(tackle).toMatchObject({
+        school: "Published U",
+        position: "OT",
+        rank: 10,
+        posRank: 2,
         bigDiscrepency: false,
       });
     }

@@ -770,15 +770,35 @@ class OnDraftController implements IOnDraftController {
       res.status(this.mapBigBoardErrorToStatusCode(yearsResult.value)).send(yearsResult.value.message);
       return;
     }
-    const schoolsResult = await this.service.getSavedSchools(result.value.year);
-    if (schoolsResult.ok === false) {
-      this.logger.error("Failed to load big board schools" + { error: schoolsResult.value });
-      res.status(this.mapBigBoardErrorToStatusCode(schoolsResult.value)).send(schoolsResult.value.message);
-      return;
+    let schools: string[] = [];
+    if (result.value.creator === "Consensus") {
+      const unfilteredConsensus = await this.service.getBigBoard(result.value.year, result.value.creator);
+      if (unfilteredConsensus.ok === false) {
+        this.logger.error("Failed to load consensus big board schools" + { error: unfilteredConsensus.value });
+        res.status(this.mapBigBoardErrorToStatusCode(unfilteredConsensus.value)).send(unfilteredConsensus.value.message);
+        return;
+      }
+      schools = [...new Set(unfilteredConsensus.value.entries
+        .filter((entry) => entry.playerInfoPublished)
+        .map((entry) => entry.school)
+        .filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b));
+    } else {
+      const schoolsResult = await this.service.getSavedSchools(result.value.year);
+      if (schoolsResult.ok === false) {
+        this.logger.error("Failed to load big board schools" + { error: schoolsResult.value });
+        res.status(this.mapBigBoardErrorToStatusCode(schoolsResult.value)).send(schoolsResult.value.message);
+        return;
+      }
+      schools = schoolsResult.value;
     }
     const rankedBigBoard = [...result.value.entries]
       .filter((entry) => entry.playerInfoPublished)
-      .sort((a, b) => (a.rank ?? Number.MAX_SAFE_INTEGER) - (b.rank ?? Number.MAX_SAFE_INTEGER));
+      .sort((a, b) =>
+        (a.rank ?? Number.MAX_SAFE_INTEGER) - (b.rank ?? Number.MAX_SAFE_INTEGER) ||
+        (a.posRank ?? Number.MAX_SAFE_INTEGER) - (b.posRank ?? Number.MAX_SAFE_INTEGER) ||
+        a.playerName.localeCompare(b.playerName)
+      );
     const viewModel = {
       session,
       isAdmin: isAdminSession(session),
@@ -787,7 +807,7 @@ class OnDraftController implements IOnDraftController {
       years: yearsResult.value,
       creators: BIG_BOARD_CREATORS,
       positions: POSITIONS,
-      schools: schoolsResult.value,
+      schools,
       filters: filter ?? {},
     };
     if (req.get("HX-Request") === "true") {
@@ -822,7 +842,7 @@ class OnDraftController implements IOnDraftController {
       isAdmin: isAdminSession(session),
       board: { ...board, entries: sortedEntries },
       years: yearsResult.value,
-      creators: BIG_BOARD_CREATORS,
+      creators: BIG_BOARD_CREATORS.filter((creator) => creator !== "Consensus"),
       positions: POSITIONS,
       errorMessage,
       statusMessage,
@@ -947,7 +967,7 @@ class OnDraftController implements IOnDraftController {
         year: new Date().getFullYear(),
         creator: "Ryan",
       },
-      creators: BIG_BOARD_CREATORS,
+      creators: BIG_BOARD_CREATORS.filter((creator) => creator !== "Consensus"),
     });
   }
 
@@ -1377,7 +1397,7 @@ class OnDraftController implements IOnDraftController {
         isAdmin: isAdminSession(session),
         errorMessage: result.value.message,
         values: req.body,
-        creators: BIG_BOARD_CREATORS,
+        creators: BIG_BOARD_CREATORS.filter((creator) => creator !== "Consensus"),
       });
       return;
     }

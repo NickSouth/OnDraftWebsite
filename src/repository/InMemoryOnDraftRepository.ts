@@ -1,5 +1,5 @@
 import { Err, Ok, Result } from "../lib/result";
-import { Article, ArticleFilter, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, Comment, DraftBoardFilter, ForumPost, ForumPostFilter, Video, VideoQuery } from "../model/OnDraftContent";
+import { Article, ArticleFilter, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, Comment, ConsensusBigBoard, DraftBoardFilter, ForumPost, ForumPostFilter, Video, VideoQuery } from "../model/OnDraftContent";
 import { ArticleNotFound, BigBoardNotFound, CommentNotFound, DuplicateBigBoardYear, DuplicatePlayer, DuplicateArticle, DuplicateForumPost, type ArticleError, type BigBoardError, type IOnDraftRepository, PlayerNotFound, ForumPostError, ForumPostNotFound } from "./OnDraftRepository";
 
 
@@ -88,13 +88,13 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
     const aleksBoard = this.findBigBoard(year, "Aleks");
     const entriesByPlayer = new Map<string, { Ryan?: BigBoardEntry; Aleks?: BigBoardEntry }>();
 
-    ryanBoard?.entries.forEach((entry) => {
+    ryanBoard?.entries.filter((entry) => entry.playerInfoPublished).forEach((entry) => {
       entriesByPlayer.set(entry.playerName, {
         ...entriesByPlayer.get(entry.playerName),
         Ryan: entry,
       });
     });
-    aleksBoard?.entries.forEach((entry) => {
+    aleksBoard?.entries.filter((entry) => entry.playerInfoPublished).forEach((entry) => {
       entriesByPlayer.set(entry.playerName, {
         ...entriesByPlayer.get(entry.playerName),
         Aleks: entry,
@@ -568,6 +568,27 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
 
   async getTags(): Promise<Result<string[], ArticleError>> {
     return Ok([...this.tagList].sort((a, b) => a.localeCompare(b)));
+  }
+
+  async getConsensusBigBoard(year: number): Promise<Result<ConsensusBigBoard, BigBoardError>> {
+    if (!this.bigBoards.find(bb => bb.year === year)) {
+      return Err(BigBoardNotFound(`Big board for ${year} was not found.`));
+    }
+    const generated = this.generateConsensusBigBoard(year);
+    const consensusBigBoard: ConsensusBigBoard = {
+      year: generated.year,
+      entries: generated.entries.map((entry) => ({
+        playerName: entry.playerName,
+        position: entry.position as ConsensusBigBoard["entries"][number]["position"],
+        school: entry.school,
+        rank: entry.rank,
+        posRank: entry.posRank,
+        height: entry.height,
+        weight: entry.weight,
+        bigDiscrepency: entry.bigDiscrepency ?? false,
+      })),
+    };
+    return Ok(consensusBigBoard);
   }
 }
 

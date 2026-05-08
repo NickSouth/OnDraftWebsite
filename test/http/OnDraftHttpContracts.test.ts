@@ -243,6 +243,9 @@ describe("OnDraft HTTP contracts", () => {
     expect(fullBoard.text).toContain('<option value="Mock Tech"');
     expect(fullBoard.text).toContain("Apply filters");
     expect(fullBoard.text).not.toContain("Reset");
+    expect(fullBoard.text).toMatch(/>\s*Ryan\s*<\/button>/);
+    expect(fullBoard.text).toMatch(/>\s*Aleks\s*<\/button>/);
+    expect(fullBoard.text).toMatch(/>\s*Consensus\s*<\/button>/);
 
     const filteredBoard = await request(ondraft)
       .get("/bigboard?year=2026&creator=Ryan&position=QB&school=OnDraft%20State")
@@ -265,6 +268,96 @@ describe("OnDraft HTTP contracts", () => {
     expect(resetBoard.text).toContain("Quarterback Prospect");
     expect(resetBoard.text).toContain("Receiver Prospect");
     expect(resetBoard.text).not.toContain("Reset");
+  });
+
+  it("renders the consensus big board with averaged published rankings and discrepancy badges", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+
+    const saveRyan = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": "ryan-qb",
+        "entries[0][playerName]": "Quarterback Prospect",
+        "entries[0][school]": "Ryan State",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2",
+        "entries[0][weight]": "220",
+        "entries[0][playerInfoPublished]": "true",
+        "entries[1][id]": "ryan-edge",
+        "entries[1][playerName]": "Edge Prospect",
+        "entries[1][school]": "OnDraft State",
+        "entries[1][position]": "EDGE",
+        "entries[1][rank]": "4",
+        "entries[1][posRank]": "1",
+        "entries[1][heightLabel]": "6-4",
+        "entries[1][weight]": "255",
+        "entries[1][playerInfoPublished]": "true",
+        "entries[2][id]": "ryan-tackle",
+        "entries[2][playerName]": "Tackle Prospect",
+        "entries[2][school]": "Published U",
+        "entries[2][position]": "OT",
+        "entries[2][rank]": "10",
+        "entries[2][posRank]": "2",
+        "entries[2][heightLabel]": "6-6",
+        "entries[2][weight]": "315",
+        "entries[2][playerInfoPublished]": "true",
+      });
+    expect(saveRyan.status).toBe(200);
+
+    const saveAleks = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Aleks",
+        "entries[0][id]": "aleks-qb",
+        "entries[0][playerName]": "Quarterback Prospect",
+        "entries[0][school]": "Aleks Tech",
+        "entries[0][position]": "WR",
+        "entries[0][rank]": "13",
+        "entries[0][posRank]": "3",
+        "entries[0][heightLabel]": "5-11",
+        "entries[0][weight]": "185",
+        "entries[0][playerInfoPublished]": "true",
+        "entries[1][id]": "aleks-edge",
+        "entries[1][playerName]": "Edge Prospect",
+        "entries[1][school]": "OnDraft State",
+        "entries[1][position]": "EDGE",
+        "entries[1][rank]": "6",
+        "entries[1][posRank]": "2",
+        "entries[1][heightLabel]": "6-4",
+        "entries[1][weight]": "255",
+        "entries[1][playerInfoPublished]": "true",
+        "entries[2][id]": "aleks-tackle",
+        "entries[2][playerName]": "Tackle Prospect",
+        "entries[2][school]": "Private U",
+        "entries[2][position]": "IOL",
+        "entries[2][rank]": "30",
+        "entries[2][posRank]": "8",
+        "entries[2][heightLabel]": "6-3",
+        "entries[2][weight]": "295",
+      });
+    expect(saveAleks.status).toBe(200);
+
+    const consensus = await agent.get("/bigboard?year=2026&creator=Consensus");
+
+    expect(consensus.status).toBe(200);
+    expect(consensus.text).toContain('value="Consensus"');
+    expect(consensus.text).toMatch(/aria-pressed="true"[\s\S]*Consensus/);
+    expect(consensus.text).not.toContain("/bigboard/edit?year=2026&amp;creator=Consensus");
+    expect(consensus.text).toMatch(/5\. Edge Prospect[\s\S]*EDGE1\.5/);
+    expect(consensus.text).toMatch(/7\. Quarterback Prospect[\s\S]*QB2/);
+    expect(consensus.text).toContain("Ryan State");
+    expect(consensus.text).not.toContain("Aleks Tech");
+    expect(consensus.text).toContain("Big discrepancy");
+    expect(consensus.text).toMatch(/10\. Tackle Prospect[\s\S]*Published U/);
+    expect(consensus.text).not.toContain("Private U");
   });
 
   it("lets admins create a new big board year from the editor", async () => {

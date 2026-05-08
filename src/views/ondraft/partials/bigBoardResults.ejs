@@ -1,13 +1,26 @@
 <div id="big-board-results">
+  <%
+    const formatBoardNumber = (value) => {
+      if (typeof value !== "number") {
+        return "";
+      }
+      return Number.isInteger(value) ? value.toString() : value.toFixed(1);
+    };
+  %>
   <% if (bigBoard.length === 0) { %>
     <p>No draft board entries have been created yet.</p>
   <% } else { %>
     <ol class="ranking-list">
       <% bigBoard.forEach((entry) => { %>
         <li>
-          <div>
-            <strong><%= entry.rank %>. <%= entry.playerName %></strong>
-            <span><%= entry.position %><%= entry.posRank ? entry.posRank : "" %> &middot; <%= entry.school %></span>
+          <div class="big-board-entry-heading">
+            <div>
+              <strong><%= formatBoardNumber(entry.rank) %>. <%= entry.playerName %></strong>
+              <span><%= entry.position %><%= entry.posRank ? formatBoardNumber(entry.posRank) : "" %> &middot; <%= entry.school %></span>
+            </div>
+            <% if (entry.bigDiscrepency) { %>
+              <span class="big-discrepency-badge">Big discrepancy</span>
+            <% } %>
           </div>
           <p>
             <%= entry.height.feet %>'<%= entry.height.inches %>" &middot; <%= entry.weight %> lbs

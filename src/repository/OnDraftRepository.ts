@@ -1,5 +1,5 @@
 import { Result } from "../lib/result";
-import { type BigBoard, Article, BigBoardCreator, BigBoardEntry, ArticleFilter, Comment, ForumPost, ForumPostFilter, DraftBoardFilter, Video, VideoQuery, } from "../model/OnDraftContent";
+import { type BigBoard, Article, BigBoardCreator, BigBoardEntry, ArticleFilter, Comment, ForumPost, ForumPostFilter, DraftBoardFilter, Video, VideoQuery, ConsensusBigBoard, } from "../model/OnDraftContent";
 
 export type BigBoardError = 
     | {name: "BigBoardNotFound"; message: string}
@@ -80,4 +80,5 @@ export interface IOnDraftRepository {
     filterYoutubeVideos(query: VideoQuery): Promise<Result<Video[], ArticleError>>;
     updateYoutubeVideoStats(videoId: string, stats: { thumbnailUrl?: string; viewCount?: number; youtubeStatsFetchedAt: Date }): Promise<Result<Video, ArticleError>>;
     getTags(): Promise<Result<string[], ArticleError>>;
+    getConsensusBigBoard(year: number): Promise<Result<ConsensusBigBoard, BigBoardError>>;
 }
