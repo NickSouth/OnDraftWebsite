@@ -21,6 +21,7 @@ describe("EmailService", () => {
       appBaseUrl: "http://localhost:3000",
       resendApiKey: null,
       verificationTokenTtlHours: 24,
+      mailingListUnsubscribeSecret: "test-mailing-secret",
     }, logger);
 
     await service.sendEmailVerificationEmail({
@@ -45,6 +46,7 @@ describe("EmailService", () => {
       appBaseUrl: "https://ondraftfootball.com",
       resendApiKey: "test-resend-key",
       verificationTokenTtlHours: 24,
+      mailingListUnsubscribeSecret: "test-mailing-secret",
     }, logger, fetcher as unknown as typeof fetch);
 
     await service.sendEmailVerificationEmail({

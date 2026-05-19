@@ -129,6 +129,13 @@ describe("OnDraft HTTP contracts", () => {
     expect(response.text).toContain("If that email needs verification");
   });
 
+  it("renders a safe mailing list unsubscribe failure page for invalid tokens", async () => {
+    const response = await request(app()).get("/mailing-list/unsubscribe?token=invalid-token");
+
+    expect(response.status).toBe(400);
+    expect(response.text).toContain("We could not process that unsubscribe link.");
+  });
+
   it("allows anonymous visitors to view articles and the big board", async () => {
     const ondraft = app();
 

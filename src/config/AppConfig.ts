@@ -7,6 +7,7 @@ export interface IEmailConfig {
   appBaseUrl: string;
   resendApiKey: string | null;
   verificationTokenTtlHours: number;
+  mailingListUnsubscribeSecret: string;
 }
 
 export interface IAppConfig {
@@ -103,6 +104,9 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): IAppConfig 
   const from = readOptionalEnv(env, "EMAIL_FROM");
   const appBaseUrl = readOptionalEnv(env, "APP_BASE_URL") ?? "http://localhost:3000";
   const resendApiKey = readOptionalEnv(env, "RESEND_API_KEY");
+  const mailingListUnsubscribeSecret = readOptionalEnv(env, "MAILING_LIST_UNSUBSCRIBE_SECRET")
+    ?? readOptionalEnv(env, "SESSION_SECRET")
+    ?? "ondraft-local-mailing-list-unsubscribe-secret";
   const verificationTokenTtlHours = parsePositiveIntegerEnv(
     env,
     "EMAIL_VERIFICATION_TOKEN_TTL_HOURS",
@@ -117,6 +121,9 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): IAppConfig 
 
   if (env.NODE_ENV === "production") {
     requireEnv(env, "APP_BASE_URL", errors);
+    if (!readOptionalEnv(env, "MAILING_LIST_UNSUBSCRIBE_SECRET") && !readOptionalEnv(env, "SESSION_SECRET")) {
+      errors.push("MAILING_LIST_UNSUBSCRIBE_SECRET or SESSION_SECRET is required.");
+    }
   }
 
   parseUrl(appBaseUrl, "APP_BASE_URL", errors);
@@ -138,6 +145,7 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): IAppConfig 
       appBaseUrl,
       resendApiKey,
       verificationTokenTtlHours,
+      mailingListUnsubscribeSecret,
     },
   };
 }

@@ -20,6 +20,12 @@ export interface IAuthController {
     status: "success" | "failure",
     message: string,
   ): Promise<void>;
+  showMailingListUnsubscribeResult(
+    res: Response,
+    session: IOnDraftBrowserSession,
+    status: "success" | "failure",
+    message: string,
+  ): Promise<void>;
   loginFromForm(
     res: Response,
     email: string,
@@ -42,6 +48,11 @@ export interface IAuthController {
   requestEmailVerificationFromForm(
     res: Response,
     email: string,
+    store: OnDraftSessionStore,
+  ): Promise<void>;
+  unsubscribeMailingListFromRequest(
+    res: Response,
+    token: string,
     store: OnDraftSessionStore,
   ): Promise<void>;
   logoutFromForm(res: Response, store: OnDraftSessionStore): Promise<void>;
@@ -83,6 +94,15 @@ class AuthController implements IAuthController {
     message: string,
   ): Promise<void> {
     res.render("auth/verifyEmail", { status, message, session });
+  }
+
+  async showMailingListUnsubscribeResult(
+    res: Response,
+    session: IOnDraftBrowserSession,
+    status: "success" | "failure",
+    message: string,
+  ): Promise<void> {
+    res.render("auth/mailingListUnsubscribe", { status, message, session });
   }
 
   async loginFromForm(
@@ -189,6 +209,33 @@ class AuthController implements IAuthController {
       session,
       "success",
       "If that email needs verification, we sent a new verification link.",
+    );
+  }
+
+  async unsubscribeMailingListFromRequest(
+    res: Response,
+    token: string,
+    store: OnDraftSessionStore,
+  ): Promise<void> {
+    const session = touchOnDraftSession(store);
+    const result = await this.service.unsubscribeMailingList({ token });
+
+    if (result.ok === false) {
+      const error = result.value;
+      const status = this.mapErrorStatus(error);
+      const log = status >= 500 ? this.logger.error : this.logger.warn;
+      log.call(this.logger, `Mailing list unsubscribe failed: ${error.message}`);
+      res.status(status);
+      await this.showMailingListUnsubscribeResult(res, session, "failure", error.message);
+      return;
+    }
+
+    this.logger.info("Mailing list unsubscribe completed");
+    await this.showMailingListUnsubscribeResult(
+      res,
+      session,
+      "success",
+      "You have been unsubscribed from OnDraft marketing emails.",
     );
   }
 

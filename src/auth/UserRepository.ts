@@ -55,6 +55,9 @@ export interface IUserRepository {
   findMailingListSubscriptionByEmail(
     email: string,
   ): Promise<Result<IMailingListSubscriptionRecord | null, AuthError>>;
+  findMailingListSubscriptionById(
+    id: string,
+  ): Promise<Result<IMailingListSubscriptionRecord | null, AuthError>>;
   findMailingListSubscriptionByUserId(
     userId: string,
   ): Promise<Result<IMailingListSubscriptionRecord | null, AuthError>>;

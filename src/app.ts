@@ -229,6 +229,22 @@ class ExpressApp implements IApp {
       }),
     );
 
+    this.app.get(
+      "/mailing-list/unsubscribe",
+      asyncHandler(async (req, res) => {
+        const token = typeof req.query.token === "string" ? req.query.token : "";
+        await this.authController.unsubscribeMailingListFromRequest(res, token, sessionStore(req));
+      }),
+    );
+
+    this.app.post(
+      "/mailing-list/unsubscribe",
+      asyncHandler(async (req, res) => {
+        const token = typeof req.body.token === "string" ? req.body.token : "";
+        await this.authController.unsubscribeMailingListFromRequest(res, token, sessionStore(req));
+      }),
+    );
+
     this.app.post(
       "/logout",
       asyncHandler(async (req, res) => {

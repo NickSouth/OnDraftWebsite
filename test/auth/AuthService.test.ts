@@ -3,6 +3,7 @@ import { CreateInMemoryUserRepository } from "../../src/auth/InMemoryUserReposit
 import { createHash } from "node:crypto";
 import type { IEmailService, SendEmailVerificationEmailInput } from "../../src/email/EmailService";
 import type { IUserRepository } from "../../src/auth/UserRepository";
+import type { IEmailConfig } from "../../src/config/AppConfig";
 
 class CapturingEmailService implements IEmailService {
   sent: SendEmailVerificationEmailInput[] = [];
@@ -14,6 +15,17 @@ class CapturingEmailService implements IEmailService {
 
 function tokenFromVerificationUrl(verificationUrl: string): string {
   return new URL(verificationUrl).searchParams.get("token") ?? "";
+}
+
+function testEmailConfig(): IEmailConfig {
+  return {
+    provider: "logging",
+    from: null,
+    appBaseUrl: "https://ondraftfootball.com",
+    resendApiKey: null,
+    verificationTokenTtlHours: 24,
+    mailingListUnsubscribeSecret: "test-mailing-secret",
+  };
 }
 
 async function addVerificationFixture(
@@ -164,6 +176,7 @@ describe("AuthService", () => {
       appBaseUrl: "https://ondraftfootball.com",
       resendApiKey: null,
       verificationTokenTtlHours: 1,
+      mailingListUnsubscribeSecret: "test-mailing-secret",
     });
 
     const result = await service.register({
@@ -205,6 +218,7 @@ describe("AuthService", () => {
       appBaseUrl: "https://ondraftfootball.com",
       resendApiKey: null,
       verificationTokenTtlHours: 24,
+      mailingListUnsubscribeSecret: "test-mailing-secret",
     });
 
     await service.register({
@@ -316,6 +330,7 @@ describe("AuthService", () => {
       appBaseUrl: "https://ondraftfootball.com",
       resendApiKey: null,
       verificationTokenTtlHours: 24,
+      mailingListUnsubscribeSecret: "test-mailing-secret",
     });
 
     await service.register({
@@ -346,6 +361,7 @@ describe("AuthService", () => {
       appBaseUrl: "https://ondraftfootball.com",
       resendApiKey: null,
       verificationTokenTtlHours: 24,
+      mailingListUnsubscribeSecret: "test-mailing-secret",
     });
 
     const result = await service.requestEmailVerification({ email: "ryanmcwalter@ondraft.test" });
@@ -363,11 +379,120 @@ describe("AuthService", () => {
       appBaseUrl: "https://ondraftfootball.com",
       resendApiKey: null,
       verificationTokenTtlHours: 24,
+      mailingListUnsubscribeSecret: "test-mailing-secret",
     });
 
     const result = await service.requestEmailVerification({ email: "missing@ondraft.test" });
 
     expect(result.ok).toBe(true);
     expect(email.sent).toHaveLength(0);
+  });
+
+  it("unsubscribes a mailing list subscription with a valid token", async () => {
+    const users = CreateInMemoryUserRepository();
+    const service = CreateAuthService(users, new CapturingEmailService(), testEmailConfig());
+    await users.upsertMailingListSubscription({
+      id: "subscription-unsubscribe",
+      email: "reader@ondraft.test",
+      userId: null,
+      status: "subscribed",
+      consentSource: "registration",
+      consentTextVersion: "registration-v1",
+      consentedAt: "2026-05-19T12:00:00.000Z",
+      unsubscribedAt: null,
+      createdAt: "2026-05-19T12:00:00.000Z",
+      updatedAt: "2026-05-19T12:00:00.000Z",
+    });
+
+    const unsubscribeUrl = await service.createMailingListUnsubscribeUrl({ email: "reader@ondraft.test" });
+    expect(unsubscribeUrl.ok).toBe(true);
+    if (!unsubscribeUrl.ok || !unsubscribeUrl.value) return;
+
+    const result = await service.unsubscribeMailingList({
+      token: new URL(unsubscribeUrl.value).searchParams.get("token") ?? "",
+    });
+    const subscription = await users.findMailingListSubscriptionByEmail("reader@ondraft.test");
+
+    expect(result.ok).toBe(true);
+    expect(subscription.ok).toBe(true);
+    if (subscription.ok) {
+      expect(subscription.value?.status).toBe("unsubscribed");
+      expect(subscription.value?.unsubscribedAt).toBeTruthy();
+    }
+  });
+
+  it("allows repeated mailing list unsubscribe without changing suppression status", async () => {
+    const users = CreateInMemoryUserRepository();
+    const service = CreateAuthService(users, new CapturingEmailService(), testEmailConfig());
+    await users.upsertMailingListSubscription({
+      id: "subscription-repeat-unsubscribe",
+      email: "repeat@ondraft.test",
+      userId: null,
+      status: "subscribed",
+      consentSource: "registration",
+      consentTextVersion: "registration-v1",
+      consentedAt: "2026-05-19T12:00:00.000Z",
+      unsubscribedAt: null,
+      createdAt: "2026-05-19T12:00:00.000Z",
+      updatedAt: "2026-05-19T12:00:00.000Z",
+    });
+    const unsubscribeUrl = await service.createMailingListUnsubscribeUrl({ email: "repeat@ondraft.test" });
+    expect(unsubscribeUrl.ok).toBe(true);
+    if (!unsubscribeUrl.ok || !unsubscribeUrl.value) return;
+    const token = new URL(unsubscribeUrl.value).searchParams.get("token") ?? "";
+
+    const first = await service.unsubscribeMailingList({ token });
+    const afterFirst = await users.findMailingListSubscriptionByEmail("repeat@ondraft.test");
+    const second = await service.unsubscribeMailingList({ token });
+    const afterSecond = await users.findMailingListSubscriptionByEmail("repeat@ondraft.test");
+
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    if (afterFirst.ok && afterSecond.ok) {
+      expect(afterSecond.value?.status).toBe("unsubscribed");
+      expect(afterSecond.value?.unsubscribedAt).toBe(afterFirst.value?.unsubscribedAt);
+    }
+  });
+
+  it("rejects invalid mailing list unsubscribe tokens", async () => {
+    const users = CreateInMemoryUserRepository();
+    const service = CreateAuthService(users, new CapturingEmailService(), testEmailConfig());
+
+    const result = await service.unsubscribeMailingList({ token: "not-a-real-token" });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.value.message).toBe("We could not process that unsubscribe link.");
+    }
+  });
+
+  it("does not re-subscribe suppressed emails during registration without new consent", async () => {
+    const users = CreateInMemoryUserRepository();
+    const service = CreateAuthService(users, new CapturingEmailService(), testEmailConfig());
+    await users.upsertMailingListSubscription({
+      id: "subscription-suppressed",
+      email: "suppressed@ondraft.test",
+      userId: null,
+      status: "unsubscribed",
+      consentSource: "registration",
+      consentTextVersion: "registration-v1",
+      consentedAt: "2026-05-19T12:00:00.000Z",
+      unsubscribedAt: "2026-05-19T12:30:00.000Z",
+      createdAt: "2026-05-19T12:00:00.000Z",
+      updatedAt: "2026-05-19T12:30:00.000Z",
+    });
+
+    await service.register({
+      displayName: "Suppressed Reader",
+      email: "suppressed@ondraft.test",
+      password: "password123",
+    });
+    const subscription = await users.findMailingListSubscriptionByEmail("suppressed@ondraft.test");
+
+    expect(subscription.ok).toBe(true);
+    if (subscription.ok) {
+      expect(subscription.value?.status).toBe("unsubscribed");
+      expect(subscription.value?.unsubscribedAt).toBe("2026-05-19T12:30:00.000Z");
+    }
   });
 });

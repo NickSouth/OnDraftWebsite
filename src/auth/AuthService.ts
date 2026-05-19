@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import type { IEmailConfig } from "../config/AppConfig";
 import type { IEmailService } from "../email/EmailService";
 import { Err, Ok, type Result } from "../lib/result";
@@ -9,7 +9,7 @@ import {
   ValidationError,
   type AuthError,
 } from "./errors";
-import { toAuthenticatedUser, type IAuthenticatedUser } from "./User";
+import { toAuthenticatedUser, type IAuthenticatedUser, type IMailingListSubscriptionRecord } from "./User";
 import type { IUserRepository } from "./UserRepository";
 
 export interface LoginInput {
@@ -30,14 +30,25 @@ export interface RequestEmailVerificationInput {
   email: string;
 }
 
+export interface CreateMailingListUnsubscribeUrlInput {
+  email: string;
+}
+
+export interface UnsubscribeMailingListInput {
+  token: string;
+}
+
 export interface IAuthService {
   authenticate(input: LoginInput): Promise<Result<IAuthenticatedUser, AuthError>>;
   register(input: RegisterInput): Promise<Result<IAuthenticatedUser, AuthError>>;
   verifyEmail(input: VerifyEmailInput): Promise<Result<void, AuthError>>;
   requestEmailVerification(input: RequestEmailVerificationInput): Promise<Result<void, AuthError>>;
+  createMailingListUnsubscribeUrl(input: CreateMailingListUnsubscribeUrlInput): Promise<Result<string | null, AuthError>>;
+  unsubscribeMailingList(input: UnsubscribeMailingListInput): Promise<Result<void, AuthError>>;
 }
 
 const EMAIL_VERIFICATION_FAILED_MESSAGE = "We could not verify that email link. It may be expired or already used.";
+const MAILING_LIST_UNSUBSCRIBE_FAILED_MESSAGE = "We could not process that unsubscribe link.";
 
 class NullEmailService implements IEmailService {
   async sendEmailVerificationEmail(): Promise<void> {
@@ -55,6 +66,7 @@ class AuthService implements IAuthService {
       appBaseUrl: "http://localhost:3000",
       resendApiKey: null,
       verificationTokenTtlHours: 24,
+      mailingListUnsubscribeSecret: "ondraft-local-mailing-list-unsubscribe-secret",
     },
   ) {}
 
@@ -288,6 +300,112 @@ class AuthService implements IAuthService {
     }
 
     return this.sendVerificationEmail(user, { invalidateExistingTokens: true });
+  }
+
+  async createMailingListUnsubscribeUrl(
+    input: CreateMailingListUnsubscribeUrlInput,
+  ): Promise<Result<string | null, AuthError>> {
+    const email = input.email.trim().toLowerCase();
+    if (!email || !email.includes("@")) {
+      return Ok(null);
+    }
+
+    const subscriptionResult = await this.users.findMailingListSubscriptionByEmail(email);
+    if (subscriptionResult.ok === false) {
+      return Err(UnexpectedDependencyError(subscriptionResult.value.message));
+    }
+
+    const subscription = subscriptionResult.value;
+    if (!subscription || subscription.status === "unsubscribed") {
+      return Ok(null);
+    }
+
+    const token = this.createMailingListUnsubscribeToken(subscription);
+    const unsubscribeUrl = new URL("/mailing-list/unsubscribe", this.emailConfig.appBaseUrl);
+    unsubscribeUrl.searchParams.set("token", token);
+    return Ok(unsubscribeUrl.toString());
+  }
+
+  async unsubscribeMailingList(input: UnsubscribeMailingListInput): Promise<Result<void, AuthError>> {
+    const tokenPayload = this.parseMailingListUnsubscribeToken(input.token.trim());
+    if (!tokenPayload) {
+      return Err(ValidationError(MAILING_LIST_UNSUBSCRIBE_FAILED_MESSAGE));
+    }
+
+    const subscriptionResult = await this.users.findMailingListSubscriptionById(tokenPayload.subscriptionId);
+    if (subscriptionResult.ok === false) {
+      return Err(UnexpectedDependencyError(subscriptionResult.value.message));
+    }
+
+    const subscription = subscriptionResult.value;
+    if (!subscription || subscription.email !== tokenPayload.email) {
+      return Err(ValidationError(MAILING_LIST_UNSUBSCRIBE_FAILED_MESSAGE));
+    }
+
+    if (subscription.status === "unsubscribed") {
+      return Ok(undefined);
+    }
+
+    const now = new Date().toISOString();
+    const updated = await this.users.upsertMailingListSubscription({
+      ...subscription,
+      status: "unsubscribed",
+      unsubscribedAt: now,
+      updatedAt: now,
+    });
+
+    if (updated.ok === false) {
+      return Err(UnexpectedDependencyError(updated.value.message));
+    }
+
+    return Ok(undefined);
+  }
+
+  private createMailingListUnsubscribeToken(subscription: IMailingListSubscriptionRecord): string {
+    const payload = Buffer.from(JSON.stringify({
+      subscriptionId: subscription.id,
+      email: subscription.email,
+    }), "utf8").toString("base64url");
+    return `${payload}.${this.signMailingListPayload(payload)}`;
+  }
+
+  private parseMailingListUnsubscribeToken(token: string): { subscriptionId: string; email: string } | null {
+    const [payload, signature, extra] = token.split(".");
+    if (!payload || !signature || extra) {
+      return null;
+    }
+
+    if (!this.safeEqual(signature, this.signMailingListPayload(payload))) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
+        subscriptionId?: unknown;
+        email?: unknown;
+      };
+      if (typeof parsed.subscriptionId !== "string" || typeof parsed.email !== "string") {
+        return null;
+      }
+      return {
+        subscriptionId: parsed.subscriptionId,
+        email: parsed.email,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private signMailingListPayload(payload: string): string {
+    return createHmac("sha256", this.emailConfig.mailingListUnsubscribeSecret)
+      .update(payload)
+      .digest("base64url");
+  }
+
+  private safeEqual(left: string, right: string): boolean {
+    const leftBuffer = Buffer.from(left);
+    const rightBuffer = Buffer.from(right);
+    return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
   }
 }
 
