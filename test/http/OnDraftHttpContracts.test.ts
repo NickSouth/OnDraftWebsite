@@ -93,6 +93,42 @@ describe("OnDraft HTTP contracts", () => {
     expect(response.text).toContain("If that email needs verification");
   });
 
+  it("rate limits verification resend requests by email", async () => {
+    const ondraft = app();
+    let response = await request(ondraft)
+      .post("/verify-email/resend")
+      .type("form")
+      .send({ email: "limited@ondraft.test" });
+
+    for (let count = 0; count < 3; count += 1) {
+      response = await request(ondraft)
+        .post("/verify-email/resend")
+        .type("form")
+        .send({ email: "limited@ondraft.test" });
+    }
+
+    expect(response.status).toBe(429);
+    expect(response.text).toContain("If that email needs verification");
+  });
+
+  it("rate limits verification resend requests by IP", async () => {
+    const ondraft = app();
+    let response = await request(ondraft)
+      .post("/verify-email/resend")
+      .type("form")
+      .send({ email: "limited-0@ondraft.test" });
+
+    for (let count = 1; count <= 6; count += 1) {
+      response = await request(ondraft)
+        .post("/verify-email/resend")
+        .type("form")
+        .send({ email: `limited-${count}@ondraft.test` });
+    }
+
+    expect(response.status).toBe(429);
+    expect(response.text).toContain("If that email needs verification");
+  });
+
   it("allows anonymous visitors to view articles and the big board", async () => {
     const ondraft = app();
 

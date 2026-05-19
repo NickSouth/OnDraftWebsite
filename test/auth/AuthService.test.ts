@@ -12,6 +12,10 @@ class CapturingEmailService implements IEmailService {
   }
 }
 
+function tokenFromVerificationUrl(verificationUrl: string): string {
+  return new URL(verificationUrl).searchParams.get("token") ?? "";
+}
+
 async function addVerificationFixture(
   users: IUserRepository,
   options: {
@@ -319,11 +323,35 @@ describe("AuthService", () => {
       email: "draft@ondraft.test",
       password: "password123",
     });
+    const originalToken = tokenFromVerificationUrl(email.sent[0].verificationUrl);
     const result = await service.requestEmailVerification({ email: "draft@ondraft.test" });
+    const resentToken = tokenFromVerificationUrl(email.sent[1].verificationUrl);
+    const oldTokenResult = await service.verifyEmail({ token: originalToken });
+    const newTokenResult = await service.verifyEmail({ token: resentToken });
 
     expect(result.ok).toBe(true);
     expect(email.sent).toHaveLength(2);
     expect(email.sent[1].verificationUrl).toContain("https://ondraftfootball.com/verify-email?token=");
+    expect(resentToken).not.toBe(originalToken);
+    expect(oldTokenResult.ok).toBe(false);
+    expect(newTokenResult.ok).toBe(true);
+  });
+
+  it("accepts verification email requests for verified accounts without sending", async () => {
+    const users = CreateInMemoryUserRepository();
+    const email = new CapturingEmailService();
+    const service = CreateAuthService(users, email, {
+      provider: "logging",
+      from: null,
+      appBaseUrl: "https://ondraftfootball.com",
+      resendApiKey: null,
+      verificationTokenTtlHours: 24,
+    });
+
+    const result = await service.requestEmailVerification({ email: "ryanmcwalter@ondraft.test" });
+
+    expect(result.ok).toBe(true);
+    expect(email.sent).toHaveLength(0);
   });
 
   it("accepts verification email requests for unknown emails without sending", async () => {

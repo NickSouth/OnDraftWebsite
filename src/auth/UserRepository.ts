@@ -45,6 +45,10 @@ export interface IUserRepository {
     tokenId: string,
     usedAt: string,
   ): Promise<Result<IEmailVerificationTokenRecord, AuthError>>;
+  markUnusedEmailVerificationTokensUsedForUser(
+    userId: string,
+    usedAt: string,
+  ): Promise<Result<void, AuthError>>;
   upsertMailingListSubscription(
     subscription: UpsertMailingListSubscriptionInput,
   ): Promise<Result<IMailingListSubscriptionRecord, AuthError>>;

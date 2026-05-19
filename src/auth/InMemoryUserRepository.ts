@@ -151,6 +151,22 @@ class InMemoryUserRepository implements IUserRepository {
     }
   }
 
+  async markUnusedEmailVerificationTokensUsedForUser(
+    userId: string,
+    usedAt: string,
+  ): Promise<Result<void, AuthError>> {
+    try {
+      for (const token of this.emailVerificationTokens) {
+        if (token.userId === userId && !token.usedAt) {
+          token.usedAt = usedAt;
+        }
+      }
+      return Ok(undefined);
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to update the email verification tokens."));
+    }
+  }
+
   async upsertMailingListSubscription(
     subscription: UpsertMailingListSubscriptionInput,
   ): Promise<Result<IMailingListSubscriptionRecord, AuthError>> {

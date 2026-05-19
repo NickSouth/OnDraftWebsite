@@ -86,8 +86,21 @@ class AuthService implements IAuthService {
     return Ok(toAuthenticatedUser(userResult.value));
   }
 
-  private async sendVerificationEmail(user: { id: string; email: string }): Promise<Result<void, AuthError>> {
+  private async sendVerificationEmail(
+    user: { id: string; email: string },
+    options: { invalidateExistingTokens?: boolean } = {},
+  ): Promise<Result<void, AuthError>> {
     const now = new Date();
+    if (options.invalidateExistingTokens) {
+      const invalidated = await this.users.markUnusedEmailVerificationTokensUsedForUser(
+        user.id,
+        now.toISOString(),
+      );
+      if (invalidated.ok === false) {
+        return Err(UnexpectedDependencyError(invalidated.value.message));
+      }
+    }
+
     const rawToken = randomBytes(32).toString("base64url");
     const tokenHash = createHash("sha256").update(rawToken).digest("hex");
     const expiresAt = new Date(
@@ -274,7 +287,7 @@ class AuthService implements IAuthService {
       return Ok(undefined);
     }
 
-    return this.sendVerificationEmail(user);
+    return this.sendVerificationEmail(user, { invalidateExistingTokens: true });
   }
 }
 

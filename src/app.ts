@@ -3,6 +3,7 @@ import express, { NextFunction, Request, RequestHandler, Response } from "expres
 import session from "express-session";
 import Layouts from "express-ejs-layouts";
 import { IAuthController } from "./auth/AuthController";
+import { VerificationResendRateLimiter } from "./auth/VerificationResendRateLimiter";
 import { IApp } from "./contracts";
 import { IOnDraftController } from "./controller/OnDraftController";
 import { ARTICLE_PDF_MAX_BYTES, articleUpload } from "./uploads/articlePdfUpload";
@@ -29,6 +30,7 @@ function sessionStore(req: Request): OnDraftSessionStore {
 
 class ExpressApp implements IApp {
   private readonly app: express.Express;
+  private readonly verificationResendRateLimiter = new VerificationResendRateLimiter();
 
   constructor(
     private readonly controller: IOnDraftController,
@@ -119,6 +121,22 @@ class ExpressApp implements IApp {
     });
   }
 
+  private limitVerificationResend(req: Request, res: Response, next: NextFunction): void {
+    const result = this.verificationResendRateLimiter.check(req);
+    if (!result.limited) {
+      next();
+      return;
+    }
+
+    this.logger.warn("Rate limited verification email resend request");
+    res.setHeader("Retry-After", String(result.retryAfterSeconds));
+    res.status(429).render("auth/verifyEmail", {
+      status: "success",
+      message: "If that email needs verification, we sent a new verification link.",
+      session: touchOnDraftSession(sessionStore(req)),
+    });
+  }
+
   private registerRoutes(): void {
     this.app.get(
       "/",
@@ -204,6 +222,7 @@ class ExpressApp implements IApp {
 
     this.app.post(
       "/verify-email/resend",
+      (req, res, next) => this.limitVerificationResend(req, res, next),
       asyncHandler(async (req, res) => {
         const email = typeof req.body.email === "string" ? req.body.email : "";
         await this.authController.requestEmailVerificationFromForm(res, email, sessionStore(req));
