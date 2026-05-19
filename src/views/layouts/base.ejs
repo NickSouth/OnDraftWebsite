@@ -29,6 +29,14 @@
           <% } %>
         </div>
       </nav>
+      <% if (currentSession?.authenticatedUser && !currentSession.authenticatedUser.emailVerifiedAt) { %>
+        <section class="verification-banner">
+          <p>Verify your email before using admin tools.</p>
+          <form method="post" action="/verify-email/resend">
+            <button type="submit" class="secondary-button">Resend verification email</button>
+          </form>
+        </section>
+      <% } %>
       <main><%- body %></main>
     </div>
   </body>

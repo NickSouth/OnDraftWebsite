@@ -17,7 +17,7 @@ export const DEMO_USERS: IUserRecord[] = [
   {
     id: "user-ryan",
     email: "ryanmcwalter@ondraft.test",
-    emailVerifiedAt: null,
+    emailVerifiedAt: "2026-05-19T00:00:00.000Z",
     displayName: "Ryan McWalter",
     password: "password123",
     role: "admin",
@@ -26,7 +26,7 @@ export const DEMO_USERS: IUserRecord[] = [
   {
     id: "user-bob",
     email: "bob@ondraft.test",
-    emailVerifiedAt: null,
+    emailVerifiedAt: "2026-05-19T00:00:00.000Z",
     displayName: "Bob OnDraft",
     password: "password123",
     role: "user",

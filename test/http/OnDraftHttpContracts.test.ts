@@ -80,6 +80,17 @@ describe("OnDraft HTTP contracts", () => {
 
     expect(ondraft.status).toBe(200);
     expect(ondraft.text).toContain("New Analyst");
+    expect(ondraft.text).toContain("Resend verification email");
+  });
+
+  it("accepts verification resend requests without revealing whether the email exists", async () => {
+    const response = await request(app())
+      .post("/verify-email/resend")
+      .type("form")
+      .send({ email: "unknown@ondraft.test" });
+
+    expect(response.status).toBe(200);
+    expect(response.text).toContain("If that email needs verification");
   });
 
   it("allows anonymous visitors to view articles and the big board", async () => {

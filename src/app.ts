@@ -203,6 +203,14 @@ class ExpressApp implements IApp {
     );
 
     this.app.post(
+      "/verify-email/resend",
+      asyncHandler(async (req, res) => {
+        const email = typeof req.body.email === "string" ? req.body.email : "";
+        await this.authController.requestEmailVerificationFromForm(res, email, sessionStore(req));
+      }),
+    );
+
+    this.app.post(
       "/logout",
       asyncHandler(async (req, res) => {
         await this.authController.logoutFromForm(res, sessionStore(req));

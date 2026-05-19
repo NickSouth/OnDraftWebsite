@@ -26,10 +26,15 @@ export interface VerifyEmailInput {
   token: string;
 }
 
+export interface RequestEmailVerificationInput {
+  email: string;
+}
+
 export interface IAuthService {
   authenticate(input: LoginInput): Promise<Result<IAuthenticatedUser, AuthError>>;
   register(input: RegisterInput): Promise<Result<IAuthenticatedUser, AuthError>>;
   verifyEmail(input: VerifyEmailInput): Promise<Result<void, AuthError>>;
+  requestEmailVerification(input: RequestEmailVerificationInput): Promise<Result<void, AuthError>>;
 }
 
 const EMAIL_VERIFICATION_FAILED_MESSAGE = "We could not verify that email link. It may be expired or already used.";
@@ -81,6 +86,39 @@ class AuthService implements IAuthService {
     return Ok(toAuthenticatedUser(userResult.value));
   }
 
+  private async sendVerificationEmail(user: { id: string; email: string }): Promise<Result<void, AuthError>> {
+    const now = new Date();
+    const rawToken = randomBytes(32).toString("base64url");
+    const tokenHash = createHash("sha256").update(rawToken).digest("hex");
+    const expiresAt = new Date(
+      now.getTime() + this.emailConfig.verificationTokenTtlHours * 60 * 60 * 1000,
+    );
+    const tokenResult = await this.users.addEmailVerificationToken({
+      id: randomUUID(),
+      userId: user.id,
+      tokenHash,
+      expiresAt: expiresAt.toISOString(),
+      createdAt: now.toISOString(),
+    });
+
+    if (tokenResult.ok === false) {
+      return Err(UnexpectedDependencyError(tokenResult.value.message));
+    }
+
+    const verificationUrl = new URL("/verify-email", this.emailConfig.appBaseUrl);
+    verificationUrl.searchParams.set("token", rawToken);
+    try {
+      await this.email.sendEmailVerificationEmail({
+        to: user.email,
+        verificationUrl: verificationUrl.toString(),
+      });
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to send the email verification message."));
+    }
+
+    return Ok(undefined);
+  }
+
   async register(input: RegisterInput): Promise<Result<IAuthenticatedUser, AuthError>> {
     const displayName = input.displayName.trim();
     const email = input.email.trim().toLowerCase();
@@ -130,21 +168,9 @@ class AuthService implements IAuthService {
     }
 
     const now = new Date();
-    const rawToken = randomBytes(32).toString("base64url");
-    const tokenHash = createHash("sha256").update(rawToken).digest("hex");
-    const expiresAt = new Date(
-      now.getTime() + this.emailConfig.verificationTokenTtlHours * 60 * 60 * 1000,
-    );
-    const tokenResult = await this.users.addEmailVerificationToken({
-      id: randomUUID(),
-      userId: created.value.id,
-      tokenHash,
-      expiresAt: expiresAt.toISOString(),
-      createdAt: now.toISOString(),
-    });
-
-    if (tokenResult.ok === false) {
-      return Err(UnexpectedDependencyError(tokenResult.value.message));
+    const verificationEmail = await this.sendVerificationEmail(created.value);
+    if (verificationEmail.ok === false) {
+      return verificationEmail;
     }
 
     if (input.mailingListConsent === true) {
@@ -164,17 +190,6 @@ class AuthService implements IAuthService {
       if (subscriptionResult.ok === false) {
         return Err(UnexpectedDependencyError(subscriptionResult.value.message));
       }
-    }
-
-    const verificationUrl = new URL("/verify-email", this.emailConfig.appBaseUrl);
-    verificationUrl.searchParams.set("token", rawToken);
-    try {
-      await this.email.sendEmailVerificationEmail({
-        to: email,
-        verificationUrl: verificationUrl.toString(),
-      });
-    } catch {
-      return Err(UnexpectedDependencyError("Unable to send the email verification message."));
     }
 
     return Ok(toAuthenticatedUser(created.value));
@@ -240,6 +255,26 @@ class AuthService implements IAuthService {
     }
 
     return Ok(undefined);
+  }
+
+  async requestEmailVerification(input: RequestEmailVerificationInput): Promise<Result<void, AuthError>> {
+    const email = input.email.trim().toLowerCase();
+
+    if (!email || !email.includes("@")) {
+      return Ok(undefined);
+    }
+
+    const userResult = await this.users.findByEmail(email);
+    if (userResult.ok === false) {
+      return Err(UnexpectedDependencyError(userResult.value.message));
+    }
+
+    const user = userResult.value;
+    if (!user || user.emailVerifiedAt) {
+      return Ok(undefined);
+    }
+
+    return this.sendVerificationEmail(user);
   }
 }
 

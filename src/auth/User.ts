@@ -11,6 +11,7 @@ export interface IUserRecord {
 export interface IAuthenticatedUser {
   id: string;
   email: string;
+  emailVerifiedAt: string | null;
   displayName: string;
 }
 
@@ -18,6 +19,7 @@ export function toAuthenticatedUser(user: IUserRecord): IAuthenticatedUser {
   return {
     id: user.id,
     email: user.email,
+    emailVerifiedAt: user.emailVerifiedAt,
     displayName: user.displayName,
   };
 }

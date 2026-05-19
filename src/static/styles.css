@@ -846,6 +846,29 @@ textarea {
   width: auto;
 }
 
+.verification-banner {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 16px 0;
+  padding: 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  background: #fff8e6;
+}
+
+.verification-banner p,
+.verification-banner form {
+  margin: 0;
+}
+
+.verification-resend-form {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--panel-border);
+}
+
 .board-editor-page {
   max-width: none;
 }

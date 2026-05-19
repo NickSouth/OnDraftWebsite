@@ -39,6 +39,11 @@ export interface IAuthController {
     token: string,
     store: OnDraftSessionStore,
   ): Promise<void>;
+  requestEmailVerificationFromForm(
+    res: Response,
+    email: string,
+    store: OnDraftSessionStore,
+  ): Promise<void>;
   logoutFromForm(res: Response, store: OnDraftSessionStore): Promise<void>;
 }
 
@@ -154,6 +159,36 @@ class AuthController implements IAuthController {
       session,
       "success",
       "Your email has been verified.",
+    );
+  }
+
+  async requestEmailVerificationFromForm(
+    res: Response,
+    email: string,
+    store: OnDraftSessionStore,
+  ): Promise<void> {
+    const session = touchOnDraftSession(store);
+    const requestedEmail = session.authenticatedUser?.email ?? email;
+    const result = await this.service.requestEmailVerification({ email: requestedEmail });
+
+    if (result.ok === false) {
+      this.logger.error(`Verification email request failed: ${result.value.message}`);
+      res.status(500);
+      await this.showVerifyEmailResult(
+        res,
+        session,
+        "failure",
+        "We could not process that request right now.",
+      );
+      return;
+    }
+
+    this.logger.info("Verification email request accepted");
+    await this.showVerifyEmailResult(
+      res,
+      session,
+      "success",
+      "If that email needs verification, we sent a new verification link.",
     );
   }
 

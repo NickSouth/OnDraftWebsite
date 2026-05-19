@@ -302,4 +302,44 @@ describe("AuthService", () => {
       expect(result.value.message).toBe("We could not verify that email link. It may be expired or already used.");
     }
   });
+
+  it("resends verification email for an unverified account without returning account details", async () => {
+    const users = CreateInMemoryUserRepository();
+    const email = new CapturingEmailService();
+    const service = CreateAuthService(users, email, {
+      provider: "logging",
+      from: null,
+      appBaseUrl: "https://ondraftfootball.com",
+      resendApiKey: null,
+      verificationTokenTtlHours: 24,
+    });
+
+    await service.register({
+      displayName: "Draft Analyst",
+      email: "draft@ondraft.test",
+      password: "password123",
+    });
+    const result = await service.requestEmailVerification({ email: "draft@ondraft.test" });
+
+    expect(result.ok).toBe(true);
+    expect(email.sent).toHaveLength(2);
+    expect(email.sent[1].verificationUrl).toContain("https://ondraftfootball.com/verify-email?token=");
+  });
+
+  it("accepts verification email requests for unknown emails without sending", async () => {
+    const users = CreateInMemoryUserRepository();
+    const email = new CapturingEmailService();
+    const service = CreateAuthService(users, email, {
+      provider: "logging",
+      from: null,
+      appBaseUrl: "https://ondraftfootball.com",
+      resendApiKey: null,
+      verificationTokenTtlHours: 24,
+    });
+
+    const result = await service.requestEmailVerification({ email: "missing@ondraft.test" });
+
+    expect(result.ok).toBe(true);
+    expect(email.sent).toHaveLength(0);
+  });
 });

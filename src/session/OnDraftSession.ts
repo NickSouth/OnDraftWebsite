@@ -5,6 +5,7 @@ import type { IAuthenticatedUser } from "../auth/User";
 export interface IAuthenticatedUserSession {
   userId: string;
   email: string;
+  emailVerifiedAt: string | null;
   displayName: string;
   signedInAt: string;
 }
@@ -86,6 +87,7 @@ export function signInAuthenticatedUser(
   session.authenticatedUser = {
     userId: user.id,
     email: user.email,
+    emailVerifiedAt: user.emailVerifiedAt,
     displayName: user.displayName,
     signedInAt: now.toISOString(),
   };
@@ -119,7 +121,9 @@ export function isAuthenticatedSession(
 
 export function isAdminSession(session: IOnDraftBrowserSession): boolean {
   const email = session.authenticatedUser?.email;
-  if (!email) {
+  // The app already lets signed-in and anonymous users browse/read, so the smallest
+  // verification gate is on admin privileges rather than login itself.
+  if (!email || !session.authenticatedUser?.emailVerifiedAt) {
     return false;
   }
 
