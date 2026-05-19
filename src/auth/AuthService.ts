@@ -249,6 +249,11 @@ class AuthService implements IAuthService {
     }
 
     const verifiedAt = new Date().toISOString();
+    const used = await this.users.markEmailVerificationTokenUsed(token.id, verifiedAt);
+    if (used.ok === false) {
+      return Err(UnexpectedDependencyError(used.value.message));
+    }
+
     if (!user.emailVerifiedAt) {
       const verified = await this.users.setEmailVerified(user.id, verifiedAt);
       if (verified.ok === false) {
@@ -273,11 +278,6 @@ class AuthService implements IAuthService {
       if (subscribed.ok === false) {
         return Err(UnexpectedDependencyError(subscribed.value.message));
       }
-    }
-
-    const used = await this.users.markEmailVerificationTokenUsed(token.id, verifiedAt);
-    if (used.ok === false) {
-      return Err(UnexpectedDependencyError(used.value.message));
     }
 
     return Ok(undefined);

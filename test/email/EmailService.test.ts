@@ -13,7 +13,7 @@ function testLogger() {
 }
 
 describe("EmailService", () => {
-  it("logs verification URLs in safe logging mode", async () => {
+  it("redacts raw verification tokens in safe logging mode", async () => {
     const { logger, messages } = testLogger();
     const service = CreateEmailService({
       provider: "logging",
@@ -30,8 +30,9 @@ describe("EmailService", () => {
     });
 
     expect(messages).toContain(
-      "Email verification URL for reader@ondraft.test: https://ondraftfootball.com/verify-email?token=example",
+      "Email verification URL for reader@ondraft.test: https://ondraftfootball.com/verify-email?token=%5Bredacted%5D",
     );
+    expect(messages.join("\n")).not.toContain("token=example");
   });
 
   it("sends a server-rendered Resend request without exposing API keys in code", async () => {

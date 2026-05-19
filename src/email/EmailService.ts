@@ -14,7 +14,7 @@ class LoggingEmailService implements IEmailService {
   constructor(private readonly logger: ILoggingService) {}
 
   async sendEmailVerificationEmail(input: SendEmailVerificationEmailInput): Promise<void> {
-    this.logger.info(`Email verification URL for ${input.to}: ${input.verificationUrl}`);
+    this.logger.info(`Email verification URL for ${input.to}: ${redactVerificationToken(input.verificationUrl)}`);
   }
 }
 
@@ -73,6 +73,18 @@ function renderEmailVerificationText(verificationUrl: string): string {
     "",
     "If you did not create an OnDraft account, you can ignore this email.",
   ].join("\n");
+}
+
+function redactVerificationToken(verificationUrl: string): string {
+  try {
+    const url = new URL(verificationUrl);
+    if (url.searchParams.has("token")) {
+      url.searchParams.set("token", "[redacted]");
+    }
+    return url.toString();
+  } catch {
+    return "[redacted-verification-url]";
+  }
 }
 
 function escapeHtmlAttribute(value: string): string {
