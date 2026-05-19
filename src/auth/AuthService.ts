@@ -1,4 +1,6 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
+import type { IEmailConfig } from "../config/AppConfig";
+import type { IEmailService } from "../email/EmailService";
 import { Err, Ok, type Result } from "../lib/result";
 import {
   InvalidCredentials,
@@ -17,6 +19,7 @@ export interface LoginInput {
 
 export interface RegisterInput extends LoginInput {
   displayName: string;
+  mailingListConsent?: boolean;
 }
 
 export interface IAuthService {
@@ -24,8 +27,24 @@ export interface IAuthService {
   register(input: RegisterInput): Promise<Result<IAuthenticatedUser, AuthError>>;
 }
 
+class NullEmailService implements IEmailService {
+  async sendEmailVerificationEmail(): Promise<void> {
+    return Promise.resolve();
+  }
+}
+
 class AuthService implements IAuthService {
-  constructor(private readonly users: IUserRepository) {}
+  constructor(
+    private readonly users: IUserRepository,
+    private readonly email: IEmailService = new NullEmailService(),
+    private readonly emailConfig: IEmailConfig = {
+      provider: "logging",
+      from: null,
+      appBaseUrl: "http://localhost:3000",
+      resendApiKey: null,
+      verificationTokenTtlHours: 24,
+    },
+  ) {}
 
   async authenticate(input: LoginInput): Promise<Result<IAuthenticatedUser, AuthError>> {
     const email = input.email.trim().toLowerCase();
@@ -103,10 +122,62 @@ class AuthService implements IAuthService {
       return Err(UnexpectedDependencyError(created.value.message));
     }
 
+    const now = new Date();
+    const rawToken = randomBytes(32).toString("base64url");
+    const tokenHash = createHash("sha256").update(rawToken).digest("hex");
+    const expiresAt = new Date(
+      now.getTime() + this.emailConfig.verificationTokenTtlHours * 60 * 60 * 1000,
+    );
+    const tokenResult = await this.users.addEmailVerificationToken({
+      id: randomUUID(),
+      userId: created.value.id,
+      tokenHash,
+      expiresAt: expiresAt.toISOString(),
+      createdAt: now.toISOString(),
+    });
+
+    if (tokenResult.ok === false) {
+      return Err(UnexpectedDependencyError(tokenResult.value.message));
+    }
+
+    if (input.mailingListConsent === true) {
+      const subscriptionResult = await this.users.upsertMailingListSubscription({
+        id: randomUUID(),
+        email,
+        userId: created.value.id,
+        status: "pending",
+        consentSource: "registration",
+        consentTextVersion: "registration-v1",
+        consentedAt: now.toISOString(),
+        unsubscribedAt: null,
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
+      });
+
+      if (subscriptionResult.ok === false) {
+        return Err(UnexpectedDependencyError(subscriptionResult.value.message));
+      }
+    }
+
+    const verificationUrl = new URL("/verify-email", this.emailConfig.appBaseUrl);
+    verificationUrl.searchParams.set("token", rawToken);
+    try {
+      await this.email.sendEmailVerificationEmail({
+        to: email,
+        verificationUrl: verificationUrl.toString(),
+      });
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to send the email verification message."));
+    }
+
     return Ok(toAuthenticatedUser(created.value));
   }
 }
 
-export function CreateAuthService(users: IUserRepository): IAuthService {
-  return new AuthService(users);
+export function CreateAuthService(
+  users: IUserRepository,
+  email?: IEmailService,
+  emailConfig?: IEmailConfig,
+): IAuthService {
+  return new AuthService(users, email, emailConfig);
 }

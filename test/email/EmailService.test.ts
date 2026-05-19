@@ -18,8 +18,9 @@ describe("EmailService", () => {
     const service = CreateEmailService({
       provider: "logging",
       from: null,
-      appBaseUrl: null,
+      appBaseUrl: "http://localhost:3000",
       resendApiKey: null,
+      verificationTokenTtlHours: 24,
     }, logger);
 
     await service.sendEmailVerificationEmail({
@@ -43,6 +44,7 @@ describe("EmailService", () => {
       from: "OnDraft <no-reply@ondraftfootball.com>",
       appBaseUrl: "https://ondraftfootball.com",
       resendApiKey: "test-resend-key",
+      verificationTokenTtlHours: 24,
     }, logger, fetcher as unknown as typeof fetch);
 
     await service.sendEmailVerificationEmail({

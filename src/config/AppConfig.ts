@@ -4,8 +4,9 @@ export type EmailProvider = "logging" | "resend";
 export interface IEmailConfig {
   provider: EmailProvider;
   from: string | null;
-  appBaseUrl: string | null;
+  appBaseUrl: string;
   resendApiKey: string | null;
+  verificationTokenTtlHours: number;
 }
 
 export interface IAppConfig {
@@ -40,6 +41,26 @@ function parsePort(env: NodeJS.ProcessEnv, errors: string[]): number {
   }
 
   return port;
+}
+
+function parsePositiveIntegerEnv(
+  env: NodeJS.ProcessEnv,
+  key: string,
+  defaultValue: number,
+  errors: string[],
+): number {
+  const raw = readOptionalEnv(env, key);
+  if (!raw) {
+    return defaultValue;
+  }
+
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) {
+    errors.push(`${key} must be a positive integer.`);
+    return defaultValue;
+  }
+
+  return value;
 }
 
 function parseRepositoryMode(env: NodeJS.ProcessEnv): RepositoryMode {
@@ -80,13 +101,22 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): IAppConfig 
   const port = parsePort(env, errors);
   const provider = parseEmailProvider(env, errors);
   const from = readOptionalEnv(env, "EMAIL_FROM");
-  const appBaseUrl = readOptionalEnv(env, "APP_BASE_URL");
+  const appBaseUrl = readOptionalEnv(env, "APP_BASE_URL") ?? "http://localhost:3000";
   const resendApiKey = readOptionalEnv(env, "RESEND_API_KEY");
+  const verificationTokenTtlHours = parsePositiveIntegerEnv(
+    env,
+    "EMAIL_VERIFICATION_TOKEN_TTL_HOURS",
+    24,
+    errors,
+  );
 
   if (provider === "resend") {
     requireEnv(env, "EMAIL_FROM", errors);
-    requireEnv(env, "APP_BASE_URL", errors);
     requireEnv(env, "RESEND_API_KEY", errors);
+  }
+
+  if (env.NODE_ENV === "production") {
+    requireEnv(env, "APP_BASE_URL", errors);
   }
 
   parseUrl(appBaseUrl, "APP_BASE_URL", errors);
@@ -107,6 +137,7 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): IAppConfig 
       from,
       appBaseUrl,
       resendApiKey,
+      verificationTokenTtlHours,
     },
   };
 }

@@ -21,13 +21,13 @@ export function createComposedApp(
   const resolvedLogger = logger ?? CreateLoggingService();
 
   const repository = CreateInMemoryOnDraftRepository();
-  CreateEmailService(config.email, resolvedLogger);
+  const emailService = CreateEmailService(config.email, resolvedLogger);
 
   const youtubeStats = CreateYoutubeVideoStatsService();
   const service = CreateOnDraftService(repository, youtubeStats);
   const authUsers = CreateInMemoryUserRepository();
   const userPreferences = CreateUserPreferenceService(authUsers);
-  const authService = CreateAuthService(authUsers);
+  const authService = CreateAuthService(authUsers, emailService, config.email);
   const authController = CreateAuthController(authService, resolvedLogger);
   const controller = CreateOnDraftController(service, userPreferences, resolvedLogger);
   return CreateApp(controller, authController, resolvedLogger);

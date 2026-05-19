@@ -174,11 +174,13 @@ class ExpressApp implements IApp {
         const displayName = typeof req.body.displayName === "string" ? req.body.displayName : "";
         const email = typeof req.body.email === "string" ? req.body.email : "";
         const password = typeof req.body.password === "string" ? req.body.password : "";
+        const mailingListConsent = req.body.mailingListConsent === "on";
         await this.authController.registerFromForm(
           res,
           displayName,
           email,
           password,
+          mailingListConsent,
           sessionStore(req),
         );
       }),

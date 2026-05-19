@@ -835,6 +835,17 @@ textarea {
   gap: 10px;
 }
 
+.checkbox-field {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+}
+
+.checkbox-field input {
+  width: auto;
+}
+
 .board-editor-page {
   max-width: none;
 }

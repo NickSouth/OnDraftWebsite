@@ -25,6 +25,7 @@ export interface IAuthController {
     displayName: string,
     email: string,
     password: string,
+    mailingListConsent: boolean,
     store: OnDraftSessionStore,
   ): Promise<void>;
   logoutFromForm(res: Response, store: OnDraftSessionStore): Promise<void>;
@@ -88,10 +89,11 @@ class AuthController implements IAuthController {
     displayName: string,
     email: string,
     password: string,
+    mailingListConsent: boolean,
     store: OnDraftSessionStore,
   ): Promise<void> {
     const session = touchOnDraftSession(store);
-    const result = await this.service.register({ displayName, email, password });
+    const result = await this.service.register({ displayName, email, password, mailingListConsent });
 
     if (result.ok === false) {
       const error = result.value;
