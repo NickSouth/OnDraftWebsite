@@ -2,12 +2,65 @@ import { CreateAuthService } from "../../src/auth/AuthService";
 import { CreateInMemoryUserRepository } from "../../src/auth/InMemoryUserRepository";
 import { createHash } from "node:crypto";
 import type { IEmailService, SendEmailVerificationEmailInput } from "../../src/email/EmailService";
+import type { IUserRepository } from "../../src/auth/UserRepository";
 
 class CapturingEmailService implements IEmailService {
   sent: SendEmailVerificationEmailInput[] = [];
 
   async sendEmailVerificationEmail(input: SendEmailVerificationEmailInput): Promise<void> {
     this.sent.push(input);
+  }
+}
+
+async function addVerificationFixture(
+  users: IUserRepository,
+  options: {
+    rawToken: string;
+    expiresAt: string;
+    usedAt?: string | null;
+    mailingListConsent?: boolean;
+  },
+) {
+  await users.add({
+    id: "user-verification",
+    email: "verify@ondraft.test",
+    emailVerifiedAt: null,
+    displayName: "Verify Reader",
+    password: "password123",
+    role: "user",
+    preferences: {
+      theme: "light",
+      fontSize: "small",
+      bookmarks: [],
+    },
+  });
+
+  const tokenHash = createHash("sha256").update(options.rawToken).digest("hex");
+  const token = await users.addEmailVerificationToken({
+    id: "verification-token",
+    userId: "user-verification",
+    tokenHash,
+    expiresAt: options.expiresAt,
+    createdAt: "2026-05-19T12:00:00.000Z",
+  });
+
+  if (token.ok && options.usedAt) {
+    await users.markEmailVerificationTokenUsed(token.value.id, options.usedAt);
+  }
+
+  if (options.mailingListConsent) {
+    await users.upsertMailingListSubscription({
+      id: "subscription-verification",
+      email: "verify@ondraft.test",
+      userId: "user-verification",
+      status: "pending",
+      consentSource: "registration",
+      consentTextVersion: "registration-v1",
+      consentedAt: "2026-05-19T12:00:00.000Z",
+      unsubscribedAt: null,
+      createdAt: "2026-05-19T12:00:00.000Z",
+      updatedAt: "2026-05-19T12:00:00.000Z",
+    });
   }
 }
 
@@ -166,6 +219,87 @@ describe("AuthService", () => {
       expect(subscription.value?.consentTextVersion).toBe("registration-v1");
       expect(subscription.value?.consentedAt).toBeTruthy();
       expect(subscription.value?.unsubscribedAt).toBeNull();
+    }
+  });
+
+  it("verifies a valid token and subscribes pending mailing list consent", async () => {
+    const users = CreateInMemoryUserRepository();
+    const service = CreateAuthService(users);
+    await addVerificationFixture(users, {
+      rawToken: "valid-token",
+      expiresAt: "2999-05-20T12:00:00.000Z",
+      mailingListConsent: true,
+    });
+
+    const result = await service.verifyEmail({ token: "valid-token" });
+    const user = await users.findByEmail("verify@ondraft.test");
+    const subscription = await users.findMailingListSubscriptionByEmail("verify@ondraft.test");
+    const token = await users.findEmailVerificationTokenByHash(
+      createHash("sha256").update("valid-token").digest("hex"),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(user.ok).toBe(true);
+    expect(subscription.ok).toBe(true);
+    expect(token.ok).toBe(true);
+    if (user.ok) {
+      expect(user.value?.emailVerifiedAt).toBeTruthy();
+    }
+    if (subscription.ok) {
+      expect(subscription.value?.status).toBe("subscribed");
+      expect(subscription.value?.consentedAt).toBeTruthy();
+    }
+    if (token.ok) {
+      expect(token.value?.usedAt).toBeTruthy();
+    }
+  });
+
+  it("rejects expired verification tokens", async () => {
+    const users = CreateInMemoryUserRepository();
+    const service = CreateAuthService(users);
+    await addVerificationFixture(users, {
+      rawToken: "expired-token",
+      expiresAt: "2000-05-20T12:00:00.000Z",
+    });
+
+    const result = await service.verifyEmail({ token: "expired-token" });
+    const user = await users.findByEmail("verify@ondraft.test");
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.value.message).toBe("We could not verify that email link. It may be expired or already used.");
+    }
+    if (user.ok) {
+      expect(user.value?.emailVerifiedAt).toBeNull();
+    }
+  });
+
+  it("rejects reused verification tokens", async () => {
+    const users = CreateInMemoryUserRepository();
+    const service = CreateAuthService(users);
+    await addVerificationFixture(users, {
+      rawToken: "used-token",
+      expiresAt: "2999-05-20T12:00:00.000Z",
+      usedAt: "2026-05-19T12:30:00.000Z",
+    });
+
+    const result = await service.verifyEmail({ token: "used-token" });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.value.message).toBe("We could not verify that email link. It may be expired or already used.");
+    }
+  });
+
+  it("rejects nonexistent verification tokens", async () => {
+    const users = CreateInMemoryUserRepository();
+    const service = CreateAuthService(users);
+
+    const result = await service.verifyEmail({ token: "missing-token" });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.value.message).toBe("We could not verify that email link. It may be expired or already used.");
     }
   });
 });

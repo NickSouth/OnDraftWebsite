@@ -54,6 +54,14 @@ class InMemoryUserRepository implements IUserRepository {
     }
   }
 
+  async findById(userId: string): Promise<Result<IUserRecord | null, AuthError>> {
+    try {
+      return Ok(this.findUser(userId));
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to read the user."));
+    }
+  }
+
   async findByEmail(email: string): Promise<Result<IUserRecord | null, AuthError>> {
     try {
       const match = this.users.find((user) => user.email === email) ?? null;
@@ -175,6 +183,17 @@ class InMemoryUserRepository implements IUserRepository {
   ): Promise<Result<IMailingListSubscriptionRecord | null, AuthError>> {
     try {
       const match = this.mailingListSubscriptions.find((subscription) => subscription.email === email) ?? null;
+      return Ok(match);
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to read the mailing list subscription."));
+    }
+  }
+
+  async findMailingListSubscriptionByUserId(
+    userId: string,
+  ): Promise<Result<IMailingListSubscriptionRecord | null, AuthError>> {
+    try {
+      const match = this.mailingListSubscriptions.find((subscription) => subscription.userId === userId) ?? null;
       return Ok(match);
     } catch {
       return Err(UnexpectedDependencyError("Unable to read the mailing list subscription."));

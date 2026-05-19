@@ -14,6 +14,12 @@ import type { AuthError } from "./errors";
 export interface IAuthController {
   showLogin(res: Response, session: IOnDraftBrowserSession, pageError?: string | null): Promise<void>;
   showRegister(res: Response, session: IOnDraftBrowserSession, pageError?: string | null): Promise<void>;
+  showVerifyEmailResult(
+    res: Response,
+    session: IOnDraftBrowserSession,
+    status: "success" | "failure",
+    message: string,
+  ): Promise<void>;
   loginFromForm(
     res: Response,
     email: string,
@@ -26,6 +32,11 @@ export interface IAuthController {
     email: string,
     password: string,
     mailingListConsent: boolean,
+    store: OnDraftSessionStore,
+  ): Promise<void>;
+  verifyEmailFromRequest(
+    res: Response,
+    token: string,
     store: OnDraftSessionStore,
   ): Promise<void>;
   logoutFromForm(res: Response, store: OnDraftSessionStore): Promise<void>;
@@ -58,6 +69,15 @@ class AuthController implements IAuthController {
     pageError: string | null = null,
   ): Promise<void> {
     res.render("auth/register", { pageError, session });
+  }
+
+  async showVerifyEmailResult(
+    res: Response,
+    session: IOnDraftBrowserSession,
+    status: "success" | "failure",
+    message: string,
+  ): Promise<void> {
+    res.render("auth/verifyEmail", { status, message, session });
   }
 
   async loginFromForm(
@@ -108,6 +128,33 @@ class AuthController implements IAuthController {
     const nextSession = signInAuthenticatedUser(store, result.value);
     this.logger.info(`Registered ${nextSession.authenticatedUser?.email ?? "unknown user"}`);
     res.redirect("/");
+  }
+
+  async verifyEmailFromRequest(
+    res: Response,
+    token: string,
+    store: OnDraftSessionStore,
+  ): Promise<void> {
+    const session = touchOnDraftSession(store);
+    const result = await this.service.verifyEmail({ token });
+
+    if (result.ok === false) {
+      const error = result.value;
+      const status = this.mapErrorStatus(error);
+      const log = status >= 500 ? this.logger.error : this.logger.warn;
+      log.call(this.logger, `Email verification failed: ${error.message}`);
+      res.status(status);
+      await this.showVerifyEmailResult(res, session, "failure", error.message);
+      return;
+    }
+
+    this.logger.info("Email verification completed");
+    await this.showVerifyEmailResult(
+      res,
+      session,
+      "success",
+      "Your email has been verified.",
+    );
   }
 
   async logoutFromForm(res: Response, store: OnDraftSessionStore): Promise<void> {

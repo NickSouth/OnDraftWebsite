@@ -22,10 +22,17 @@ export interface RegisterInput extends LoginInput {
   mailingListConsent?: boolean;
 }
 
+export interface VerifyEmailInput {
+  token: string;
+}
+
 export interface IAuthService {
   authenticate(input: LoginInput): Promise<Result<IAuthenticatedUser, AuthError>>;
   register(input: RegisterInput): Promise<Result<IAuthenticatedUser, AuthError>>;
+  verifyEmail(input: VerifyEmailInput): Promise<Result<void, AuthError>>;
 }
+
+const EMAIL_VERIFICATION_FAILED_MESSAGE = "We could not verify that email link. It may be expired or already used.";
 
 class NullEmailService implements IEmailService {
   async sendEmailVerificationEmail(): Promise<void> {
@@ -171,6 +178,68 @@ class AuthService implements IAuthService {
     }
 
     return Ok(toAuthenticatedUser(created.value));
+  }
+
+  async verifyEmail(input: VerifyEmailInput): Promise<Result<void, AuthError>> {
+    const rawToken = input.token.trim();
+    if (!rawToken) {
+      return Err(ValidationError(EMAIL_VERIFICATION_FAILED_MESSAGE));
+    }
+
+    const tokenHash = createHash("sha256").update(rawToken).digest("hex");
+    const tokenResult = await this.users.findEmailVerificationTokenByHash(tokenHash);
+    if (tokenResult.ok === false) {
+      return Err(UnexpectedDependencyError(tokenResult.value.message));
+    }
+
+    const token = tokenResult.value;
+    if (!token || token.usedAt || new Date(token.expiresAt).getTime() <= Date.now()) {
+      return Err(ValidationError(EMAIL_VERIFICATION_FAILED_MESSAGE));
+    }
+
+    const userResult = await this.users.findById(token.userId);
+    if (userResult.ok === false) {
+      return Err(UnexpectedDependencyError(userResult.value.message));
+    }
+
+    const user = userResult.value;
+    if (!user) {
+      return Err(ValidationError(EMAIL_VERIFICATION_FAILED_MESSAGE));
+    }
+
+    const verifiedAt = new Date().toISOString();
+    if (!user.emailVerifiedAt) {
+      const verified = await this.users.setEmailVerified(user.id, verifiedAt);
+      if (verified.ok === false) {
+        return Err(UnexpectedDependencyError(verified.value.message));
+      }
+    }
+
+    const subscriptionResult = await this.users.findMailingListSubscriptionByUserId(user.id);
+    if (subscriptionResult.ok === false) {
+      return Err(UnexpectedDependencyError(subscriptionResult.value.message));
+    }
+
+    const subscription = subscriptionResult.value;
+    if (subscription?.status === "pending") {
+      const subscribed = await this.users.upsertMailingListSubscription({
+        ...subscription,
+        status: "subscribed",
+        consentedAt: verifiedAt,
+        updatedAt: verifiedAt,
+      });
+
+      if (subscribed.ok === false) {
+        return Err(UnexpectedDependencyError(subscribed.value.message));
+      }
+    }
+
+    const used = await this.users.markEmailVerificationTokenUsed(token.id, verifiedAt);
+    if (used.ok === false) {
+      return Err(UnexpectedDependencyError(used.value.message));
+    }
+
+    return Ok(undefined);
   }
 }
 

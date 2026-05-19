@@ -186,6 +186,22 @@ class ExpressApp implements IApp {
       }),
     );
 
+    this.app.get(
+      "/verify-email",
+      asyncHandler(async (req, res) => {
+        const token = typeof req.query.token === "string" ? req.query.token : "";
+        await this.authController.verifyEmailFromRequest(res, token, sessionStore(req));
+      }),
+    );
+
+    this.app.post(
+      "/verify-email",
+      asyncHandler(async (req, res) => {
+        const token = typeof req.body.token === "string" ? req.body.token : "";
+        await this.authController.verifyEmailFromRequest(res, token, sessionStore(req));
+      }),
+    );
+
     this.app.post(
       "/logout",
       asyncHandler(async (req, res) => {

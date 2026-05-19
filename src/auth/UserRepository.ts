@@ -32,6 +32,7 @@ export interface UpsertMailingListSubscriptionInput {
 
 export interface IUserRepository {
   add(user: IUserRecord): Promise<Result<IUserRecord, AuthError>>;
+  findById(userId: string): Promise<Result<IUserRecord | null, AuthError>>;
   findByEmail(email: string): Promise<Result<IUserRecord | null, AuthError>>;
   setEmailVerified(userId: string, verifiedAt: string): Promise<Result<IUserRecord, AuthError>>;
   addEmailVerificationToken(
@@ -49,6 +50,9 @@ export interface IUserRepository {
   ): Promise<Result<IMailingListSubscriptionRecord, AuthError>>;
   findMailingListSubscriptionByEmail(
     email: string,
+  ): Promise<Result<IMailingListSubscriptionRecord | null, AuthError>>;
+  findMailingListSubscriptionByUserId(
+    userId: string,
   ): Promise<Result<IMailingListSubscriptionRecord | null, AuthError>>;
   getPreferences(userId: string): Promise<Result<UserPreferences, AuthError>>;
   bookmarkArticle(userId: string, articleId: string): Promise<Result<void, AuthError>>;
