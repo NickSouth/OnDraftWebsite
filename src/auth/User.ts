@@ -1,6 +1,7 @@
 export interface IUserRecord {
   id: string;
   email: string;
+  emailVerifiedAt: string | null;
   displayName: string;
   password: string;
   role: Role;
@@ -22,6 +23,30 @@ export function toAuthenticatedUser(user: IUserRecord): IAuthenticatedUser {
 }
 
 export type Role = "admin" | "user";
+
+export interface IEmailVerificationTokenRecord {
+  id: string;
+  userId: string;
+  tokenHash: string;
+  expiresAt: string;
+  usedAt: string | null;
+  createdAt: string;
+}
+
+export type MailingListSubscriptionStatus = "pending" | "subscribed" | "unsubscribed";
+
+export interface IMailingListSubscriptionRecord {
+  id: string;
+  email: string;
+  userId: string | null;
+  status: MailingListSubscriptionStatus;
+  consentSource: string;
+  consentTextVersion: string;
+  consentedAt: string | null;
+  unsubscribedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export type Bookmark = 
   | { type: "article"; articleId: string }

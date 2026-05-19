@@ -89,6 +89,7 @@ class AuthService implements IAuthService {
       id: randomUUID(),
       displayName,
       email,
+      emailVerifiedAt: null,
       password,
       role: "user",
       preferences: {

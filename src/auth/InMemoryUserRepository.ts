@@ -1,12 +1,23 @@
 import { Err, Ok, type Result } from "../lib/result";
 import { UnexpectedDependencyError, type AuthError } from "./errors";
-import type { IUserRepository } from "./UserRepository";
-import type { Bookmark, IUserRecord, UserPreferences } from "./User";
+import type {
+  CreateEmailVerificationTokenInput,
+  IUserRepository,
+  UpsertMailingListSubscriptionInput,
+} from "./UserRepository";
+import type {
+  Bookmark,
+  IEmailVerificationTokenRecord,
+  IMailingListSubscriptionRecord,
+  IUserRecord,
+  UserPreferences,
+} from "./User";
 
 export const DEMO_USERS: IUserRecord[] = [
   {
     id: "user-ryan",
     email: "ryanmcwalter@ondraft.test",
+    emailVerifiedAt: null,
     displayName: "Ryan McWalter",
     password: "password123",
     role: "admin",
@@ -15,6 +26,7 @@ export const DEMO_USERS: IUserRecord[] = [
   {
     id: "user-bob",
     email: "bob@ondraft.test",
+    emailVerifiedAt: null,
     displayName: "Bob OnDraft",
     password: "password123",
     role: "user",
@@ -23,7 +35,11 @@ export const DEMO_USERS: IUserRecord[] = [
 ];
 
 class InMemoryUserRepository implements IUserRepository {
-  constructor(private readonly users: IUserRecord[]) {}
+  constructor(
+    private readonly users: IUserRecord[],
+    private readonly emailVerificationTokens: IEmailVerificationTokenRecord[] = [],
+    private readonly mailingListSubscriptions: IMailingListSubscriptionRecord[] = [],
+  ) {}
 
   private findUser(userId: string): IUserRecord | null {
     return this.users.find((user) => user.id === userId) ?? null;
@@ -59,6 +75,109 @@ class InMemoryUserRepository implements IUserRepository {
       });
     } catch {
       return Err(UnexpectedDependencyError("Unable to retrieve user preferences."));
+    }
+  }
+
+  async setEmailVerified(userId: string, verifiedAt: string): Promise<Result<IUserRecord, AuthError>> {
+    try {
+      const user = this.findUser(userId);
+      if (!user) {
+        return Err(UnexpectedDependencyError("User not found."));
+      }
+      user.emailVerifiedAt = verifiedAt;
+      return Ok(user);
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to verify the user email."));
+    }
+  }
+
+  async addEmailVerificationToken(
+    token: CreateEmailVerificationTokenInput,
+  ): Promise<Result<IEmailVerificationTokenRecord, AuthError>> {
+    try {
+      const user = this.findUser(token.userId);
+      if (!user) {
+        return Err(UnexpectedDependencyError("User not found."));
+      }
+
+      const existing = this.emailVerificationTokens.find((candidate) => candidate.tokenHash === token.tokenHash);
+      if (existing) {
+        return Err(UnexpectedDependencyError("Email verification token already exists."));
+      }
+
+      const created: IEmailVerificationTokenRecord = {
+        ...token,
+        usedAt: null,
+      };
+      this.emailVerificationTokens.push(created);
+      return Ok(created);
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to save the email verification token."));
+    }
+  }
+
+  async findEmailVerificationTokenByHash(
+    tokenHash: string,
+  ): Promise<Result<IEmailVerificationTokenRecord | null, AuthError>> {
+    try {
+      const match = this.emailVerificationTokens.find((token) => token.tokenHash === tokenHash) ?? null;
+      return Ok(match);
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to read the email verification token."));
+    }
+  }
+
+  async markEmailVerificationTokenUsed(
+    tokenId: string,
+    usedAt: string,
+  ): Promise<Result<IEmailVerificationTokenRecord, AuthError>> {
+    try {
+      const token = this.emailVerificationTokens.find((candidate) => candidate.id === tokenId) ?? null;
+      if (!token) {
+        return Err(UnexpectedDependencyError("Email verification token not found."));
+      }
+      token.usedAt = usedAt;
+      return Ok(token);
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to update the email verification token."));
+    }
+  }
+
+  async upsertMailingListSubscription(
+    subscription: UpsertMailingListSubscriptionInput,
+  ): Promise<Result<IMailingListSubscriptionRecord, AuthError>> {
+    try {
+      const existing = this.mailingListSubscriptions.find(
+        (candidate) => candidate.email === subscription.email,
+      );
+
+      if (existing) {
+        existing.userId = subscription.userId;
+        existing.status = subscription.status;
+        existing.consentSource = subscription.consentSource;
+        existing.consentTextVersion = subscription.consentTextVersion;
+        existing.consentedAt = subscription.consentedAt;
+        existing.unsubscribedAt = subscription.unsubscribedAt;
+        existing.updatedAt = subscription.updatedAt;
+        return Ok(existing);
+      }
+
+      const created: IMailingListSubscriptionRecord = { ...subscription };
+      this.mailingListSubscriptions.push(created);
+      return Ok(created);
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to save the mailing list subscription."));
+    }
+  }
+
+  async findMailingListSubscriptionByEmail(
+    email: string,
+  ): Promise<Result<IMailingListSubscriptionRecord | null, AuthError>> {
+    try {
+      const match = this.mailingListSubscriptions.find((subscription) => subscription.email === email) ?? null;
+      return Ok(match);
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to read the mailing list subscription."));
     }
   }
 

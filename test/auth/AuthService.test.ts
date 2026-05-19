@@ -68,4 +68,22 @@ describe("AuthService", () => {
       expect(result.value.displayName).toBe("Draft Analyst");
     }
   });
+
+  it("stores registered users as unverified until a verification flow marks them", async () => {
+    const users = CreateInMemoryUserRepository();
+    const service = CreateAuthService(users);
+
+    await service.register({
+      displayName: "Draft Analyst",
+      email: "draft@ondraft.test",
+      password: "password123",
+    });
+
+    const persisted = await users.findByEmail("draft@ondraft.test");
+
+    expect(persisted.ok).toBe(true);
+    if (persisted.ok) {
+      expect(persisted.value?.emailVerifiedAt).toBeNull();
+    }
+  });
 });
