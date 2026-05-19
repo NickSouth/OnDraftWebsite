@@ -3,7 +3,7 @@ Here are features I plan to implement for the website:
 Bookmarking posts by users <>
 Videos Page for hyperlinks to YouTube <>
 Share button on articles <>
-Consensus Draft Board
+Consensus Draft Board <needs debugging, pos rank should sort and display in order by pos>
 Registration email verification
 Mailing list on registration
 About Us page with links and stuff

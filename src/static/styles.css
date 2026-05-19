@@ -79,6 +79,37 @@ main:has(.board-editor-page) {
   text-decoration: none;
 }
 
+.panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--panel);
+}
+
+.data-table th,
+.data-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--panel-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.data-table th {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
 .nav-brand {
   display: inline-flex;
   align-items: center;
@@ -476,6 +507,33 @@ textarea {
   margin-bottom: 6px;
 }
 
+.big-board-entry-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.big-board-entry-heading > div {
+  display: grid;
+  gap: 2px;
+}
+
+.big-discrepency-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 8px;
+  border: 1px solid #f79009;
+  border-radius: 4px;
+  background: #fffaeb;
+  color: #93370d;
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
 .big-board-writeup {
   margin-top: 8px;
 }
@@ -806,6 +864,40 @@ textarea {
 .ondraft-form {
   display: grid;
   gap: 10px;
+}
+
+.checkbox-field {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+}
+
+.checkbox-field input {
+  width: auto;
+}
+
+.verification-banner {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 16px 0;
+  padding: 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  background: #fff8e6;
+}
+
+.verification-banner p,
+.verification-banner form {
+  margin: 0;
+}
+
+.verification-resend-form {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--panel-border);
 }
 
 .board-editor-page {

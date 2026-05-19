@@ -338,6 +338,29 @@ describe("OnDraftService big board editing", () => {
       height: { feet: 6, inches: 4 },
       weight: 255,
     });
+    await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Ryan",
+      playerName: "Tackle Prospect",
+      school: "Published U",
+      position: "OT",
+      rank: 10,
+      posRank: 2,
+      height: { feet: 6, inches: 6 },
+      weight: 315,
+    });
+    await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Aleks",
+      playerName: "Tackle Prospect",
+      school: "Private U",
+      position: "IOL",
+      rank: 30,
+      posRank: 8,
+      height: { feet: 6, inches: 3 },
+      weight: 295,
+      playerInfoPublished: false,
+    });
 
     const consensus = await ondraftService.getBigBoard(2026, "Consensus");
 
@@ -346,6 +369,7 @@ describe("OnDraftService big board editing", () => {
       expect(consensus.value.entries.map((entry) => entry.playerName)).toEqual([
         "Edge Prospect",
         "Quarterback Prospect",
+        "Tackle Prospect",
       ]);
 
       const quarterback = consensus.value.entries.find((entry) => entry.playerName === "Quarterback Prospect");
@@ -363,6 +387,15 @@ describe("OnDraftService big board editing", () => {
       expect(edge).toMatchObject({
         rank: 5,
         posRank: 1.5,
+        bigDiscrepency: false,
+      });
+
+      const tackle = consensus.value.entries.find((entry) => entry.playerName === "Tackle Prospect");
+      expect(tackle).toMatchObject({
+        school: "Published U",
+        position: "OT",
+        rank: 10,
+        posRank: 2,
         bigDiscrepency: false,
       });
     }
@@ -554,13 +587,13 @@ describe("UserPreferenceService bookmarks", () => {
   it("toggles article and forum post bookmarks for a user", async () => {
     const preferences = userPreferenceService();
 
-    const articleOn = await preferences.toggleBookmark("user-bob", { type: "article", articleId: "article-1" });
-    const forumPostOn = await preferences.toggleBookmark("user-bob", { type: "forumPost", forumPostId: "post-1" });
+    const articleOn = await preferences.toggleBookmark("user-support", { type: "article", articleId: "article-1" });
+    const forumPostOn = await preferences.toggleBookmark("user-support", { type: "forumPost", forumPostId: "post-1" });
 
     expect(articleOn).toEqual({ ok: true, value: true });
     expect(forumPostOn).toEqual({ ok: true, value: true });
 
-    const bookmarks = await preferences.getUserBookmarks("user-bob");
+    const bookmarks = await preferences.getUserBookmarks("user-support");
     expect(bookmarks.ok).toBe(true);
     if (bookmarks.ok === true) {
       expect(bookmarks.value).toEqual([
@@ -569,10 +602,10 @@ describe("UserPreferenceService bookmarks", () => {
       ]);
     }
 
-    const articleOff = await preferences.toggleBookmark("user-bob", { type: "article", articleId: "article-1" });
+    const articleOff = await preferences.toggleBookmark("user-support", { type: "article", articleId: "article-1" });
     expect(articleOff).toEqual({ ok: true, value: false });
 
-    const updated = await preferences.getUserBookmarks("user-bob");
+    const updated = await preferences.getUserBookmarks("user-support");
     expect(updated.ok).toBe(true);
     if (updated.ok === true) {
       expect(updated.value).toEqual([{ type: "forumPost", forumPostId: "post-1" }]);

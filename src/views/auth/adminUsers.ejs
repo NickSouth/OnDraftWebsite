@@ -1,0 +1,35 @@
+<section class="panel">
+  <div class="panel-header">
+    <h1>Manage Users</h1>
+    <p>Registered accounts and marketing email consent status.</p>
+  </div>
+
+  <div class="panel-actions">
+    <a class="button-link" href="/admin/mailing-list/subscribers.csv">Download mailing list CSV</a>
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Verified</th>
+          <th>Mailing List</th>
+          <th>Registered</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% users.forEach((user) => { %>
+          <tr>
+            <td><%= user.displayName %></td>
+            <td><%= user.email %></td>
+            <td><%= user.emailVerifiedAt ? "Verified" : "Unverified" %></td>
+            <td><%= user.mailingListStatus %></td>
+            <td><%= new Date(user.registeredAt).toLocaleString() %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section>

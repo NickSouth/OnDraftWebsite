@@ -3,6 +3,7 @@ import express, { NextFunction, Request, RequestHandler, Response } from "expres
 import session from "express-session";
 import Layouts from "express-ejs-layouts";
 import { IAuthController } from "./auth/AuthController";
+import { VerificationResendRateLimiter } from "./auth/VerificationResendRateLimiter";
 import { IApp } from "./contracts";
 import { IOnDraftController } from "./controller/OnDraftController";
 import { ARTICLE_PDF_MAX_BYTES, articleUpload } from "./uploads/articlePdfUpload";
@@ -29,6 +30,7 @@ function sessionStore(req: Request): OnDraftSessionStore {
 
 class ExpressApp implements IApp {
   private readonly app: express.Express;
+  private readonly verificationResendRateLimiter = new VerificationResendRateLimiter();
 
   constructor(
     private readonly controller: IOnDraftController,
@@ -66,6 +68,7 @@ class ExpressApp implements IApp {
     );
     this.app.use(Layouts);
     this.app.use(express.urlencoded({ extended: true }));
+    this.app.use((req, res, next) => this.exposeSessionLocals(req, res, next));
   }
 
   private registerTemplating(): void {
@@ -117,6 +120,28 @@ class ExpressApp implements IApp {
         saveAction: "/articles",
       });
     });
+  }
+
+  private limitVerificationResend(req: Request, res: Response, next: NextFunction): void {
+    const result = this.verificationResendRateLimiter.check(req);
+    if (!result.limited) {
+      next();
+      return;
+    }
+
+    this.logger.warn("Rate limited verification email resend request");
+    res.setHeader("Retry-After", String(result.retryAfterSeconds));
+    res.status(429).render("auth/verifyEmail", {
+      status: "success",
+      message: "If that email needs verification, we sent a new verification link.",
+      session: touchOnDraftSession(sessionStore(req)),
+    });
+  }
+
+  private exposeSessionLocals(req: Request, res: Response, next: NextFunction): void {
+    const browserSession = touchOnDraftSession(sessionStore(req));
+    res.locals.isAdmin = isAdminSession(browserSession);
+    next();
   }
 
   private registerRoutes(): void {
@@ -174,13 +199,78 @@ class ExpressApp implements IApp {
         const displayName = typeof req.body.displayName === "string" ? req.body.displayName : "";
         const email = typeof req.body.email === "string" ? req.body.email : "";
         const password = typeof req.body.password === "string" ? req.body.password : "";
+        const mailingListConsent = req.body.mailingListConsent === "on";
         await this.authController.registerFromForm(
           res,
           displayName,
           email,
           password,
+          mailingListConsent,
           sessionStore(req),
         );
+      }),
+    );
+
+    this.app.get(
+      "/verify-email",
+      asyncHandler(async (req, res) => {
+        const token = typeof req.query.token === "string" ? req.query.token : "";
+        await this.authController.verifyEmailFromRequest(res, token, sessionStore(req));
+      }),
+    );
+
+    this.app.post(
+      "/verify-email",
+      asyncHandler(async (req, res) => {
+        const token = typeof req.body.token === "string" ? req.body.token : "";
+        await this.authController.verifyEmailFromRequest(res, token, sessionStore(req));
+      }),
+    );
+
+    this.app.post(
+      "/verify-email/resend",
+      (req, res, next) => this.limitVerificationResend(req, res, next),
+      asyncHandler(async (req, res) => {
+        const email = typeof req.body.email === "string" ? req.body.email : "";
+        await this.authController.requestEmailVerificationFromForm(res, email, sessionStore(req));
+      }),
+    );
+
+    this.app.get(
+      "/mailing-list/unsubscribe",
+      asyncHandler(async (req, res) => {
+        const token = typeof req.query.token === "string" ? req.query.token : "";
+        await this.authController.unsubscribeMailingListFromRequest(res, token, sessionStore(req));
+      }),
+    );
+
+    this.app.post(
+      "/mailing-list/unsubscribe",
+      asyncHandler(async (req, res) => {
+        const token = typeof req.body.token === "string" ? req.body.token : "";
+        await this.authController.unsubscribeMailingListFromRequest(res, token, sessionStore(req));
+      }),
+    );
+
+    this.app.get(
+      "/admin/users",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        await this.authController.showAdminUsers(res, sessionStore(req));
+      }),
+    );
+
+    this.app.get(
+      "/admin/mailing-list/subscribers.csv",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        await this.authController.exportSubscribedMailingListCsv(res);
       }),
     );
 

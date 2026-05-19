@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import type { IOnDraftBrowserSession } from "../session/OnDraftSession";
-import { isAdminSession } from "../session/OnDraftSession";
+import { isAdminSession, isVerifiedUserSession } from "../session/OnDraftSession";
 import type { BigBoardEditableEntryInput, CreateArticleInput, CreateYoutubeVideoInput, IOnDraftService, SaveBigBoardEntriesInput } from "../service/OnDraftService";
 import type { IUserPreferenceService, UserPreferenceError } from "../service/UserPreferenceService";
 import type { ILoggingService } from "../service/LoggingService";
@@ -455,6 +455,15 @@ class OnDraftController implements IOnDraftController {
     return null;
   }
 
+  private requireVerifiedUser(res: Response, session: IOnDraftBrowserSession, message: string): boolean {
+    if (isVerifiedUserSession(session)) {
+      return true;
+    }
+
+    res.status(403).send(message);
+    return false;
+  }
+
   private renderBookmarkButton(res: Response, bookmark: Bookmark, bookmarked: boolean): void {
     res.render("ondraft/partials/bookmarkButton", {
       layout: false,
@@ -770,15 +779,35 @@ class OnDraftController implements IOnDraftController {
       res.status(this.mapBigBoardErrorToStatusCode(yearsResult.value)).send(yearsResult.value.message);
       return;
     }
-    const schoolsResult = await this.service.getSavedSchools(result.value.year);
-    if (schoolsResult.ok === false) {
-      this.logger.error("Failed to load big board schools" + { error: schoolsResult.value });
-      res.status(this.mapBigBoardErrorToStatusCode(schoolsResult.value)).send(schoolsResult.value.message);
-      return;
+    let schools: string[] = [];
+    if (result.value.creator === "Consensus") {
+      const unfilteredConsensus = await this.service.getBigBoard(result.value.year, result.value.creator);
+      if (unfilteredConsensus.ok === false) {
+        this.logger.error("Failed to load consensus big board schools" + { error: unfilteredConsensus.value });
+        res.status(this.mapBigBoardErrorToStatusCode(unfilteredConsensus.value)).send(unfilteredConsensus.value.message);
+        return;
+      }
+      schools = [...new Set(unfilteredConsensus.value.entries
+        .filter((entry) => entry.playerInfoPublished)
+        .map((entry) => entry.school)
+        .filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b));
+    } else {
+      const schoolsResult = await this.service.getSavedSchools(result.value.year);
+      if (schoolsResult.ok === false) {
+        this.logger.error("Failed to load big board schools" + { error: schoolsResult.value });
+        res.status(this.mapBigBoardErrorToStatusCode(schoolsResult.value)).send(schoolsResult.value.message);
+        return;
+      }
+      schools = schoolsResult.value;
     }
     const rankedBigBoard = [...result.value.entries]
       .filter((entry) => entry.playerInfoPublished)
-      .sort((a, b) => (a.rank ?? Number.MAX_SAFE_INTEGER) - (b.rank ?? Number.MAX_SAFE_INTEGER));
+      .sort((a, b) =>
+        (a.rank ?? Number.MAX_SAFE_INTEGER) - (b.rank ?? Number.MAX_SAFE_INTEGER) ||
+        (a.posRank ?? Number.MAX_SAFE_INTEGER) - (b.posRank ?? Number.MAX_SAFE_INTEGER) ||
+        a.playerName.localeCompare(b.playerName)
+      );
     const viewModel = {
       session,
       isAdmin: isAdminSession(session),
@@ -787,7 +816,7 @@ class OnDraftController implements IOnDraftController {
       years: yearsResult.value,
       creators: BIG_BOARD_CREATORS,
       positions: POSITIONS,
-      schools: schoolsResult.value,
+      schools,
       filters: filter ?? {},
     };
     if (req.get("HX-Request") === "true") {
@@ -822,7 +851,7 @@ class OnDraftController implements IOnDraftController {
       isAdmin: isAdminSession(session),
       board: { ...board, entries: sortedEntries },
       years: yearsResult.value,
-      creators: BIG_BOARD_CREATORS,
+      creators: BIG_BOARD_CREATORS.filter((creator) => creator !== "Consensus"),
       positions: POSITIONS,
       errorMessage,
       statusMessage,
@@ -947,7 +976,7 @@ class OnDraftController implements IOnDraftController {
         year: new Date().getFullYear(),
         creator: "Ryan",
       },
-      creators: BIG_BOARD_CREATORS,
+      creators: BIG_BOARD_CREATORS.filter((creator) => creator !== "Consensus"),
     });
   }
 
@@ -1049,6 +1078,9 @@ class OnDraftController implements IOnDraftController {
     if (!userId) {
       return;
     }
+    if (!this.requireVerifiedUser(res, session, "Verify your email to bookmark OnDraft content.")) {
+      return;
+    }
 
     const articleId = this.routeParam(req, "id");
     const article = await this.service.getArticle(articleId);
@@ -1095,6 +1127,9 @@ class OnDraftController implements IOnDraftController {
       });
       return;
     }
+    if (!this.requireVerifiedUser(res, session, "Verify your email to comment.")) {
+      return;
+    }
 
     const articleId = this.routeParam(req, "id");
     const result = await this.service.commentByArticleId({
@@ -1135,6 +1170,9 @@ class OnDraftController implements IOnDraftController {
         layout: false,
         message: "Log in to comment.",
       });
+      return;
+    }
+    if (!this.requireVerifiedUser(res, session, "Verify your email to comment.")) {
       return;
     }
 
@@ -1267,6 +1305,9 @@ class OnDraftController implements IOnDraftController {
     if (!userId) {
       return;
     }
+    if (!this.requireVerifiedUser(res, session, "Verify your email to bookmark OnDraft content.")) {
+      return;
+    }
 
     const postId = this.routeParam(req, "id");
     const post = await this.service.getForumPost(postId);
@@ -1292,6 +1333,9 @@ class OnDraftController implements IOnDraftController {
         layout: false,
         message: "Log in to comment.",
       });
+      return;
+    }
+    if (!this.requireVerifiedUser(res, session, "Verify your email to comment.")) {
       return;
     }
 
@@ -1377,7 +1421,7 @@ class OnDraftController implements IOnDraftController {
         isAdmin: isAdminSession(session),
         errorMessage: result.value.message,
         values: req.body,
-        creators: BIG_BOARD_CREATORS,
+        creators: BIG_BOARD_CREATORS.filter((creator) => creator !== "Consensus"),
       });
       return;
     }
