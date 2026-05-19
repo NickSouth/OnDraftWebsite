@@ -495,4 +495,56 @@ describe("AuthService", () => {
       expect(subscription.value?.unsubscribedAt).toBe("2026-05-19T12:30:00.000Z");
     }
   });
+
+  it("exports only subscribed marketing emails with consent metadata", async () => {
+    const users = CreateInMemoryUserRepository();
+    const service = CreateAuthService(users, new CapturingEmailService(), testEmailConfig());
+    await users.upsertMailingListSubscription({
+      id: "subscription-subscribed",
+      email: "subscribed@ondraft.test",
+      userId: "user-subscribed",
+      status: "subscribed",
+      consentSource: "registration",
+      consentTextVersion: "registration-v1",
+      consentedAt: "2026-05-19T12:00:00.000Z",
+      unsubscribedAt: null,
+      createdAt: "2026-05-19T11:59:00.000Z",
+      updatedAt: "2026-05-19T12:00:00.000Z",
+    });
+    await users.upsertMailingListSubscription({
+      id: "subscription-pending",
+      email: "pending@ondraft.test",
+      userId: "user-pending",
+      status: "pending",
+      consentSource: "registration",
+      consentTextVersion: "registration-v1",
+      consentedAt: "2026-05-19T12:00:00.000Z",
+      unsubscribedAt: null,
+      createdAt: "2026-05-19T11:59:00.000Z",
+      updatedAt: "2026-05-19T12:00:00.000Z",
+    });
+    await users.upsertMailingListSubscription({
+      id: "subscription-unsubscribed",
+      email: "unsubscribed@ondraft.test",
+      userId: "user-unsubscribed",
+      status: "unsubscribed",
+      consentSource: "registration",
+      consentTextVersion: "registration-v1",
+      consentedAt: "2026-05-19T12:00:00.000Z",
+      unsubscribedAt: "2026-05-19T12:30:00.000Z",
+      createdAt: "2026-05-19T11:59:00.000Z",
+      updatedAt: "2026-05-19T12:30:00.000Z",
+    });
+
+    const result = await service.exportSubscribedMailingListCsv();
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toContain('"email","status","consentSource","consentTextVersion","consentedAt","createdAt","updatedAt"');
+      expect(result.value).toContain('"subscribed@ondraft.test","subscribed","registration","registration-v1"');
+      expect(result.value).toContain('"2026-05-19T12:00:00.000Z"');
+      expect(result.value).not.toContain("pending@ondraft.test");
+      expect(result.value).not.toContain("unsubscribed@ondraft.test");
+    }
+  });
 });

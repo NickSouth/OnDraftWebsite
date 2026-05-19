@@ -136,6 +136,21 @@ describe("OnDraft HTTP contracts", () => {
     expect(response.text).toContain("We could not process that unsubscribe link.");
   });
 
+  it("restricts mailing list subscriber CSV export to admins", async () => {
+    const ondraft = app();
+
+    const anonymous = await request(ondraft).get("/admin/mailing-list/subscribers.csv");
+    expect(anonymous.status).toBe(403);
+
+    const admin = await loginAdminAgent(ondraft);
+    const exportResponse = await admin.get("/admin/mailing-list/subscribers.csv");
+
+    expect(exportResponse.status).toBe(200);
+    expect(exportResponse.headers["content-type"]).toContain("text/csv");
+    expect(exportResponse.headers["content-disposition"]).toContain("ondraft-mailing-list-subscribers.csv");
+    expect(exportResponse.text).toContain('"email","status","consentSource","consentTextVersion"');
+  });
+
   it("allows anonymous visitors to view articles and the big board", async () => {
     const ondraft = app();
 

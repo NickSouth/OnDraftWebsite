@@ -55,6 +55,7 @@ export interface IAuthController {
     token: string,
     store: OnDraftSessionStore,
   ): Promise<void>;
+  exportSubscribedMailingListCsv(res: Response): Promise<void>;
   logoutFromForm(res: Response, store: OnDraftSessionStore): Promise<void>;
 }
 
@@ -237,6 +238,22 @@ class AuthController implements IAuthController {
       "success",
       "You have been unsubscribed from OnDraft marketing emails.",
     );
+  }
+
+  async exportSubscribedMailingListCsv(res: Response): Promise<void> {
+    const result = await this.service.exportSubscribedMailingListCsv();
+
+    if (result.ok === false) {
+      this.logger.error(`Mailing list CSV export failed: ${result.value.message}`);
+      res.status(500).render("ondraft/partials/error", {
+        message: "Unable to export mailing list subscribers.",
+      });
+      return;
+    }
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", 'attachment; filename="ondraft-mailing-list-subscribers.csv"');
+    res.send(result.value);
   }
 
   async logoutFromForm(res: Response, store: OnDraftSessionStore): Promise<void> {

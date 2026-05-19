@@ -227,6 +227,18 @@ class InMemoryUserRepository implements IUserRepository {
     }
   }
 
+  async listMailingListSubscriptionsByStatus(
+    status: IMailingListSubscriptionRecord["status"],
+  ): Promise<Result<IMailingListSubscriptionRecord[], AuthError>> {
+    try {
+      return Ok(this.mailingListSubscriptions
+        .filter((subscription) => subscription.status === status)
+        .map((subscription) => ({ ...subscription })));
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to read the mailing list subscriptions."));
+    }
+  }
+
   async bookmarkArticle(userId: string, articleId: string): Promise<Result<void, AuthError>> {
     try {
       const user = this.findUser(userId);

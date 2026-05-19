@@ -245,6 +245,17 @@ class ExpressApp implements IApp {
       }),
     );
 
+    this.app.get(
+      "/admin/mailing-list/subscribers.csv",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        await this.authController.exportSubscribedMailingListCsv(res);
+      }),
+    );
+
     this.app.post(
       "/logout",
       asyncHandler(async (req, res) => {

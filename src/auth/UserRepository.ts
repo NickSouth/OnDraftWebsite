@@ -61,6 +61,9 @@ export interface IUserRepository {
   findMailingListSubscriptionByUserId(
     userId: string,
   ): Promise<Result<IMailingListSubscriptionRecord | null, AuthError>>;
+  listMailingListSubscriptionsByStatus(
+    status: MailingListSubscriptionStatus,
+  ): Promise<Result<IMailingListSubscriptionRecord[], AuthError>>;
   getPreferences(userId: string): Promise<Result<UserPreferences, AuthError>>;
   bookmarkArticle(userId: string, articleId: string): Promise<Result<void, AuthError>>;
   bookmarkForumPost(userId: string, forumPostId: string): Promise<Result<void, AuthError>>;

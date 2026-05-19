@@ -45,6 +45,7 @@ export interface IAuthService {
   requestEmailVerification(input: RequestEmailVerificationInput): Promise<Result<void, AuthError>>;
   createMailingListUnsubscribeUrl(input: CreateMailingListUnsubscribeUrlInput): Promise<Result<string | null, AuthError>>;
   unsubscribeMailingList(input: UnsubscribeMailingListInput): Promise<Result<void, AuthError>>;
+  exportSubscribedMailingListCsv(): Promise<Result<string, AuthError>>;
 }
 
 const EMAIL_VERIFICATION_FAILED_MESSAGE = "We could not verify that email link. It may be expired or already used.";
@@ -359,6 +360,42 @@ class AuthService implements IAuthService {
     }
 
     return Ok(undefined);
+  }
+
+  async exportSubscribedMailingListCsv(): Promise<Result<string, AuthError>> {
+    const subscriptionsResult = await this.users.listMailingListSubscriptionsByStatus("subscribed");
+    if (subscriptionsResult.ok === false) {
+      return Err(UnexpectedDependencyError(subscriptionsResult.value.message));
+    }
+
+    const header = [
+      "email",
+      "status",
+      "consentSource",
+      "consentTextVersion",
+      "consentedAt",
+      "createdAt",
+      "updatedAt",
+    ];
+    const rows = subscriptionsResult.value
+      .map((subscription) => [
+        subscription.email,
+        subscription.status,
+        subscription.consentSource,
+        subscription.consentTextVersion,
+        subscription.consentedAt ?? "",
+        subscription.createdAt,
+        subscription.updatedAt,
+      ]);
+
+    return Ok([header, ...rows]
+      .map((row) => row.map((value) => this.escapeCsvCell(value)).join(","))
+      .join("\n"));
+  }
+
+  private escapeCsvCell(value: string): string {
+    const formulaSafeValue = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+    return `"${formulaSafeValue.replaceAll("\"", "\"\"")}"`;
   }
 
   private createMailingListUnsubscribeToken(subscription: IMailingListSubscriptionRecord): string {
