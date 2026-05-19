@@ -5,6 +5,7 @@ export interface IUserRecord {
   displayName: string;
   password: string;
   role: Role;
+  createdAt: string;
   preferences: UserPreferences;
 }
 
@@ -13,6 +14,8 @@ export interface IAuthenticatedUser {
   email: string;
   emailVerifiedAt: string | null;
   displayName: string;
+  role: Role;
+  createdAt: string;
 }
 
 export function toAuthenticatedUser(user: IUserRecord): IAuthenticatedUser {
@@ -21,6 +24,8 @@ export function toAuthenticatedUser(user: IUserRecord): IAuthenticatedUser {
     email: user.email,
     emailVerifiedAt: user.emailVerifiedAt,
     displayName: user.displayName,
+    role: user.role,
+    createdAt: user.createdAt,
   };
 }
 

@@ -15,21 +15,33 @@ import type {
 
 export const DEMO_USERS: IUserRecord[] = [
   {
+    id: "user-support",
+    email: "support@ondraftfootball.com",
+    emailVerifiedAt: "2026-05-19T00:00:00.000Z",
+    displayName: "OnDraft Support",
+    password: "password123",
+    role: "admin",
+    createdAt: "2026-05-19T00:00:00.000Z",
+    preferences: {theme: "light", fontSize: "small", bookmarks: []},
+  },
+  {
     id: "user-ryan",
-    email: "ryanmcwalter@ondraft.test",
+    email: "ryan@ondraftfootball.com",
     emailVerifiedAt: "2026-05-19T00:00:00.000Z",
     displayName: "Ryan McWalter",
     password: "password123",
     role: "admin",
+    createdAt: "2026-05-19T00:00:00.000Z",
     preferences: {theme: "light", fontSize: "small", bookmarks: []},
   },
   {
-    id: "user-bob",
-    email: "bob@ondraft.test",
+    id: "user-aleks",
+    email: "aleks@ondraftfootball.com",
     emailVerifiedAt: "2026-05-19T00:00:00.000Z",
-    displayName: "Bob OnDraft",
+    displayName: "Aleks OnDraft",
     password: "password123",
-    role: "user",
+    role: "admin",
+    createdAt: "2026-05-19T00:00:00.000Z",
     preferences: {theme: "light", fontSize: "small", bookmarks: []},
   },
 ];
@@ -51,6 +63,20 @@ class InMemoryUserRepository implements IUserRepository {
       return Ok(user);
     } catch {
       return Err(UnexpectedDependencyError("Unable to save the user."));
+    }
+  }
+
+  async listUsers(): Promise<Result<IUserRecord[], AuthError>> {
+    try {
+      return Ok(this.users.map((user) => ({
+        ...user,
+        preferences: {
+          ...user.preferences,
+          bookmarks: [...user.preferences.bookmarks],
+        },
+      })));
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to read the users."));
     }
   }
 

@@ -7,6 +7,8 @@ export interface IAuthenticatedUserSession {
   email: string;
   emailVerifiedAt: string | null;
   displayName: string;
+  role: string;
+  createdAt: string;
   signedInAt: string;
 }
 
@@ -89,6 +91,8 @@ export function signInAuthenticatedUser(
     email: user.email,
     emailVerifiedAt: user.emailVerifiedAt,
     displayName: user.displayName,
+    role: user.role,
+    createdAt: user.createdAt,
     signedInAt: now.toISOString(),
   };
   session.lastSeenAt = now.toISOString();
@@ -121,16 +125,18 @@ export function isAuthenticatedSession(
 
 export function isAdminSession(session: IOnDraftBrowserSession): boolean {
   const email = session.authenticatedUser?.email;
-  // The app already lets signed-in and anonymous users browse/read, so the smallest
-  // verification gate is on admin privileges rather than login itself.
-  if (!email || !session.authenticatedUser?.emailVerifiedAt) {
+  if (!email) {
     return false;
   }
 
-  const adminEmails = (process.env.ADMIN_EMAILS ?? "ryanmcwalter@ondraft.test")
+  const adminEmails = (process.env.ADMIN_EMAILS ?? "support@ondraftfootball.com,ryan@ondraftfootball.com,aleks@ondraftfootball.com")
     .split(",")
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean);
 
   return adminEmails.includes(email.toLowerCase());
+}
+
+export function isVerifiedUserSession(session: IOnDraftBrowserSession): boolean {
+  return Boolean(session.authenticatedUser?.emailVerifiedAt);
 }

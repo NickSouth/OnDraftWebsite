@@ -32,6 +32,7 @@ export interface UpsertMailingListSubscriptionInput {
 
 export interface IUserRepository {
   add(user: IUserRecord): Promise<Result<IUserRecord, AuthError>>;
+  listUsers(): Promise<Result<IUserRecord[], AuthError>>;
   findById(userId: string): Promise<Result<IUserRecord | null, AuthError>>;
   findByEmail(email: string): Promise<Result<IUserRecord | null, AuthError>>;
   setEmailVerified(userId: string, verifiedAt: string): Promise<Result<IUserRecord, AuthError>>;

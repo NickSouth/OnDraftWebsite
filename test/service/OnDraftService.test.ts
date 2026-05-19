@@ -587,13 +587,13 @@ describe("UserPreferenceService bookmarks", () => {
   it("toggles article and forum post bookmarks for a user", async () => {
     const preferences = userPreferenceService();
 
-    const articleOn = await preferences.toggleBookmark("user-bob", { type: "article", articleId: "article-1" });
-    const forumPostOn = await preferences.toggleBookmark("user-bob", { type: "forumPost", forumPostId: "post-1" });
+    const articleOn = await preferences.toggleBookmark("user-support", { type: "article", articleId: "article-1" });
+    const forumPostOn = await preferences.toggleBookmark("user-support", { type: "forumPost", forumPostId: "post-1" });
 
     expect(articleOn).toEqual({ ok: true, value: true });
     expect(forumPostOn).toEqual({ ok: true, value: true });
 
-    const bookmarks = await preferences.getUserBookmarks("user-bob");
+    const bookmarks = await preferences.getUserBookmarks("user-support");
     expect(bookmarks.ok).toBe(true);
     if (bookmarks.ok === true) {
       expect(bookmarks.value).toEqual([
@@ -602,10 +602,10 @@ describe("UserPreferenceService bookmarks", () => {
       ]);
     }
 
-    const articleOff = await preferences.toggleBookmark("user-bob", { type: "article", articleId: "article-1" });
+    const articleOff = await preferences.toggleBookmark("user-support", { type: "article", articleId: "article-1" });
     expect(articleOff).toEqual({ ok: true, value: false });
 
-    const updated = await preferences.getUserBookmarks("user-bob");
+    const updated = await preferences.getUserBookmarks("user-support");
     expect(updated.ok).toBe(true);
     if (updated.ok === true) {
       expect(updated.value).toEqual([{ type: "forumPost", forumPostId: "post-1" }]);

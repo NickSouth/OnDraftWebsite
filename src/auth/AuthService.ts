@@ -38,6 +38,16 @@ export interface UnsubscribeMailingListInput {
   token: string;
 }
 
+export interface AdminUserListItem {
+  id: string;
+  displayName: string;
+  email: string;
+  role: string;
+  emailVerifiedAt: string | null;
+  mailingListStatus: string;
+  registeredAt: string;
+}
+
 export interface IAuthService {
   authenticate(input: LoginInput): Promise<Result<IAuthenticatedUser, AuthError>>;
   register(input: RegisterInput): Promise<Result<IAuthenticatedUser, AuthError>>;
@@ -46,6 +56,7 @@ export interface IAuthService {
   createMailingListUnsubscribeUrl(input: CreateMailingListUnsubscribeUrlInput): Promise<Result<string | null, AuthError>>;
   unsubscribeMailingList(input: UnsubscribeMailingListInput): Promise<Result<void, AuthError>>;
   exportSubscribedMailingListCsv(): Promise<Result<string, AuthError>>;
+  listAdminUsers(): Promise<Result<AdminUserListItem[], AuthError>>;
 }
 
 const EMAIL_VERIFICATION_FAILED_MESSAGE = "We could not verify that email link. It may be expired or already used.";
@@ -175,6 +186,7 @@ class AuthService implements IAuthService {
       return Err(UserAlreadyExists("An account already exists for that email."));
     }
 
+    const now = new Date();
     const created = await this.users.add({
       id: randomUUID(),
       displayName,
@@ -182,6 +194,7 @@ class AuthService implements IAuthService {
       emailVerifiedAt: null,
       password,
       role: "user",
+      createdAt: now.toISOString(),
       preferences: {
         theme: "light",
         fontSize: "small",
@@ -193,7 +206,6 @@ class AuthService implements IAuthService {
       return Err(UnexpectedDependencyError(created.value.message));
     }
 
-    const now = new Date();
     const verificationEmail = await this.sendVerificationEmail(created.value);
     if (verificationEmail.ok === false) {
       return verificationEmail;
@@ -391,6 +403,33 @@ class AuthService implements IAuthService {
     return Ok([header, ...rows]
       .map((row) => row.map((value) => this.escapeCsvCell(value)).join(","))
       .join("\n"));
+  }
+
+  async listAdminUsers(): Promise<Result<AdminUserListItem[], AuthError>> {
+    const usersResult = await this.users.listUsers();
+    if (usersResult.ok === false) {
+      return Err(UnexpectedDependencyError(usersResult.value.message));
+    }
+
+    const items: AdminUserListItem[] = [];
+    for (const user of usersResult.value) {
+      const subscriptionResult = await this.users.findMailingListSubscriptionByEmail(user.email);
+      if (subscriptionResult.ok === false) {
+        return Err(UnexpectedDependencyError(subscriptionResult.value.message));
+      }
+
+      items.push({
+        id: user.id,
+        displayName: user.displayName,
+        email: user.email,
+        role: user.role,
+        emailVerifiedAt: user.emailVerifiedAt,
+        mailingListStatus: subscriptionResult.value?.status ?? "none",
+        registeredAt: user.createdAt,
+      });
+    }
+
+    return Ok(items.sort((first, second) => first.email.localeCompare(second.email)));
   }
 
   private escapeCsvCell(value: string): string {

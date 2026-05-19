@@ -10,6 +10,7 @@
   </head>
   <body>
     <% const currentSession = typeof session !== "undefined" ? session : null; %>
+    <% const currentIsAdmin = typeof isAdmin !== "undefined" ? isAdmin : false; %>
     <div class="page-shell">
       <nav class="main-nav">
         <a href="/" class="nav-brand">
@@ -17,6 +18,9 @@
         </a>
         <div class="nav-actions">
           <% if (currentSession?.authenticatedUser) { %>
+            <% if (currentIsAdmin) { %>
+              <a href="/admin/users" class="nav-link">Manage users</a>
+            <% } %>
             <span class="nav-status">
               Signed in as <strong><%= currentSession.authenticatedUser.displayName %></strong>
             </span>
@@ -31,7 +35,7 @@
       </nav>
       <% if (currentSession?.authenticatedUser && !currentSession.authenticatedUser.emailVerifiedAt) { %>
         <section class="verification-banner">
-          <p>Verify your email before using admin tools.</p>
+          <p>Verify your email before commenting or bookmarking.</p>
           <form method="post" action="/verify-email/resend">
             <button type="submit" class="secondary-button">Resend verification email</button>
           </form>

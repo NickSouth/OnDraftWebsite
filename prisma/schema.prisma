@@ -14,6 +14,7 @@ model User {
   displayName             String                    @map("display_name")
   password                String
   role                    String
+  createdAt               DateTime                  @map("created_at")
   preferences             String
   emailVerificationTokens EmailVerificationToken[]
   mailingListSubscription MailingListSubscription?

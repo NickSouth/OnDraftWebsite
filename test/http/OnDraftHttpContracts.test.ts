@@ -12,7 +12,7 @@ async function adminAgent() {
   await agent
     .post("/login")
     .type("form")
-    .send({ email: "ryanmcwalter@ondraft.test", password: "password123" });
+    .send({ email: "ryan@ondraftfootball.com", password: "password123" });
   return agent;
 }
 
@@ -21,7 +21,7 @@ async function loginAdminAgent(ondraft: ReturnType<typeof app>) {
   await agent
     .post("/login")
     .type("form")
-    .send({ email: "ryanmcwalter@ondraft.test", password: "password123" });
+    .send({ email: "ryan@ondraftfootball.com", password: "password123" });
   return agent;
 }
 
@@ -49,7 +49,7 @@ describe("OnDraft HTTP contracts", () => {
     const login = await agent
       .post("/login")
       .type("form")
-      .send({ email: "ryanmcwalter@ondraft.test", password: "password123" });
+      .send({ email: "ryan@ondraftfootball.com", password: "password123" });
 
     expect(login.status).toBe(302);
     expect(login.headers.location).toBe("/");
@@ -149,6 +149,23 @@ describe("OnDraft HTTP contracts", () => {
     expect(exportResponse.headers["content-type"]).toContain("text/csv");
     expect(exportResponse.headers["content-disposition"]).toContain("ondraft-mailing-list-subscribers.csv");
     expect(exportResponse.text).toContain('"email","status","consentSource","consentTextVersion"');
+  });
+
+  it("lets admins manage users with verification and mailing list status", async () => {
+    const ondraft = app();
+
+    const anonymous = await request(ondraft).get("/admin/users");
+    expect(anonymous.status).toBe(403);
+
+    const admin = await loginAdminAgent(ondraft);
+    const usersPage = await admin.get("/admin/users");
+
+    expect(usersPage.status).toBe(200);
+    expect(usersPage.text).toContain("Manage Users");
+    expect(usersPage.text).toContain("support@ondraftfootball.com");
+    expect(usersPage.text).toContain("ryan@ondraftfootball.com");
+    expect(usersPage.text).toContain("aleks@ondraftfootball.com");
+    expect(usersPage.text).toContain("Download mailing list CSV");
   });
 
   it("allows anonymous visitors to view articles and the big board", async () => {
@@ -759,20 +776,28 @@ describe("OnDraft HTTP contracts", () => {
         password: "password123",
       });
 
-    const comment = await reader
+    const unverifiedComment = await reader
+      .post(`/articles/${articleId}/comments`)
+      .type("form")
+      .send({ text: "Good read." });
+
+    expect(unverifiedComment.status).toBe(403);
+    expect(unverifiedComment.text).toContain("Verify your email to comment.");
+
+    const comment = await admin
       .post(`/articles/${articleId}/comments`)
       .type("form")
       .send({ text: "Good read." });
 
     expect(comment.status).toBe(200);
     expect(comment.text).toContain("Good read.");
-    expect(comment.text).toContain("Reader One");
+    expect(comment.text).toContain("Ryan McWalter");
 
     const commentId = comment.text.match(/id="comment-([A-Za-z0-9]{8})"/)?.[1];
     expect(commentId).toBeDefined();
     expect(comment.text).toContain(`/articles/${articleId}/comments/${commentId}/replies`);
 
-    const reply = await reader
+    const reply = await admin
       .post(`/articles/${articleId}/comments/${commentId}/replies`)
       .type("form")
       .send({ text: "Agree with this." });
@@ -796,7 +821,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(articles.text).toContain("1 likes");
     expect(articles.text).toContain("1 comments");
 
-    const deleted = await reader.delete(`/articles/${articleId}/comments/${commentId}`);
+    const deleted = await admin.delete(`/articles/${articleId}/comments/${commentId}`);
     expect(deleted.status).toBe(200);
     expect(deleted.text).not.toContain("Good read.");
   });
@@ -818,18 +843,8 @@ describe("OnDraft HTTP contracts", () => {
       });
 
     const articleId = create.headers.location.split("/").pop();
-    const reader = request.agent(ondraft);
-    await reader
-      .post("/register")
-      .type("form")
-      .send({
-        displayName: "Many Comments",
-        email: "many-comments@ondraft.test",
-        password: "password123",
-      });
-
     for (let index = 1; index <= 11; index += 1) {
-      await reader
+      await admin
         .post(`/articles/${articleId}/comments`)
         .type("form")
         .send({ text: `Comment ${index}` });

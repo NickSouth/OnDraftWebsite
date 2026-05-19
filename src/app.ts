@@ -68,6 +68,7 @@ class ExpressApp implements IApp {
     );
     this.app.use(Layouts);
     this.app.use(express.urlencoded({ extended: true }));
+    this.app.use((req, res, next) => this.exposeSessionLocals(req, res, next));
   }
 
   private registerTemplating(): void {
@@ -135,6 +136,12 @@ class ExpressApp implements IApp {
       message: "If that email needs verification, we sent a new verification link.",
       session: touchOnDraftSession(sessionStore(req)),
     });
+  }
+
+  private exposeSessionLocals(req: Request, res: Response, next: NextFunction): void {
+    const browserSession = touchOnDraftSession(sessionStore(req));
+    res.locals.isAdmin = isAdminSession(browserSession);
+    next();
   }
 
   private registerRoutes(): void {
@@ -242,6 +249,17 @@ class ExpressApp implements IApp {
       asyncHandler(async (req, res) => {
         const token = typeof req.body.token === "string" ? req.body.token : "";
         await this.authController.unsubscribeMailingListFromRequest(res, token, sessionStore(req));
+      }),
+    );
+
+    this.app.get(
+      "/admin/users",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        await this.authController.showAdminUsers(res, sessionStore(req));
       }),
     );
 

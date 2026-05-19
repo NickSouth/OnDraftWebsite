@@ -44,6 +44,7 @@ async function addVerificationFixture(
     displayName: "Verify Reader",
     password: "password123",
     role: "user",
+    createdAt: "2026-05-19T12:00:00.000Z",
     preferences: {
       theme: "light",
       fontSize: "small",
@@ -85,7 +86,7 @@ describe("AuthService", () => {
     const service = CreateAuthService(CreateInMemoryUserRepository());
 
     const result = await service.authenticate({
-      email: "ryanmcwalter@ondraft.test",
+      email: "ryan@ondraftfootball.com",
       password: "password123",
     });
 
@@ -99,7 +100,7 @@ describe("AuthService", () => {
     const service = CreateAuthService(CreateInMemoryUserRepository());
 
     const result = await service.authenticate({
-      email: "ryanmcwalter@ondraft.test",
+      email: "ryan@ondraftfootball.com",
       password: "wrong-password",
     });
 
@@ -118,7 +119,7 @@ describe("AuthService", () => {
       password: "password123",
     });
     const missingPassword = await service.authenticate({
-      email: "ryanmcwalter@ondraft.test",
+      email: "ryan@ondraftfootball.com",
       password: "   ",
     });
 
@@ -364,7 +365,7 @@ describe("AuthService", () => {
       mailingListUnsubscribeSecret: "test-mailing-secret",
     });
 
-    const result = await service.requestEmailVerification({ email: "ryanmcwalter@ondraft.test" });
+    const result = await service.requestEmailVerification({ email: "ryan@ondraftfootball.com" });
 
     expect(result.ok).toBe(true);
     expect(email.sent).toHaveLength(0);

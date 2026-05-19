@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS "users" (
   "display_name" TEXT NOT NULL,
   "password" TEXT NOT NULL,
   "role" TEXT NOT NULL,
+  "created_at" DATETIME NOT NULL,
   "preferences" TEXT NOT NULL
 );
 

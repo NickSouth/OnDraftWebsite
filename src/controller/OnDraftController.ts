@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import type { IOnDraftBrowserSession } from "../session/OnDraftSession";
-import { isAdminSession } from "../session/OnDraftSession";
+import { isAdminSession, isVerifiedUserSession } from "../session/OnDraftSession";
 import type { BigBoardEditableEntryInput, CreateArticleInput, CreateYoutubeVideoInput, IOnDraftService, SaveBigBoardEntriesInput } from "../service/OnDraftService";
 import type { IUserPreferenceService, UserPreferenceError } from "../service/UserPreferenceService";
 import type { ILoggingService } from "../service/LoggingService";
@@ -453,6 +453,15 @@ class OnDraftController implements IOnDraftController {
 
     res.status(401).send("Log in to bookmark OnDraft content.");
     return null;
+  }
+
+  private requireVerifiedUser(res: Response, session: IOnDraftBrowserSession, message: string): boolean {
+    if (isVerifiedUserSession(session)) {
+      return true;
+    }
+
+    res.status(403).send(message);
+    return false;
   }
 
   private renderBookmarkButton(res: Response, bookmark: Bookmark, bookmarked: boolean): void {
@@ -1069,6 +1078,9 @@ class OnDraftController implements IOnDraftController {
     if (!userId) {
       return;
     }
+    if (!this.requireVerifiedUser(res, session, "Verify your email to bookmark OnDraft content.")) {
+      return;
+    }
 
     const articleId = this.routeParam(req, "id");
     const article = await this.service.getArticle(articleId);
@@ -1115,6 +1127,9 @@ class OnDraftController implements IOnDraftController {
       });
       return;
     }
+    if (!this.requireVerifiedUser(res, session, "Verify your email to comment.")) {
+      return;
+    }
 
     const articleId = this.routeParam(req, "id");
     const result = await this.service.commentByArticleId({
@@ -1155,6 +1170,9 @@ class OnDraftController implements IOnDraftController {
         layout: false,
         message: "Log in to comment.",
       });
+      return;
+    }
+    if (!this.requireVerifiedUser(res, session, "Verify your email to comment.")) {
       return;
     }
 
@@ -1287,6 +1305,9 @@ class OnDraftController implements IOnDraftController {
     if (!userId) {
       return;
     }
+    if (!this.requireVerifiedUser(res, session, "Verify your email to bookmark OnDraft content.")) {
+      return;
+    }
 
     const postId = this.routeParam(req, "id");
     const post = await this.service.getForumPost(postId);
@@ -1312,6 +1333,9 @@ class OnDraftController implements IOnDraftController {
         layout: false,
         message: "Log in to comment.",
       });
+      return;
+    }
+    if (!this.requireVerifiedUser(res, session, "Verify your email to comment.")) {
       return;
     }
 

@@ -56,6 +56,7 @@ export interface IAuthController {
     store: OnDraftSessionStore,
   ): Promise<void>;
   exportSubscribedMailingListCsv(res: Response): Promise<void>;
+  showAdminUsers(res: Response, store: OnDraftSessionStore): Promise<void>;
   logoutFromForm(res: Response, store: OnDraftSessionStore): Promise<void>;
 }
 
@@ -254,6 +255,24 @@ class AuthController implements IAuthController {
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", 'attachment; filename="ondraft-mailing-list-subscribers.csv"');
     res.send(result.value);
+  }
+
+  async showAdminUsers(res: Response, store: OnDraftSessionStore): Promise<void> {
+    const session = touchOnDraftSession(store);
+    const result = await this.service.listAdminUsers();
+
+    if (result.ok === false) {
+      this.logger.error(`Admin user list failed: ${result.value.message}`);
+      res.status(500).render("ondraft/partials/error", {
+        message: "Unable to load users.",
+      });
+      return;
+    }
+
+    res.render("auth/adminUsers", {
+      session,
+      users: result.value,
+    });
   }
 
   async logoutFromForm(res: Response, store: OnDraftSessionStore): Promise<void> {
