@@ -110,6 +110,36 @@ main:has(.board-editor-page) {
   font-weight: 700;
 }
 
+.inline-form {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.user-moderation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.moderation-menu {
+  flex-basis: 100%;
+  margin-top: 0.5rem;
+}
+
+.moderation-form {
+  display: grid;
+  gap: 0.65rem;
+  max-width: 22rem;
+}
+
+.moderation-form textarea,
+.moderation-form select {
+  width: 100%;
+}
+
 .nav-brand {
   display: inline-flex;
   align-items: center;
@@ -1303,6 +1333,20 @@ button.comment-like-button:hover {
   background: var(--danger-soft);
   border-color: rgba(180, 35, 24, 0.16);
   color: var(--danger);
+}
+
+.ban-notice {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 16px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(180, 35, 24, 0.18);
+  background: var(--danger-soft);
+}
+
+.ban-notice p {
+  margin: 0;
 }
 
 .empty-state {

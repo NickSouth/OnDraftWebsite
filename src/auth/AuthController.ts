@@ -8,7 +8,7 @@ import {
   type OnDraftSessionStore,
 } from "../session/OnDraftSession";
 import type { ILoggingService } from "../service/LoggingService";
-import type { IAuthService } from "./AuthService";
+import type { AdminUserListItem, BanDuration, IAuthService } from "./AuthService";
 import type { AuthError } from "./errors";
 
 export interface IAuthController {
@@ -57,6 +57,9 @@ export interface IAuthController {
   ): Promise<void>;
   exportSubscribedMailingListCsv(res: Response): Promise<void>;
   showAdminUsers(res: Response, store: OnDraftSessionStore): Promise<void>;
+  showUserModerationMenu(res: Response, store: OnDraftSessionStore, userId: string, contextId: string): Promise<void>;
+  banUserFromForm(res: Response, store: OnDraftSessionStore, userId: string, contextId: string, message: string, duration: string): Promise<void>;
+  unbanUserFromForm(res: Response, store: OnDraftSessionStore, userId: string, contextId: string): Promise<void>;
   logoutFromForm(res: Response, store: OnDraftSessionStore): Promise<void>;
 }
 
@@ -273,6 +276,101 @@ class AuthController implements IAuthController {
       session,
       users: result.value,
     });
+  }
+
+  private async findAdminUser(userId: string) {
+    const users = await this.service.listAdminUsers();
+    if (users.ok === false) {
+      return users;
+    }
+
+    const user = users.value.find((candidate) => candidate.id === userId) ?? null;
+    if (!user) {
+      return {
+        ok: false as const,
+        value: { name: "ValidationError" as const, message: "User not found." },
+      };
+    }
+
+    return { ok: true as const, value: user };
+  }
+
+  private renderUserModerationActions(res: Response, user: AdminUserListItem, contextId: string): void {
+    res.render("auth/partials/userModerationActions", {
+      layout: false,
+      user,
+      contextId,
+      errorMessage: null,
+    });
+  }
+
+  async showUserModerationMenu(res: Response, _store: OnDraftSessionStore, userId: string, contextId: string): Promise<void> {
+    const user = await this.findAdminUser(userId);
+    if (user.ok === false) {
+      res.status(this.mapErrorStatus(user.value)).render("auth/partials/userBanMenu", {
+        layout: false,
+        user: null,
+        contextId,
+        errorMessage: user.value.message,
+      });
+      return;
+    }
+
+    res.render("auth/partials/userBanMenu", {
+      layout: false,
+      user: user.value,
+      contextId,
+      errorMessage: null,
+    });
+  }
+
+  async banUserFromForm(res: Response, store: OnDraftSessionStore, userId: string, contextId: string, message: string, duration: string): Promise<void> {
+    const session = touchOnDraftSession(store);
+    const adminUserId = session.authenticatedUser?.userId ?? "";
+    const result = await this.service.banUser({
+      userId,
+      bannedByUserId: adminUserId,
+      message,
+      duration: duration as BanDuration,
+    });
+
+    if (result.ok === false) {
+      const user = await this.findAdminUser(userId);
+      res.status(result.value.name === "ValidationError" ? 200 : this.mapErrorStatus(result.value)).render("auth/partials/userBanMenu", {
+        layout: false,
+        user: user.ok === true ? user.value : null,
+        contextId,
+        errorMessage: result.value.message,
+      });
+      return;
+    }
+
+    const user = await this.findAdminUser(userId);
+    if (user.ok === false) {
+      res.status(this.mapErrorStatus(user.value)).send(user.value.message);
+      return;
+    }
+    this.renderUserModerationActions(res, user.value, contextId);
+  }
+
+  async unbanUserFromForm(res: Response, _store: OnDraftSessionStore, userId: string, contextId: string): Promise<void> {
+    const result = await this.service.unbanUser({ userId });
+    if (result.ok === false) {
+      res.status(this.mapErrorStatus(result.value)).render("auth/partials/userBanMenu", {
+        layout: false,
+        user: null,
+        contextId,
+        errorMessage: result.value.message,
+      });
+      return;
+    }
+
+    const user = await this.findAdminUser(userId);
+    if (user.ok === false) {
+      res.status(this.mapErrorStatus(user.value)).send(user.value.message);
+      return;
+    }
+    this.renderUserModerationActions(res, user.value, contextId);
   }
 
   async logoutFromForm(res: Response, store: OnDraftSessionStore): Promise<void> {

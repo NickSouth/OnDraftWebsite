@@ -1,0 +1,10 @@
+<div class="ban-notice" role="status">
+  <p><strong>Your posting access is temporarily closed.</strong></p>
+  <p><%= ban.message %></p>
+  <% if (ban.expiresAt) { %>
+    <p class="muted-text">This ban expires <%= new Date(ban.expiresAt).toLocaleString() %>.</p>
+  <% } else { %>
+    <p class="muted-text">This ban is permanent.</p>
+  <% } %>
+  <p class="muted-text">Want to appeal? Email support@ondraftfootball.com.</p>
+</div>

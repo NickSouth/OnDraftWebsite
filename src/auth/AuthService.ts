@@ -9,7 +9,7 @@ import {
   ValidationError,
   type AuthError,
 } from "./errors";
-import { toAuthenticatedUser, type IAuthenticatedUser, type IMailingListSubscriptionRecord } from "./User";
+import { toAuthenticatedUser, type IAuthenticatedUser, type IMailingListSubscriptionRecord, type IUserBanRecord } from "./User";
 import type { IUserRepository } from "./UserRepository";
 
 export interface LoginInput {
@@ -38,6 +38,25 @@ export interface UnsubscribeMailingListInput {
   token: string;
 }
 
+export type BanDuration = "1-day" | "1-month" | "1-year" | "permanent";
+
+export interface BanUserInput {
+  userId: string;
+  message: string;
+  duration: BanDuration;
+  bannedByUserId: string;
+  now?: Date;
+}
+
+export interface UnbanUserInput {
+  userId: string;
+}
+
+export interface GetActiveUserBanInput {
+  userId: string;
+  now?: Date;
+}
+
 export interface AdminUserListItem {
   id: string;
   displayName: string;
@@ -45,6 +64,8 @@ export interface AdminUserListItem {
   role: string;
   emailVerifiedAt: string | null;
   mailingListStatus: string;
+  ban: IUserBanRecord | null;
+  activeBan: IUserBanRecord | null;
   registeredAt: string;
 }
 
@@ -57,10 +78,14 @@ export interface IAuthService {
   unsubscribeMailingList(input: UnsubscribeMailingListInput): Promise<Result<void, AuthError>>;
   exportSubscribedMailingListCsv(): Promise<Result<string, AuthError>>;
   listAdminUsers(): Promise<Result<AdminUserListItem[], AuthError>>;
+  banUser(input: BanUserInput): Promise<Result<IAuthenticatedUser, AuthError>>;
+  unbanUser(input: UnbanUserInput): Promise<Result<IAuthenticatedUser, AuthError>>;
+  getActiveUserBan(input: GetActiveUserBanInput): Promise<Result<IUserBanRecord | null, AuthError>>;
 }
 
 const EMAIL_VERIFICATION_FAILED_MESSAGE = "We could not verify that email link. It may be expired or already used.";
 const MAILING_LIST_UNSUBSCRIBE_FAILED_MESSAGE = "We could not process that unsubscribe link.";
+const BAN_DURATION_MS = 24 * 60 * 60 * 1000;
 
 class NullEmailService implements IEmailService {
   async sendEmailVerificationEmail(): Promise<void> {
@@ -194,6 +219,7 @@ class AuthService implements IAuthService {
       emailVerifiedAt: null,
       password,
       role: "user",
+      ban: null,
       createdAt: now.toISOString(),
       preferences: {
         theme: "light",
@@ -425,6 +451,8 @@ class AuthService implements IAuthService {
         role: user.role,
         emailVerifiedAt: user.emailVerifiedAt,
         mailingListStatus: subscriptionResult.value?.status ?? "none",
+        ban: user.ban ? { ...user.ban } : null,
+        activeBan: this.activeBan(user.ban),
         registeredAt: user.createdAt,
       });
     }
@@ -432,9 +460,127 @@ class AuthService implements IAuthService {
     return Ok(items.sort((first, second) => first.email.localeCompare(second.email)));
   }
 
+  async banUser(input: BanUserInput): Promise<Result<IAuthenticatedUser, AuthError>> {
+    const userId = input.userId.trim();
+    const bannedByUserId = input.bannedByUserId.trim();
+    const message = input.message.trim();
+
+    if (!userId) {
+      return Err(ValidationError("User id is required."));
+    }
+    if (!bannedByUserId) {
+      return Err(ValidationError("Banning admin id is required."));
+    }
+    if (!message) {
+      return Err(ValidationError("Ban message is required."));
+    }
+    if (!this.isBanDuration(input.duration)) {
+      return Err(ValidationError("Ban duration must be one day, one month, one year, or permanent."));
+    }
+    if (userId === bannedByUserId) {
+      return Err(ValidationError("Admins cannot ban themselves."));
+    }
+
+    const targetResult = await this.users.findById(userId);
+    if (targetResult.ok === false) {
+      return Err(UnexpectedDependencyError(targetResult.value.message));
+    }
+    const target = targetResult.value;
+    if (!target) {
+      return Err(ValidationError("User not found."));
+    }
+    if (target.role === "admin") {
+      return Err(ValidationError("Admin users cannot be banned."));
+    }
+
+    const adminResult = await this.users.findById(bannedByUserId);
+    if (adminResult.ok === false) {
+      return Err(UnexpectedDependencyError(adminResult.value.message));
+    }
+    const admin = adminResult.value;
+    if (!admin || admin.role !== "admin") {
+      return Err(ValidationError("Only admins can ban users."));
+    }
+
+    const now = input.now ?? new Date();
+    const banned = await this.users.banUser({
+      userId,
+      message,
+      bannedAt: now.toISOString(),
+      expiresAt: this.banExpiresAt(input.duration, now),
+      bannedByUserId,
+    });
+    if (banned.ok === false) {
+      return Err(UnexpectedDependencyError(banned.value.message));
+    }
+
+    return Ok(toAuthenticatedUser(banned.value));
+  }
+
+  async unbanUser(input: UnbanUserInput): Promise<Result<IAuthenticatedUser, AuthError>> {
+    const userId = input.userId.trim();
+    if (!userId) {
+      return Err(ValidationError("User id is required."));
+    }
+
+    const unbanned = await this.users.unbanUser(userId);
+    if (unbanned.ok === false) {
+      return Err(UnexpectedDependencyError(unbanned.value.message));
+    }
+
+    return Ok(toAuthenticatedUser(unbanned.value));
+  }
+
+  async getActiveUserBan(input: GetActiveUserBanInput): Promise<Result<IUserBanRecord | null, AuthError>> {
+    const userId = input.userId.trim();
+    if (!userId) {
+      return Err(ValidationError("User id is required."));
+    }
+
+    const userResult = await this.users.findById(userId);
+    if (userResult.ok === false) {
+      return Err(UnexpectedDependencyError(userResult.value.message));
+    }
+    if (!userResult.value) {
+      return Err(ValidationError("User not found."));
+    }
+
+    return Ok(this.activeBan(userResult.value.ban, input.now));
+  }
+
   private escapeCsvCell(value: string): string {
     const formulaSafeValue = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
     return `"${formulaSafeValue.replaceAll("\"", "\"\"")}"`;
+  }
+
+  private isBanDuration(value: string): value is BanDuration {
+    return value === "1-day" || value === "1-month" || value === "1-year" || value === "permanent";
+  }
+
+  private banExpiresAt(duration: BanDuration, now: Date): string | null {
+    if (duration === "permanent") {
+      return null;
+    }
+
+    const expiresAt = new Date(now);
+    if (duration === "1-day") {
+      expiresAt.setTime(now.getTime() + BAN_DURATION_MS);
+    } else if (duration === "1-month") {
+      expiresAt.setMonth(expiresAt.getMonth() + 1);
+    } else {
+      expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+    }
+    return expiresAt.toISOString();
+  }
+
+  private activeBan(ban: IUserBanRecord | null, now: Date = new Date()): IUserBanRecord | null {
+    if (!ban) {
+      return null;
+    }
+    if (ban.expiresAt && new Date(ban.expiresAt).getTime() <= now.getTime()) {
+      return null;
+    }
+    return { ...ban };
   }
 
   private createMailingListUnsubscribeToken(subscription: IMailingListSubscriptionRecord): string {

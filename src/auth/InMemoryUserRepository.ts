@@ -1,6 +1,7 @@
 import { Err, Ok, type Result } from "../lib/result";
 import { UnexpectedDependencyError, type AuthError } from "./errors";
 import type {
+  BanUserInput,
   CreateEmailVerificationTokenInput,
   IUserRepository,
   UpsertMailingListSubscriptionInput,
@@ -21,6 +22,7 @@ export const DEMO_USERS: IUserRecord[] = [
     displayName: "OnDraft Support",
     password: "password123",
     role: "admin",
+    ban: null,
     createdAt: "2026-05-19T00:00:00.000Z",
     preferences: {theme: "light", fontSize: "small", bookmarks: []},
   },
@@ -31,6 +33,7 @@ export const DEMO_USERS: IUserRecord[] = [
     displayName: "Ryan McWalter",
     password: "password123",
     role: "admin",
+    ban: null,
     createdAt: "2026-05-19T00:00:00.000Z",
     preferences: {theme: "light", fontSize: "small", bookmarks: []},
   },
@@ -41,6 +44,7 @@ export const DEMO_USERS: IUserRecord[] = [
     displayName: "Aleks OnDraft",
     password: "password123",
     role: "admin",
+    ban: null,
     createdAt: "2026-05-19T00:00:00.000Z",
     preferences: {theme: "light", fontSize: "small", bookmarks: []},
   },
@@ -57,10 +61,21 @@ class InMemoryUserRepository implements IUserRepository {
     return this.users.find((user) => user.id === userId) ?? null;
   }
 
+  private cloneUser(user: IUserRecord): IUserRecord {
+    return {
+      ...user,
+      ban: user.ban ? { ...user.ban } : null,
+      preferences: {
+        ...user.preferences,
+        bookmarks: [...user.preferences.bookmarks],
+      },
+    };
+  }
+
   async add(user: IUserRecord): Promise<Result<IUserRecord, AuthError>> {
     try {
       this.users.push(user);
-      return Ok(user);
+      return Ok(this.cloneUser(user));
     } catch {
       return Err(UnexpectedDependencyError("Unable to save the user."));
     }
@@ -68,13 +83,7 @@ class InMemoryUserRepository implements IUserRepository {
 
   async listUsers(): Promise<Result<IUserRecord[], AuthError>> {
     try {
-      return Ok(this.users.map((user) => ({
-        ...user,
-        preferences: {
-          ...user.preferences,
-          bookmarks: [...user.preferences.bookmarks],
-        },
-      })));
+      return Ok(this.users.map((user) => this.cloneUser(user)));
     } catch {
       return Err(UnexpectedDependencyError("Unable to read the users."));
     }
@@ -82,7 +91,8 @@ class InMemoryUserRepository implements IUserRepository {
 
   async findById(userId: string): Promise<Result<IUserRecord | null, AuthError>> {
     try {
-      return Ok(this.findUser(userId));
+      const user = this.findUser(userId);
+      return Ok(user ? this.cloneUser(user) : null);
     } catch {
       return Err(UnexpectedDependencyError("Unable to read the user."));
     }
@@ -91,9 +101,40 @@ class InMemoryUserRepository implements IUserRepository {
   async findByEmail(email: string): Promise<Result<IUserRecord | null, AuthError>> {
     try {
       const match = this.users.find((user) => user.email === email) ?? null;
-      return Ok(match);
+      return Ok(match ? this.cloneUser(match) : null);
     } catch {
       return Err(UnexpectedDependencyError("Unable to read the users."));
+    }
+  }
+
+  async banUser(input: BanUserInput): Promise<Result<IUserRecord, AuthError>> {
+    try {
+      const user = this.findUser(input.userId);
+      if (!user) {
+        return Err(UnexpectedDependencyError("User not found."));
+      }
+      user.ban = {
+        message: input.message,
+        bannedAt: input.bannedAt,
+        expiresAt: input.expiresAt,
+        bannedByUserId: input.bannedByUserId,
+      };
+      return Ok(this.cloneUser(user));
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to ban the user."));
+    }
+  }
+
+  async unbanUser(userId: string): Promise<Result<IUserRecord, AuthError>> {
+    try {
+      const user = this.findUser(userId);
+      if (!user) {
+        return Err(UnexpectedDependencyError("User not found."));
+      }
+      user.ban = null;
+      return Ok(this.cloneUser(user));
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to unban the user."));
     }
   }
 
@@ -119,7 +160,7 @@ class InMemoryUserRepository implements IUserRepository {
         return Err(UnexpectedDependencyError("User not found."));
       }
       user.emailVerifiedAt = verifiedAt;
-      return Ok(user);
+      return Ok(this.cloneUser(user));
     } catch {
       return Err(UnexpectedDependencyError("Unable to verify the user email."));
     }
