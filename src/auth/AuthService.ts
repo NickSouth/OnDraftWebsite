@@ -194,6 +194,7 @@ class AuthService implements IAuthService {
       emailVerifiedAt: null,
       password,
       role: "user",
+      ban: null,
       createdAt: now.toISOString(),
       preferences: {
         theme: "light",

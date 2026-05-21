@@ -5,6 +5,7 @@ export interface IUserRecord {
   displayName: string;
   password: string;
   role: Role;
+  ban: IUserBanRecord | null;
   createdAt: string;
   preferences: UserPreferences;
 }
@@ -15,6 +16,7 @@ export interface IAuthenticatedUser {
   emailVerifiedAt: string | null;
   displayName: string;
   role: Role;
+  ban: IUserBanRecord | null;
   createdAt: string;
 }
 
@@ -25,11 +27,19 @@ export function toAuthenticatedUser(user: IUserRecord): IAuthenticatedUser {
     emailVerifiedAt: user.emailVerifiedAt,
     displayName: user.displayName,
     role: user.role,
+    ban: user.ban ? { ...user.ban } : null,
     createdAt: user.createdAt,
   };
 }
 
 export type Role = "admin" | "user";
+
+export interface IUserBanRecord {
+  message: string;
+  bannedAt: string;
+  expiresAt: string | null;
+  bannedByUserId: string;
+}
 
 export interface IEmailVerificationTokenRecord {
   id: string;

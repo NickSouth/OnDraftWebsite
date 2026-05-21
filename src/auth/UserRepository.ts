@@ -4,6 +4,7 @@ import type {
   Bookmark,
   IEmailVerificationTokenRecord,
   IMailingListSubscriptionRecord,
+  IUserBanRecord,
   IUserRecord,
   MailingListSubscriptionStatus,
   UserPreferences,
@@ -30,11 +31,17 @@ export interface UpsertMailingListSubscriptionInput {
   updatedAt: string;
 }
 
+export interface BanUserInput extends IUserBanRecord {
+  userId: string;
+}
+
 export interface IUserRepository {
   add(user: IUserRecord): Promise<Result<IUserRecord, AuthError>>;
   listUsers(): Promise<Result<IUserRecord[], AuthError>>;
   findById(userId: string): Promise<Result<IUserRecord | null, AuthError>>;
   findByEmail(email: string): Promise<Result<IUserRecord | null, AuthError>>;
+  banUser(input: BanUserInput): Promise<Result<IUserRecord, AuthError>>;
+  unbanUser(userId: string): Promise<Result<IUserRecord, AuthError>>;
   setEmailVerified(userId: string, verifiedAt: string): Promise<Result<IUserRecord, AuthError>>;
   addEmailVerificationToken(
     token: CreateEmailVerificationTokenInput,

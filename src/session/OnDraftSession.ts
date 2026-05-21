@@ -8,6 +8,7 @@ export interface IAuthenticatedUserSession {
   emailVerifiedAt: string | null;
   displayName: string;
   role: string;
+  ban: IAuthenticatedUser["ban"];
   createdAt: string;
   signedInAt: string;
 }
@@ -92,6 +93,7 @@ export function signInAuthenticatedUser(
     emailVerifiedAt: user.emailVerifiedAt,
     displayName: user.displayName,
     role: user.role,
+    ban: user.ban ? { ...user.ban } : null,
     createdAt: user.createdAt,
     signedInAt: now.toISOString(),
   };
