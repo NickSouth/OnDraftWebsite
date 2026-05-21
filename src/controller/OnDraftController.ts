@@ -1137,6 +1137,7 @@ class OnDraftController implements IOnDraftController {
       userId: authenticatedUser.userId,
       userName: authenticatedUser.displayName,
       text: req.body.text,
+      isAdmin: isAdminSession(session),
     });
     if (result.ok === false) {
       const articleResult = await this.service.getArticle(articleId);
@@ -1182,6 +1183,7 @@ class OnDraftController implements IOnDraftController {
       userId: authenticatedUser.userId,
       userName: authenticatedUser.displayName,
       text: req.body.text,
+      isAdmin: isAdminSession(session),
     });
     if (result.ok === false) {
       res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
@@ -1253,6 +1255,7 @@ class OnDraftController implements IOnDraftController {
       userId: authenticatedUser.userId,
       userName: authenticatedUser.displayName,
       content: req.body.content,
+      isAdmin: isAdminSession(session),
     });
     if (result.ok === false) {
       res.set("HX-Retarget", "#hot-take-composer");
@@ -1344,6 +1347,7 @@ class OnDraftController implements IOnDraftController {
       userId: authenticatedUser.userId,
       userName: authenticatedUser.displayName,
       text: req.body.text,
+      isAdmin: isAdminSession(session),
     });
     if (result.ok === false) {
       const postResult = await this.service.getForumPost(postId);

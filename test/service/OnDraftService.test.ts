@@ -150,6 +150,82 @@ describe("OnDraftService article validation", () => {
     }
   });
 
+  it("rejects banned phrases in non-admin comments and forum posts", async () => {
+    const ondraftService = service();
+    const created = await ondraftService.createArticle({
+      title: "Moderated Discussion",
+      author: "Alice OnDraft",
+      writeup: "A short moderation summary.",
+      publicationDate: new Date("2024-01-01"),
+      content: {
+        type: "plainText",
+        text: "A regular article body.",
+      },
+    });
+    expect(created.ok).toBe(true);
+    if (created.ok === false) {
+      return;
+    }
+
+    const comment = await ondraftService.commentByArticleId({
+      articleId: created.value.id,
+      userId: "reader-1",
+      userName: "Reader One",
+      text: "This casino angle is not it.",
+    });
+    expect(comment.ok).toBe(false);
+    if (comment.ok === false) {
+      expect(comment.value.name).toBe("ArticleValidationError");
+      expect(comment.value.message).toContain("contains profanity");
+    }
+
+    const forumPost = await ondraftService.createForumPost({
+      userId: "reader-1",
+      userName: "Reader One",
+      content: "The betting odds take is tired.",
+    });
+    expect(forumPost.ok).toBe(false);
+    if (forumPost.ok === false) {
+      expect(forumPost.value.name).toBe("ForumPostValidationError");
+      expect(forumPost.value.message).toContain("contains profanity");
+    }
+  });
+
+  it("allows admins to submit text that would otherwise match the banned phrase list", async () => {
+    const ondraftService = service();
+    const created = await ondraftService.createArticle({
+      title: "Admin Moderation",
+      author: "Alice OnDraft",
+      writeup: "A short admin summary.",
+      publicationDate: new Date("2024-01-01"),
+      content: {
+        type: "plainText",
+        text: "A regular article body.",
+      },
+    });
+    expect(created.ok).toBe(true);
+    if (created.ok === false) {
+      return;
+    }
+
+    const comment = await ondraftService.commentByArticleId({
+      articleId: created.value.id,
+      userId: "admin-1",
+      userName: "Admin One",
+      text: "Moderating a casino keyword here.",
+      isAdmin: true,
+    });
+    expect(comment.ok).toBe(true);
+
+    const forumPost = await ondraftService.createForumPost({
+      userId: "admin-1",
+      userName: "Admin One",
+      content: "Moderating a betting odds keyword here.",
+      isAdmin: true,
+    });
+    expect(forumPost.ok).toBe(true);
+  });
+
   it("rejects empty plain text article content", async () => {
     const result = await service().createArticle({
       title: "Draft Notes",

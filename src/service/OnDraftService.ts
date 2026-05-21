@@ -5,6 +5,7 @@ import { Article, ArticleContent, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator,
 import { UnknownArticleError, UnknownForumPostError, ArticleError,  BigBoardError, IOnDraftRepository, ArticleValidationError, BigBoardValidationError, ForumPostError, ForumPostValidationError } from "../repository/OnDraftRepository";
 import { DraftBoardFilterInput } from "../controller/OnDraftController";
 import { IYoutubeVideoStatsService } from "./YoutubeVideoStatsService";
+import { BANNED_PHRASES } from "./bannedPhrases";
 
 const ARTICLE_PDF_MAX_BYTES = 5 * 1024 * 1024;
 const ARTICLE_ID_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -26,6 +27,14 @@ const DEFAULT_BIG_BOARD_CREATOR: BigBoardCreator = "Ryan";
 const HOT_TAKE_MAX_LENGTH = 300;
 const VIDEO_DESCRIPTION_MAX_LENGTH = 500;
 const YOUTUBE_STATS_TTL_MS = 6 * 60 * 60 * 1000;
+const PROFANITY_VALIDATION_MESSAGE = "The comment/post contains profanity. Please edit it and try again.";
+const BANNED_PHRASE_PATTERNS = [...new Set(BANNED_PHRASES.map((phrase) => phrase.trim().toLowerCase()).filter(Boolean))]
+  .map((phrase) => {
+    const escapedPhrase = phrase
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      .replace(/\s+/g, "\\s+");
+    return new RegExp(`(^|[^a-z0-9])${escapedPhrase}([^a-z0-9]|$)`, "i");
+  });
 
 export function parseYoutubeVideoId(youtubeUrl: string): Result<string, ArticleError> {
   let parsed: URL;
@@ -120,12 +129,14 @@ export interface CreateCommentInput {
   userId: string;
   userName: string;
   text: string;
+  isAdmin?: boolean;
 }
 
 export interface ForumPostInput {
   content: string;
   userId: string;
   userName: string;
+  isAdmin?: boolean;
 }
 
 export interface CreateYoutubeVideoInput {
@@ -538,6 +549,9 @@ class OnDraftService implements IOnDraftService {
     if (input.text.length > COMMENT_TEXT_MAX_LENGTH) {
       return Err(ArticleValidationError(`Comment text cannot be more than ${COMMENT_TEXT_MAX_LENGTH} characters.`));
     }
+    if (!input.isAdmin && this.containsBannedPhrase(input.text)) {
+      return Err(ArticleValidationError(PROFANITY_VALIDATION_MESSAGE));
+    }
     return Ok(undefined);
   }
 
@@ -550,6 +564,9 @@ class OnDraftService implements IOnDraftService {
     }
     if (input.content.trim().length > HOT_TAKE_MAX_LENGTH) {
       return Err(ForumPostValidationError(`Hot takes cannot be more than ${HOT_TAKE_MAX_LENGTH} characters.`));
+    }
+    if (!input.isAdmin && this.containsBannedPhrase(input.content)) {
+      return Err(ForumPostValidationError(PROFANITY_VALIDATION_MESSAGE));
     }
     return Ok(undefined);
   }
@@ -564,7 +581,15 @@ class OnDraftService implements IOnDraftService {
     if (input.text.length > COMMENT_TEXT_MAX_LENGTH) {
       return Err(ForumPostValidationError(`Comment text cannot be more than ${COMMENT_TEXT_MAX_LENGTH} characters.`));
     }
+    if (!input.isAdmin && this.containsBannedPhrase(input.text)) {
+      return Err(ForumPostValidationError(PROFANITY_VALIDATION_MESSAGE));
+    }
     return Ok(undefined);
+  }
+
+  private containsBannedPhrase(text: string): boolean {
+    const normalizedText = text.toLowerCase().replace(/\s+/g, " ").trim();
+    return BANNED_PHRASE_PATTERNS.some((pattern) => pattern.test(normalizedText));
   }
 
   private validateYoutubeVideoInput(input: CreateYoutubeVideoInput): Result<void, ArticleError> {
@@ -1002,6 +1027,7 @@ class OnDraftService implements IOnDraftService {
       content: typeof input.content === "string" ? input.content.trim() : input.content,
       userId: typeof input.userId === "string" ? input.userId.trim() : input.userId,
       userName: typeof input.userName === "string" ? input.userName.trim() : input.userName,
+      isAdmin: input.isAdmin,
     };
     const validation = this.validateForumPostInput(prepared);
     if (validation.ok === false) {
