@@ -1,6 +1,7 @@
 import "dotenv/config";
 import type { IApp, IServer } from "./contracts";
 import { createComposedApp } from "./composition";
+import { loadAppConfig } from "./config/AppConfig";
 
 export class HttpServer implements IServer {
   constructor(private readonly app: IApp) {}
@@ -15,9 +16,8 @@ export class HttpServer implements IServer {
   }
 }
 
-const mode = process.env.REPO_MODE === "prisma" ? "prisma" : "memory";
-const port = Number(process.env.PORT ?? 3000);
-const app = createComposedApp(mode);
+const config = loadAppConfig();
+const app = createComposedApp(config.repositoryMode, undefined, config);
 const server = new HttpServer(app);
 
-server.start(port);
+server.start(config.port);

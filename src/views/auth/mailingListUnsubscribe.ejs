@@ -1,0 +1,23 @@
+<section class="page-intro">
+  <p class="eyebrow">OnDraft</p>
+  <h1>Mailing List</h1>
+  <p><%= message %></p>
+</section>
+
+<section class="panel auth-panel">
+  <% if (status === "success") { %>
+    <div class="panel-header">
+      <h2>Unsubscribed</h2>
+      <p>You will still receive transactional account emails when needed.</p>
+    </div>
+  <% } else { %>
+    <div class="panel-header">
+      <h2>Link Not Accepted</h2>
+      <p>This unsubscribe link could not be used.</p>
+    </div>
+  <% } %>
+
+  <p class="form-note">
+    <a href="/">Return to OnDraft</a>.
+  </p>
+</section>

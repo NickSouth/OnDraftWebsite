@@ -1,5 +1,8 @@
 <div id="hot-take-composer" class="hot-take-composer" <% if (typeof outOfBand !== "undefined" && outOfBand) { %>hx-swap-oob="true"<% } %>>
-  <% if (session.authenticatedUser) { %>
+  <% const currentActiveBan = typeof activeUserBan !== "undefined" ? activeUserBan : null; %>
+  <% if (session.authenticatedUser && currentActiveBan) { %>
+    <%- include("bannedUserNotice", { ban: currentActiveBan }) %>
+  <% } else if (session.authenticatedUser) { %>
     <% if (errorMessage) { %>
       <p class="error-message"><%= errorMessage %></p>
     <% } %>

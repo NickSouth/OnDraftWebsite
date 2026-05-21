@@ -105,7 +105,7 @@
     <% if (articles.length === 0) { %>
       <p>No articles have been created yet.</p>
     <% } else { %>
-      <%- include("partials/articleList", { articles, isAdmin, showingPublished }) %>
+      <%- include("partials/articleList", { articles, isAdmin, showingPublished, session, bookmarkedArticleIds }) %>
     <% } %>
   </div>
 </section>

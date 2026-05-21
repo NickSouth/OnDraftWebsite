@@ -1,0 +1,27 @@
+<section class="page-intro">
+  <p class="eyebrow">OnDraft</p>
+  <h1>Email Verification</h1>
+  <p><%= message %></p>
+</section>
+
+<section class="panel auth-panel">
+  <% if (status === "success") { %>
+    <div class="panel-header">
+      <h2>Email Verified</h2>
+      <p>Your account is ready to use.</p>
+    </div>
+
+    <p class="form-note">
+      <a href="/">Return to OnDraft</a>.
+    </p>
+  <% } else { %>
+    <div class="panel-header">
+      <h2>Verification Link Not Accepted</h2>
+      <p>Use the newest verification email, or request a new one before trying again.</p>
+    </div>
+
+    <p class="form-note">
+      <a href="/login">Log in</a> to request another verification email.
+    </p>
+  <% } %>
+</section>

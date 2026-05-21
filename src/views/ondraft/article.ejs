@@ -20,7 +20,7 @@
     </div>
   </header>
 
-  <%- include("partials/articleActions", { article, session, likeActorId }) %>
+  <%- include("partials/articleActions", { article, session, likeActorId, articleBookmarked }) %>
 
   <% if (article.content.type === "pdf") { %>
     <div class="article-pdf-document" data-pdf-url="<%= article.content.url %>">
@@ -34,5 +34,5 @@
     <div class="article-body"><%= article.content.text %></div>
   <% } %>
 
-  <%- include("partials/articleComments", { article, session, isAdmin, commentsLimit, likeActorId, errorMessage: null }) %>
+  <%- include("partials/articleComments", { article, session, isAdmin, commentsLimit, likeActorId, userModerationById, activeUserBan, errorMessage: null }) %>
 </article>

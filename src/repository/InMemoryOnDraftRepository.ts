@@ -1,5 +1,5 @@
 import { Err, Ok, Result } from "../lib/result";
-import { Article, ArticleFilter, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, Comment, ForumPost, ForumPostFilter } from "../model/OnDraftContent";
+import { Article, ArticleFilter, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, Comment, ConsensusBigBoard, DraftBoardFilter, ForumPost, ForumPostFilter, Video, VideoQuery } from "../model/OnDraftContent";
 import { ArticleNotFound, BigBoardNotFound, CommentNotFound, DuplicateBigBoardYear, DuplicatePlayer, DuplicateArticle, DuplicateForumPost, type ArticleError, type BigBoardError, type IOnDraftRepository, PlayerNotFound, ForumPostError, ForumPostNotFound } from "./OnDraftRepository";
 
 
@@ -7,6 +7,9 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
   private bigBoards: BigBoard[] = [];
   private articles: Article[] = [];
   private forumPosts: ForumPost[] = [];
+  private videos: Video[] = [];
+  private tagList: Set<string> = new Set();
+
   constructor() {
     this.createBigBoardYearSync(new Date().getFullYear());
   }
@@ -46,12 +49,94 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
     return comments.some((comment) => this.deleteCommentById(comment.replies, commentId));
   }
 
-  async getBigBoard(year: number, creator: BigBoardCreator): Promise<Result<BigBoard, BigBoardError>> {
-    const bigBoard = this.findBigBoard(year, creator);
+  async getSavedSchools(year: number): Promise<Result<string[], BigBoardError>> {
+    const schools = new Set<string>();
+    this.bigBoards.forEach((bigBoard) => {
+      if (bigBoard.year === year) {
+        bigBoard.entries.forEach((entry) => {
+          schools.add(entry.school);
+        });
+      }
+    });
+    return Ok([...schools].sort((a, b) => a.localeCompare(b)));
+  }
+
+  async getBigBoard(year: number, creator: BigBoardCreator, filter?: DraftBoardFilter): Promise<Result<BigBoard, BigBoardError>> {
+    const bigBoard = creator === "Consensus"
+      ? this.generateConsensusBigBoard(year)
+      : this.findBigBoard(year, creator);
     if (!bigBoard) {
       return Err(BigBoardNotFound(`Big board for ${year} by ${creator} was not found.`));
     }
-    return Ok(bigBoard);
+    let entries = [...bigBoard.entries];
+    if (filter) {
+      entries = entries.filter((entry) => {
+        if (filter.position && entry.position !== filter.position) {
+          return false;
+        }
+        if (filter.school && entry.school.toLowerCase() !== filter.school.toLowerCase()) {
+          return false;
+        }
+        return true;
+      });
+    }
+    return Ok({ ...bigBoard, entries });
+  }
+
+  private generateConsensusBigBoard(year: number): BigBoard {
+    const ryanBoard = this.findBigBoard(year, "Ryan");
+    const aleksBoard = this.findBigBoard(year, "Aleks");
+    const entriesByPlayer = new Map<string, { Ryan?: BigBoardEntry; Aleks?: BigBoardEntry }>();
+
+    ryanBoard?.entries.filter((entry) => entry.playerInfoPublished).forEach((entry) => {
+      entriesByPlayer.set(entry.playerName, {
+        ...entriesByPlayer.get(entry.playerName),
+        Ryan: entry,
+      });
+    });
+    aleksBoard?.entries.filter((entry) => entry.playerInfoPublished).forEach((entry) => {
+      entriesByPlayer.set(entry.playerName, {
+        ...entriesByPlayer.get(entry.playerName),
+        Aleks: entry,
+      });
+    });
+
+    const average = (values: Array<number | null | undefined>): number | null => {
+      const rankedValues = values.filter((value): value is number => typeof value === "number");
+      if (rankedValues.length === 0) {
+        return null;
+      }
+      return rankedValues.reduce((sum, value) => sum + value, 0) / rankedValues.length;
+    };
+
+    const consensusEntries: BigBoardEntry[] = [...entriesByPlayer.values()].map(({ Ryan, Aleks }) => {
+      const sourceOfTruth = Ryan ?? Aleks;
+      if (!sourceOfTruth) {
+        throw new Error("Consensus entry cannot be created without a source player.");
+      }
+
+      const rank = average([Ryan?.rank, Aleks?.rank]);
+      const posRank = average([Ryan?.posRank, Aleks?.posRank]);
+      const rankDiscrepency = typeof Ryan?.rank === "number" && typeof Aleks?.rank === "number"
+        ? Math.abs(Ryan.rank - Aleks.rank)
+        : 0;
+
+      return {
+        ...sourceOfTruth,
+        id: `consensus-${sourceOfTruth.id}`,
+        rank,
+        posRank,
+        bigDiscrepency: rankDiscrepency > 10,
+      };
+    }).sort((first, second) => {
+      const firstRank = first.rank ?? Number.MAX_SAFE_INTEGER;
+      const secondRank = second.rank ?? Number.MAX_SAFE_INTEGER;
+      return firstRank - secondRank ||
+        (first.posRank ?? Number.MAX_SAFE_INTEGER) - (second.posRank ?? Number.MAX_SAFE_INTEGER) ||
+        first.playerName.localeCompare(second.playerName);
+    });
+
+    return { year, creator: "Consensus", entries: consensusEntries };
   }
 
   async createBigBoardYear(year: number): Promise<Result<void, BigBoardError>> {
@@ -155,6 +240,7 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
       return Err(DuplicateArticle(`Article with id "${article.id}" already exists.`));
     }
     this.articles.push(article);
+    this.tagList = new Set([...this.tagList, ...(article.tags ?? [])]);
     return Ok(article);
   }
 
@@ -198,6 +284,15 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
       return Err(ArticleNotFound(`Article with id "${id}" not found.`));
     }
     this.articles.splice(index, 1);
+    const article = this.articles[index];
+    if (article && article.tags) {
+      article.tags.forEach((tag) => {
+        const tagExistsInOtherArticles = this.articles.some((a) => a !== article && a.tags?.includes(tag));
+        if (!tagExistsInOtherArticles) {
+          this.tagList.delete(tag);
+        }
+      });
+    }
     return Ok(undefined);
   }
 
@@ -406,6 +501,94 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
     }
     this.forumPosts.splice(index, 1);
     return Ok(undefined);
+  }
+
+  async createYoutubeVideo(video: Video): Promise<Result<Video, ArticleError>> {
+    if (this.videos.find((existing) => existing.videoId === video.videoId)) {
+      return Err(DuplicateArticle(`YouTube video with id "${video.videoId}" already exists.`));
+    }
+    this.videos.push(video);
+    this.tagList = new Set([...this.tagList, ...(video.tags ?? [])]);
+    return Ok(video);
+  }
+
+  async getYoutubeVideos(): Promise<Result<Video[], ArticleError>> {
+    return Ok([...this.videos].sort((first, second) => second.createdAt.getTime() - first.createdAt.getTime()));
+  }
+
+  async filterYoutubeVideos(query: VideoQuery): Promise<Result<Video[], ArticleError>> {
+    const filtered = this.videos.filter((video) => {
+      if (query.keyword) {
+        const keyword = query.keyword.toLowerCase();
+        const searchText = `${video.title} ${video.description} ${video.tags.join(" ")}`;
+        if (!searchText.toLowerCase().includes(keyword)) {
+          return false;
+        }
+      }
+
+      if (query.tags && query.tags.length > 0) {
+        const videoTags = video.tags.map((tag) => tag.toLowerCase());
+        const requiredTags = query.tags.map((tag) => tag.toLowerCase());
+        if (!requiredTags.every((tag) => videoTags.includes(tag))) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    const sortBy = query.sortBy ?? "date";
+    const direction = query.sortDirection === "asc" ? 1 : -1;
+    const sorted = [...filtered].sort((first, second) => {
+      const firstValue = sortBy === "popularity" ? first.viewCount ?? 0 : first.createdAt.getTime();
+      const secondValue = sortBy === "popularity" ? second.viewCount ?? 0 : second.createdAt.getTime();
+
+      return (firstValue - secondValue) * direction;
+    });
+
+    return Ok(sorted);
+  }
+
+  async updateYoutubeVideoStats(videoId: string, stats: { thumbnailUrl?: string; viewCount?: number; youtubeStatsFetchedAt: Date }): Promise<Result<Video, ArticleError>> {
+    const videoIndex = this.videos.findIndex((video) => video.videoId === videoId);
+    if (videoIndex === -1) {
+      return Err(ArticleNotFound(`YouTube video with id "${videoId}" not found.`));
+    }
+
+    const updated: Video = {
+      ...this.videos[videoIndex],
+      thumbnailUrl: stats.thumbnailUrl ?? this.videos[videoIndex].thumbnailUrl,
+      viewCount: stats.viewCount ?? this.videos[videoIndex].viewCount,
+      youtubeStatsFetchedAt: stats.youtubeStatsFetchedAt,
+      updatedAt: new Date(),
+    };
+    this.videos[videoIndex] = updated;
+    return Ok(updated);
+  }
+
+  async getTags(): Promise<Result<string[], ArticleError>> {
+    return Ok([...this.tagList].sort((a, b) => a.localeCompare(b)));
+  }
+
+  async getConsensusBigBoard(year: number): Promise<Result<ConsensusBigBoard, BigBoardError>> {
+    if (!this.bigBoards.find(bb => bb.year === year)) {
+      return Err(BigBoardNotFound(`Big board for ${year} was not found.`));
+    }
+    const generated = this.generateConsensusBigBoard(year);
+    const consensusBigBoard: ConsensusBigBoard = {
+      year: generated.year,
+      entries: generated.entries.map((entry) => ({
+        playerName: entry.playerName,
+        position: entry.position as ConsensusBigBoard["entries"][number]["position"],
+        school: entry.school,
+        rank: entry.rank,
+        posRank: entry.posRank,
+        height: entry.height,
+        weight: entry.weight,
+        bigDiscrepency: entry.bigDiscrepency ?? false,
+      })),
+    };
+    return Ok(consensusBigBoard);
   }
 }
 

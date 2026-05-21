@@ -34,11 +34,18 @@
     New here? <a href="/register">Create an account</a>.
   </p>
 
+  <form class="ondraft-form verification-resend-form" method="post" action="/verify-email/resend">
+    <label for="verificationEmail">Need a new verification email?</label>
+    <input id="verificationEmail" name="email" type="email" autocomplete="username" />
+    <button type="submit" class="secondary-button">Send verification link</button>
+  </form>
+
   <div class="demo-users">
     <h3>Demo Users</h3>
     <ul class="credential-list">
-      <li><code>ryanmcwalter@ondraft.test</code> / <code>password123</code></li>
-      <li><code>bob@ondraft.test</code> / <code>password123</code></li>
+      <li><code>support@ondraftfootball.com</code> / <code>password123</code></li>
+      <li><code>ryan@ondraftfootball.com</code> / <code>password123</code></li>
+      <li><code>aleks@ondraftfootball.com</code> / <code>password123</code></li>
     </ul>
   </div>
 </section>

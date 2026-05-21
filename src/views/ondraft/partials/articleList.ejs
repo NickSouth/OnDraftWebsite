@@ -36,18 +36,23 @@
             <% } %>
           </span>
         </a>
-        <% if (isAdmin) { %>
-          <button
-            type="button"
-            class="danger-button article-delete-button"
-            hx-delete="/articles/<%= article.id %>"
-            hx-confirm="Are you sure? Deleted articles cannot be recovered."
-            hx-target="#article-list-item-<%= article.id %>"
-            hx-swap="outerHTML"
-          >
-            Delete
-          </button>
-        <% } %>
+        <div class="article-list-actions">
+          <% if (session.authenticatedUser) { %>
+            <%- include("bookmarkButton", { bookmark: { type: "article", articleId: article.id }, bookmarked: bookmarkedArticleIds.includes(article.id) }) %>
+          <% } %>
+          <% if (isAdmin) { %>
+            <button
+              type="button"
+              class="danger-button article-delete-button"
+              hx-delete="/articles/<%= article.id %>"
+              hx-confirm="Are you sure? Deleted articles cannot be recovered."
+              hx-target="#article-list-item-<%= article.id %>"
+              hx-swap="outerHTML"
+            >
+              Delete
+            </button>
+          <% } %>
+        </div>
       </li>
     <% }) %>
   </ul>

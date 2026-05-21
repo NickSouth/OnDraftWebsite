@@ -1,5 +1,6 @@
 import {
   createInitialOnDraftSession,
+  isAdminSession,
   signInAuthenticatedUser,
   touchOnDraftSession,
   type OnDraftSessionStore,
@@ -28,13 +29,58 @@ describe("OnDraftSession", () => {
       store,
       {
         id: "user-alice",
-        email: "ryanmcwalter@ondraft.test",
+        email: "ryan@ondraftfootball.com",
+        emailVerifiedAt: "2026-03-15T09:00:00.000Z",
         displayName: "Ryan McWalter",
+        role: "admin",
+        ban: null,
+        createdAt: "2026-03-15T09:00:00.000Z",
       },
       new Date("2026-03-15T09:30:00.000Z"),
     );
 
-    expect(signedIn.authenticatedUser?.email).toBe("ryanmcwalter@ondraft.test");
+    expect(signedIn.authenticatedUser?.email).toBe("ryan@ondraftfootball.com");
     expect(signedIn.authenticatedUser).not.toHaveProperty("password");
+  });
+
+  it("uses configured admin emails without requiring email verification", () => {
+    const store = {
+      ondraft: createInitialOnDraftSession(
+        new Date("2026-03-15T09:00:00.000Z"),
+        "browser-admin",
+      ),
+    } as OnDraftSessionStore;
+
+    const unverified = signInAuthenticatedUser(
+      store,
+      {
+        id: "user-admin",
+        email: "ryan@ondraftfootball.com",
+        emailVerifiedAt: null,
+        displayName: "Ryan McWalter",
+        role: "admin",
+        ban: null,
+        createdAt: "2026-03-15T09:00:00.000Z",
+      },
+      new Date("2026-03-15T09:30:00.000Z"),
+    );
+
+    expect(isAdminSession(unverified)).toBe(true);
+
+    const verified = signInAuthenticatedUser(
+      store,
+      {
+        id: "user-admin",
+        email: "reader@ondraftfootball.com",
+        emailVerifiedAt: "2026-03-15T09:35:00.000Z",
+        displayName: "Reader",
+        role: "user",
+        ban: null,
+        createdAt: "2026-03-15T09:00:00.000Z",
+      },
+      new Date("2026-03-15T09:40:00.000Z"),
+    );
+
+    expect(isAdminSession(verified)).toBe(false);
   });
 });

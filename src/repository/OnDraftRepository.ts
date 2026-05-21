@@ -1,5 +1,5 @@
 import { Result } from "../lib/result";
-import { type BigBoard, Article, BigBoardCreator, BigBoardEntry, ArticleFilter, Comment, ForumPost, ForumPostFilter } from "../model/OnDraftContent";
+import { type BigBoard, Article, BigBoardCreator, BigBoardEntry, ArticleFilter, Comment, ForumPost, ForumPostFilter, DraftBoardFilter, Video, VideoQuery, ConsensusBigBoard, } from "../model/OnDraftContent";
 
 export type BigBoardError = 
     | {name: "BigBoardNotFound"; message: string}
@@ -45,9 +45,10 @@ export const UnknownArticleError = (message: string): ArticleError => ({ name: "
 export const UnknownBigBoardError = (message: string): BigBoardError => ({ name: "UnknownBigBoardError", message });
 
 export interface IOnDraftRepository {
-    getBigBoard(year: number, creator: BigBoardCreator): Promise<Result<BigBoard, BigBoardError>>;
+    getBigBoard(year: number, creator: BigBoardCreator, filter?: DraftBoardFilter): Promise<Result<BigBoard, BigBoardError>>;
     createBigBoardYear(year: number): Promise<Result<void, BigBoardError>>;
     deleteBigBoardYear(year: number): Promise<Result<void, BigBoardError>>;
+    getSavedSchools(year: number): Promise<Result<string[], BigBoardError>>;
     getBigBoardYears(): Promise<Result<number[], BigBoardError>>;
     getArticles(published?: boolean): Promise<Result<Article[], ArticleError>>;
     getArticleTags(): Promise<Result<string[], ArticleError>>;
@@ -74,4 +75,10 @@ export interface IOnDraftRepository {
     commentByForumPostId(postId: string, comment: Comment): Promise<Result<Comment, ForumPostError>>;
     getFilteredForumPosts(filter: ForumPostFilter): Promise<Result<ForumPost[], ForumPostError>>;
     deleteForumPost(postId: string): Promise<Result<void, ForumPostError>>;
+    createYoutubeVideo(video: Video): Promise<Result<Video, ArticleError>>;
+    getYoutubeVideos(): Promise<Result<Video[], ArticleError>>;
+    filterYoutubeVideos(query: VideoQuery): Promise<Result<Video[], ArticleError>>;
+    updateYoutubeVideoStats(videoId: string, stats: { thumbnailUrl?: string; viewCount?: number; youtubeStatsFetchedAt: Date }): Promise<Result<Video, ArticleError>>;
+    getTags(): Promise<Result<string[], ArticleError>>;
+    getConsensusBigBoard(year: number): Promise<Result<ConsensusBigBoard, BigBoardError>>;
 }

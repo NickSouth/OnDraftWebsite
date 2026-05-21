@@ -1,0 +1,82 @@
+<section class="plain-page">
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">OnDraft</p>
+      <h1>Videos</h1>
+    </div>
+    <% if (isAdmin) { %>
+      <a class="button-link" href="/videos/new">Add video</a>
+    <% } %>
+  </div>
+
+  <form class="article-filter-form" method="get" action="/videos">
+    <div class="article-search-row">
+      <label class="article-search-field">
+        <span>Search</span>
+        <input name="keyword" type="search" placeholder="Search videos" value="<%= values.keyword %>" />
+      </label>
+      <button type="submit">Search</button>
+      <button
+        type="button"
+        class="secondary-button"
+        onclick="this.form.reset(); this.form.keyword.value = ''; this.form.tags.value = ''; this.form.sortBy.value = 'date'; this.form.sortDirection.value = 'desc'; this.form.submit();"
+      >
+        Clear
+      </button>
+    </div>
+
+    <div class="article-sort-row video-filter-row">
+      <label>
+        Tags
+        <input name="tags" value="<%= values.tags %>" placeholder="draft,film-room" />
+      </label>
+      <label>
+        Sort by
+        <select name="sortBy">
+          <option value="date" <%= values.sortBy === "date" ? "selected" : "" %>>Date</option>
+          <option value="popularity" <%= values.sortBy === "popularity" ? "selected" : "" %>>Popularity</option>
+        </select>
+      </label>
+      <label>
+        Direction
+        <select name="sortDirection">
+          <option value="desc" <%= values.sortDirection === "desc" ? "selected" : "" %>>Descending</option>
+          <option value="asc" <%= values.sortDirection === "asc" ? "selected" : "" %>>Ascending</option>
+        </select>
+      </label>
+      <button type="submit">Apply filters</button>
+    </div>
+  </form>
+
+  <% if (videos.length === 0) { %>
+    <p class="muted-text">No videos have been added yet.</p>
+  <% } else { %>
+    <div class="video-grid">
+      <% videos.forEach((video) => { %>
+        <% const thumbnailUrl = video.thumbnailUrl || `https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`; %>
+        <article class="video-card">
+          <a href="<%= video.youtubeUrl %>" target="_blank" rel="noopener noreferrer">
+            <img class="video-thumb" src="<%= thumbnailUrl %>" alt="" />
+          </a>
+          <div class="video-card-copy">
+            <h2><%= video.title %></h2>
+            <p><%= video.description.length > 180 ? `${video.description.slice(0, 177)}...` : video.description %></p>
+            <div class="article-tags">
+              <% video.tags.forEach((tag) => { %>
+                <span class="article-tag"><%= tag %></span>
+              <% }) %>
+            </div>
+            <div class="video-card-footer">
+              <% if (typeof video.viewCount === "number") { %>
+                <span class="muted-text"><%= video.viewCount.toLocaleString() %> views</span>
+              <% } else { %>
+                <span class="muted-text">Views unavailable</span>
+              <% } %>
+              <a class="button-link secondary-link" href="<%= video.youtubeUrl %>" target="_blank" rel="noopener noreferrer">Watch</a>
+            </div>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+  <% } %>
+</section>

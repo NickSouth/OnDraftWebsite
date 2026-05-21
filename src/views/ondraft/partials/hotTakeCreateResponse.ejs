@@ -1,2 +1,2 @@
-<%- include("hotTakeComposer", { session, errorMessage, values, outOfBand: true }) %>
-<%- include("hotTakeList", { posts, session, isAdmin, likeActorId, errorMessage }) %>
+<%- include("hotTakeComposer", { session, errorMessage, values, activeUserBan, outOfBand: true }) %>
+<%- include("hotTakeList", { posts, session, isAdmin, likeActorId, bookmarkedForumPostIds, userModerationById, activeUserBan, errorMessage }) %>

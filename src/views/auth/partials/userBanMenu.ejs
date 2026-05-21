@@ -1,0 +1,43 @@
+<div class="moderation-menu">
+  <% if (errorMessage) { %>
+    <p class="error-message"><%= errorMessage %></p>
+  <% } %>
+
+  <% if (user && user.activeBan) { %>
+    <p class="muted-text">
+      Banned<% if (user.activeBan.expiresAt) { %> until <%= new Date(user.activeBan.expiresAt).toLocaleString() %><% } else { %> permanently<% } %>.
+    </p>
+    <form
+      class="inline-form"
+      hx-post="/admin/users/<%= user.id %>/unban"
+      hx-target="#user-moderation-actions-<%= contextId %>"
+      hx-swap="outerHTML"
+    >
+      <input type="hidden" name="contextId" value="<%= contextId %>" />
+      <button type="submit" class="secondary-button">Unban</button>
+    </form>
+  <% } else if (user && user.role !== "admin") { %>
+    <form
+      class="moderation-form"
+      hx-post="/admin/users/<%= user.id %>/ban"
+      hx-target="#user-moderation-actions-<%= contextId %>"
+      hx-swap="outerHTML"
+    >
+      <input type="hidden" name="contextId" value="<%= contextId %>" />
+      <label>
+        Ban message
+        <textarea name="message" rows="3" required></textarea>
+      </label>
+      <label>
+        Duration
+        <select name="duration" required>
+          <option value="1-day">1 day</option>
+          <option value="1-month">1 month</option>
+          <option value="1-year">1 year</option>
+          <option value="permanent">Permanent</option>
+        </select>
+      </label>
+      <button type="submit">Ban user</button>
+    </form>
+  <% } %>
+</div>

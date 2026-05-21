@@ -1,0 +1,20 @@
+<%
+  const isArticleBookmark = bookmark.type === "article";
+  const contentId = isArticleBookmark ? bookmark.articleId : bookmark.forumPostId;
+  const contentType = isArticleBookmark ? "article" : "forum post";
+  const targetId = `${isArticleBookmark ? "article" : "forum-post"}-bookmark-${contentId}`;
+  const postUrl = isArticleBookmark ? `/articles/${contentId}/bookmark` : `/hottakes/${contentId}/bookmark`;
+%>
+<button
+  id="<%= targetId %>"
+  type="button"
+  class="icon-button bookmark-button <%= bookmarked ? "is-bookmarked" : "" %>"
+  aria-label="<%= bookmarked ? `Remove ${contentType} bookmark` : `Bookmark ${contentType}` %>"
+  aria-pressed="<%= bookmarked ? "true" : "false" %>"
+  title="<%= bookmarked ? "Remove bookmark" : "Bookmark" %>"
+  hx-post="<%= postUrl %>"
+  hx-target="#<%= targetId %>"
+  hx-swap="outerHTML"
+>
+  <span aria-hidden="true"><%- bookmarked ? "&#128204;" : "&#128205;" %></span>
+</button>

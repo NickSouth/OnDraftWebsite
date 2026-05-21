@@ -5,7 +5,11 @@ import type { IAuthenticatedUser } from "../auth/User";
 export interface IAuthenticatedUserSession {
   userId: string;
   email: string;
+  emailVerifiedAt: string | null;
   displayName: string;
+  role: string;
+  ban: IAuthenticatedUser["ban"];
+  createdAt: string;
   signedInAt: string;
 }
 
@@ -86,7 +90,11 @@ export function signInAuthenticatedUser(
   session.authenticatedUser = {
     userId: user.id,
     email: user.email,
+    emailVerifiedAt: user.emailVerifiedAt,
     displayName: user.displayName,
+    role: user.role,
+    ban: user.ban ? { ...user.ban } : null,
+    createdAt: user.createdAt,
     signedInAt: now.toISOString(),
   };
   session.lastSeenAt = now.toISOString();
@@ -123,10 +131,14 @@ export function isAdminSession(session: IOnDraftBrowserSession): boolean {
     return false;
   }
 
-  const adminEmails = (process.env.ADMIN_EMAILS ?? "ryanmcwalter@ondraft.test")
+  const adminEmails = (process.env.ADMIN_EMAILS ?? "support@ondraftfootball.com,ryan@ondraftfootball.com,aleks@ondraftfootball.com")
     .split(",")
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean);
 
   return adminEmails.includes(email.toLowerCase());
+}
+
+export function isVerifiedUserSession(session: IOnDraftBrowserSession): boolean {
+  return Boolean(session.authenticatedUser?.emailVerifiedAt);
 }
