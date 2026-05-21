@@ -264,6 +264,47 @@ class ExpressApp implements IApp {
     );
 
     this.app.get(
+      "/admin/users/:userId/moderation-menu",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+        const contextId = typeof req.query.contextId === "string" ? req.query.contextId : userId;
+        await this.authController.showUserModerationMenu(res, sessionStore(req), userId, contextId);
+      }),
+    );
+
+    this.app.post(
+      "/admin/users/:userId/ban",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+        const contextId = typeof req.body.contextId === "string" ? req.body.contextId : userId;
+        const message = typeof req.body.message === "string" ? req.body.message : "";
+        const duration = typeof req.body.duration === "string" ? req.body.duration : "";
+        await this.authController.banUserFromForm(res, sessionStore(req), userId, contextId, message, duration);
+      }),
+    );
+
+    this.app.post(
+      "/admin/users/:userId/unban",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+        const contextId = typeof req.body.contextId === "string" ? req.body.contextId : userId;
+        await this.authController.unbanUserFromForm(res, sessionStore(req), userId, contextId);
+      }),
+    );
+
+    this.app.get(
       "/admin/mailing-list/subscribers.csv",
       asyncHandler(async (req, res) => {
         if (!this.requireAdmin(req, res)) {

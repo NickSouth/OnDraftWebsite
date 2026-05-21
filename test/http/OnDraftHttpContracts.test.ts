@@ -168,6 +168,61 @@ describe("OnDraft HTTP contracts", () => {
     expect(usersPage.text).toContain("Download mailing list CSV");
   });
 
+  it("lets admins open the ban menu, ban users, and unban users from Manage Users", async () => {
+    const ondraft = app();
+    const reader = request.agent(ondraft);
+    await reader
+      .post("/register")
+      .type("form")
+      .send({
+        displayName: "Moderated Reader",
+        email: "moderated-reader@ondraft.test",
+        password: "password123",
+      });
+
+    const admin = await loginAdminAgent(ondraft);
+    const usersPage = await admin.get("/admin/users");
+    expect(usersPage.status).toBe(200);
+    expect(usersPage.text).toContain("Moderation");
+    expect(usersPage.text).toContain("moderated-reader@ondraft.test");
+
+    const banMenuPath = usersPage.text.match(/hx-get="([^"]+moderation-menu\?contextId=admin-user-[^"]+)"/)?.[1].replaceAll("&amp;", "&");
+    expect(banMenuPath).toBeDefined();
+    if (!banMenuPath) return;
+    const userId = banMenuPath.match(/\/admin\/users\/([^/]+)\/moderation-menu/)?.[1];
+    expect(userId).toBeDefined();
+    if (!userId) return;
+
+    const menu = await admin.get(banMenuPath);
+    expect(menu.status).toBe(200);
+    expect(menu.text).toContain("Ban message");
+    expect(menu.text).toContain("Permanent");
+
+    const banned = await admin
+      .post(`/admin/users/${userId}/ban`)
+      .type("form")
+      .send({
+        contextId: `admin-user-${userId}`,
+        message: "Cool down before posting again.",
+        duration: "1-day",
+      });
+    expect(banned.status).toBe(200);
+    expect(banned.text).toContain("Unban");
+
+    const bannedUsersPage = await admin.get("/admin/users");
+    expect(bannedUsersPage.status).toBe(200);
+    expect(bannedUsersPage.text).toContain("Banned");
+    expect(bannedUsersPage.text).toContain("Unban");
+
+    const unbanned = await admin
+      .post(`/admin/users/${userId}/unban`)
+      .type("form")
+      .send({ contextId: `admin-user-${userId}` });
+    expect(unbanned.status).toBe(200);
+    expect(unbanned.text).toContain("Ban");
+    expect(unbanned.text).not.toContain("Unban");
+  });
+
   it("allows anonymous visitors to view articles and the big board", async () => {
     const ondraft = app();
 

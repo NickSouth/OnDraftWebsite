@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import type { IOnDraftBrowserSession } from "../session/OnDraftSession";
 import { isAdminSession, isVerifiedUserSession } from "../session/OnDraftSession";
+import type { AdminUserListItem, IAuthService } from "../auth/AuthService";
 import type { BigBoardEditableEntryInput, CreateArticleInput, CreateYoutubeVideoInput, IOnDraftService, SaveBigBoardEntriesInput } from "../service/OnDraftService";
 import type { IUserPreferenceService, UserPreferenceError } from "../service/UserPreferenceService";
 import type { ILoggingService } from "../service/LoggingService";
@@ -63,6 +64,7 @@ class OnDraftController implements IOnDraftController {
     private readonly service: IOnDraftService,
     private readonly userPreferences: IUserPreferenceService,
     private readonly logger: ILoggingService,
+    private readonly authService: IAuthService,
   ) {}
 
   private mapArticleErrorToStatusCode(error: ArticleError): number {
@@ -445,6 +447,20 @@ class OnDraftController implements IOnDraftController {
       .map((bookmark) => bookmark.forumPostId);
   }
 
+  private async userModerationById(session: IOnDraftBrowserSession): Promise<Map<string, AdminUserListItem>> {
+    if (!isAdminSession(session)) {
+      return new Map();
+    }
+
+    const result = await this.authService.listAdminUsers();
+    if (result.ok === false) {
+      this.logger.warn(`Unable to load user moderation state: ${result.value.message}`);
+      return new Map();
+    }
+
+    return new Map(result.value.map((user) => [user.id, user]));
+  }
+
   private requireAuthenticatedUser(res: Response, session: IOnDraftBrowserSession): string | null {
     const userId = session.authenticatedUser?.userId;
     if (userId) {
@@ -695,6 +711,7 @@ class OnDraftController implements IOnDraftController {
       isAdmin: isAdminSession(session),
       likeActorId: this.likeActorId(session),
       bookmarkedForumPostIds: await this.bookmarkedForumPostIds(session),
+      userModerationById: await this.userModerationById(session),
       errorMessage,
     });
   }
@@ -716,6 +733,7 @@ class OnDraftController implements IOnDraftController {
       sortDirection: this.forumPostSortDirection(req),
       likeActorId: this.likeActorId(session),
       bookmarkedForumPostIds: await this.bookmarkedForumPostIds(session),
+      userModerationById: await this.userModerationById(session),
       errorMessage: null,
       values: {},
     });
@@ -898,6 +916,7 @@ class OnDraftController implements IOnDraftController {
       commentsLimit: 10,
       likeActorId: this.likeActorId(session),
       articleBookmarked: (await this.bookmarkedArticleIds(session)).includes(result.value.id),
+      userModerationById: await this.userModerationById(session),
     });
   }
 
@@ -1115,6 +1134,7 @@ class OnDraftController implements IOnDraftController {
       commentsLimit: this.commentLimit(req),
       likeActorId: this.likeActorId(session),
       errorMessage: null,
+      userModerationById: await this.userModerationById(session),
     });
   }
 
@@ -1153,6 +1173,7 @@ class OnDraftController implements IOnDraftController {
           commentsLimit: this.commentLimit(req),
           likeActorId: this.likeActorId(session),
           errorMessage: result.value.message,
+          userModerationById: await this.userModerationById(session),
         });
         return;
       }
@@ -1282,6 +1303,7 @@ class OnDraftController implements IOnDraftController {
       isAdmin: isAdminSession(session),
       likeActorId: this.likeActorId(session),
       bookmarkedForumPostIds: await this.bookmarkedForumPostIds(session),
+      userModerationById: await this.userModerationById(session),
       errorMessage: null,
       values: {},
     });
@@ -1357,7 +1379,9 @@ class OnDraftController implements IOnDraftController {
             layout: false,
             post: postResult.value,
             session,
+            isAdmin: isAdminSession(session),
             errorMessage: result.value.message,
+            userModerationById: await this.userModerationById(session),
           });
         return;
       }
@@ -1374,7 +1398,9 @@ class OnDraftController implements IOnDraftController {
       layout: false,
       post: postResult.value,
       session,
+      isAdmin: isAdminSession(session),
       errorMessage: null,
+      userModerationById: await this.userModerationById(session),
     });
   }
 
@@ -1602,6 +1628,7 @@ export function CreateOnDraftController(
   service: IOnDraftService,
   userPreferences: IUserPreferenceService,
   logger: ILoggingService,
+  authService: IAuthService,
 ): IOnDraftController {
-  return new OnDraftController(service, userPreferences, logger);
+  return new OnDraftController(service, userPreferences, logger, authService);
 }

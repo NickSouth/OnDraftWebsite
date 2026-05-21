@@ -1,4 +1,5 @@
 <section id="article-comments-section" class="article-comments-section">
+  <% const moderationById = typeof userModerationById !== "undefined" ? userModerationById : new Map(); %>
   <div class="section-heading">
     <h2>Comments</h2>
     <p class="muted-text"><%= article.comments.length %> total</p>
@@ -37,6 +38,10 @@
               <strong><%= comment.userName %></strong>
               <span class="muted-text"><%= new Date(comment.createdAt).toLocaleString() %></span>
             </div>
+            <% const commentModeratedUser = moderationById.get(comment.userId); %>
+            <% if (isAdmin && commentModeratedUser) { %>
+              <%- include("../../auth/partials/userModerationActions", { user: commentModeratedUser, contextId: `article-comment-${comment.id}`, errorMessage: null }) %>
+            <% } %>
             <% if (isAdmin || comment.userId === session.authenticatedUser?.userId) { %>
               <button
                 type="button"
@@ -62,6 +67,10 @@
                       <strong><%= reply.userName %></strong>
                       <span class="muted-text"><%= new Date(reply.createdAt).toLocaleString() %></span>
                     </div>
+                    <% const replyModeratedUser = moderationById.get(reply.userId); %>
+                    <% if (isAdmin && replyModeratedUser) { %>
+                      <%- include("../../auth/partials/userModerationActions", { user: replyModeratedUser, contextId: `article-reply-${reply.id}`, errorMessage: null }) %>
+                    <% } %>
                     <% if (isAdmin || reply.userId === session.authenticatedUser?.userId) { %>
                       <button
                         type="button"

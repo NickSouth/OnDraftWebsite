@@ -29,6 +29,6 @@ export function createComposedApp(
   const userPreferences = CreateUserPreferenceService(authUsers);
   const authService = CreateAuthService(authUsers, emailService, config.email);
   const authController = CreateAuthController(authService, resolvedLogger);
-  const controller = CreateOnDraftController(service, userPreferences, resolvedLogger);
+  const controller = CreateOnDraftController(service, userPreferences, resolvedLogger, authService);
   return CreateApp(controller, authController, resolvedLogger);
 }

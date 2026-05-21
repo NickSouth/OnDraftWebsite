@@ -16,6 +16,7 @@
           <th>Email</th>
           <th>Verified</th>
           <th>Mailing List</th>
+          <th>Moderation</th>
           <th>Registered</th>
         </tr>
       </thead>
@@ -26,6 +27,14 @@
             <td><%= user.email %></td>
             <td><%= user.emailVerifiedAt ? "Verified" : "Unverified" %></td>
             <td><%= user.mailingListStatus %></td>
+            <td>
+              <% if (user.activeBan) { %>
+                <p class="muted-text">
+                  Banned<% if (user.activeBan.expiresAt) { %> until <%= new Date(user.activeBan.expiresAt).toLocaleString() %><% } else { %> permanently<% } %>
+                </p>
+              <% } %>
+              <%- include("partials/userModerationActions", { user, contextId: `admin-user-${user.id}`, errorMessage: null }) %>
+            </td>
             <td><%= new Date(user.registeredAt).toLocaleString() %></td>
           </tr>
         <% }) %>

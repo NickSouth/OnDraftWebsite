@@ -34,5 +34,5 @@
     <div class="article-body"><%= article.content.text %></div>
   <% } %>
 
-  <%- include("partials/articleComments", { article, session, isAdmin, commentsLimit, likeActorId, errorMessage: null }) %>
+  <%- include("partials/articleComments", { article, session, isAdmin, commentsLimit, likeActorId, userModerationById, errorMessage: null }) %>
 </article>

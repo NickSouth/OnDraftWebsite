@@ -1,0 +1,27 @@
+<div id="user-moderation-actions-<%= contextId %>" class="user-moderation-actions">
+  <% if (user.role === "admin") { %>
+    <span class="muted-text">Admin</span>
+  <% } else if (user.activeBan) { %>
+    <form
+      class="inline-form"
+      hx-post="/admin/users/<%= user.id %>/unban"
+      hx-target="#user-moderation-actions-<%= contextId %>"
+      hx-swap="outerHTML"
+    >
+      <input type="hidden" name="contextId" value="<%= contextId %>" />
+      <button type="submit" class="secondary-button">Unban</button>
+    </form>
+    <div id="user-moderation-menu-<%= contextId %>"></div>
+  <% } else { %>
+    <button
+      type="button"
+      class="secondary-button"
+      hx-get="/admin/users/<%= user.id %>/moderation-menu?contextId=<%= encodeURIComponent(contextId) %>"
+      hx-target="#user-moderation-menu-<%= contextId %>"
+      hx-swap="innerHTML"
+    >
+      Ban
+    </button>
+    <div id="user-moderation-menu-<%= contextId %>"></div>
+  <% } %>
+</div>

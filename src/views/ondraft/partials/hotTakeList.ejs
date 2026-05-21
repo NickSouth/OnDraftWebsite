@@ -1,4 +1,5 @@
 <div id="hot-take-list" class="hot-take-list">
+  <% const moderationById = typeof userModerationById !== "undefined" ? userModerationById : new Map(); %>
   <% if (errorMessage) { %>
     <p class="error-message"><%= errorMessage %></p>
   <% } %>
@@ -14,6 +15,10 @@
               <strong><%= post.userName %></strong>
               <span class="muted-text"><%= new Date(post.createdAt).toLocaleString() %></span>
             </div>
+            <% const postModeratedUser = moderationById.get(post.userId); %>
+            <% if (isAdmin && postModeratedUser) { %>
+              <%- include("../../auth/partials/userModerationActions", { user: postModeratedUser, contextId: `hot-take-${post.id}`, errorMessage: null }) %>
+            <% } %>
             <% if (isAdmin || post.userId === session.authenticatedUser?.userId) { %>
               <button
                 type="button"
@@ -29,7 +34,7 @@
           </div>
           <p class="hot-take-content"><%= post.content %></p>
           <%- include("hotTakeActions", { post, session, likeActorId, postBookmarked: bookmarkedForumPostIds.includes(post.id) }) %>
-          <%- include("hotTakeComments", { post, session, errorMessage: null }) %>
+          <%- include("hotTakeComments", { post, session, isAdmin, userModerationById: moderationById, errorMessage: null }) %>
         </li>
       <% }) %>
     </ol>
