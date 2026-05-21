@@ -1,7 +1,7 @@
-<div id="big-board-heading-actions" class="big-board-heading-actions" hx-swap-oob="true">
+<div id="big-board-heading-actions" class="big-board-heading-actions grid gap-3" hx-swap-oob="true">
   <%- include("bigBoardControls", { board, years, creators, positions, schools, filters }) %>
   <% if (isAdmin && board.creator !== "Consensus") { %>
-    <a class="button-link" href="/bigboard/edit?year=<%= board.year %>&creator=<%= board.creator %>">Edit board</a>
+    <a class="od-primary-link w-fit" href="/bigboard/edit?year=<%= board.year %>&creator=<%= board.creator %>">Edit board</a>
   <% } %>
 </div>
 <%- include("bigBoardResults", { bigBoard }) %>

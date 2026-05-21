@@ -39,7 +39,7 @@ describe("OnDraft HTTP contracts", () => {
     const response = await request(app()).get("/");
 
     expect(response.status).toBe(200);
-    expect(response.text).toContain("View articles");
+    expect(response.text).toContain("Articles On Tap");
     expect(response.text).toContain("Log in");
   });
 

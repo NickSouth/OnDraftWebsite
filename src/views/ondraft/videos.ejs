@@ -1,78 +1,92 @@
-<section class="plain-page">
-  <div class="page-heading">
-    <div>
-      <p class="eyebrow">OnDraft</p>
-      <h1>Videos</h1>
+<section class="mx-auto grid w-full max-w-6xl gap-8">
+  <div class="grid gap-5 border-b border-slate-200 pb-6 dark:border-white/10 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+    <div class="max-w-3xl">
+      <p class="text-xs font-black uppercase tracking-[0.2em] text-draft-amber dark:text-draft-gold">Bar TV</p>
+      <h1 class="mt-2 font-display text-4xl font-black leading-tight text-slate-950 dark:text-white sm:text-5xl">
+        Video breakdowns on tap.
+      </h1>
+      <p class="mt-3 text-base leading-7 text-slate-600 dark:text-slate-300">
+        Film sessions, scouting clips, and draft conversations built for watching fast and following up later.
+      </p>
     </div>
     <% if (isAdmin) { %>
-      <a class="button-link" href="/videos/new">Add video</a>
+      <a class="od-primary-link" href="/videos/new">Add video</a>
     <% } %>
   </div>
 
-  <form class="article-filter-form" method="get" action="/videos">
-    <div class="article-search-row">
-      <label class="article-search-field">
+  <form class="article-filter-form od-card grid gap-4 p-4 sm:p-5" method="get" action="/videos">
+    <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-end">
+      <label class="grid gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
         <span>Search</span>
-        <input name="keyword" type="search" placeholder="Search videos" value="<%= values.keyword %>" />
+        <input class="od-focus-ring min-h-11 rounded-md border border-slate-300 bg-white px-3 text-base text-slate-950 placeholder:text-slate-400 dark:border-white/15 dark:bg-draft-ink dark:text-white" name="keyword" type="search" placeholder="Search videos" value="<%= values.keyword %>" />
       </label>
-      <button type="submit">Search</button>
+      <button class="od-primary-link w-full lg:w-auto" type="submit">Search</button>
       <button
         type="button"
-        class="secondary-button"
+        class="od-secondary-link w-full lg:w-auto"
         onclick="this.form.reset(); this.form.keyword.value = ''; this.form.tags.value = ''; this.form.sortBy.value = 'date'; this.form.sortDirection.value = 'desc'; this.form.submit();"
       >
         Clear
       </button>
     </div>
 
-    <div class="article-sort-row video-filter-row">
-      <label>
-        Tags
-        <input name="tags" value="<%= values.tags %>" placeholder="draft,film-room" />
+    <div class="video-filter-row grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_12rem_12rem_auto] lg:items-end">
+      <label class="grid gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+        <span>Tags</span>
+        <input class="od-focus-ring min-h-11 rounded-md border border-slate-300 bg-white px-3 text-slate-950 placeholder:text-slate-400 dark:border-white/15 dark:bg-draft-ink dark:text-white" name="tags" value="<%= values.tags %>" placeholder="draft,film-room" />
       </label>
-      <label>
-        Sort by
-        <select name="sortBy">
+      <label class="grid gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+        <span>Sort by</span>
+        <select class="od-focus-ring min-h-11 rounded-md border border-slate-300 bg-white px-3 text-slate-950 dark:border-white/15 dark:bg-draft-ink dark:text-white" name="sortBy">
           <option value="date" <%= values.sortBy === "date" ? "selected" : "" %>>Date</option>
           <option value="popularity" <%= values.sortBy === "popularity" ? "selected" : "" %>>Popularity</option>
         </select>
       </label>
-      <label>
-        Direction
-        <select name="sortDirection">
+      <label class="grid gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+        <span>Direction</span>
+        <select class="od-focus-ring min-h-11 rounded-md border border-slate-300 bg-white px-3 text-slate-950 dark:border-white/15 dark:bg-draft-ink dark:text-white" name="sortDirection">
           <option value="desc" <%= values.sortDirection === "desc" ? "selected" : "" %>>Descending</option>
           <option value="asc" <%= values.sortDirection === "asc" ? "selected" : "" %>>Ascending</option>
         </select>
       </label>
-      <button type="submit">Apply filters</button>
+      <button class="od-primary-link w-full" type="submit">Apply filters</button>
     </div>
   </form>
 
   <% if (videos.length === 0) { %>
-    <p class="muted-text">No videos have been added yet.</p>
+    <div class="od-card grid min-h-48 place-items-center p-8 text-center">
+      <div>
+        <p class="text-xs font-black uppercase tracking-[0.18em] text-draft-amber dark:text-draft-gold">No signal</p>
+        <p class="mt-2 font-display text-2xl font-bold text-slate-950 dark:text-white">No videos have been added yet.</p>
+        <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">New Bar TV entries will appear here once they are published.</p>
+      </div>
+    </div>
   <% } else { %>
-    <div class="video-grid">
+    <div class="video-grid grid gap-5 md:grid-cols-2">
       <% videos.forEach((video) => { %>
         <% const thumbnailUrl = video.thumbnailUrl || `https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`; %>
-        <article class="video-card">
-          <a href="<%= video.youtubeUrl %>" target="_blank" rel="noopener noreferrer">
+        <article class="video-card od-card grid overflow-hidden transition hover:-translate-y-0.5 hover:border-draft-gold hover:shadow-editorial">
+          <a class="group block overflow-hidden bg-draft-ink" href="<%= video.youtubeUrl %>" target="_blank" rel="noopener noreferrer">
             <img class="video-thumb" src="<%= thumbnailUrl %>" alt="" />
           </a>
-          <div class="video-card-copy">
-            <h2><%= video.title %></h2>
-            <p><%= video.description.length > 180 ? `${video.description.slice(0, 177)}...` : video.description %></p>
-            <div class="article-tags">
+          <div class="video-card-copy grid gap-4 p-5">
+            <div class="grid gap-2">
+              <p class="m-0 text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Bar TV</p>
+              <h2 class="m-0 font-display text-2xl font-black leading-tight text-slate-950 dark:text-white"><%= video.title %></h2>
+              <p class="m-0 text-base leading-7 text-slate-700 dark:text-slate-200"><%= video.description.length > 180 ? `${video.description.slice(0, 177)}...` : video.description %></p>
+            </div>
+            <div class="flex flex-wrap gap-2">
               <% video.tags.forEach((tag) => { %>
-                <span class="article-tag"><%= tag %></span>
+                <span class="rounded bg-draft-foam px-2.5 py-1 text-xs font-black uppercase tracking-wide text-draft-amber dark:bg-white/10 dark:text-draft-gold"><%= tag %></span>
               <% }) %>
             </div>
-            <div class="video-card-footer">
+            <div class="video-card-footer mt-auto flex flex-col gap-3 border-t border-slate-200 pt-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
               <% if (typeof video.viewCount === "number") { %>
-                <span class="muted-text"><%= video.viewCount.toLocaleString() %> views</span>
+                <span class="text-sm font-bold text-slate-600 dark:text-slate-300"><%= video.viewCount.toLocaleString() %> views</span>
               <% } else { %>
-                <span class="muted-text">Views unavailable</span>
+                <span class="text-sm font-bold text-slate-600 dark:text-slate-300">Views unavailable</span>
               <% } %>
-              <a class="button-link secondary-link" href="<%= video.youtubeUrl %>" target="_blank" rel="noopener noreferrer">Watch</a>
+              <a class="od-secondary-link" href="<%= video.youtubeUrl %>" target="_blank" rel="noopener noreferrer">Watch</a>
             </div>
           </div>
         </article>

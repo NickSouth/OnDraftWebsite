@@ -46,6 +46,9 @@ class ExpressApp implements IApp {
   private registerMiddleware(): void {
     this.app.use(express.static(path.join(process.cwd(), "src/static")));
     this.app.use("/vendor/htmx", express.static(path.join(process.cwd(), "node_modules", "htmx.org", "dist")));
+    this.app.use("/vendor/alpinejs", express.static(path.join(process.cwd(), "node_modules", "alpinejs", "dist")));
+    this.app.use("/vendor/alpinejs-focus", express.static(path.join(process.cwd(), "node_modules", "@alpinejs", "focus", "dist")));
+    this.app.use("/vendor/alpinejs-collapse", express.static(path.join(process.cwd(), "node_modules", "@alpinejs", "collapse", "dist")));
     this.app.use("/vendor/pdfjs", express.static(path.join(process.cwd(), "node_modules", "pdfjs-dist")));
     this.app.use(express.static(path.join(process.cwd(), "public"), {
       setHeaders: (res, filePath) => {
