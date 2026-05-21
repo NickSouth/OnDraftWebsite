@@ -8,7 +8,7 @@ import type { ILoggingService } from "../service/LoggingService";
 import { ArticleError, BigBoardError, ForumPostError } from "../repository/OnDraftRepository";
 import { publicArticleUploadUrl } from "../uploads/articlePdfUpload";
 import { BIG_BOARD_CREATORS, POSITIONS, type Article, type ArticleContent, type ArticleFilter, type BigBoard, type BigBoardCreator, type ForumPost, type ForumPostFilter, type VideoQuery } from "../model/OnDraftContent";
-import type { Bookmark } from "../auth/User";
+import type { Bookmark, IUserBanRecord } from "../auth/User";
 
 export interface DraftBoardFilterInput {
   school?: string;
@@ -461,6 +461,28 @@ class OnDraftController implements IOnDraftController {
     return new Map(result.value.map((user) => [user.id, user]));
   }
 
+  private async activeUserBan(session: IOnDraftBrowserSession): Promise<IUserBanRecord | null> {
+    const userId = session.authenticatedUser?.userId;
+    if (!userId || isAdminSession(session)) {
+      return null;
+    }
+
+    const result = await this.authService.getActiveUserBan({ userId });
+    if (result.ok === false) {
+      this.logger.warn(`Unable to load active user ban: ${result.value.message}`);
+      return null;
+    }
+
+    return result.value;
+  }
+
+  private renderBanResponse(res: Response, ban: IUserBanRecord): void {
+    res.status(403).render("ondraft/partials/bannedUserNotice", {
+      layout: false,
+      ban,
+    });
+  }
+
   private requireAuthenticatedUser(res: Response, session: IOnDraftBrowserSession): string | null {
     const userId = session.authenticatedUser?.userId;
     if (userId) {
@@ -712,6 +734,7 @@ class OnDraftController implements IOnDraftController {
       likeActorId: this.likeActorId(session),
       bookmarkedForumPostIds: await this.bookmarkedForumPostIds(session),
       userModerationById: await this.userModerationById(session),
+      activeUserBan: await this.activeUserBan(session),
       errorMessage,
     });
   }
@@ -734,6 +757,7 @@ class OnDraftController implements IOnDraftController {
       likeActorId: this.likeActorId(session),
       bookmarkedForumPostIds: await this.bookmarkedForumPostIds(session),
       userModerationById: await this.userModerationById(session),
+      activeUserBan: await this.activeUserBan(session),
       errorMessage: null,
       values: {},
     });
@@ -917,6 +941,7 @@ class OnDraftController implements IOnDraftController {
       likeActorId: this.likeActorId(session),
       articleBookmarked: (await this.bookmarkedArticleIds(session)).includes(result.value.id),
       userModerationById: await this.userModerationById(session),
+      activeUserBan: await this.activeUserBan(session),
     });
   }
 
@@ -1135,6 +1160,7 @@ class OnDraftController implements IOnDraftController {
       likeActorId: this.likeActorId(session),
       errorMessage: null,
       userModerationById: await this.userModerationById(session),
+      activeUserBan: await this.activeUserBan(session),
     });
   }
 
@@ -1145,6 +1171,11 @@ class OnDraftController implements IOnDraftController {
         layout: false,
         message: "Log in to comment.",
       });
+      return;
+    }
+    const activeBan = await this.activeUserBan(session);
+    if (activeBan) {
+      this.renderBanResponse(res, activeBan);
       return;
     }
     if (!this.requireVerifiedUser(res, session, "Verify your email to comment.")) {
@@ -1174,6 +1205,7 @@ class OnDraftController implements IOnDraftController {
           likeActorId: this.likeActorId(session),
           errorMessage: result.value.message,
           userModerationById: await this.userModerationById(session),
+          activeUserBan: await this.activeUserBan(session),
         });
         return;
       }
@@ -1192,6 +1224,11 @@ class OnDraftController implements IOnDraftController {
         layout: false,
         message: "Log in to comment.",
       });
+      return;
+    }
+    const activeBan = await this.activeUserBan(session);
+    if (activeBan) {
+      this.renderBanResponse(res, activeBan);
       return;
     }
     if (!this.requireVerifiedUser(res, session, "Verify your email to comment.")) {
@@ -1268,6 +1305,19 @@ class OnDraftController implements IOnDraftController {
         session,
         errorMessage: "Log in to post a hot take.",
         values: req.body,
+        activeUserBan: null,
+      });
+      return;
+    }
+    const activeBan = await this.activeUserBan(session);
+    if (activeBan) {
+      res.set("HX-Retarget", "#hot-take-composer");
+      res.status(403).render("ondraft/partials/hotTakeComposer", {
+        layout: false,
+        session,
+        errorMessage: null,
+        values: req.body,
+        activeUserBan: activeBan,
       });
       return;
     }
@@ -1286,6 +1336,7 @@ class OnDraftController implements IOnDraftController {
           session,
           errorMessage: result.value.message,
           values: req.body,
+          activeUserBan: null,
         });
       return;
     }
@@ -1304,6 +1355,7 @@ class OnDraftController implements IOnDraftController {
       likeActorId: this.likeActorId(session),
       bookmarkedForumPostIds: await this.bookmarkedForumPostIds(session),
       userModerationById: await this.userModerationById(session),
+      activeUserBan: await this.activeUserBan(session),
       errorMessage: null,
       values: {},
     });
@@ -1360,6 +1412,11 @@ class OnDraftController implements IOnDraftController {
       });
       return;
     }
+    const activeBan = await this.activeUserBan(session);
+    if (activeBan) {
+      this.renderBanResponse(res, activeBan);
+      return;
+    }
     if (!this.requireVerifiedUser(res, session, "Verify your email to comment.")) {
       return;
     }
@@ -1382,6 +1439,7 @@ class OnDraftController implements IOnDraftController {
             isAdmin: isAdminSession(session),
             errorMessage: result.value.message,
             userModerationById: await this.userModerationById(session),
+            activeUserBan: await this.activeUserBan(session),
           });
         return;
       }
@@ -1401,6 +1459,7 @@ class OnDraftController implements IOnDraftController {
       isAdmin: isAdminSession(session),
       errorMessage: null,
       userModerationById: await this.userModerationById(session),
+      activeUserBan: await this.activeUserBan(session),
     });
   }
 

@@ -1,5 +1,6 @@
 <section id="article-comments-section" class="article-comments-section">
   <% const moderationById = typeof userModerationById !== "undefined" ? userModerationById : new Map(); %>
+  <% const currentActiveBan = typeof activeUserBan !== "undefined" ? activeUserBan : null; %>
   <div class="section-heading">
     <h2>Comments</h2>
     <p class="muted-text"><%= article.comments.length %> total</p>
@@ -9,7 +10,9 @@
     <p class="error-message"><%= errorMessage %></p>
   <% } %>
 
-  <% if (session.authenticatedUser) { %>
+  <% if (session.authenticatedUser && currentActiveBan) { %>
+    <%- include("bannedUserNotice", { ban: currentActiveBan }) %>
+  <% } else if (session.authenticatedUser) { %>
     <form
       class="comment-form"
       hx-post="/articles/<%= article.id %>/comments?limit=<%= commentsLimit %>"
@@ -89,7 +92,7 @@
               <% }) %>
             </ol>
           <% } %>
-          <% if (session.authenticatedUser) { %>
+          <% if (session.authenticatedUser && !currentActiveBan) { %>
             <div class="reply-thread-actions">
               <button
                 type="button"

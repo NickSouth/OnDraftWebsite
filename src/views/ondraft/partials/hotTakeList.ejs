@@ -1,5 +1,6 @@
 <div id="hot-take-list" class="hot-take-list">
   <% const moderationById = typeof userModerationById !== "undefined" ? userModerationById : new Map(); %>
+  <% const currentActiveBan = typeof activeUserBan !== "undefined" ? activeUserBan : null; %>
   <% if (errorMessage) { %>
     <p class="error-message"><%= errorMessage %></p>
   <% } %>
@@ -34,7 +35,7 @@
           </div>
           <p class="hot-take-content"><%= post.content %></p>
           <%- include("hotTakeActions", { post, session, likeActorId, postBookmarked: bookmarkedForumPostIds.includes(post.id) }) %>
-          <%- include("hotTakeComments", { post, session, isAdmin, userModerationById: moderationById, errorMessage: null }) %>
+          <%- include("hotTakeComments", { post, session, isAdmin, userModerationById: moderationById, activeUserBan: currentActiveBan, errorMessage: null }) %>
         </li>
       <% }) %>
     </ol>

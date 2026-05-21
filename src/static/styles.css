@@ -1335,6 +1335,20 @@ button.comment-like-button:hover {
   color: var(--danger);
 }
 
+.ban-notice {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 16px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(180, 35, 24, 0.18);
+  background: var(--danger-soft);
+}
+
+.ban-notice p {
+  margin: 0;
+}
+
 .empty-state {
   color: var(--muted);
   text-align: center;

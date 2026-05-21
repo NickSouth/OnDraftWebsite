@@ -1,6 +1,7 @@
 <section id="hot-take-comments-<%= post.id %>" class="hot-take-comments">
   <% const moderationById = typeof userModerationById !== "undefined" ? userModerationById : new Map(); %>
   <% const currentIsAdmin = typeof isAdmin !== "undefined" ? isAdmin : false; %>
+  <% const currentActiveBan = typeof activeUserBan !== "undefined" ? activeUserBan : null; %>
   <% if (errorMessage) { %>
     <p class="error-message"><%= errorMessage %></p>
   <% } %>
@@ -25,7 +26,9 @@
     </ol>
   <% } %>
 
-  <% if (session.authenticatedUser) { %>
+  <% if (session.authenticatedUser && currentActiveBan) { %>
+    <%- include("bannedUserNotice", { ban: currentActiveBan }) %>
+  <% } else if (session.authenticatedUser) { %>
     <form
       class="comment-form reply-form hot-take-comment-form"
       hx-post="/hottakes/<%= post.id %>/comments"

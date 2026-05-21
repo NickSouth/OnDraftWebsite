@@ -223,6 +223,78 @@ describe("OnDraft HTTP contracts", () => {
     expect(unbanned.text).not.toContain("Unban");
   });
 
+  it("prevents banned users from posting forum content or article comments while keeping pages viewable", async () => {
+    const ondraft = app();
+    const reader = request.agent(ondraft);
+    await reader
+      .post("/register")
+      .type("form")
+      .send({
+        displayName: "Bench Timeout",
+        email: "bench-timeout@ondraft.test",
+        password: "password123",
+      });
+
+    const admin = await loginAdminAgent(ondraft);
+    const usersPage = await admin.get("/admin/users");
+    const banMenuPath = usersPage.text.match(/hx-get="([^"]+moderation-menu\?contextId=admin-user-[^"]+)"/)?.[1].replaceAll("&amp;", "&");
+    expect(banMenuPath).toBeDefined();
+    if (!banMenuPath) return;
+    const userId = banMenuPath.match(/\/admin\/users\/([^/]+)\/moderation-menu/)?.[1];
+    expect(userId).toBeDefined();
+    if (!userId) return;
+
+    await admin
+      .post(`/admin/users/${userId}/ban`)
+      .type("form")
+      .send({
+        contextId: `admin-user-${userId}`,
+        message: "Cool down before posting again.",
+        duration: "1-month",
+      });
+
+    const createArticle = await admin
+      .post("/articles")
+      .type("form")
+      .send({
+        title: "Banned User Comment Target",
+        author: "Ryan McWalter",
+        writeup: "A short moderation target.",
+        publicationDate: "2024-01-01",
+        contentType: "plainText",
+        content: "A regular article body.",
+      });
+    expect(createArticle.status).toBe(302);
+    const articleId = createArticle.headers.location.split("/").pop();
+
+    const hotTakes = await reader.get("/hottakes");
+    expect(hotTakes.status).toBe(200);
+    expect(hotTakes.text).toContain("Cool down before posting again.");
+    expect(hotTakes.text).toContain("Want to appeal? Email support@ondraftfootball.com.");
+    expect(hotTakes.text).not.toContain("Post Hot Take");
+
+    const createHotTake = await reader
+      .post("/hottakes")
+      .type("form")
+      .set("HX-Request", "true")
+      .send({ content: "I should not be able to post this." });
+    expect(createHotTake.status).toBe(403);
+    expect(createHotTake.text).toContain("Cool down before posting again.");
+
+    const article = await reader.get(`/articles/${articleId}`);
+    expect(article.status).toBe(200);
+    expect(article.text).toContain("Banned User Comment Target");
+    expect(article.text).toContain("Cool down before posting again.");
+    expect(article.text).not.toContain("Post Comment");
+
+    const comment = await reader
+      .post(`/articles/${articleId}/comments`)
+      .type("form")
+      .send({ text: "I should not be able to comment." });
+    expect(comment.status).toBe(403);
+    expect(comment.text).toContain("Cool down before posting again.");
+  });
+
   it("allows anonymous visitors to view articles and the big board", async () => {
     const ondraft = app();
 

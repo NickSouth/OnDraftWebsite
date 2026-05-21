@@ -7,10 +7,10 @@ Consensus Draft Board <needs debugging, pos rank should sort and display in orde
 Registration email verification <>
 Mailing list on registration <>
 About Us page with links and stuff
-Automatic Content Moderation for comments and forums, check for profanity and spam
+Automatic Content Moderation for comments and forums, check for profanity and spam <>
 Hyperlinks to articles embedded in writeups of players option for admins
 Grades on draft board
-Banning users
+Banning users <>
 Reporting users
 Frontend Overhaul with light mode dark mode
  - Like the picture I drew
