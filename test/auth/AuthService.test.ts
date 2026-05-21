@@ -44,6 +44,7 @@ async function addVerificationFixture(
     displayName: "Verify Reader",
     password: "password123",
     role: "user",
+    ban: null,
     createdAt: "2026-05-19T12:00:00.000Z",
     preferences: {
       theme: "light",
@@ -387,6 +388,231 @@ describe("AuthService", () => {
 
     expect(result.ok).toBe(true);
     expect(email.sent).toHaveLength(0);
+  });
+
+  it("bans a non-admin user with the selected duration", async () => {
+    const users = CreateInMemoryUserRepository();
+    const service = CreateAuthService(users);
+    await service.register({
+      displayName: "Moderated Reader",
+      email: "moderated@ondraft.test",
+      password: "password123",
+    });
+    const reader = await users.findByEmail("moderated@ondraft.test");
+    expect(reader.ok).toBe(true);
+    if (!reader.ok || !reader.value) return;
+
+    const result = await service.banUser({
+      userId: reader.value.id,
+      bannedByUserId: "user-ryan",
+      message: "Cooldown period.",
+      duration: "1-month",
+      now: new Date("2026-05-20T12:00:00.000Z"),
+    });
+    const stored = await users.findById(reader.value.id);
+
+    expect(result.ok).toBe(true);
+    expect(stored.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.ban).toEqual({
+        message: "Cooldown period.",
+        bannedAt: "2026-05-20T12:00:00.000Z",
+        expiresAt: "2026-06-20T12:00:00.000Z",
+        bannedByUserId: "user-ryan",
+      });
+    }
+    if (stored.ok) {
+      expect(stored.value?.ban?.expiresAt).toBe("2026-06-20T12:00:00.000Z");
+    }
+  });
+
+  it("stores permanent bans with no expiration", async () => {
+    const users = CreateInMemoryUserRepository();
+    const service = CreateAuthService(users);
+    await service.register({
+      displayName: "Permanent Reader",
+      email: "permanent@ondraft.test",
+      password: "password123",
+    });
+    const reader = await users.findByEmail("permanent@ondraft.test");
+    expect(reader.ok).toBe(true);
+    if (!reader.ok || !reader.value) return;
+
+    const result = await service.banUser({
+      userId: reader.value.id,
+      bannedByUserId: "user-ryan",
+      message: "Permanent moderation action.",
+      duration: "permanent",
+      now: new Date("2026-05-20T12:00:00.000Z"),
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.ban?.expiresAt).toBeNull();
+    }
+  });
+
+  it("returns active bans and ignores expired bans", async () => {
+    const users = CreateInMemoryUserRepository();
+    const service = CreateAuthService(users);
+    await service.register({
+      displayName: "Ban Status Reader",
+      email: "ban-status@ondraft.test",
+      password: "password123",
+    });
+    const reader = await users.findByEmail("ban-status@ondraft.test");
+    expect(reader.ok).toBe(true);
+    if (!reader.ok || !reader.value) return;
+
+    await service.banUser({
+      userId: reader.value.id,
+      bannedByUserId: "user-ryan",
+      message: "One day away.",
+      duration: "1-day",
+      now: new Date("2026-05-20T12:00:00.000Z"),
+    });
+
+    const active = await service.getActiveUserBan({
+      userId: reader.value.id,
+      now: new Date("2026-05-20T13:00:00.000Z"),
+    });
+    const expired = await service.getActiveUserBan({
+      userId: reader.value.id,
+      now: new Date("2026-05-21T12:00:00.000Z"),
+    });
+
+    expect(active.ok).toBe(true);
+    expect(expired.ok).toBe(true);
+    if (active.ok) {
+      expect(active.value?.message).toBe("One day away.");
+    }
+    if (expired.ok) {
+      expect(expired.value).toBeNull();
+    }
+  });
+
+  it("unbans a user", async () => {
+    const users = CreateInMemoryUserRepository();
+    const service = CreateAuthService(users);
+    await service.register({
+      displayName: "Unban Reader",
+      email: "unban@ondraft.test",
+      password: "password123",
+    });
+    const reader = await users.findByEmail("unban@ondraft.test");
+    expect(reader.ok).toBe(true);
+    if (!reader.ok || !reader.value) return;
+
+    await service.banUser({
+      userId: reader.value.id,
+      bannedByUserId: "user-ryan",
+      message: "Temporary.",
+      duration: "1-day",
+      now: new Date("2026-05-20T12:00:00.000Z"),
+    });
+    const result = await service.unbanUser({ userId: reader.value.id });
+    const active = await service.getActiveUserBan({ userId: reader.value.id });
+
+    expect(result.ok).toBe(true);
+    expect(active.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.ban).toBeNull();
+    }
+    if (active.ok) {
+      expect(active.value).toBeNull();
+    }
+  });
+
+  it("includes ban status in the admin user list", async () => {
+    const users = CreateInMemoryUserRepository();
+    const service = CreateAuthService(users);
+    await service.register({
+      displayName: "Listed Ban Reader",
+      email: "listed-ban@ondraft.test",
+      password: "password123",
+    });
+    const reader = await users.findByEmail("listed-ban@ondraft.test");
+    expect(reader.ok).toBe(true);
+    if (!reader.ok || !reader.value) return;
+
+    await service.banUser({
+      userId: reader.value.id,
+      bannedByUserId: "user-ryan",
+      message: "Visible to admins.",
+      duration: "1-year",
+      now: new Date("2026-05-20T12:00:00.000Z"),
+    });
+
+    const usersList = await service.listAdminUsers();
+
+    expect(usersList.ok).toBe(true);
+    if (usersList.ok) {
+      const listed = usersList.value.find((user) => user.email === "listed-ban@ondraft.test");
+      expect(listed?.ban?.message).toBe("Visible to admins.");
+      expect(listed?.activeBan?.message).toBe("Visible to admins.");
+    }
+  });
+
+  it("rejects invalid or unsafe ban requests", async () => {
+    const users = CreateInMemoryUserRepository();
+    const service = CreateAuthService(users);
+    await service.register({
+      displayName: "Unsafe Ban Reader",
+      email: "unsafe-ban@ondraft.test",
+      password: "password123",
+    });
+    await service.register({
+      displayName: "Unsafe Ban Target",
+      email: "unsafe-ban-target@ondraft.test",
+      password: "password123",
+    });
+    const reader = await users.findByEmail("unsafe-ban@ondraft.test");
+    const target = await users.findByEmail("unsafe-ban-target@ondraft.test");
+    expect(reader.ok).toBe(true);
+    expect(target.ok).toBe(true);
+    if (!reader.ok || !reader.value || !target.ok || !target.value) return;
+
+    const blankMessage = await service.banUser({
+      userId: reader.value.id,
+      bannedByUserId: "user-ryan",
+      message: "   ",
+      duration: "1-day",
+    });
+    const selfBan = await service.banUser({
+      userId: "user-ryan",
+      bannedByUserId: "user-ryan",
+      message: "Nope.",
+      duration: "1-day",
+    });
+    const adminTarget = await service.banUser({
+      userId: "user-aleks",
+      bannedByUserId: "user-ryan",
+      message: "Nope.",
+      duration: "1-day",
+    });
+    const nonAdminActor = await service.banUser({
+      userId: target.value.id,
+      bannedByUserId: reader.value.id,
+      message: "Nope.",
+      duration: "1-day",
+    });
+    const badDuration = await service.banUser({
+      userId: reader.value.id,
+      bannedByUserId: "user-ryan",
+      message: "Nope.",
+      duration: "forever" as never,
+    });
+
+    expect(blankMessage.ok).toBe(false);
+    expect(selfBan.ok).toBe(false);
+    expect(adminTarget.ok).toBe(false);
+    expect(nonAdminActor.ok).toBe(false);
+    expect(badDuration.ok).toBe(false);
+    if (!blankMessage.ok) expect(blankMessage.value.message).toBe("Ban message is required.");
+    if (!selfBan.ok) expect(selfBan.value.message).toBe("Admins cannot ban themselves.");
+    if (!adminTarget.ok) expect(adminTarget.value.message).toBe("Admin users cannot be banned.");
+    if (!nonAdminActor.ok) expect(nonAdminActor.value.message).toBe("Only admins can ban users.");
+    if (!badDuration.ok) expect(badDuration.value.message).toBe("Ban duration must be one day, one month, one year, or permanent.");
   });
 
   it("unsubscribes a mailing list subscription with a valid token", async () => {
