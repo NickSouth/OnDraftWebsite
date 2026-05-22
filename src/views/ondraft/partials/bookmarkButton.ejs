@@ -8,7 +8,7 @@
 <button
   id="<%= targetId %>"
   type="button"
-  class="icon-button bookmark-button <%= bookmarked ? "is-bookmarked" : "" %>"
+  class="bookmark-button <%= bookmarked ? "is-bookmarked" : "" %> od-focus-ring inline-flex size-11 shrink-0 items-center justify-center rounded-md border transition <%= bookmarked ? "border-draft-gold bg-draft-foam text-draft-gold shadow-sm" : "border-slate-300 bg-white text-slate-500 hover:border-draft-gold hover:text-draft-gold dark:border-white/15 dark:bg-white/10 dark:text-slate-300" %>"
   aria-label="<%= bookmarked ? `Remove ${contentType} bookmark` : `Bookmark ${contentType}` %>"
   aria-pressed="<%= bookmarked ? "true" : "false" %>"
   title="<%= bookmarked ? "Remove bookmark" : "Bookmark" %>"
@@ -16,5 +16,13 @@
   hx-target="#<%= targetId %>"
   hx-swap="outerHTML"
 >
-  <span aria-hidden="true"><%- bookmarked ? "&#128204;" : "&#128205;" %></span>
+  <svg class="size-5" viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M12 2.9l2.77 5.61 6.2.9-4.49 4.38 1.06 6.18L12 17.06l-5.54 2.91 1.06-6.18-4.49-4.38 6.2-.9L12 2.9z"
+      fill="<%= bookmarked ? "currentColor" : "none" %>"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linejoin="round"
+    />
+  </svg>
 </button>

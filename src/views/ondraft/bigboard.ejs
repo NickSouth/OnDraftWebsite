@@ -1,15 +1,6 @@
-<section class="plain-page">
-  <div class="page-heading big-board-heading">
-    <div>
-      <p class="eyebrow">Draft Board</p>
-      <h1>Big Board</h1>
-    </div>
-    <div id="big-board-heading-actions" class="big-board-heading-actions">
-      <%- include("partials/bigBoardControls", { board, years, creators, positions, schools, filters }) %>
-      <% if (isAdmin && board.creator !== "Consensus") { %>
-        <a class="button-link" href="/bigboard/edit?year=<%= board.year %>&creator=<%= board.creator %>">Edit board</a>
-      <% } %>
-    </div>
+<section class="grid w-full gap-8">
+  <div id="big-board-heading-actions" class="grid gap-3">
+    <%- include("partials/bigBoardControls", { board, years, creators, positions, schools, filters, isAdmin }) %>
   </div>
 
   <%- include("partials/bigBoardResults", { bigBoard }) %>

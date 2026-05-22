@@ -1,15 +1,20 @@
-<section class="plain-page form-page">
-  <p><a href="/articles">Back to articles</a></p>
+<section class="od-admin-page">
   <% const pageHeading = typeof heading !== "undefined" ? heading : "Create Article"; %>
   <% const previewAction = typeof formAction !== "undefined" ? formAction : "/articles/preview"; %>
   <% const draftSaveAction = typeof saveAction !== "undefined" ? saveAction : "/articles"; %>
-  <h1><%= pageHeading %></h1>
+  <div class="od-admin-heading">
+    <div>
+      <a class="od-admin-back-link" href="/articles">Back to articles</a>
+      <p>Admin</p>
+      <h1><%= pageHeading %></h1>
+    </div>
+  </div>
 
   <% if (errorMessage) { %>
-    <p class="error-message"><%= errorMessage %></p>
+    <p class="od-admin-error" role="alert"><%= errorMessage %></p>
   <% } %>
 
-  <form class="ondraft-form" method="post" action="<%= previewAction %>" enctype="multipart/form-data">
+  <form class="ondraft-form od-admin-form" method="post" action="<%= previewAction %>" enctype="multipart/form-data">
     <label>
       Title
       <input name="title" value="<%= values.title || "" %>" required />
@@ -71,7 +76,7 @@
       <input type="hidden" name="pdfOriginalName" value="<%= values.pdfOriginalName || "" %>" />
       <input type="hidden" name="pdfSize" value="<%= values.pdfSize || "" %>" />
     <% } %>
-    <div class="form-actions">
+    <div class="form-actions od-admin-actions">
       <button type="submit" formaction="<%= draftSaveAction %>" name="published" value="false">Save As Draft</button>
       <button type="submit">Preview</button>
     </div>

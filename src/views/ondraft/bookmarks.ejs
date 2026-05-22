@@ -1,24 +1,64 @@
-<section class="plain-page">
-  <div class="page-heading">
-    <div>
-      <p class="eyebrow">OnDraft</p>
-      <h1>Bookmarks</h1>
+<section class="mx-auto grid w-full max-w-6xl gap-8">
+  <div class="grid gap-4 border-b border-slate-200 pb-6 dark:border-white/10">
+    <div class="max-w-3xl">
+      <p class="text-xs font-black uppercase tracking-[0.2em] text-draft-amber dark:text-draft-gold">Saved Pints</p>
+      <h1 class="mt-2 font-display text-4xl font-black leading-tight text-slate-950 dark:text-white sm:text-5xl">
+        Bookmarks
+      </h1>
+      <p class="mt-3 text-base leading-7 text-slate-600 dark:text-slate-300">
+        Your saved articles and Taproom posts, ready for the next round of draft reading.
+      </p>
     </div>
   </div>
 
   <% if (requireLogin) { %>
-    <p class="muted-text"><a href="/login">Log in</a> to view your bookmarks.</p>
+    <div class="od-card grid min-h-56 place-items-center p-8 text-center">
+      <div class="max-w-md">
+        <p class="text-xs font-black uppercase tracking-[0.18em] text-draft-amber dark:text-draft-gold">Members only</p>
+        <p class="mt-2 font-display text-2xl font-bold text-slate-950 dark:text-white">Log in to view your bookmarks.</p>
+        <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">Saved Pints follow your account across articles and The Taproom.</p>
+        <a class="od-primary-link mt-5" href="/login">Log in</a>
+      </div>
+    </div>
   <% } else if (bookmarkedArticles.length === 0 && bookmarkedForumPosts.length === 0) { %>
-    <p class="muted-text">No bookmarks yet.</p>
+    <div class="od-card grid min-h-56 place-items-center p-8 text-center">
+      <div class="max-w-md">
+        <p class="text-xs font-black uppercase tracking-[0.18em] text-draft-amber dark:text-draft-gold">Empty shelf</p>
+        <p class="mt-2 font-display text-2xl font-bold text-slate-950 dark:text-white">No bookmarks yet.</p>
+        <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">Use the gold star on articles and Taproom posts to stock this page.</p>
+      </div>
+    </div>
   <% } else { %>
     <% if (bookmarkedArticles.length > 0) { %>
-      <section class="bookmark-section">
-        <h2>Articles</h2>
-        <ul class="simple-list bookmark-list">
+      <section class="grid gap-4">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p class="text-xs font-black uppercase tracking-[0.18em] text-draft-amber dark:text-draft-gold">Articles On Tap</p>
+            <h2 class="mt-1 font-display text-3xl font-black text-slate-950 dark:text-white">Saved Articles</h2>
+          </div>
+          <span class="rounded bg-draft-foam px-3 py-1 text-sm font-black text-draft-amber dark:bg-white/10 dark:text-draft-gold"><%= bookmarkedArticles.length %> saved</span>
+        </div>
+
+        <ul class="grid list-none gap-5 p-0">
           <% bookmarkedArticles.forEach((article) => { %>
-            <li>
-              <a href="/articles/<%= article.id %>"><%= article.title %></a>
-              <span class="muted-text">by <%= article.author %></span>
+            <li class="od-card grid overflow-hidden transition hover:-translate-y-0.5 hover:border-draft-gold hover:shadow-editorial sm:grid-cols-[14rem_minmax(0,1fr)]">
+              <a class="group block overflow-hidden bg-draft-ink" href="/articles/<%= article.id %>">
+                <% if (article.imageUrl) { %>
+                  <img class="article-list-thumb aspect-[16/10]" src="<%= article.imageUrl %>" alt="" />
+                <% } else { %>
+                  <span class="article-list-thumb article-list-thumb-empty aspect-[16/10]">
+                    <span class="rounded bg-draft-gold px-3 py-2 text-xs font-black uppercase tracking-[0.18em] text-draft-ink">OnDraft</span>
+                  </span>
+                <% } %>
+              </a>
+              <div class="grid content-start gap-3 p-5">
+                <p class="m-0 text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Article</p>
+                <a class="font-display text-2xl font-black leading-tight text-slate-950 no-underline transition hover:text-draft-amber dark:text-white dark:hover:text-draft-gold" href="/articles/<%= article.id %>"><%= article.title %></a>
+                <p class="m-0 text-sm font-bold text-slate-600 dark:text-slate-300">by <%= article.author %></p>
+                <% if (article.writeup) { %>
+                  <p class="m-0 line-clamp-2 text-base leading-7 text-slate-700 dark:text-slate-200"><%= article.writeup %></p>
+                <% } %>
+              </div>
             </li>
           <% }) %>
         </ul>
@@ -26,13 +66,23 @@
     <% } %>
 
     <% if (bookmarkedForumPosts.length > 0) { %>
-      <section class="bookmark-section">
-        <h2>Hot Takes</h2>
-        <ul class="simple-list bookmark-list">
+      <section class="grid gap-4">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p class="text-xs font-black uppercase tracking-[0.18em] text-draft-amber dark:text-draft-gold">The Taproom</p>
+            <h2 class="mt-1 font-display text-3xl font-black text-slate-950 dark:text-white">Saved Hot Takes</h2>
+          </div>
+          <span class="rounded bg-draft-foam px-3 py-1 text-sm font-black text-draft-amber dark:bg-white/10 dark:text-draft-gold"><%= bookmarkedForumPosts.length %> saved</span>
+        </div>
+
+        <ul class="grid list-none gap-4 p-0">
           <% bookmarkedForumPosts.forEach((post) => { %>
-            <li>
-              <a href="/hottakes#hot-take-<%= post.id %>"><%= post.content %></a>
-              <span class="muted-text">by <%= post.userName %></span>
+            <li class="od-card grid gap-3 p-5 transition hover:-translate-y-0.5 hover:border-draft-gold hover:shadow-editorial">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <p class="m-0 text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Hot Take</p>
+                <span class="text-sm font-bold text-slate-600 dark:text-slate-300">by <%= post.userName %></span>
+              </div>
+              <a class="font-display text-2xl font-bold leading-snug text-slate-950 no-underline transition hover:text-draft-amber dark:text-white dark:hover:text-draft-gold" href="/hottakes#hot-take-<%= post.id %>"><%= post.content %></a>
             </li>
           <% }) %>
         </ul>

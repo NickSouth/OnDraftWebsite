@@ -1,17 +1,232 @@
-<section class="plain-page">
-  <p class="eyebrow">OnDraft</p>
-  <h1>OnDraft</h1>
-  <% if (session.authenticatedUser) { %>
-    <p class="welcome-note">
-      Signed in as <strong><%= session.authenticatedUser.displayName %></strong>
-      (<%= session.authenticatedUser.email %>).
-    </p>
-  <% } %>
-  <div class="home-actions">
-    <a class="button-link" href="/articles">View articles</a>
-    <a class="button-link" href="/videos">Videos</a>
-    <a class="button-link" href="/hottakes">OnDraft Hot Takes</a>
-    <a class="button-link" href="/bigboard">View draft board</a>
-    <a class="button-link" href="/bookmarks">Bookmarks</a>
+<% const featured = latestItems[0]; %>
+<% const carouselItems = latestItems.length > 0 ? latestItems : []; %>
+
+<section class="grid gap-8">
+  <div class="relative overflow-hidden rounded-lg border border-slate-200 bg-white shadow-editorial dark:border-white/10 dark:bg-draft-slate">
+    <div class="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(217,152,34,0.22),transparent_34%),linear-gradient(135deg,rgba(7,17,31,0.02),rgba(7,17,31,0.1))] dark:bg-[radial-gradient(circle_at_20%_0%,rgba(217,152,34,0.2),transparent_32%),linear-gradient(135deg,rgba(255,255,255,0.06),rgba(7,17,31,0.1))]" aria-hidden="true"></div>
+    <div class="relative grid gap-8 p-5 md:p-8 xl:grid-cols-[1.08fr_0.92fr]">
+      <div class="flex min-h-[360px] flex-col justify-between gap-8">
+        <div class="max-w-2xl">
+          <p class="mb-3 text-xs font-black uppercase tracking-[0.22em] text-draft-amber dark:text-draft-gold">Fresh from the tap</p>
+          <h1 class="font-display text-4xl font-black leading-tight text-slate-950 dark:text-white md:text-6xl">
+            OnDraft
+          </h1>
+          <p class="mt-4 max-w-xl text-base leading-7 text-slate-700 dark:text-slate-200 md:text-lg">
+            Sharp NFL Draft coverage, film notes, rankings, and community discussion with just enough taproom character to make the board breathe.
+          </p>
+        </div>
+
+        <div class="grid gap-3 border-l-4 border-draft-gold pl-4 text-sm font-semibold text-slate-600 dark:text-slate-300">
+          <p class="m-0">Articles On Tap, Bar TV, and the Draft Board are stocked from the side menu.</p>
+          <p class="m-0">Latest work pours here first.</p>
+        </div>
+      </div>
+
+      <div
+        class="od-card overflow-hidden"
+        x-data="{
+          active: 0,
+          count: <%= Math.max(carouselItems.length, 1) %>,
+          duration: 7000,
+          remaining: 7000,
+          startedAt: 0,
+          progress: 0,
+          timeout: null,
+          frame: null,
+          paused: false,
+          init() {
+            this.schedule(this.duration);
+          },
+          destroy() {
+            this.clearTimer();
+          },
+          clearTimer() {
+            if (this.timeout) {
+              window.clearTimeout(this.timeout);
+              this.timeout = null;
+            }
+            if (this.frame) {
+              window.cancelAnimationFrame(this.frame);
+              this.frame = null;
+            }
+          },
+          next(shouldRestart = true) {
+            this.active = this.active === this.count - 1 ? 0 : this.active + 1;
+            if (shouldRestart) {
+              this.schedule(this.duration);
+            }
+          },
+          prev() {
+            this.active = this.active === 0 ? this.count - 1 : this.active - 1;
+            this.schedule(this.duration);
+          },
+          go(index) {
+            this.active = index;
+            this.schedule(this.duration);
+          },
+          schedule(delay) {
+            this.clearTimer();
+            this.remaining = delay;
+            if (this.count <= 1 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+              this.progress = 0;
+              return;
+            }
+            this.paused = false;
+            this.startedAt = Date.now();
+            this.progress = ((this.duration - this.remaining) / this.duration) * 100;
+            this.tick();
+            this.timeout = window.setTimeout(() => {
+              this.next(false);
+              this.schedule(this.duration);
+            }, this.remaining);
+          },
+          tick() {
+            if (this.paused) {
+              return;
+            }
+            const elapsed = Date.now() - this.startedAt;
+            this.progress = Math.min(100, ((this.duration - this.remaining + elapsed) / this.duration) * 100);
+            if (this.progress < 100) {
+              this.frame = window.requestAnimationFrame(() => this.tick());
+            }
+          },
+          pause() {
+            if (this.count <= 1 || this.paused) {
+              return;
+            }
+            const elapsed = Date.now() - this.startedAt;
+            this.remaining = Math.max(0, this.remaining - elapsed);
+            this.paused = true;
+            this.clearTimer();
+          },
+          resume() {
+            if (!this.paused) {
+              return;
+            }
+            this.schedule(this.remaining || this.duration);
+          }
+        }"
+        @mouseenter="pause()"
+        @mouseleave="resume()"
+        @focusin="pause()"
+        @focusout="if (!$el.contains($event.relatedTarget)) resume()"
+      >
+        <div class="border-b border-slate-200 px-4 py-3 dark:border-white/10">
+          <p class="m-0 text-xs font-black uppercase tracking-[0.18em] text-slate-500 dark:text-slate-300">Latest pour</p>
+        </div>
+
+        <% if (carouselItems.length === 0) { %>
+          <div class="grid min-h-[320px] place-items-center p-6 text-center">
+            <div class="max-w-sm">
+              <div class="mx-auto mb-4 grid size-16 place-items-center rounded-lg bg-draft-gold text-2xl text-draft-ink" aria-hidden="true">OD</div>
+              <h2 class="font-display text-2xl font-bold text-slate-950 dark:text-white">The tap list is warming up.</h2>
+              <p class="mt-2 text-slate-600 dark:text-slate-300">Publish an article or add a video and it will headline the homepage carousel.</p>
+            </div>
+          </div>
+        <% } else { %>
+          <div class="relative min-h-[360px] overflow-hidden bg-slate-900">
+            <% carouselItems.forEach((item, index) => { %>
+              <article
+                class="absolute inset-0 grid content-end overflow-hidden bg-slate-900 transition-opacity duration-500"
+                :class="active === <%= index %> ? 'opacity-100 pointer-events-auto z-10' : 'opacity-0 pointer-events-none z-0'"
+                :aria-hidden="active === <%= index %> ? 'false' : 'true'"
+              >
+                <% if (item.imageUrl) { %>
+                  <img class="absolute inset-0 h-full w-full object-cover opacity-60" src="<%= item.imageUrl %>" alt="" />
+                <% } else { %>
+                  <div class="absolute inset-0 bg-[linear-gradient(135deg,#07111f,#263247_54%,#a75f12)]" aria-hidden="true"></div>
+                <% } %>
+                <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent" aria-hidden="true"></div>
+                <div class="group relative p-5 md:p-6">
+                  <div class="mb-3 flex flex-wrap items-center gap-2">
+                    <span class="rounded bg-draft-gold px-2 py-1 text-xs font-black uppercase tracking-wide text-draft-ink"><%= item.type === "article" ? "Article" : "Video" %></span>
+                    <% item.tags.slice(0, 3).forEach((tag) => { %>
+                      <span class="rounded border border-white/20 px-2 py-1 text-xs font-bold text-white/85"><%= tag %></span>
+                    <% }) %>
+                  </div>
+                  <h2 class="font-display text-3xl font-black leading-tight text-white"><%= item.title %></h2>
+                  <p class="mt-3 max-h-0 overflow-hidden text-sm leading-6 text-slate-200 opacity-0 transition-all duration-200 group-hover:max-h-32 group-hover:opacity-100 group-focus-within:max-h-32 group-focus-within:opacity-100">
+                    <%= item.description %>
+                  </p>
+                  <div class="mt-5 flex items-center justify-between gap-4">
+                    <span class="text-xs font-bold uppercase tracking-[0.16em] text-slate-300">
+                      <%= item.date.toLocaleDateString() %>
+                    </span>
+                    <a class="od-primary-link" href="<%= item.href %>" <%= item.type === "video" ? 'target="_blank" rel="noopener noreferrer"' : "" %>>Open</a>
+                  </div>
+                </div>
+              </article>
+            <% }) %>
+          </div>
+
+          <div class="h-1 bg-slate-200 dark:bg-white/10" aria-hidden="true">
+            <div
+              class="h-full bg-draft-gold"
+              :style="`width: ${progress}%; transition: ${paused ? 'none' : 'width 120ms linear'};`"
+            ></div>
+          </div>
+
+          <div class="flex items-center justify-between gap-3 border-t border-slate-200 p-4 dark:border-white/10">
+            <button type="button" class="od-secondary-link min-h-9 px-3 py-1.5" @click="prev()">Prev</button>
+            <div class="flex gap-2" aria-label="Carousel slides">
+              <% carouselItems.forEach((_item, index) => { %>
+                <button
+                  type="button"
+                  class="size-2.5 rounded-full p-0"
+                  :class="active === <%= index %> ? 'bg-draft-gold' : 'bg-slate-300 dark:bg-white/30'"
+                  aria-label="Show slide <%= index + 1 %>"
+                  @click="go(<%= index %>)"
+                ></button>
+              <% }) %>
+            </div>
+            <button type="button" class="od-secondary-link min-h-9 px-3 py-1.5" @click="next()">Next</button>
+          </div>
+        <% } %>
+      </div>
+    </div>
   </div>
+
+  <section class="grid gap-4">
+    <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+      <div>
+        <p class="mb-2 text-xs font-black uppercase tracking-[0.18em] text-draft-amber dark:text-draft-gold">Most Popular</p>
+        <h2 class="font-display text-3xl font-black text-slate-950 dark:text-white">Crowd favorites</h2>
+      </div>
+      <a class="od-secondary-link" href="/articles">Articles On Tap</a>
+    </div>
+
+    <% if (popularArticles.length === 0) { %>
+      <div class="od-card p-6 text-slate-600 dark:text-slate-300">
+        <p class="m-0">No liked articles yet. Once readers start tapping the like button, the top ten will live here.</p>
+      </div>
+    <% } else { %>
+      <div class="grid max-h-[720px] gap-3 overflow-y-auto px-1 py-1">
+        <% popularArticles.forEach((article, index) => { %>
+          <a href="/articles/<%= article.id %>" class="od-card od-focus-ring grid gap-3 overflow-hidden text-slate-950 no-underline transition hover:-translate-y-0.5 hover:border-draft-gold dark:text-white sm:grid-cols-[3.5rem_6rem_minmax(0,1fr)_auto] sm:items-center">
+            <span class="grid size-12 place-items-center rounded-md bg-slate-100 font-display text-xl font-black text-slate-700 dark:bg-white/10 dark:text-white"><%= index + 1 %></span>
+            <span class="relative block aspect-[16/10] overflow-hidden bg-draft-ink sm:aspect-square sm:h-full sm:min-h-24">
+              <% if (article.imageUrl) { %>
+                <img class="article-list-thumb" src="<%= article.imageUrl %>" alt="" />
+              <% } else { %>
+                <span class="article-list-thumb article-list-thumb-empty">
+                  <span class="rounded bg-draft-gold px-2 py-1 text-xs font-black uppercase tracking-[0.18em] text-draft-ink">OD</span>
+                </span>
+              <% } %>
+            </span>
+            <span class="grid gap-1 p-4 sm:p-0">
+              <span class="font-display text-xl font-bold"><%= article.title %></span>
+              <span class="text-sm text-slate-600 dark:text-slate-300">
+                by <%= article.author %> on <%= article.publicationDate.toLocaleDateString() %>
+              </span>
+              <span class="text-sm text-slate-700 dark:text-slate-200"><%= article.writeup %></span>
+            </span>
+            <span class="mx-4 mb-4 inline-flex w-fit items-center gap-1 rounded bg-draft-foam px-3 py-1 text-sm font-black text-draft-amber dark:bg-white/10 dark:text-draft-gold sm:m-0 sm:mr-4">
+              <span aria-hidden="true">&hearts;</span>
+              <span><%= article.likes %></span>
+            </span>
+          </a>
+        <% }) %>
+      </div>
+    <% } %>
+  </section>
 </section>

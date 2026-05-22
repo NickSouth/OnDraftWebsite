@@ -1,4 +1,4 @@
-<div id="big-board-results">
+<div id="big-board-results" class="big-board-results">
   <%
     const formatBoardNumber = (value) => {
       if (typeof value !== "number") {
@@ -6,43 +6,95 @@
       }
       return Number.isInteger(value) ? value.toString() : value.toFixed(1);
     };
+    const hasText = (value) => typeof value === "string" && value.trim().length > 0;
   %>
   <% if (bigBoard.length === 0) { %>
-    <p>No draft board entries have been created yet.</p>
+    <div class="od-card grid min-h-48 place-items-center p-8 text-center">
+      <div>
+        <p class="text-xs font-black uppercase tracking-[0.18em] text-draft-amber dark:text-draft-gold">Empty board</p>
+        <p class="mt-2 font-display text-2xl font-bold text-slate-950 dark:text-white">No draft board entries have been created yet.</p>
+        <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">Try a different year, creator, position, or school.</p>
+      </div>
+    </div>
   <% } else { %>
-    <ol class="ranking-list">
+    <ol class="ranking-list grid list-none p-0">
       <% bigBoard.forEach((entry) => { %>
-        <li>
-          <div class="big-board-entry-heading">
-            <div>
-              <strong><%= formatBoardNumber(entry.rank) %>. <%= entry.playerName %></strong>
-              <span><%= entry.position %><%= entry.posRank ? formatBoardNumber(entry.posRank) : "" %> &middot; <%= entry.school %></span>
-            </div>
-            <% if (entry.bigDiscrepency) { %>
-              <span class="big-discrepency-badge">Big discrepancy</span>
-            <% } %>
-          </div>
-          <p>
-            <%= entry.height.feet %>'<%= entry.height.inches %>" &middot; <%= entry.weight %> lbs
-          </p>
+        <%
+          const rankLabel = formatBoardNumber(entry.rank) || "NR";
+          const positionLabel = entry.position || "POS";
+          const posRankLabel = entry.posRank ? `${positionLabel}${formatBoardNumber(entry.posRank)}` : positionLabel;
+          const heightLabel = entry.height ? `${entry.height.feet}'${entry.height.inches}"` : "Height TBD";
+          const weightLabel = entry.weight ? `${entry.weight} lbs` : "Weight TBD";
+          const accessibleSummary = `${rankLabel}. ${entry.playerName} ${posRankLabel}`;
+        %>
+        <li class="border-b border-slate-200 py-5 last:border-b-0 dark:border-white/10">
           <% if (entry.writeupPublished) { %>
-            <details class="big-board-writeup">
-              <summary>Writeup</summary>
-              <div class="big-board-writeup-grid">
-                <section>
-                  <h3>Strengths</h3>
-                  <p><%= entry.writeup.strengths %></p>
-                </section>
-                <section>
-                  <h3>Weaknesses</h3>
-                  <p><%= entry.writeup.weaknesses %></p>
-                </section>
-                <section>
-                  <h3>Rundown</h3>
-                  <p><%= entry.writeup.rundown %></p>
+            <details class="group">
+              <summary class="od-focus-ring grid cursor-pointer list-none gap-4 rounded-md p-2 transition hover:bg-white/70 dark:hover:bg-white/[0.04] sm:grid-cols-[5.5rem_minmax(0,1fr)] [&::-webkit-details-marker]:hidden">
+                <span class="sr-only"><%= accessibleSummary %></span>
+                <span class="font-display text-5xl font-black leading-none text-draft-amber dark:text-draft-gold"><%= rankLabel %></span>
+                <span class="grid gap-3">
+                  <span class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+                    <span>
+                      <span class="block font-display text-3xl font-black leading-tight text-slate-950 dark:text-white"><%= entry.playerName %></span>
+                      <span class="mt-2 inline-flex rounded bg-draft-gold px-3 py-1 text-sm font-black uppercase tracking-wide text-draft-ink"><%= posRankLabel %></span>
+                    </span>
+                    <span class="flex flex-wrap gap-2 text-sm font-bold text-slate-600 dark:text-slate-300 lg:justify-end">
+                      <span><%= entry.school %></span>
+                      <span aria-hidden="true">/</span>
+                      <span><%= heightLabel %></span>
+                      <span aria-hidden="true">/</span>
+                      <span><%= weightLabel %></span>
+                    </span>
+                  </span>
+                  <span class="flex flex-wrap items-center gap-2 text-sm">
+                    <% if (entry.bigDiscrepency) { %>
+                      <span class="rounded bg-red-50 px-2.5 py-1 font-black uppercase tracking-wide text-red-700 dark:bg-red-500/10 dark:text-red-200">Big discrepancy</span>
+                    <% } %>
+                    <span class="font-semibold text-slate-500 dark:text-slate-400">Click for scouting writeup</span>
+                  </span>
+                </span>
+              </summary>
+              <div class="grid gap-4 px-2 pb-2 pt-4 sm:ml-[6.5rem]">
+                <div class="grid gap-4 md:grid-cols-2">
+                  <section class="rounded-lg border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+                    <h3 class="text-xs font-black uppercase tracking-[0.18em] text-draft-amber dark:text-draft-gold">Strengths</h3>
+                    <p class="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-200"><%= hasText(entry.writeup.strengths) ? entry.writeup.strengths : "No strengths published." %></p>
+                  </section>
+                  <section class="rounded-lg border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+                    <h3 class="text-xs font-black uppercase tracking-[0.18em] text-red-700 dark:text-red-200">Weaknesses</h3>
+                    <p class="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-200"><%= hasText(entry.writeup.weaknesses) ? entry.writeup.weaknesses : "No weaknesses published." %></p>
+                  </section>
+                </div>
+                <section class="mx-auto w-full max-w-3xl rounded-lg border border-slate-200 bg-white p-5 text-center dark:border-white/10 dark:bg-white/[0.04]">
+                  <h3 class="text-xs font-black uppercase tracking-[0.18em] text-draft-amber dark:text-draft-gold">Rundown</h3>
+                  <p class="mt-3 whitespace-pre-wrap text-base leading-7 text-slate-800 dark:text-slate-100"><%= hasText(entry.writeup.rundown) ? entry.writeup.rundown : "No rundown published." %></p>
                 </section>
               </div>
             </details>
+          <% } else { %>
+            <div class="grid gap-4 rounded-md p-2 sm:grid-cols-[5.5rem_minmax(0,1fr)]">
+              <span class="sr-only"><%= accessibleSummary %></span>
+              <span class="font-display text-5xl font-black leading-none text-draft-amber dark:text-draft-gold"><%= rankLabel %></span>
+              <div class="grid gap-3">
+                <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+                  <div>
+                    <span class="block font-display text-3xl font-black leading-tight text-slate-950 dark:text-white"><%= entry.playerName %></span>
+                    <span class="mt-2 inline-flex rounded bg-draft-gold px-3 py-1 text-sm font-black uppercase tracking-wide text-draft-ink"><%= posRankLabel %></span>
+                  </div>
+                  <div class="flex flex-wrap gap-2 text-sm font-bold text-slate-600 dark:text-slate-300 lg:justify-end">
+                    <span><%= entry.school %></span>
+                    <span aria-hidden="true">/</span>
+                    <span><%= heightLabel %></span>
+                    <span aria-hidden="true">/</span>
+                    <span><%= weightLabel %></span>
+                  </div>
+                </div>
+                <% if (entry.bigDiscrepency) { %>
+                  <span class="w-fit rounded bg-red-50 px-2.5 py-1 text-sm font-black uppercase tracking-wide text-red-700 dark:bg-red-500/10 dark:text-red-200">Big discrepancy</span>
+                <% } %>
+              </div>
+            </div>
           <% } %>
         </li>
       <% }) %>

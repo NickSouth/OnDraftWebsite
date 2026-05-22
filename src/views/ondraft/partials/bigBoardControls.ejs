@@ -1,63 +1,85 @@
 <form
   id="big-board-controls"
-  class="big-board-controls"
+  class="big-board-controls grid gap-5 border-b border-slate-200 pb-6 dark:border-white/10"
   method="get"
   action="/bigboard"
   hx-get="/bigboard"
   hx-target="#big-board-results"
   hx-swap="outerHTML"
 >
-  <label class="big-board-year-control">
-    <span>Year</span>
-    <select name="year" onchange="htmx.trigger(this.form, 'submit');">
-      <% years.forEach((year) => { %>
-        <option value="<%= year %>" <%= board.year === year ? "selected" : "" %>><%= year %></option>
-      <% }) %>
-    </select>
-  </label>
-  <input type="hidden" name="creator" value="<%= board.creator %>" />
-  <div class="creator-toggle" aria-label="Board creator">
-    <% creators.forEach((creator) => { %>
-      <button
-        type="button"
-        class="<%= board.creator === creator ? "is-active" : "" %>"
-        aria-pressed="<%= board.creator === creator ? "true" : "false" %>"
-        onclick="this.form.creator.value = '<%= creator %>'; htmx.trigger(this.form, 'submit');"
-      >
-        <%= creator %>
-      </button>
-    <% }) %>
-  </div>
-  <label class="big-board-filter-control">
-    <span>Position</span>
-    <select name="position">
-      <option value="" <%= !filters.position ? "selected" : "" %>>All</option>
-      <% positions.forEach((position) => { %>
-        <option value="<%= position %>" <%= filters.position === position ? "selected" : "" %>><%= position %></option>
-      <% }) %>
-    </select>
-  </label>
-  <label class="big-board-filter-control">
-    <span>School</span>
-    <select name="school">
-      <option value="" <%= !filters.school ? "selected" : "" %>>All</option>
-      <% schools.forEach((school) => { %>
-        <option value="<%= school %>" <%= filters.school === school ? "selected" : "" %>><%= school %></option>
-      <% }) %>
-    </select>
-  </label>
-  <div class="big-board-filter-actions">
-    <button type="submit">Apply filters</button>
-    <% if (filters.position || filters.school) { %>
-      <a
-        class="button-link secondary-link"
-        href="/bigboard?year=<%= board.year %>&creator=<%= encodeURIComponent(board.creator) %>"
-        hx-get="/bigboard?year=<%= board.year %>&creator=<%= encodeURIComponent(board.creator) %>"
-        hx-target="#big-board-results"
-        hx-swap="outerHTML"
-      >
-        Reset
-      </a>
-    <% } %>
+  <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_27rem] lg:items-start xl:grid-cols-[minmax(0,1fr)_30rem]">
+    <div class="grid justify-items-start gap-4 text-left">
+      <div class="w-full">
+        <p class="text-xs font-black uppercase tracking-[0.2em] text-draft-amber dark:text-draft-gold">Draft Board</p>
+        <label class="mt-2 flex flex-wrap items-center justify-start gap-x-4 gap-y-2 lg:flex-nowrap">
+          <span class="shrink-0 font-display text-4xl font-black leading-tight text-slate-950 dark:text-white sm:text-5xl">Big Board</span>
+          <span class="sr-only">Year</span>
+          <select class="big-board-year-select" name="year" onchange="htmx.trigger(this.form, 'submit');">
+            <% years.forEach((year) => { %>
+              <option value="<%= year %>" <%= board.year === year ? "selected" : "" %>><%= year %></option>
+            <% }) %>
+          </select>
+        </label>
+      </div>
+
+      <div class="w-full">
+        <p class="mb-2 text-sm font-bold text-slate-800 dark:text-slate-100">Board</p>
+        <input type="hidden" name="creator" value="<%= board.creator %>" />
+        <div class="grid w-full max-w-xl gap-2 sm:grid-cols-3" aria-label="Board creator">
+          <% creators.forEach((creator) => { %>
+            <button
+              type="button"
+              class="od-focus-ring rounded-md border px-4 py-2 text-sm font-black transition <%= board.creator === creator ? "border-draft-gold bg-draft-gold text-draft-ink" : "border-white/10 bg-draft-slate text-white hover:border-draft-gold hover:bg-draft-ink dark:border-white/20 dark:bg-draft-slate dark:text-white dark:hover:border-draft-gold" %>"
+              aria-pressed="<%= board.creator === creator ? "true" : "false" %>"
+              onclick="this.form.creator.value = '<%= creator %>'; htmx.trigger(this.form, 'submit');"
+            >
+              <%= creator %>
+            </button>
+          <% }) %>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="od-card grid gap-3 p-4">
+      <% if (isAdmin && board.creator !== "Consensus") { %>
+        <div class="flex justify-end">
+          <a class="od-primary-link w-full sm:w-fit" href="/bigboard/edit?year=<%= board.year %>&creator=<%= board.creator %>">Edit board</a>
+        </div>
+      <% } %>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <label class="grid gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+          <span>Position</span>
+          <select name="position" onchange="htmx.trigger(this.form, 'submit');">
+            <option value="" <%= !filters.position ? "selected" : "" %>>All</option>
+            <% positions.forEach((position) => { %>
+              <option value="<%= position %>" <%= filters.position === position ? "selected" : "" %>><%= position %></option>
+            <% }) %>
+          </select>
+        </label>
+        <label class="grid gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+          <span>School</span>
+          <select name="school" onchange="htmx.trigger(this.form, 'submit');">
+            <option value="" <%= !filters.school ? "selected" : "" %>>All</option>
+            <% schools.forEach((school) => { %>
+              <option value="<%= school %>" <%= filters.school === school ? "selected" : "" %>><%= school %></option>
+            <% }) %>
+          </select>
+        </label>
+      </div>
+      <div class="flex flex-col gap-3 sm:flex-row sm:justify-end">
+        <% if (filters.position || filters.school) { %>
+          <a
+            class="od-secondary-link"
+            href="/bigboard?year=<%= board.year %>&creator=<%= encodeURIComponent(board.creator) %>"
+            hx-get="/bigboard?year=<%= board.year %>&creator=<%= encodeURIComponent(board.creator) %>"
+            hx-target="#big-board-results"
+            hx-swap="outerHTML"
+          >
+            Reset
+          </a>
+        <% } %>
+      </div>
+    </div>
   </div>
 </form>
