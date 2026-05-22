@@ -731,6 +731,8 @@ describe("OnDraft HTTP contracts", () => {
     expect(create.status).toBe(200);
     expect(create.text).toContain("Never draft a round-one long snapper.");
     expect(create.text).toContain("hx-swap-oob");
+    expect(create.text).toContain("verified-admin-badge");
+    expect(create.text).toContain("Verified OnDraft admin");
 
     const postId = create.text.match(/id="hot-take-([A-Za-z0-9]{5})"/)?.[1];
     expect(postId).toBeTruthy();
@@ -752,6 +754,7 @@ describe("OnDraft HTTP contracts", () => {
       .send({ text: "Counterpoint: special teams matter." });
     expect(comment.status).toBe(200);
     expect(comment.text).toContain("Counterpoint: special teams matter.");
+    expect(comment.text).toContain("verified-admin-badge");
 
     const remove = await agent
       .delete(`/hottakes/${postId}`)
@@ -1021,6 +1024,8 @@ describe("OnDraft HTTP contracts", () => {
     expect(comment.status).toBe(200);
     expect(comment.text).toContain("Good read.");
     expect(comment.text).toContain("Ryan McWalter");
+    expect(comment.text).toContain("verified-admin-badge");
+    expect(comment.text).toContain("Verified OnDraft admin");
 
     const commentId = comment.text.match(/id="comment-([A-Za-z0-9]{8})"/)?.[1];
     expect(commentId).toBeDefined();
@@ -1034,6 +1039,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(reply.status).toBe(200);
     expect(reply.text).toContain("Agree with this.");
     expect(reply.text).toContain("reply-list");
+    expect(reply.text).toContain("verified-admin-badge");
 
     const likedComment = await anonymous.post(`/comments/${commentId}/like`);
     expect(likedComment.status).toBe(200);

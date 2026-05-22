@@ -1,4 +1,5 @@
 <div id="hot-take-list" class="hot-take-list">
+  <% const usersById = typeof userDirectoryById !== "undefined" ? userDirectoryById : new Map(); %>
   <% const moderationById = typeof userModerationById !== "undefined" ? userModerationById : new Map(); %>
   <% const currentActiveBan = typeof activeUserBan !== "undefined" ? activeUserBan : null; %>
   <% if (errorMessage) { %>
@@ -10,10 +11,11 @@
   <% } else { %>
     <ol class="comment-list">
       <% posts.forEach((post) => { %>
+        <% const postUser = usersById.get(post.userId); %>
         <li id="hot-take-<%= post.id %>" class="comment-item hot-take-item">
           <div class="comment-header">
             <div>
-              <strong><%= post.userName %></strong>
+              <strong class="verified-name"><%= post.userName %><% if (postUser?.role === "admin") { %><%- include("verifiedAdminBadge") %><% } %></strong>
               <span class="muted-text"><%= new Date(post.createdAt).toLocaleString() %></span>
             </div>
             <% const postModeratedUser = moderationById.get(post.userId); %>
@@ -35,7 +37,7 @@
           </div>
           <p class="hot-take-content"><%= post.content %></p>
           <%- include("hotTakeActions", { post, session, likeActorId, postBookmarked: bookmarkedForumPostIds.includes(post.id) }) %>
-          <%- include("hotTakeComments", { post, session, isAdmin, userModerationById: moderationById, activeUserBan: currentActiveBan, errorMessage: null }) %>
+          <%- include("hotTakeComments", { post, session, isAdmin, userDirectoryById: usersById, userModerationById: moderationById, activeUserBan: currentActiveBan, errorMessage: null }) %>
         </li>
       <% }) %>
     </ol>

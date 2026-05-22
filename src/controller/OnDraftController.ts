@@ -522,6 +522,16 @@ class OnDraftController implements IOnDraftController {
     return new Map(result.value.map((user) => [user.id, user]));
   }
 
+  private async userDirectoryById(): Promise<Map<string, AdminUserListItem>> {
+    const result = await this.authService.listAdminUsers();
+    if (result.ok === false) {
+      this.logger.warn(`Unable to load user directory: ${result.value.message}`);
+      return new Map();
+    }
+
+    return new Map(result.value.map((user) => [user.id, user]));
+  }
+
   private async activeUserBan(session: IOnDraftBrowserSession): Promise<IUserBanRecord | null> {
     const userId = session.authenticatedUser?.userId;
     if (!userId || isAdminSession(session)) {
@@ -816,6 +826,7 @@ class OnDraftController implements IOnDraftController {
       isAdmin: isAdminSession(session),
       likeActorId: this.likeActorId(session),
       bookmarkedForumPostIds: await this.bookmarkedForumPostIds(session),
+      userDirectoryById: await this.userDirectoryById(),
       userModerationById: await this.userModerationById(session),
       activeUserBan: await this.activeUserBan(session),
       errorMessage,
@@ -839,6 +850,7 @@ class OnDraftController implements IOnDraftController {
       sortDirection: this.forumPostSortDirection(req),
       likeActorId: this.likeActorId(session),
       bookmarkedForumPostIds: await this.bookmarkedForumPostIds(session),
+      userDirectoryById: await this.userDirectoryById(),
       userModerationById: await this.userModerationById(session),
       activeUserBan: await this.activeUserBan(session),
       errorMessage: null,
@@ -1023,6 +1035,7 @@ class OnDraftController implements IOnDraftController {
       commentsLimit: 10,
       likeActorId: this.likeActorId(session),
       articleBookmarked: (await this.bookmarkedArticleIds(session)).includes(result.value.id),
+      userDirectoryById: await this.userDirectoryById(),
       userModerationById: await this.userModerationById(session),
       activeUserBan: await this.activeUserBan(session),
     });
@@ -1242,6 +1255,7 @@ class OnDraftController implements IOnDraftController {
       commentsLimit: this.commentLimit(req),
       likeActorId: this.likeActorId(session),
       errorMessage: null,
+      userDirectoryById: await this.userDirectoryById(),
       userModerationById: await this.userModerationById(session),
       activeUserBan: await this.activeUserBan(session),
     });
@@ -1287,6 +1301,7 @@ class OnDraftController implements IOnDraftController {
           commentsLimit: this.commentLimit(req),
           likeActorId: this.likeActorId(session),
           errorMessage: result.value.message,
+          userDirectoryById: await this.userDirectoryById(),
           userModerationById: await this.userModerationById(session),
           activeUserBan: await this.activeUserBan(session),
         });
@@ -1437,6 +1452,7 @@ class OnDraftController implements IOnDraftController {
       isAdmin: isAdminSession(session),
       likeActorId: this.likeActorId(session),
       bookmarkedForumPostIds: await this.bookmarkedForumPostIds(session),
+      userDirectoryById: await this.userDirectoryById(),
       userModerationById: await this.userModerationById(session),
       activeUserBan: await this.activeUserBan(session),
       errorMessage: null,
@@ -1521,6 +1537,7 @@ class OnDraftController implements IOnDraftController {
             session,
             isAdmin: isAdminSession(session),
             errorMessage: result.value.message,
+            userDirectoryById: await this.userDirectoryById(),
             userModerationById: await this.userModerationById(session),
             activeUserBan: await this.activeUserBan(session),
           });
@@ -1541,6 +1558,7 @@ class OnDraftController implements IOnDraftController {
       session,
       isAdmin: isAdminSession(session),
       errorMessage: null,
+      userDirectoryById: await this.userDirectoryById(),
       userModerationById: await this.userModerationById(session),
       activeUserBan: await this.activeUserBan(session),
     });

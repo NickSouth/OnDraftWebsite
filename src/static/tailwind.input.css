@@ -472,6 +472,18 @@
     @apply text-slate-950 dark:text-white;
   }
 
+  .verified-name {
+    @apply inline-flex items-center gap-1.5;
+  }
+
+  .verified-admin-badge {
+    @apply inline-flex size-4 shrink-0 items-center justify-center text-sky-500;
+  }
+
+  .verified-admin-badge-icon {
+    @apply size-4;
+  }
+
   .od-article-page .comment-text {
     @apply m-0 whitespace-pre-wrap text-base leading-7 text-slate-800 dark:text-slate-100;
   }
