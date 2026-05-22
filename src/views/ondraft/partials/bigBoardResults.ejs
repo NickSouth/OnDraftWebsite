@@ -1,4 +1,20 @@
-<div id="big-board-results" class="big-board-results">
+<div
+  id="big-board-results"
+  class="big-board-results"
+  x-data="{
+    boardView: 'card',
+    init() {
+      const savedView = window.localStorage.getItem('bigBoardView');
+      if (savedView === 'card' || savedView === 'list') {
+        this.boardView = savedView;
+      }
+    },
+    setBoardView(view) {
+      this.boardView = view;
+      window.localStorage.setItem('bigBoardView', view);
+    }
+  }"
+>
   <%
     const formatBoardNumber = (value) => {
       if (typeof value !== "number") {
@@ -17,7 +33,45 @@
       </div>
     </div>
   <% } else { %>
-    <ol class="ranking-list grid list-none p-0">
+    <div class="mb-3 flex justify-end">
+      <div class="inline-flex rounded-md border border-slate-200 bg-white p-1 shadow-sm dark:border-white/10 dark:bg-draft-slate" aria-label="Draft board view">
+        <button
+          type="button"
+          class="od-focus-ring inline-grid size-10 place-items-center rounded transition"
+          :class="boardView === 'card' ? 'bg-draft-gold text-draft-ink' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10'"
+          :aria-pressed="boardView === 'card'"
+          aria-label="Card view"
+          title="Card view"
+          @click="setBoardView('card')"
+        >
+          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <rect x="4" y="5" width="16" height="4" rx="1" />
+            <rect x="4" y="10" width="16" height="4" rx="1" />
+            <rect x="4" y="15" width="16" height="4" rx="1" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          class="od-focus-ring inline-grid size-10 place-items-center rounded transition"
+          :class="boardView === 'list' ? 'bg-draft-gold text-draft-ink' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10'"
+          :aria-pressed="boardView === 'list'"
+          aria-label="List view"
+          title="List view"
+          @click="setBoardView('list')"
+        >
+          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M8 6h12" />
+            <path d="M8 12h12" />
+            <path d="M8 18h12" />
+            <path d="M4 6h.01" />
+            <path d="M4 12h.01" />
+            <path d="M4 18h.01" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <ol class="ranking-list grid list-none p-0" x-show="boardView === 'card'">
       <% bigBoard.forEach((entry) => { %>
         <%
           const rankLabel = formatBoardNumber(entry.rank) || "NR";
@@ -26,74 +80,200 @@
           const heightLabel = entry.height ? `${entry.height.feet}'${entry.height.inches}"` : "Height TBD";
           const weightLabel = entry.weight ? `${entry.weight} lbs` : "Weight TBD";
           const accessibleSummary = `${rankLabel}. ${entry.playerName} ${posRankLabel}`;
+          const teamColors = typeof collegeTeamColors !== "undefined" ? collegeTeamColors[entry.school] : undefined;
+          const helmetPrimaryColor = teamColors?.primaryColor || "#111111";
+          const helmetSecondaryColor = teamColors?.secondaryColor || "#F8FAFC";
         %>
-        <li class="border-b border-slate-200 py-5 last:border-b-0 dark:border-white/10">
+        <li class="border-b border-slate-200 py-3 last:border-b-0 dark:border-white/10">
           <% if (entry.writeupPublished) { %>
             <details class="group">
-              <summary class="od-focus-ring grid cursor-pointer list-none gap-4 rounded-md p-2 transition hover:bg-white/70 dark:hover:bg-white/[0.04] sm:grid-cols-[5.5rem_minmax(0,1fr)] [&::-webkit-details-marker]:hidden">
+              <summary class="od-focus-ring relative grid cursor-pointer list-none gap-3 overflow-hidden rounded-md p-2 transition hover:bg-white/70 dark:hover:bg-white/[0.04] sm:min-h-32 sm:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)] sm:items-center [&::-webkit-details-marker]:hidden">
+                <span class="pointer-events-none absolute inset-y-0 right-0 left-[31rem] hidden bg-slate-200/55 [clip-path:polygon(3rem_0,100%_0,100%_100%,0_100%)] dark:bg-white/[0.06] lg:block" aria-hidden="true"></span>
                 <span class="sr-only"><%= accessibleSummary %></span>
-                <span class="font-display text-5xl font-black leading-none text-draft-amber dark:text-draft-gold"><%= rankLabel %></span>
-                <span class="grid gap-3">
-                  <span class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+                <span class="relative z-10 flex items-center gap-2">
+                  <span class="grid justify-items-center gap-2">
+                    <span class="font-display text-5xl font-black leading-none text-draft-amber dark:text-draft-gold"><%= rankLabel %></span>
+                    <span class="inline-grid size-6 place-items-center rounded border border-slate-300/70 text-slate-500 transition group-open:bg-draft-gold group-open:text-draft-ink dark:border-white/15 dark:text-slate-300" aria-hidden="true">
+                      <svg class="size-3.5 transition group-open:rotate-180" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" />
+                      </svg>
+                    </span>
+                  </span>
+                  <span class="h-14 w-px bg-slate-300 dark:bg-white/20" aria-hidden="true"></span>
+                </span>
+                <span class="relative z-10 grid justify-items-center text-center">
+                  <img
+                    class="h-24 w-32 shrink-0 object-contain opacity-0 transition-opacity duration-150 sm:h-28 sm:w-32"
+                    src="/teamHelmetTemplate.png"
+                    alt="<%= entry.school %> football helmet"
+                    data-team-helmet
+                    data-primary-color="<%= helmetPrimaryColor %>"
+                    data-secondary-color="<%= helmetSecondaryColor %>"
+                  />
+                </span>
+                <span class="relative z-10 grid gap-3">
+                  <span class="grid gap-3 lg:grid-cols-[minmax(0,18rem)_minmax(12rem,1fr)] lg:items-start">
                     <span>
                       <span class="block font-display text-3xl font-black leading-tight text-slate-950 dark:text-white"><%= entry.playerName %></span>
-                      <span class="mt-2 inline-flex rounded bg-draft-gold px-3 py-1 text-sm font-black uppercase tracking-wide text-draft-ink"><%= posRankLabel %></span>
+                      <span class="mt-2 flex flex-wrap items-center gap-2">
+                        <span class="inline-flex rounded bg-draft-gold px-3 py-1 text-sm font-black uppercase tracking-wide text-draft-ink"><%= posRankLabel %></span>
+                        <span class="text-sm font-black leading-tight text-slate-500 dark:text-slate-300"><%= entry.school %></span>
+                      </span>
                     </span>
-                    <span class="flex flex-wrap gap-2 text-sm font-bold text-slate-600 dark:text-slate-300 lg:justify-end">
-                      <span><%= entry.school %></span>
-                      <span aria-hidden="true">/</span>
-                      <span><%= heightLabel %></span>
-                      <span aria-hidden="true">/</span>
-                      <span><%= weightLabel %></span>
+                    <span class="flex flex-wrap gap-2 pt-1 text-slate-500 dark:text-slate-300 lg:justify-end">
+                      <span class="grid min-w-20 gap-0.5 rounded bg-draft-slate px-3 py-2 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink">
+                        <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Height</span>
+                        <span class="text-sm font-black leading-none text-slate-500 dark:text-slate-300"><%= heightLabel %></span>
+                      </span>
+                      <span class="grid min-w-20 gap-0.5 rounded bg-draft-slate px-3 py-2 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink">
+                        <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Weight</span>
+                        <span class="text-sm font-black leading-none text-slate-500 dark:text-slate-300"><%= weightLabel %></span>
+                      </span>
                     </span>
                   </span>
-                  <span class="flex flex-wrap items-center gap-2 text-sm">
-                    <% if (entry.bigDiscrepency) { %>
+                  <% if (entry.bigDiscrepency) { %>
+                    <span class="flex flex-wrap items-center gap-2 text-sm">
                       <span class="rounded bg-red-50 px-2.5 py-1 font-black uppercase tracking-wide text-red-700 dark:bg-red-500/10 dark:text-red-200">Big discrepancy</span>
-                    <% } %>
-                    <span class="font-semibold text-slate-500 dark:text-slate-400">Click for scouting writeup</span>
-                  </span>
+                    </span>
+                  <% } %>
                 </span>
               </summary>
-              <div class="grid gap-4 px-2 pb-2 pt-4 sm:ml-[6.5rem]">
-                <div class="grid gap-4 md:grid-cols-2">
-                  <section class="rounded-lg border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
-                    <h3 class="text-xs font-black uppercase tracking-[0.18em] text-draft-amber dark:text-draft-gold">Strengths</h3>
-                    <p class="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-200"><%= hasText(entry.writeup.strengths) ? entry.writeup.strengths : "No strengths published." %></p>
-                  </section>
-                  <section class="rounded-lg border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
-                    <h3 class="text-xs font-black uppercase tracking-[0.18em] text-red-700 dark:text-red-200">Weaknesses</h3>
-                    <p class="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-200"><%= hasText(entry.writeup.weaknesses) ? entry.writeup.weaknesses : "No weaknesses published." %></p>
-                  </section>
-                </div>
-                <section class="mx-auto w-full max-w-3xl rounded-lg border border-slate-200 bg-white p-5 text-center dark:border-white/10 dark:bg-white/[0.04]">
-                  <h3 class="text-xs font-black uppercase tracking-[0.18em] text-draft-amber dark:text-draft-gold">Rundown</h3>
-                  <p class="mt-3 whitespace-pre-wrap text-base leading-7 text-slate-800 dark:text-slate-100"><%= hasText(entry.writeup.rundown) ? entry.writeup.rundown : "No rundown published." %></p>
-                </section>
-              </div>
+              <%- include("bigBoardWriteupPanel", { entry, hasText }) %>
             </details>
           <% } else { %>
-            <div class="grid gap-4 rounded-md p-2 sm:grid-cols-[5.5rem_minmax(0,1fr)]">
+            <div class="relative grid gap-3 overflow-hidden rounded-md p-2 sm:min-h-32 sm:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)] sm:items-center">
+              <span class="pointer-events-none absolute inset-y-0 right-0 left-[31rem] hidden bg-slate-200/55 [clip-path:polygon(3rem_0,100%_0,100%_100%,0_100%)] dark:bg-white/[0.06] lg:block" aria-hidden="true"></span>
               <span class="sr-only"><%= accessibleSummary %></span>
-              <span class="font-display text-5xl font-black leading-none text-draft-amber dark:text-draft-gold"><%= rankLabel %></span>
-              <div class="grid gap-3">
-                <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+              <span class="relative z-10 flex items-center gap-2">
+                <span class="font-display text-5xl font-black leading-none text-draft-amber dark:text-draft-gold"><%= rankLabel %></span>
+                <span class="h-14 w-px bg-slate-300 dark:bg-white/20" aria-hidden="true"></span>
+              </span>
+              <span class="relative z-10 grid justify-items-center text-center">
+                <img
+                  class="h-24 w-32 shrink-0 object-contain opacity-0 transition-opacity duration-150 sm:h-28 sm:w-32"
+                  src="/teamHelmetTemplate.png"
+                  alt="<%= entry.school %> football helmet"
+                  data-team-helmet
+                  data-primary-color="<%= helmetPrimaryColor %>"
+                  data-secondary-color="<%= helmetSecondaryColor %>"
+                />
+              </span>
+              <div class="relative z-10 grid gap-3">
+                <div class="grid gap-3 lg:grid-cols-[minmax(0,18rem)_minmax(12rem,1fr)] lg:items-start">
                   <div>
                     <span class="block font-display text-3xl font-black leading-tight text-slate-950 dark:text-white"><%= entry.playerName %></span>
-                    <span class="mt-2 inline-flex rounded bg-draft-gold px-3 py-1 text-sm font-black uppercase tracking-wide text-draft-ink"><%= posRankLabel %></span>
+                    <span class="mt-2 flex flex-wrap items-center gap-2">
+                      <span class="inline-flex rounded bg-draft-gold px-3 py-1 text-sm font-black uppercase tracking-wide text-draft-ink"><%= posRankLabel %></span>
+                      <span class="text-sm font-black leading-tight text-slate-500 dark:text-slate-300"><%= entry.school %></span>
+                    </span>
                   </div>
-                  <div class="flex flex-wrap gap-2 text-sm font-bold text-slate-600 dark:text-slate-300 lg:justify-end">
-                    <span><%= entry.school %></span>
-                    <span aria-hidden="true">/</span>
-                    <span><%= heightLabel %></span>
-                    <span aria-hidden="true">/</span>
-                    <span><%= weightLabel %></span>
+                  <div class="flex flex-wrap gap-2 pt-1 text-slate-500 dark:text-slate-300 lg:justify-end">
+                    <span class="grid min-w-20 gap-0.5 rounded bg-draft-slate px-3 py-2 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink">
+                      <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Height</span>
+                      <span class="text-sm font-black leading-none text-slate-500 dark:text-slate-300"><%= heightLabel %></span>
+                    </span>
+                    <span class="grid min-w-20 gap-0.5 rounded bg-draft-slate px-3 py-2 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink">
+                      <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Weight</span>
+                      <span class="text-sm font-black leading-none text-slate-500 dark:text-slate-300"><%= weightLabel %></span>
+                    </span>
                   </div>
                 </div>
                 <% if (entry.bigDiscrepency) { %>
                   <span class="w-fit rounded bg-red-50 px-2.5 py-1 text-sm font-black uppercase tracking-wide text-red-700 dark:bg-red-500/10 dark:text-red-200">Big discrepancy</span>
                 <% } %>
               </div>
+            </div>
+          <% } %>
+        </li>
+      <% }) %>
+    </ol>
+
+    <ol class="grid list-none divide-y divide-slate-200 rounded-md border border-slate-200 bg-white p-0 dark:divide-white/10 dark:border-white/10 dark:bg-draft-slate" x-show="boardView === 'list'" x-cloak>
+      <% bigBoard.forEach((entry) => { %>
+        <%
+          const rankLabel = formatBoardNumber(entry.rank) || "NR";
+          const positionLabel = entry.position || "POS";
+          const posRankLabel = entry.posRank ? `${positionLabel}${formatBoardNumber(entry.posRank)}` : positionLabel;
+          const heightLabel = entry.height ? `${entry.height.feet}'${entry.height.inches}"` : "Height TBD";
+          const weightLabel = entry.weight ? `${entry.weight} lbs` : "Weight TBD";
+          const accessibleSummary = `${rankLabel}. ${entry.playerName} ${posRankLabel}`;
+          const teamColors = typeof collegeTeamColors !== "undefined" ? collegeTeamColors[entry.school] : undefined;
+          const helmetPrimaryColor = teamColors?.primaryColor || "#111111";
+          const helmetSecondaryColor = teamColors?.secondaryColor || "#F8FAFC";
+        %>
+        <li>
+          <% if (entry.writeupPublished) { %>
+            <details class="group">
+              <summary class="od-focus-ring grid cursor-pointer list-none gap-3 px-3 py-3 transition hover:bg-slate-50 dark:hover:bg-white/[0.04] sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:items-center [&::-webkit-details-marker]:hidden">
+                <span class="sr-only"><%= accessibleSummary %></span>
+                <span class="flex items-center gap-2">
+                  <span class="w-8 font-display text-2xl font-black leading-none text-draft-amber dark:text-draft-gold"><%= rankLabel %></span>
+                  <span class="inline-grid size-6 place-items-center rounded border border-slate-300/70 text-slate-500 transition group-open:bg-draft-gold group-open:text-draft-ink dark:border-white/15 dark:text-slate-300" aria-hidden="true">
+                    <svg class="size-3.5 transition group-open:rotate-180" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" />
+                    </svg>
+                  </span>
+                </span>
+                <span class="grid min-w-0 gap-2 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:items-center">
+                  <img
+                    class="hidden h-14 w-16 shrink-0 object-contain opacity-0 transition-opacity duration-150 sm:block"
+                    src="/teamHelmetTemplate.png"
+                    alt="<%= entry.school %> football helmet"
+                    data-team-helmet
+                    data-primary-color="<%= helmetPrimaryColor %>"
+                    data-secondary-color="<%= helmetSecondaryColor %>"
+                  />
+                  <span class="min-w-0">
+                    <span class="block truncate font-display text-xl font-black leading-tight text-slate-950 dark:text-white"><%= entry.playerName %></span>
+                    <span class="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm font-bold text-slate-600 dark:text-slate-300">
+                      <span class="text-draft-amber dark:text-draft-gold"><%= posRankLabel %></span>
+                      <span class="truncate"><%= entry.school %></span>
+                    </span>
+                  </span>
+                </span>
+                <span class="flex flex-wrap gap-2 sm:justify-end">
+                  <span class="grid min-w-20 gap-0.5 rounded bg-draft-slate px-3 py-2 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink">
+                    <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Height</span>
+                    <span class="text-sm font-black leading-none text-slate-500 dark:text-slate-300"><%= heightLabel %></span>
+                  </span>
+                  <span class="grid min-w-20 gap-0.5 rounded bg-draft-slate px-3 py-2 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink">
+                    <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Weight</span>
+                    <span class="text-sm font-black leading-none text-slate-500 dark:text-slate-300"><%= weightLabel %></span>
+                  </span>
+                </span>
+              </summary>
+              <%- include("bigBoardWriteupPanel", { entry, hasText }) %>
+            </details>
+          <% } else { %>
+            <div class="grid gap-3 px-3 py-3 sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:items-center">
+              <span class="font-display text-2xl font-black leading-none text-draft-amber dark:text-draft-gold"><%= rankLabel %></span>
+              <span class="grid min-w-0 gap-2 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:items-center">
+                <img
+                  class="hidden h-14 w-16 shrink-0 object-contain opacity-0 transition-opacity duration-150 sm:block"
+                  src="/teamHelmetTemplate.png"
+                  alt="<%= entry.school %> football helmet"
+                  data-team-helmet
+                  data-primary-color="<%= helmetPrimaryColor %>"
+                  data-secondary-color="<%= helmetSecondaryColor %>"
+                />
+                <span class="min-w-0">
+                  <span class="block truncate font-display text-xl font-black leading-tight text-slate-950 dark:text-white"><%= entry.playerName %></span>
+                  <span class="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm font-bold text-slate-600 dark:text-slate-300">
+                    <span class="text-draft-amber dark:text-draft-gold"><%= posRankLabel %></span>
+                    <span class="truncate"><%= entry.school %></span>
+                  </span>
+                </span>
+              </span>
+              <span class="flex flex-wrap gap-2 sm:justify-end">
+                <span class="grid min-w-20 gap-0.5 rounded bg-draft-slate px-3 py-2 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink">
+                  <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Height</span>
+                  <span class="text-sm font-black leading-none text-slate-500 dark:text-slate-300"><%= heightLabel %></span>
+                </span>
+                <span class="grid min-w-20 gap-0.5 rounded bg-draft-slate px-3 py-2 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink">
+                  <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Weight</span>
+                  <span class="text-sm font-black leading-none text-slate-500 dark:text-slate-300"><%= weightLabel %></span>
+                </span>
+              </span>
             </div>
           <% } %>
         </li>
