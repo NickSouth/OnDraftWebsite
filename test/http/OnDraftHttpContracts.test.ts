@@ -426,6 +426,8 @@ describe("OnDraft HTTP contracts", () => {
     expect(editor.text).toContain("Edit Big Board");
     expect(editor.text).toContain("Add player");
     expect(editor.text).toContain("Publish");
+    expect(editor.text).toContain('list="college-team-options"');
+    expect(editor.text).toContain('<option value="Alabama"></option>');
 
     const draft = await agent
       .post("/bigboard/edit")
@@ -435,7 +437,7 @@ describe("OnDraft HTTP contracts", () => {
         creator: "Ryan",
         "entries[0][id]": "entry-1",
         "entries[0][playerName]": "Hidden Prospect",
-        "entries[0][school]": "OnDraft State",
+        "entries[0][school]": "Alabama",
         "entries[0][position]": "QB",
         "entries[0][rank]": "1",
         "entries[0][posRank]": "1",
@@ -462,7 +464,7 @@ describe("OnDraft HTTP contracts", () => {
         creator: "Ryan",
         "entries[0][id]": "entry-1",
         "entries[0][playerName]": "Hidden Prospect",
-        "entries[0][school]": "OnDraft State",
+        "entries[0][school]": "Alabama",
         "entries[0][position]": "QB",
         "entries[0][rank]": "1",
         "entries[0][posRank]": "1",
@@ -481,6 +483,10 @@ describe("OnDraft HTTP contracts", () => {
     const visibleWithoutWriteup = await agent.get("/bigboard?year=2026&creator=Ryan");
     expect(visibleWithoutWriteup.status).toBe(200);
     expect(visibleWithoutWriteup.text).toContain("Hidden Prospect");
+    expect(visibleWithoutWriteup.text).toContain("Alabama football helmet");
+    expect(visibleWithoutWriteup.text).toContain('src="/teamHelmetTemplate.png"');
+    expect(visibleWithoutWriteup.text).toContain('data-primary-color="#690014"');
+    expect(visibleWithoutWriteup.text).toContain('data-secondary-color="#F1F2F3"');
     expect(visibleWithoutWriteup.text).not.toContain("Starter traits.");
     expect(visibleWithoutWriteup.text).not.toContain("Private eval note.");
 
@@ -492,7 +498,7 @@ describe("OnDraft HTTP contracts", () => {
         creator: "Ryan",
         "entries[0][id]": "entry-1",
         "entries[0][playerName]": "Hidden Prospect",
-        "entries[0][school]": "OnDraft State",
+        "entries[0][school]": "Alabama",
         "entries[0][position]": "QB",
         "entries[0][rank]": "1",
         "entries[0][posRank]": "1",

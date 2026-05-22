@@ -119,7 +119,7 @@
                 <input type="hidden" name="entries[<%= index %>][id]" value="<%= entry.id %>" data-entry-id />
                 <input name="entries[<%= index %>][playerName]" value="<%= entry.playerName %>" placeholder="Player name" data-publish-section="player" />
               </td>
-              <td><input name="entries[<%= index %>][school]" value="<%= entry.school %>" placeholder="School" data-publish-section="player" /></td>
+              <td><input name="entries[<%= index %>][school]" list="college-team-options" value="<%= entry.school %>" placeholder="School" autocomplete="off" data-publish-section="player" /></td>
               <td>
                 <select name="entries[<%= index %>][position]" data-publish-section="player">
                   <option value="">Pos</option>
@@ -195,7 +195,7 @@
         <input type="hidden" data-field="id" data-entry-id />
         <input data-field="playerName" placeholder="Player name" data-publish-section="player" />
       </td>
-      <td><input data-field="school" placeholder="School" data-publish-section="player" /></td>
+      <td><input data-field="school" list="college-team-options" placeholder="School" autocomplete="off" data-publish-section="player" /></td>
       <td>
         <select data-field="position" data-publish-section="player">
           <option value="">Pos</option>
@@ -226,6 +226,12 @@
       <td><textarea data-field="notes" placeholder="Notes"></textarea></td>
     </tr>
   </template>
+
+  <datalist id="college-team-options">
+    <% (typeof collegeTeamNames !== "undefined" ? collegeTeamNames : []).forEach((team) => { %>
+      <option value="<%= team %>"></option>
+    <% }) %>
+  </datalist>
 </section>
 
 <script>

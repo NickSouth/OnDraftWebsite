@@ -38,7 +38,7 @@
     </label>
     <label>
       School
-      <input name="school" value="<%= values.school || "" %>" required />
+      <input name="school" list="college-team-options" value="<%= values.school || "" %>" autocomplete="off" required />
     </label>
     <label>
       Overall rank
@@ -71,5 +71,10 @@
     <div class="form-actions od-admin-actions">
       <button type="submit">Create entry</button>
     </div>
+    <datalist id="college-team-options">
+      <% (typeof collegeTeamNames !== "undefined" ? collegeTeamNames : []).forEach((team) => { %>
+        <option value="<%= team %>"></option>
+      <% }) %>
+    </datalist>
   </form>
 </section>

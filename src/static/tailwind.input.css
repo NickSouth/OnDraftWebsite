@@ -626,10 +626,11 @@
   }
 
   .od-bartop-nav {
-    @apply od-focus-ring relative isolate overflow-hidden rounded-lg border border-amber-950/60 p-3 text-left shadow-sm transition;
+    @apply od-focus-ring relative isolate overflow-hidden rounded-md border border-draft-line p-3 text-left shadow-sm transition;
     background:
-      linear-gradient(90deg, rgba(255, 255, 255, 0.1), transparent 18%, rgba(0, 0, 0, 0.2) 48%, transparent 76%, rgba(255, 255, 255, 0.08)),
-      linear-gradient(180deg, rgba(39, 18, 10, 0.18), rgba(39, 18, 10, 0.38)),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.06), transparent 22%, rgba(0, 0, 0, 0.22) 52%, transparent 80%, rgba(255, 255, 255, 0.05)),
+      linear-gradient(180deg, rgba(7, 17, 31, 0.66), rgba(7, 17, 31, 0.36)),
+      linear-gradient(0deg, rgba(39, 18, 10, 0.32), rgba(39, 18, 10, 0.32)),
       url("/images/woodTexture.jpg");
     background-position: center;
     background-size: cover;
@@ -641,19 +642,20 @@
 
   .od-bartop-nav::before {
     content: "";
-    @apply pointer-events-none absolute inset-0 -z-10 bg-amber-950/25 opacity-75 transition;
+    @apply pointer-events-none absolute inset-0 -z-10 bg-draft-ink/20 opacity-90 transition;
   }
 
   .od-bartop-nav::after {
     content: "";
-    @apply pointer-events-none absolute inset-x-3 top-2 h-px rounded-full bg-amber-100/30;
+    @apply pointer-events-none absolute inset-x-3 top-2 h-px rounded-full bg-white/20;
   }
 
   .od-bartop-nav:hover {
     @apply border-draft-gold;
     background:
-      linear-gradient(90deg, rgba(255, 255, 255, 0.14), transparent 18%, rgba(0, 0, 0, 0.18) 48%, transparent 76%, rgba(255, 255, 255, 0.11)),
-      linear-gradient(180deg, rgba(39, 18, 10, 0.08), rgba(39, 18, 10, 0.3)),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.08), transparent 22%, rgba(0, 0, 0, 0.18) 52%, transparent 80%, rgba(255, 255, 255, 0.06)),
+      linear-gradient(180deg, rgba(7, 17, 31, 0.56), rgba(7, 17, 31, 0.3)),
+      linear-gradient(0deg, rgba(39, 18, 10, 0.24), rgba(39, 18, 10, 0.24)),
       url("/images/woodTexture.jpg");
     background-position: center;
     background-size: cover;

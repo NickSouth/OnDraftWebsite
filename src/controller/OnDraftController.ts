@@ -9,6 +9,7 @@ import { ArticleError, BigBoardError, ForumPostError } from "../repository/OnDra
 import { publicArticleUploadUrl } from "../uploads/articlePdfUpload";
 import { BIG_BOARD_CREATORS, POSITIONS, type Article, type ArticleContent, type ArticleFilter, type BigBoard, type BigBoardCreator, type ForumPost, type ForumPostFilter, type Video, type VideoQuery } from "../model/OnDraftContent";
 import type { Bookmark, IUserBanRecord } from "../auth/User";
+import { collegeTeam } from "../CollegeFootballColors";
 
 export interface DraftBoardFilterInput {
   school?: string;
@@ -39,6 +40,8 @@ type HomeFeedItem =
       imageUrl?: string;
       viewCount?: number;
     };
+
+const collegeTeamNames = Object.keys(collegeTeam).sort((first, second) => first.localeCompare(second));
 
 export interface IOnDraftController {
   showHome(res: Response, session: IOnDraftBrowserSession): Promise<void>;
@@ -955,6 +958,7 @@ class OnDraftController implements IOnDraftController {
       positions: POSITIONS,
       schools,
       filters: filter ?? {},
+      collegeTeamColors: collegeTeam,
     };
     if (req.get("HX-Request") === "true") {
       res.render("ondraft/partials/bigBoardPanel", { ...viewModel, layout: false });
@@ -990,6 +994,7 @@ class OnDraftController implements IOnDraftController {
       years: yearsResult.value,
       creators: BIG_BOARD_CREATORS.filter((creator) => creator !== "Consensus"),
       positions: POSITIONS,
+      collegeTeamNames,
       errorMessage,
       statusMessage,
       forceOverlaySidebar: true,
@@ -1118,6 +1123,7 @@ class OnDraftController implements IOnDraftController {
         creator: "Ryan",
       },
       creators: BIG_BOARD_CREATORS.filter((creator) => creator !== "Consensus"),
+      collegeTeamNames,
     });
   }
 
@@ -1613,6 +1619,7 @@ class OnDraftController implements IOnDraftController {
         errorMessage: result.value.message,
         values: req.body,
         creators: BIG_BOARD_CREATORS.filter((creator) => creator !== "Consensus"),
+        collegeTeamNames,
       });
       return;
     }
