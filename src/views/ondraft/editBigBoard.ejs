@@ -10,10 +10,11 @@
   }
 %>
 
-<section class="plain-page board-editor-page">
-  <div class="page-heading big-board-heading">
+<section class="plain-page board-editor-page od-admin-board-page">
+  <div class="page-heading big-board-heading od-admin-heading">
     <div>
-      <p class="eyebrow">Admin</p>
+      <a class="od-admin-back-link" href="/bigboard">Back to big board</a>
+      <p>Admin</p>
       <h1>Edit Big Board</h1>
     </div>
     <div class="big-board-heading-actions">
@@ -65,7 +66,7 @@
   </form>
 
   <% if (errorMessage) { %>
-    <p class="error-message"><%= errorMessage %></p>
+    <p class="od-admin-error" role="alert"><%= errorMessage %></p>
   <% } %>
 
   <form

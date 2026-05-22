@@ -9,7 +9,13 @@ import {
   ValidationError,
   type AuthError,
 } from "./errors";
-import { toAuthenticatedUser, type IAuthenticatedUser, type IMailingListSubscriptionRecord, type IUserBanRecord } from "./User";
+import {
+  toAuthenticatedUser,
+  type IAuthenticatedUser,
+  type IMailingListSubscriptionRecord,
+  type IUserBanRecord,
+  type MailingListSubscriptionStatus,
+} from "./User";
 import type { IUserRepository } from "./UserRepository";
 
 export interface LoginInput {
@@ -19,6 +25,7 @@ export interface LoginInput {
 
 export interface RegisterInput extends LoginInput {
   displayName: string;
+  confirmPassword: string;
   mailingListConsent?: boolean;
 }
 
@@ -36,6 +43,19 @@ export interface CreateMailingListUnsubscribeUrlInput {
 
 export interface UnsubscribeMailingListInput {
   token: string;
+}
+
+export interface AccountSettings {
+  mailingListStatus: MailingListSubscriptionStatus | "none";
+}
+
+export interface AccountSettingsInput {
+  userId: string;
+}
+
+export interface UpdateMailingListPreferenceInput {
+  userId: string;
+  subscribe: boolean;
 }
 
 export type BanDuration = "1-day" | "1-month" | "1-year" | "permanent";
@@ -74,6 +94,10 @@ export interface IAuthService {
   register(input: RegisterInput): Promise<Result<IAuthenticatedUser, AuthError>>;
   verifyEmail(input: VerifyEmailInput): Promise<Result<void, AuthError>>;
   requestEmailVerification(input: RequestEmailVerificationInput): Promise<Result<void, AuthError>>;
+  getAccountSettings(input: AccountSettingsInput): Promise<Result<AccountSettings, AuthError>>;
+  updateMailingListPreference(
+    input: UpdateMailingListPreferenceInput,
+  ): Promise<Result<AccountSettings, AuthError>>;
   createMailingListUnsubscribeUrl(input: CreateMailingListUnsubscribeUrlInput): Promise<Result<string | null, AuthError>>;
   unsubscribeMailingList(input: UnsubscribeMailingListInput): Promise<Result<void, AuthError>>;
   exportSubscribedMailingListCsv(): Promise<Result<string, AuthError>>;
@@ -185,6 +209,7 @@ class AuthService implements IAuthService {
     const displayName = input.displayName.trim();
     const email = input.email.trim().toLowerCase();
     const password = input.password;
+    const confirmPassword = input.confirmPassword;
 
     if (!displayName) {
       return Err(ValidationError("Display name is required."));
@@ -200,6 +225,14 @@ class AuthService implements IAuthService {
 
     if (password.trim().length < 8) {
       return Err(ValidationError("Password must be at least 8 characters."));
+    }
+
+    if (!confirmPassword.trim()) {
+      return Err(ValidationError("Please confirm your password."));
+    }
+
+    if (password !== confirmPassword) {
+      return Err(ValidationError("Passwords must match."));
     }
 
     const existing = await this.users.findByEmail(email);
@@ -339,6 +372,79 @@ class AuthService implements IAuthService {
     }
 
     return this.sendVerificationEmail(user, { invalidateExistingTokens: true });
+  }
+
+  async getAccountSettings(input: AccountSettingsInput): Promise<Result<AccountSettings, AuthError>> {
+    const userId = input.userId.trim();
+    if (!userId) {
+      return Err(ValidationError("User id is required."));
+    }
+
+    const userResult = await this.users.findById(userId);
+    if (userResult.ok === false) {
+      return Err(UnexpectedDependencyError(userResult.value.message));
+    }
+    if (!userResult.value) {
+      return Err(ValidationError("User not found."));
+    }
+
+    const subscriptionResult = await this.users.findMailingListSubscriptionByUserId(userId);
+    if (subscriptionResult.ok === false) {
+      return Err(UnexpectedDependencyError(subscriptionResult.value.message));
+    }
+
+    const mailingListStatus: AccountSettings["mailingListStatus"] = subscriptionResult.value?.status ?? "none";
+    return Ok({ mailingListStatus });
+  }
+
+  async updateMailingListPreference(
+    input: UpdateMailingListPreferenceInput,
+  ): Promise<Result<AccountSettings, AuthError>> {
+    const userId = input.userId.trim();
+    if (!userId) {
+      return Err(ValidationError("User id is required."));
+    }
+
+    const userResult = await this.users.findById(userId);
+    if (userResult.ok === false) {
+      return Err(UnexpectedDependencyError(userResult.value.message));
+    }
+
+    const user = userResult.value;
+    if (!user) {
+      return Err(ValidationError("User not found."));
+    }
+
+    const existingResult = await this.users.findMailingListSubscriptionByUserId(user.id);
+    if (existingResult.ok === false) {
+      return Err(UnexpectedDependencyError(existingResult.value.message));
+    }
+
+    const now = new Date().toISOString();
+    const existing = existingResult.value;
+    const status: MailingListSubscriptionStatus = input.subscribe
+      ? user.emailVerifiedAt ? "subscribed" : "pending"
+      : "unsubscribed";
+    const updated = await this.users.upsertMailingListSubscription({
+      id: existing?.id ?? randomUUID(),
+      email: user.email,
+      userId: user.id,
+      status,
+      consentSource: "settings",
+      consentTextVersion: "settings-v1",
+      consentedAt: input.subscribe ? now : existing?.consentedAt ?? null,
+      unsubscribedAt: input.subscribe ? null : now,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    });
+
+    if (updated.ok === false) {
+      return Err(UnexpectedDependencyError(updated.value.message));
+    }
+
+    return Ok({
+      mailingListStatus: updated.value.status,
+    });
   }
 
   async createMailingListUnsubscribeUrl(

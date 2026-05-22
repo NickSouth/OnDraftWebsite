@@ -41,6 +41,26 @@ describe("OnDraft HTTP contracts", () => {
     expect(response.status).toBe(200);
     expect(response.text).toContain("Articles On Tap");
     expect(response.text).toContain("Log in");
+    expect(response.text).toContain('hx-get="/about"');
+    expect(response.text).toContain('hx-target="#site-modal-outlet"');
+  });
+
+  it("renders footer informational pages as modal content", async () => {
+    const about = await request(app()).get("/about");
+    const privacy = await request(app()).get("/privacy");
+    const contact = await request(app()).get("/contact");
+
+    expect(about.status).toBe(200);
+    expect(about.text).toContain('role="dialog"');
+    expect(about.text).toContain("This is a work in progress website by Nick Southey");
+
+    expect(privacy.status).toBe(200);
+    expect(privacy.text).toContain("OnDraft Football");
+    expect(privacy.text).toContain("ondraftfootball.com");
+    expect(privacy.text).toContain("support@ondraftfootball.com");
+
+    expect(contact.status).toBe(200);
+    expect(contact.text).toContain("For all inquiries and issues");
   });
 
   it("logs in a demo user and renders the home page", async () => {
@@ -59,6 +79,69 @@ describe("OnDraft HTTP contracts", () => {
     expect(ondraft.status).toBe(200);
     expect(ondraft.text).toContain("OnDraft");
     expect(ondraft.text).toContain("Ryan McWalter");
+    expect(ondraft.text).toContain('hx-get="/settings"');
+    expect(ondraft.text).toContain("Open account settings");
+  });
+
+  it("renders and updates account settings through modal routes", async () => {
+    const ondraft = app();
+    const anonymous = await request(ondraft).get("/settings");
+    expect(anonymous.status).toBe(401);
+    expect(anonymous.text).toContain("Log in to manage account settings.");
+
+    const agent = await loginAdminAgent(ondraft);
+    const modal = await agent.get("/settings");
+
+    expect(modal.status).toBe(200);
+    expect(modal.text).toContain('role="dialog"');
+    expect(modal.text).toContain("Settings");
+    expect(modal.text).toContain("Mailing list");
+    expect(modal.text).toContain("Subscribe");
+    expect(modal.text).toContain("Change password");
+    expect(modal.text).toContain("Delete account");
+    expect(modal.text).toContain("This cannot be undone.");
+
+    const subscribed = await agent
+      .post("/settings/mailing-list")
+      .type("form")
+      .send({ preference: "subscribe" });
+
+    expect(subscribed.status).toBe(200);
+    expect(subscribed.text).toContain("You are subscribed to the OnDraft mailing list.");
+    expect(subscribed.text).toContain("Unsubscribe");
+
+    const unsubscribed = await agent
+      .post("/settings/mailing-list")
+      .type("form")
+      .send({ preference: "unsubscribe" });
+
+    expect(unsubscribed.status).toBe(200);
+    expect(unsubscribed.text).toContain("You are unsubscribed from the OnDraft mailing list.");
+    expect(unsubscribed.text).toContain("Subscribe");
+  });
+
+  it("shows verification resend in settings only for unverified users", async () => {
+    const agent = request.agent(app());
+
+    await agent
+      .post("/register")
+      .type("form")
+      .send({
+        displayName: "Unverified Reader",
+        email: "unverified-reader@ondraft.test",
+        password: "password123",
+        confirmPassword: "password123",
+      });
+
+    const modal = await agent.get("/settings");
+
+    expect(modal.status).toBe(200);
+    expect(modal.text).toContain("Email verification");
+    expect(modal.text).toContain("Resend verify email");
+
+    const resent = await agent.post("/settings/resend-verification");
+    expect(resent.status).toBe(200);
+    expect(resent.text).toContain("we sent a new verification link");
   });
 
   it("registers a new user and signs them in", async () => {
@@ -71,6 +154,7 @@ describe("OnDraft HTTP contracts", () => {
         displayName: "New Analyst",
         email: "analyst@ondraft.test",
         password: "password123",
+        confirmPassword: "password123",
       });
 
     expect(register.status).toBe(302);
@@ -80,7 +164,22 @@ describe("OnDraft HTTP contracts", () => {
 
     expect(ondraft.status).toBe(200);
     expect(ondraft.text).toContain("New Analyst");
-    expect(ondraft.text).toContain("Resend verification email");
+    expect(ondraft.text).not.toContain("Resend verification email");
+  });
+
+  it("rejects registration when password confirmation does not match", async () => {
+    const response = await request(app())
+      .post("/register")
+      .type("form")
+      .send({
+        displayName: "New Analyst",
+        email: "mismatch@ondraft.test",
+        password: "password123",
+        confirmPassword: "different123",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.text).toContain("Passwords must match.");
   });
 
   it("accepts verification resend requests without revealing whether the email exists", async () => {
@@ -178,6 +277,7 @@ describe("OnDraft HTTP contracts", () => {
         displayName: "Moderated Reader",
         email: "moderated-reader@ondraft.test",
         password: "password123",
+        confirmPassword: "password123",
       });
 
     const admin = await loginAdminAgent(ondraft);
@@ -233,6 +333,7 @@ describe("OnDraft HTTP contracts", () => {
         displayName: "Bench Timeout",
         email: "bench-timeout@ondraft.test",
         password: "password123",
+        confirmPassword: "password123",
       });
 
     const admin = await loginAdminAgent(ondraft);
@@ -449,12 +550,12 @@ describe("OnDraft HTTP contracts", () => {
 
     const fullBoard = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
     expect(fullBoard.status).toBe(200);
-    expect(fullBoard.text).toContain('<select name="position">');
+    expect(fullBoard.text).toContain('<select name="position" onchange=');
     expect(fullBoard.text).toContain('<option value="" selected>All</option>');
     expect(fullBoard.text).toContain('<option value="QB"');
     expect(fullBoard.text).toContain('<option value="OnDraft State"');
     expect(fullBoard.text).toContain('<option value="Mock Tech"');
-    expect(fullBoard.text).toContain("Apply filters");
+    expect(fullBoard.text).not.toContain("Apply filters");
     expect(fullBoard.text).not.toContain("Reset");
     expect(fullBoard.text).toMatch(/>\s*Ryan\s*<\/button>/);
     expect(fullBoard.text).toMatch(/>\s*Aleks\s*<\/button>/);
@@ -901,6 +1002,7 @@ describe("OnDraft HTTP contracts", () => {
         displayName: "Reader One",
         email: "reader@ondraft.test",
         password: "password123",
+        confirmPassword: "password123",
       });
 
     const unverifiedComment = await reader

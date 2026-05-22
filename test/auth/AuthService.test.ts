@@ -141,6 +141,7 @@ describe("AuthService", () => {
       displayName: "Draft Analyst",
       email: "draft@ondraft.test",
       password: "password123",
+      confirmPassword: "password123",
     });
 
     expect(result.ok).toBe(true);
@@ -148,6 +149,32 @@ describe("AuthService", () => {
       expect(result.value.email).toBe("draft@ondraft.test");
       expect(result.value.displayName).toBe("Draft Analyst");
       expect(result.value).not.toHaveProperty("token");
+    }
+  });
+
+  it("requires matching password confirmation during registration", async () => {
+    const service = CreateAuthService(CreateInMemoryUserRepository());
+
+    const missingConfirmation = await service.register({
+      displayName: "Draft Analyst",
+      email: "missing-confirm@ondraft.test",
+      password: "password123",
+      confirmPassword: "",
+    });
+    const mismatched = await service.register({
+      displayName: "Draft Analyst",
+      email: "mismatch@ondraft.test",
+      password: "password123",
+      confirmPassword: "different123",
+    });
+
+    expect(missingConfirmation.ok).toBe(false);
+    expect(mismatched.ok).toBe(false);
+    if (!missingConfirmation.ok) {
+      expect(missingConfirmation.value.message).toBe("Please confirm your password.");
+    }
+    if (!mismatched.ok) {
+      expect(mismatched.value.message).toBe("Passwords must match.");
     }
   });
 
@@ -159,6 +186,7 @@ describe("AuthService", () => {
       displayName: "Draft Analyst",
       email: "draft@ondraft.test",
       password: "password123",
+      confirmPassword: "password123",
     });
 
     const persisted = await users.findByEmail("draft@ondraft.test");
@@ -185,6 +213,7 @@ describe("AuthService", () => {
       displayName: "Draft Analyst",
       email: "draft@ondraft.test",
       password: "password123",
+      confirmPassword: "password123",
     });
 
     expect(result.ok).toBe(true);
@@ -227,6 +256,7 @@ describe("AuthService", () => {
       displayName: "Draft Analyst",
       email: "draft@ondraft.test",
       password: "password123",
+      confirmPassword: "password123",
       mailingListConsent: true,
     });
 
@@ -339,6 +369,7 @@ describe("AuthService", () => {
       displayName: "Draft Analyst",
       email: "draft@ondraft.test",
       password: "password123",
+      confirmPassword: "password123",
     });
     const originalToken = tokenFromVerificationUrl(email.sent[0].verificationUrl);
     const result = await service.requestEmailVerification({ email: "draft@ondraft.test" });
@@ -397,6 +428,7 @@ describe("AuthService", () => {
       displayName: "Moderated Reader",
       email: "moderated@ondraft.test",
       password: "password123",
+      confirmPassword: "password123",
     });
     const reader = await users.findByEmail("moderated@ondraft.test");
     expect(reader.ok).toBe(true);
@@ -433,6 +465,7 @@ describe("AuthService", () => {
       displayName: "Permanent Reader",
       email: "permanent@ondraft.test",
       password: "password123",
+      confirmPassword: "password123",
     });
     const reader = await users.findByEmail("permanent@ondraft.test");
     expect(reader.ok).toBe(true);
@@ -459,6 +492,7 @@ describe("AuthService", () => {
       displayName: "Ban Status Reader",
       email: "ban-status@ondraft.test",
       password: "password123",
+      confirmPassword: "password123",
     });
     const reader = await users.findByEmail("ban-status@ondraft.test");
     expect(reader.ok).toBe(true);
@@ -498,6 +532,7 @@ describe("AuthService", () => {
       displayName: "Unban Reader",
       email: "unban@ondraft.test",
       password: "password123",
+      confirmPassword: "password123",
     });
     const reader = await users.findByEmail("unban@ondraft.test");
     expect(reader.ok).toBe(true);
@@ -530,6 +565,7 @@ describe("AuthService", () => {
       displayName: "Listed Ban Reader",
       email: "listed-ban@ondraft.test",
       password: "password123",
+      confirmPassword: "password123",
     });
     const reader = await users.findByEmail("listed-ban@ondraft.test");
     expect(reader.ok).toBe(true);
@@ -560,11 +596,13 @@ describe("AuthService", () => {
       displayName: "Unsafe Ban Reader",
       email: "unsafe-ban@ondraft.test",
       password: "password123",
+      confirmPassword: "password123",
     });
     await service.register({
       displayName: "Unsafe Ban Target",
       email: "unsafe-ban-target@ondraft.test",
       password: "password123",
+      confirmPassword: "password123",
     });
     const reader = await users.findByEmail("unsafe-ban@ondraft.test");
     const target = await users.findByEmail("unsafe-ban-target@ondraft.test");
@@ -713,6 +751,7 @@ describe("AuthService", () => {
       displayName: "Suppressed Reader",
       email: "suppressed@ondraft.test",
       password: "password123",
+      confirmPassword: "password123",
     });
     const subscription = await users.findMailingListSubscriptionByEmail("suppressed@ondraft.test");
 

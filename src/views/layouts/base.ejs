@@ -24,16 +24,9 @@
       <%- include("partials/topBar", { currentSession, currentIsAdmin }) %>
       <%- include("partials/sidebar", { currentSession, currentIsAdmin }) %>
       <%- include("partials/beerLoader") %>
-      <% if (currentSession?.authenticatedUser && !currentSession.authenticatedUser.emailVerifiedAt) { %>
-        <section class="verification-banner mx-4 mt-20 lg:mr-[22rem]">
-          <p>Verify your email before commenting or bookmarking.</p>
-          <form method="post" action="/verify-email/resend">
-            <button type="submit" class="secondary-button">Resend verification email</button>
-          </form>
-        </section>
-      <% } %>
+      <div id="site-modal-outlet"></div>
       <main id="page-content" class="mx-0 min-h-[calc(100vh-9rem)] max-w-none px-4 pb-10 pt-20 lg:mr-80 lg:px-8">
-        <div class="mx-auto max-w-6xl">
+        <div class="w-full">
           <%- body %>
         </div>
       </main>

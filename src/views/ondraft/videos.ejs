@@ -62,18 +62,18 @@
       </div>
     </div>
   <% } else { %>
-    <div class="video-grid grid gap-5 md:grid-cols-2">
+    <div class="video-grid grid gap-5">
       <% videos.forEach((video) => { %>
         <% const thumbnailUrl = video.thumbnailUrl || `https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`; %>
-        <article class="video-card od-card grid overflow-hidden transition hover:-translate-y-0.5 hover:border-draft-gold hover:shadow-editorial">
+        <article class="video-card od-card grid overflow-hidden transition hover:-translate-y-0.5 hover:border-draft-gold hover:shadow-editorial lg:grid-cols-[24rem_minmax(0,1fr)]">
           <a class="group block overflow-hidden bg-draft-ink" href="<%= video.youtubeUrl %>" target="_blank" rel="noopener noreferrer">
-            <img class="video-thumb" src="<%= thumbnailUrl %>" alt="" />
+            <img class="video-thumb h-full min-h-56" src="<%= thumbnailUrl %>" alt="" />
           </a>
-          <div class="video-card-copy grid gap-4 p-5">
+          <div class="video-card-copy grid content-between gap-5 p-5 sm:p-6">
             <div class="grid gap-2">
               <p class="m-0 text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Bar TV</p>
-              <h2 class="m-0 font-display text-2xl font-black leading-tight text-slate-950 dark:text-white"><%= video.title %></h2>
-              <p class="m-0 text-base leading-7 text-slate-700 dark:text-slate-200"><%= video.description.length > 180 ? `${video.description.slice(0, 177)}...` : video.description %></p>
+              <h2 class="m-0 font-display text-3xl font-black leading-tight text-slate-950 dark:text-white"><%= video.title %></h2>
+              <p class="m-0 text-base leading-7 text-slate-700 dark:text-slate-200"><%= video.description %></p>
             </div>
             <div class="flex flex-wrap gap-2">
               <% video.tags.forEach((tag) => { %>

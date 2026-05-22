@@ -1,0 +1,183 @@
+<%
+  const modalTitle = modal === "about"
+    ? "About Us"
+    : modal === "privacy"
+      ? "Privacy Policy"
+      : "Contact";
+%>
+
+<div
+  class="fixed inset-0 z-[70] grid place-items-center bg-slate-950/60 p-4 backdrop-blur-sm"
+  role="presentation"
+  onclick="if (event.target === this) this.remove();"
+>
+  <section
+    class="od-card max-h-[min(82vh,52rem)] w-full max-w-3xl overflow-hidden text-slate-950 shadow-editorial dark:text-slate-100"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="site-modal-title"
+    tabindex="-1"
+    onkeydown="if (event.key === 'Escape') this.closest('[role=presentation]')?.remove();"
+  >
+    <div class="flex items-start justify-between gap-4 border-b border-slate-200 p-5 dark:border-white/10">
+      <div>
+        <p class="text-xs font-black uppercase tracking-[0.2em] text-draft-amber dark:text-draft-gold">OnDraft</p>
+        <h2 id="site-modal-title" class="mt-2 font-display text-3xl font-black leading-tight text-slate-950 dark:text-white"><%= modalTitle %></h2>
+      </div>
+      <button
+        type="button"
+        class="od-focus-ring inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white text-2xl leading-none text-slate-700 transition hover:bg-slate-50 dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
+        aria-label="Close"
+        onclick="this.closest('[role=presentation]')?.remove();"
+        autofocus
+      >
+        &times;
+      </button>
+    </div>
+
+    <div class="max-h-[calc(min(82vh,52rem)-6rem)] overflow-y-auto p-5 text-base leading-7 text-slate-700 dark:text-slate-200 sm:p-6">
+      <% if (modal === "about") { %>
+        <p>This is a work in progress website by Nick Southey for OnDraft by Ryan McWalter and Aleks Ryabinkin.</p>
+      <% } else if (modal === "contact") { %>
+        <p>For all inquiries and issues, contact <a class="od-focus-ring rounded font-bold text-draft-amber hover:text-draft-gold dark:text-draft-gold" href="mailto:support@ondraftfootball.com">support@ondraftfootball.com</a>.</p>
+      <% } else { %>
+        <div class="grid gap-6">
+          <p class="text-sm font-bold text-slate-600 dark:text-slate-300">Last updated: May 21, 2026</p>
+          <p>This Privacy Policy explains how OnDraft Football (&ldquo;we,&rdquo; &ldquo;us,&rdquo; or &ldquo;our&rdquo;) collects, uses, and protects information when you visit or use our website at ondraftfootball.com.</p>
+          <p>By using our website, you agree to the practices described in this Privacy Policy.</p>
+
+          <section class="grid gap-3">
+            <h3 class="font-display text-2xl font-black text-slate-950 dark:text-white">1. Information We Collect</h3>
+            <p>We may collect the following types of information:</p>
+            <h4 class="font-bold text-slate-950 dark:text-white">Information you provide to us</h4>
+            <p>This may include:</p>
+            <ul class="list-disc space-y-1 pl-5">
+              <li>Your name or username</li>
+              <li>Your email address</li>
+              <li>Account registration information</li>
+              <li>Comments, forum posts, article submissions, or other content you choose to submit</li>
+              <li>Mailing list preferences</li>
+              <li>Messages or requests you send to us</li>
+            </ul>
+            <h4 class="font-bold text-slate-950 dark:text-white">Information collected automatically</h4>
+            <p>When you visit the website, we may automatically collect basic technical information, such as:</p>
+            <ul class="list-disc space-y-1 pl-5">
+              <li>IP address</li>
+              <li>Browser type</li>
+              <li>Device information</li>
+              <li>Pages visited</li>
+              <li>Date and time of visit</li>
+              <li>Referring website</li>
+              <li>Basic usage and performance data</li>
+            </ul>
+            <p>We may collect this information through server logs, cookies, analytics tools, or similar technologies.</p>
+          </section>
+
+          <section class="grid gap-3">
+            <h3 class="font-display text-2xl font-black text-slate-950 dark:text-white">2. How We Use Information</h3>
+            <p>We use collected information to:</p>
+            <ul class="list-disc space-y-1 pl-5">
+              <li>Operate and maintain the website</li>
+              <li>Create and manage user accounts</li>
+              <li>Verify email addresses</li>
+              <li>Send account-related emails</li>
+              <li>Send mailing list emails, if you choose to subscribe</li>
+              <li>Display comments, posts, or other content you submit</li>
+              <li>Prevent spam, abuse, fraud, and security issues</li>
+              <li>Improve the website and user experience</li>
+              <li>Respond to questions, requests, or support needs</li>
+              <li>Comply with legal obligations</li>
+            </ul>
+          </section>
+
+          <section class="grid gap-3">
+            <h3 class="font-display text-2xl font-black text-slate-950 dark:text-white">3. Mailing List</h3>
+            <p>If you choose to join our mailing list, we may use your email address to send updates, articles, announcements, or related content.</p>
+            <p>You may unsubscribe from marketing or mailing list emails at any time by using the unsubscribe link in the email or by contacting us.</p>
+            <p>Even if you unsubscribe from marketing emails, we may still send you important account-related or security-related messages.</p>
+          </section>
+
+          <section class="grid gap-3">
+            <h3 class="font-display text-2xl font-black text-slate-950 dark:text-white">4. Comments, Posts, and Public Content</h3>
+            <p>If the website allows comments, forum posts, profiles, or other public submissions, the content you choose to post may be visible to other users or the public.</p>
+            <p>Please do not submit personal information in public areas of the website that you do not want others to see.</p>
+            <p>We may moderate, edit, hide, or remove content that violates our rules, is spam, or creates security or legal concerns.</p>
+          </section>
+
+          <section class="grid gap-3">
+            <h3 class="font-display text-2xl font-black text-slate-950 dark:text-white">5. How We Share Information</h3>
+            <p>We do not sell your personal information.</p>
+            <p>We do not share your personal information with third parties for their own marketing purposes.</p>
+            <p>We may share limited information only in the following situations:</p>
+            <ul class="list-disc space-y-1 pl-5">
+              <li>With service providers who help us operate the website, such as hosting providers, email services, analytics providers, spam-prevention tools, or security tools</li>
+              <li>When required by law, legal process, or government request</li>
+              <li>To protect the rights, safety, and security of our users, website, or others</li>
+              <li>To investigate or prevent spam, fraud, abuse, or security issues</li>
+              <li>With your consent</li>
+              <li>If the website or project is transferred, merged, or sold, in which case user information may be transferred as part of that transaction</li>
+            </ul>
+            <p>Service providers are only given access to information needed to perform their services.</p>
+          </section>
+
+          <section class="grid gap-3">
+            <h3 class="font-display text-2xl font-black text-slate-950 dark:text-white">6. Cookies and Analytics</h3>
+            <p>We may use cookies or similar technologies to keep the website working, remember preferences, understand website traffic, improve performance, and protect against abuse.</p>
+            <p>You can usually adjust your browser settings to block or delete cookies. However, some parts of the website may not work properly without cookies.</p>
+          </section>
+
+          <section class="grid gap-3">
+            <h3 class="font-display text-2xl font-black text-slate-950 dark:text-white">7. Third-Party Links and Embedded Content</h3>
+            <p>Our website may contain links to third-party websites, videos, social media pages, or embedded content.</p>
+            <p>We are not responsible for the privacy practices, content, or policies of third-party websites or services. You should review their privacy policies before using them.</p>
+          </section>
+
+          <section class="grid gap-3">
+            <h3 class="font-display text-2xl font-black text-slate-950 dark:text-white">8. Data Security</h3>
+            <p>We use reasonable technical and organizational measures to protect user information from unauthorized access, loss, misuse, or alteration.</p>
+            <p>However, no website, server, or internet transmission is completely secure. We cannot guarantee absolute security.</p>
+          </section>
+
+          <section class="grid gap-3">
+            <h3 class="font-display text-2xl font-black text-slate-950 dark:text-white">9. Data Retention</h3>
+            <p>We keep personal information only as long as reasonably necessary for the purposes described in this Privacy Policy, including to operate the website, maintain accounts, comply with legal obligations, resolve disputes, and enforce our policies.</p>
+            <p>You may request that we delete certain personal information by contacting us.</p>
+          </section>
+
+          <section class="grid gap-3">
+            <h3 class="font-display text-2xl font-black text-slate-950 dark:text-white">10. Your Choices and Rights</h3>
+            <p>Depending on where you live, you may have rights to:</p>
+            <ul class="list-disc space-y-1 pl-5">
+              <li>Access the personal information we have about you</li>
+              <li>Request correction of inaccurate information</li>
+              <li>Request deletion of certain information</li>
+              <li>Opt out of mailing list emails</li>
+              <li>Ask questions about how your information is used</li>
+            </ul>
+            <p>To make a request, contact us at support@ondraftfootball.com.</p>
+            <p>We may need to verify your identity before completing certain requests.</p>
+          </section>
+
+          <section class="grid gap-3">
+            <h3 class="font-display text-2xl font-black text-slate-950 dark:text-white">11. Children&rsquo;s Privacy</h3>
+            <p>Our website is not intended for children under 13.</p>
+            <p>We do not knowingly collect personal information from children under 13. If we learn that we have collected personal information from a child under 13, we will take reasonable steps to delete that information.</p>
+            <p>If you believe a child under 13 has provided personal information to us, please contact us at support@ondraftfootball.com.</p>
+          </section>
+
+          <section class="grid gap-3">
+            <h3 class="font-display text-2xl font-black text-slate-950 dark:text-white">12. Changes to This Privacy Policy</h3>
+            <p>We may update this Privacy Policy from time to time.</p>
+            <p>If we make changes, we will update the &ldquo;Last updated&rdquo; date at the top of this page. Your continued use of the website after changes are posted means you accept the updated Privacy Policy.</p>
+          </section>
+
+          <section class="grid gap-3">
+            <h3 class="font-display text-2xl font-black text-slate-950 dark:text-white">13. Contact Us</h3>
+            <p>If you have any questions about this Privacy Policy or how we handle user information, contact us at:</p>
+            <p><strong class="text-slate-950 dark:text-white">OnDraft Football</strong><br />Email: <a class="od-focus-ring rounded font-bold text-draft-amber hover:text-draft-gold dark:text-draft-gold" href="mailto:support@ondraftfootball.com">support@ondraftfootball.com</a><br />Website: ondraftfootball.com</p>
+          </section>
+        </div>
+      <% } %>
+    </div>
+  </section>
+</div>
