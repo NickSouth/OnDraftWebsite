@@ -9,7 +9,7 @@
 
 <div
   x-cloak
-  class="fixed inset-0 z-50 bg-slate-950/50 lg:hidden"
+  class="fixed inset-0 z-50 bg-slate-950/50 <%= forceOverlaySidebar ? "" : "lg:hidden" %>"
   x-show="sidebarOpen"
   x-transition.opacity
   @click="sidebarOpen = false"
@@ -17,9 +17,9 @@
 
 <aside
   id="site-sidebar"
-  class="fixed right-0 top-14 z-50 flex h-[calc(100vh-3.5rem)] w-80 max-w-[calc(100vw-1rem)] flex-col border-l border-slate-200 bg-white shadow-editorial transition-transform duration-200 dark:border-white/10 dark:bg-draft-slate lg:translate-x-0"
-  :class="sidebarOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'"
-  x-trap.noscroll="sidebarOpen && window.innerWidth < 1024"
+  class="fixed right-0 top-14 z-50 flex h-[calc(100vh-3.5rem)] w-80 max-w-[calc(100vw-1rem)] flex-col border-l border-slate-200 bg-white shadow-editorial transition-transform duration-200 dark:border-white/10 dark:bg-draft-slate <%= forceOverlaySidebar ? "" : "lg:translate-x-0" %>"
+  :class="sidebarOpen ? 'translate-x-0' : 'translate-x-full <%= forceOverlaySidebar ? "" : "lg:translate-x-0" %>'"
+  x-trap.noscroll="sidebarOpen <%= forceOverlaySidebar ? "" : "&& window.innerWidth < 1024" %>"
   @keydown.escape.window="sidebarOpen = false"
 >
   <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-white/10">
@@ -29,7 +29,7 @@
     </div>
     <button
       type="button"
-      class="od-focus-ring inline-flex size-9 items-center justify-center rounded-md text-2xl leading-none text-slate-600 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 lg:hidden"
+      class="od-focus-ring inline-flex size-9 items-center justify-center rounded-md text-2xl leading-none text-slate-600 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 <%= forceOverlaySidebar ? "" : "lg:hidden" %>"
       aria-label="Close navigation"
       @click="sidebarOpen = false"
     >

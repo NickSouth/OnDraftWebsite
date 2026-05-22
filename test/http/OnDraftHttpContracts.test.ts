@@ -584,7 +584,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(resetBoard.text).not.toContain("Reset");
   });
 
-  it("renders the consensus big board with averaged published rankings and discrepancy badges", async () => {
+  it("renders the consensus big board with sequential published rankings and discrepancy badges", async () => {
     const ondraft = app();
     const agent = await loginAdminAgent(ondraft);
 
@@ -665,12 +665,12 @@ describe("OnDraft HTTP contracts", () => {
     expect(consensus.text).toContain('value="Consensus"');
     expect(consensus.text).toMatch(/aria-pressed="true"[\s\S]*Consensus/);
     expect(consensus.text).not.toContain("/bigboard/edit?year=2026&amp;creator=Consensus");
-    expect(consensus.text).toMatch(/5\. Edge Prospect[\s\S]*EDGE1\.5/);
-    expect(consensus.text).toMatch(/7\. Quarterback Prospect[\s\S]*QB2/);
+    expect(consensus.text).toMatch(/1\. Edge Prospect[\s\S]*EDGE1/);
+    expect(consensus.text).toMatch(/2\. Quarterback Prospect[\s\S]*QB1/);
     expect(consensus.text).toContain("Ryan State");
     expect(consensus.text).not.toContain("Aleks Tech");
     expect(consensus.text).toContain("Big discrepancy");
-    expect(consensus.text).toMatch(/10\. Tackle Prospect[\s\S]*Published U/);
+    expect(consensus.text).toMatch(/3\. Tackle Prospect[\s\S]*Published U/);
     expect(consensus.text).not.toContain("Private U");
   });
 

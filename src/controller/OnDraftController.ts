@@ -992,6 +992,7 @@ class OnDraftController implements IOnDraftController {
       positions: POSITIONS,
       errorMessage,
       statusMessage,
+      forceOverlaySidebar: true,
     });
   }
 

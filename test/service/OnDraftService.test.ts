@@ -452,8 +452,8 @@ describe("OnDraftService big board editing", () => {
       expect(quarterback).toMatchObject({
         school: "Ryan State",
         position: "QB",
-        rank: 7,
-        posRank: 2,
+        rank: 2,
+        posRank: 1,
         height: { feet: 6, inches: 2 },
         weight: 220,
         bigDiscrepency: true,
@@ -461,8 +461,8 @@ describe("OnDraftService big board editing", () => {
 
       const edge = consensus.value.entries.find((entry) => entry.playerName === "Edge Prospect");
       expect(edge).toMatchObject({
-        rank: 5,
-        posRank: 1.5,
+        rank: 1,
+        posRank: 1,
         bigDiscrepency: false,
       });
 
@@ -470,10 +470,74 @@ describe("OnDraftService big board editing", () => {
       expect(tackle).toMatchObject({
         school: "Published U",
         position: "OT",
-        rank: 10,
-        posRank: 2,
+        rank: 3,
+        posRank: 1,
         bigDiscrepency: false,
       });
+    }
+  });
+
+  it("assigns sequential consensus ranks and uses Ryan rankings to break average ties", async () => {
+    const ondraftService = service();
+
+    await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Ryan",
+      playerName: "Player One",
+      school: "Ryan State",
+      position: "QB",
+      rank: 1,
+      posRank: 1,
+      height: { feet: 6, inches: 2 },
+      weight: 220,
+    });
+    await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Aleks",
+      playerName: "Player One",
+      school: "Aleks Tech",
+      position: "QB",
+      rank: 3,
+      posRank: 3,
+      height: { feet: 6, inches: 1 },
+      weight: 215,
+    });
+    await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Ryan",
+      playerName: "Player Two",
+      school: "Ryan State",
+      position: "QB",
+      rank: 2,
+      posRank: 2,
+      height: { feet: 6, inches: 0 },
+      weight: 210,
+    });
+    await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Ryan",
+      playerName: "Receiver One",
+      school: "Ryan State",
+      position: "WR",
+      rank: 3,
+      posRank: 1,
+      height: { feet: 6, inches: 1 },
+      weight: 200,
+    });
+
+    const consensus = await ondraftService.getBigBoard(2026, "Consensus");
+
+    expect(consensus.ok).toBe(true);
+    if (consensus.ok === true) {
+      expect(consensus.value.entries.map((entry) => ({
+        playerName: entry.playerName,
+        rank: entry.rank,
+        posRank: entry.posRank,
+      }))).toEqual([
+        { playerName: "Player One", rank: 1, posRank: 1 },
+        { playerName: "Player Two", rank: 2, posRank: 2 },
+        { playerName: "Receiver One", rank: 3, posRank: 1 },
+      ]);
     }
   });
 
