@@ -46,6 +46,9 @@ class ExpressApp implements IApp {
   private registerMiddleware(): void {
     this.app.use(express.static(path.join(process.cwd(), "src/static")));
     this.app.use("/vendor/htmx", express.static(path.join(process.cwd(), "node_modules", "htmx.org", "dist")));
+    this.app.use("/vendor/alpinejs", express.static(path.join(process.cwd(), "node_modules", "alpinejs", "dist")));
+    this.app.use("/vendor/alpinejs-focus", express.static(path.join(process.cwd(), "node_modules", "@alpinejs", "focus", "dist")));
+    this.app.use("/vendor/alpinejs-collapse", express.static(path.join(process.cwd(), "node_modules", "@alpinejs", "collapse", "dist")));
     this.app.use("/vendor/pdfjs", express.static(path.join(process.cwd(), "node_modules", "pdfjs-dist")));
     this.app.use(express.static(path.join(process.cwd(), "public"), {
       setHeaders: (res, filePath) => {
@@ -144,6 +147,13 @@ class ExpressApp implements IApp {
     next();
   }
 
+  private renderInfoModal(res: Response, modal: "about" | "privacy" | "contact"): void {
+    res.render("ondraft/partials/infoModal", {
+      layout: false,
+      modal,
+    });
+  }
+
   private registerRoutes(): void {
     this.app.get(
       "/",
@@ -151,6 +161,32 @@ class ExpressApp implements IApp {
         this.logger.info("GET /");
         const browserSession = recordPageView(sessionStore(req));
         await this.controller.showHome(res, browserSession);
+      }),
+    );
+
+    this.app.get("/about", (_req, res) => this.renderInfoModal(res, "about"));
+    this.app.get("/privacy", (_req, res) => this.renderInfoModal(res, "privacy"));
+    this.app.get("/contact", (_req, res) => this.renderInfoModal(res, "contact"));
+
+    this.app.get(
+      "/settings",
+      asyncHandler(async (req, res) => {
+        await this.authController.showSettingsModal(res, sessionStore(req));
+      }),
+    );
+
+    this.app.post(
+      "/settings/mailing-list",
+      asyncHandler(async (req, res) => {
+        const subscribe = req.body.preference === "subscribe";
+        await this.authController.updateMailingListPreferenceFromSettings(res, sessionStore(req), subscribe);
+      }),
+    );
+
+    this.app.post(
+      "/settings/resend-verification",
+      asyncHandler(async (req, res) => {
+        await this.authController.requestEmailVerificationFromSettings(res, sessionStore(req));
       }),
     );
 
@@ -199,12 +235,14 @@ class ExpressApp implements IApp {
         const displayName = typeof req.body.displayName === "string" ? req.body.displayName : "";
         const email = typeof req.body.email === "string" ? req.body.email : "";
         const password = typeof req.body.password === "string" ? req.body.password : "";
+        const confirmPassword = typeof req.body.confirmPassword === "string" ? req.body.confirmPassword : "";
         const mailingListConsent = req.body.mailingListConsent === "on";
         await this.authController.registerFromForm(
           res,
           displayName,
           email,
           password,
+          confirmPassword,
           mailingListConsent,
           sessionStore(req),
         );

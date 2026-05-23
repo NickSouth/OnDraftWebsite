@@ -1,0 +1,163 @@
+<%
+  const user = session?.authenticatedUser ?? null;
+  const mailingListStatus = settings?.mailingListStatus ?? "none";
+  const isSubscribed = mailingListStatus === "subscribed" || mailingListStatus === "pending";
+  const mailingListLabel = mailingListStatus === "subscribed"
+    ? "Subscribed"
+    : mailingListStatus === "pending"
+      ? "Pending verification"
+      : "Not subscribed";
+%>
+
+<div
+  class="fixed inset-0 z-[70] grid place-items-center bg-slate-950/60 p-4 backdrop-blur-sm"
+  role="presentation"
+  onclick="if (event.target === this) this.remove();"
+>
+  <section
+    class="relative max-h-[min(86vh,46rem)] w-full max-w-2xl overflow-hidden rounded-lg border border-slate-200 bg-white text-slate-950 shadow-editorial dark:border-white/15 dark:bg-draft-slate dark:text-slate-100"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="settings-modal-title"
+    tabindex="-1"
+    x-data="{ confirmingDelete: false, deleteMessage: '' }"
+    onkeydown="if (event.key === 'Escape') this.closest('[role=presentation]')?.remove();"
+  >
+    <div class="flex items-start justify-between gap-4 border-b border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-draft-slate">
+      <div>
+        <p class="text-xs font-black uppercase tracking-[0.2em] text-draft-amber dark:text-draft-gold">Account</p>
+        <h2 id="settings-modal-title" class="mt-2 font-display text-3xl font-black leading-tight text-slate-950 dark:text-white">Settings</h2>
+        <% if (user) { %>
+          <p class="mt-1 text-sm font-semibold text-slate-600 dark:text-slate-300"><%= user.email %></p>
+        <% } %>
+      </div>
+      <button
+        type="button"
+        class="od-focus-ring inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white text-2xl leading-none text-slate-700 transition hover:bg-slate-50 dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
+        aria-label="Close settings"
+        onclick="this.closest('[role=presentation]')?.remove();"
+        autofocus
+      >
+        &times;
+      </button>
+    </div>
+
+    <div class="max-h-[calc(min(86vh,46rem)-6rem)] overflow-y-auto bg-white p-5 dark:bg-draft-slate sm:p-6">
+      <% if (flashMessage) { %>
+        <div class="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 dark:border-white/10 dark:bg-emerald-500/10 dark:text-emerald-200">
+          <%= flashMessage %>
+        </div>
+      <% } %>
+
+      <% if (errorMessage) { %>
+        <div class="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200">
+          <%= errorMessage %>
+        </div>
+      <% } %>
+
+      <% if (user) { %>
+        <div class="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 dark:divide-white/10 dark:border-white/10">
+          <div class="grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+            <div>
+              <h3 class="text-base font-black text-slate-950 dark:text-white">Mailing list</h3>
+              <p class="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                <span class="font-bold text-draft-amber dark:text-draft-gold"><%= mailingListLabel %></span>
+                <% if (mailingListStatus === "pending") { %>
+                  until your email is verified.
+                <% } else { %>
+                  for OnDraft updates and announcements.
+                <% } %>
+              </p>
+            </div>
+            <form method="post" action="/settings/mailing-list" class="m-0">
+              <input type="hidden" name="preference" value="<%= isSubscribed ? "unsubscribe" : "subscribe" %>" />
+              <button
+                type="submit"
+                class="<%= isSubscribed ? "od-secondary-link" : "od-primary-link" %> min-h-10 w-full px-4 py-2 sm:w-auto"
+                hx-post="/settings/mailing-list"
+                hx-target="#site-modal-outlet"
+                hx-swap="innerHTML"
+              >
+                <%= isSubscribed ? "Unsubscribe" : "Subscribe" %>
+              </button>
+            </form>
+          </div>
+
+          <% if (!user.emailVerifiedAt) { %>
+            <div class="grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+              <div>
+                <h3 class="text-base font-black text-slate-950 dark:text-white">Email verification</h3>
+                <p class="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">Send a fresh verification link to <%= user.email %>.</p>
+              </div>
+              <form method="post" action="/settings/resend-verification" class="m-0">
+                <button
+                  type="submit"
+                  class="od-secondary-link min-h-10 w-full px-4 py-2 sm:w-auto"
+                  hx-post="/settings/resend-verification"
+                  hx-target="#site-modal-outlet"
+                  hx-swap="innerHTML"
+                >
+                  Resend verify email
+                </button>
+              </form>
+            </div>
+          <% } %>
+
+          <div class="grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+            <div>
+              <h3 class="text-base font-black text-slate-950 dark:text-white">Change password</h3>
+              <p class="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">Password changes will be added in a later account pass.</p>
+            </div>
+            <button
+              type="button"
+              class="od-secondary-link min-h-10 w-full cursor-not-allowed px-4 py-2 opacity-60 sm:w-auto"
+              disabled
+            >
+              Coming soon
+            </button>
+          </div>
+
+          <div class="grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+            <div>
+              <h3 class="text-base font-black text-red-700 dark:text-red-200">Delete account</h3>
+              <p class="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">Remove your account and account data from OnDraft.</p>
+            </div>
+            <button
+              type="button"
+              class="od-focus-ring inline-flex min-h-10 w-full items-center justify-center rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 transition hover:bg-red-100 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200 dark:hover:bg-red-500/20 sm:w-auto"
+              @click="confirmingDelete = true; deleteMessage = ''"
+            >
+              Delete account
+            </button>
+          </div>
+        </div>
+
+        <p id="settings-action-message" class="mt-4 text-sm font-bold text-slate-600 dark:text-slate-300" x-text="deleteMessage"></p>
+      <% } %>
+    </div>
+
+    <div
+      class="absolute inset-0 z-10 grid place-items-center bg-slate-950/60 p-4 backdrop-blur-sm"
+      x-show="confirmingDelete"
+      x-cloak
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="delete-account-title"
+    >
+      <div class="w-full max-w-md rounded-lg border border-red-200 bg-white p-5 text-slate-950 shadow-editorial dark:border-red-400/30 dark:bg-draft-ink dark:text-slate-100">
+        <h3 id="delete-account-title" class="font-display text-2xl font-black text-red-700 dark:text-red-200">Delete Account?</h3>
+        <p class="mt-3 text-sm leading-6 text-slate-700 dark:text-slate-200">This cannot be undone.</p>
+        <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <button type="button" class="od-secondary-link min-h-10 px-4 py-2" @click="confirmingDelete = false">Cancel</button>
+          <button
+            type="button"
+            class="od-focus-ring inline-flex min-h-10 items-center justify-center rounded-md bg-red-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-800"
+            @click="confirmingDelete = false; deleteMessage = 'Account deletion is not available yet. Contact support@ondraftfootball.com for deletion requests.'"
+          >
+            I understand
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>

@@ -1,45 +1,68 @@
-<section class="page-intro">
-  <p class="eyebrow">OnDraft</p>
-  <h1>Register</h1>
-  <p>Create an account for OnDraft.</p>
-</section>
-
-<% if (pageError) { %>
-  <%- include("partials/error", { message: pageError }) %>
-<% } %>
-
-<section class="panel auth-panel">
-  <div class="panel-header">
-    <h2>Create Account</h2>
-    <p>This in-memory registration flow is ready to swap for a persistent user store later.</p>
+<section class="mx-auto grid w-full max-w-md gap-6">
+  <div class="text-left">
+    <p class="text-xs font-black uppercase tracking-[0.2em] text-draft-amber dark:text-draft-gold">OnDraft</p>
+    <h1 class="mt-2 font-display text-4xl font-black leading-tight text-slate-950 dark:text-white sm:text-5xl">Register</h1>
+    <p class="mt-3 text-base leading-7 text-slate-600 dark:text-slate-300">Create your OnDraft account. We will send your verification email automatically.</p>
   </div>
 
-  <form class="ondraft-form" method="post" action="/register">
-    <label for="displayName">Display Name</label>
-    <input id="displayName" name="displayName" autocomplete="name" required />
+  <% if (pageError) { %>
+    <%- include("partials/error", { message: pageError }) %>
+  <% } %>
 
-    <label for="email">Email</label>
-    <input id="email" name="email" type="email" autocomplete="username" required />
+  <section class="od-card grid gap-5 p-5 sm:p-6">
+    <div>
+      <h2 class="font-display text-2xl font-black text-slate-950 dark:text-white">Create Account</h2>
+      <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">Save stories, comment, and personalize your draft coverage.</p>
+    </div>
 
-    <label for="password">Password</label>
-    <input
-      id="password"
-      name="password"
-      type="password"
-      autocomplete="new-password"
-      minlength="8"
-      required
-    />
+    <form class="grid gap-4" method="post" action="/register">
+      <label class="grid gap-2 text-sm font-bold text-slate-800 dark:text-slate-100" for="displayName">
+        Display Name
+        <input class="od-form-input" id="displayName" name="displayName" autocomplete="name" required />
+      </label>
 
-    <label class="checkbox-field" for="mailingListConsent">
-      <input id="mailingListConsent" name="mailingListConsent" type="checkbox" />
-      Send me OnDraft updates by email.
-    </label>
+      <label class="grid gap-2 text-sm font-bold text-slate-800 dark:text-slate-100" for="email">
+        Email
+        <input class="od-form-input" id="email" name="email" type="email" autocomplete="username" required />
+      </label>
 
-    <button type="submit">Register</button>
-  </form>
+      <label class="grid gap-2 text-sm font-bold text-slate-800 dark:text-slate-100" for="password">
+        Password
+        <input
+          class="od-form-input"
+          id="password"
+          name="password"
+          type="password"
+          autocomplete="new-password"
+          minlength="8"
+          required
+        />
+      </label>
 
-  <p class="form-note">
-    Already have an account? <a href="/login">Log in</a>.
-  </p>
+      <label class="grid gap-2 text-sm font-bold text-slate-800 dark:text-slate-100" for="confirmPassword">
+        Confirm Password
+        <input
+          class="od-form-input"
+          id="confirmPassword"
+          name="confirmPassword"
+          type="password"
+          autocomplete="new-password"
+          minlength="8"
+          required
+        />
+      </label>
+
+      <label class="flex items-start gap-3 text-sm font-semibold leading-6 text-slate-700 dark:text-slate-200" for="mailingListConsent">
+        <input class="od-focus-ring mt-1 size-4 rounded border-slate-300 accent-draft-gold" id="mailingListConsent" name="mailingListConsent" type="checkbox" />
+        <span>Send me OnDraft updates by email.</span>
+      </label>
+
+      <button class="od-primary-link w-full" type="submit">Register</button>
+    </form>
+
+    <p class="text-sm font-semibold text-slate-600 dark:text-slate-300">
+      Already have an account?
+      <a class="od-focus-ring rounded text-draft-amber hover:text-draft-gold dark:text-draft-gold" href="/login">Log in</a>.
+    </p>
+  </section>
 </section>

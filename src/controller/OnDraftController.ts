@@ -7,13 +7,41 @@ import type { IUserPreferenceService, UserPreferenceError } from "../service/Use
 import type { ILoggingService } from "../service/LoggingService";
 import { ArticleError, BigBoardError, ForumPostError } from "../repository/OnDraftRepository";
 import { publicArticleUploadUrl } from "../uploads/articlePdfUpload";
-import { BIG_BOARD_CREATORS, POSITIONS, type Article, type ArticleContent, type ArticleFilter, type BigBoard, type BigBoardCreator, type ForumPost, type ForumPostFilter, type VideoQuery } from "../model/OnDraftContent";
+import { BIG_BOARD_CREATORS, POSITIONS, type Article, type ArticleContent, type ArticleFilter, type BigBoard, type BigBoardCreator, type ForumPost, type ForumPostFilter, type Video, type VideoQuery } from "../model/OnDraftContent";
 import type { Bookmark, IUserBanRecord } from "../auth/User";
+import { collegeTeam } from "../CollegeFootballColors";
 
 export interface DraftBoardFilterInput {
   school?: string;
   position?: string;
 }
+
+type HomeFeedItem =
+  | {
+      type: "article";
+      id: string;
+      title: string;
+      description: string;
+      href: string;
+      author: string;
+      date: Date;
+      tags: string[];
+      imageUrl?: string;
+      likes: number;
+    }
+  | {
+      type: "video";
+      id: string;
+      title: string;
+      description: string;
+      href: string;
+      date: Date;
+      tags: string[];
+      imageUrl?: string;
+      viewCount?: number;
+    };
+
+const collegeTeamNames = Object.keys(collegeTeam).sort((first, second) => first.localeCompare(second));
 
 export interface IOnDraftController {
   showHome(res: Response, session: IOnDraftBrowserSession): Promise<void>;
@@ -365,6 +393,42 @@ class OnDraftController implements IOnDraftController {
     return query;
   }
 
+  private articleHomeItem(article: Article): HomeFeedItem {
+    return {
+      type: "article",
+      id: article.id,
+      title: article.title,
+      description: article.writeup,
+      href: `/articles/${article.id}`,
+      author: article.author,
+      date: article.publicationDate,
+      tags: article.tags ?? [],
+      imageUrl: article.imageUrl,
+      likes: article.likes,
+    };
+  }
+
+  private videoHomeItem(video: Video): HomeFeedItem {
+    return {
+      type: "video",
+      id: video.videoId,
+      title: video.title,
+      description: video.description,
+      href: video.youtubeUrl,
+      date: video.createdAt,
+      tags: video.tags,
+      imageUrl: video.thumbnailUrl || `https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`,
+      viewCount: video.viewCount,
+    };
+  }
+
+  private homeFeedItems(articles: Article[], videos: Video[]): HomeFeedItem[] {
+    return [
+      ...articles.map((article) => this.articleHomeItem(article)),
+      ...videos.map((video) => this.videoHomeItem(video)),
+    ].sort((first, second) => second.date.getTime() - first.date.getTime());
+  }
+
   private parseArticleTags(rawTags: unknown): string[] {
     if (typeof rawTags !== "string") {
       return [];
@@ -455,6 +519,16 @@ class OnDraftController implements IOnDraftController {
     const result = await this.authService.listAdminUsers();
     if (result.ok === false) {
       this.logger.warn(`Unable to load user moderation state: ${result.value.message}`);
+      return new Map();
+    }
+
+    return new Map(result.value.map((user) => [user.id, user]));
+  }
+
+  private async userDirectoryById(): Promise<Map<string, AdminUserListItem>> {
+    const result = await this.authService.listAdminUsers();
+    if (result.ok === false) {
+      this.logger.warn(`Unable to load user directory: ${result.value.message}`);
       return new Map();
     }
 
@@ -582,7 +656,29 @@ class OnDraftController implements IOnDraftController {
 
   async showHome(res: Response, session: IOnDraftBrowserSession): Promise<void> {
     this.logger.info("Rendering ondraft home page");
-    res.render("ondraft/index", { session, isAdmin: isAdminSession(session) });
+    const articlesResult = await this.service.getFilteredArticles({ published: true, sortBy: "date", sortDirection: "desc" });
+    const videosResult = await this.service.getYoutubeVideos();
+
+    if (articlesResult.ok === false) {
+      this.logger.warn(`Unable to load homepage articles: ${articlesResult.value.message}`);
+    }
+    if (videosResult.ok === false) {
+      this.logger.warn(`Unable to load homepage videos: ${videosResult.value.message}`);
+    }
+
+    const articles = articlesResult.ok === true ? articlesResult.value : [];
+    const videos = videosResult.ok === true ? videosResult.value : [];
+    const latestItems = this.homeFeedItems(articles, videos).slice(0, 5);
+    const popularArticles = [...articles]
+      .sort((first, second) => second.likes - first.likes || second.publicationDate.getTime() - first.publicationDate.getTime())
+      .slice(0, 10);
+
+    res.render("ondraft/index", {
+      session,
+      isAdmin: isAdminSession(session),
+      latestItems,
+      popularArticles,
+    });
   }
 
   async showArticles(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
@@ -733,6 +829,7 @@ class OnDraftController implements IOnDraftController {
       isAdmin: isAdminSession(session),
       likeActorId: this.likeActorId(session),
       bookmarkedForumPostIds: await this.bookmarkedForumPostIds(session),
+      userDirectoryById: await this.userDirectoryById(),
       userModerationById: await this.userModerationById(session),
       activeUserBan: await this.activeUserBan(session),
       errorMessage,
@@ -756,6 +853,7 @@ class OnDraftController implements IOnDraftController {
       sortDirection: this.forumPostSortDirection(req),
       likeActorId: this.likeActorId(session),
       bookmarkedForumPostIds: await this.bookmarkedForumPostIds(session),
+      userDirectoryById: await this.userDirectoryById(),
       userModerationById: await this.userModerationById(session),
       activeUserBan: await this.activeUserBan(session),
       errorMessage: null,
@@ -860,6 +958,7 @@ class OnDraftController implements IOnDraftController {
       positions: POSITIONS,
       schools,
       filters: filter ?? {},
+      collegeTeamColors: collegeTeam,
     };
     if (req.get("HX-Request") === "true") {
       res.render("ondraft/partials/bigBoardPanel", { ...viewModel, layout: false });
@@ -895,8 +994,10 @@ class OnDraftController implements IOnDraftController {
       years: yearsResult.value,
       creators: BIG_BOARD_CREATORS.filter((creator) => creator !== "Consensus"),
       positions: POSITIONS,
+      collegeTeamNames,
       errorMessage,
       statusMessage,
+      forceOverlaySidebar: true,
     });
   }
 
@@ -940,6 +1041,7 @@ class OnDraftController implements IOnDraftController {
       commentsLimit: 10,
       likeActorId: this.likeActorId(session),
       articleBookmarked: (await this.bookmarkedArticleIds(session)).includes(result.value.id),
+      userDirectoryById: await this.userDirectoryById(),
       userModerationById: await this.userModerationById(session),
       activeUserBan: await this.activeUserBan(session),
     });
@@ -1021,6 +1123,7 @@ class OnDraftController implements IOnDraftController {
         creator: "Ryan",
       },
       creators: BIG_BOARD_CREATORS.filter((creator) => creator !== "Consensus"),
+      collegeTeamNames,
     });
   }
 
@@ -1159,6 +1262,7 @@ class OnDraftController implements IOnDraftController {
       commentsLimit: this.commentLimit(req),
       likeActorId: this.likeActorId(session),
       errorMessage: null,
+      userDirectoryById: await this.userDirectoryById(),
       userModerationById: await this.userModerationById(session),
       activeUserBan: await this.activeUserBan(session),
     });
@@ -1204,6 +1308,7 @@ class OnDraftController implements IOnDraftController {
           commentsLimit: this.commentLimit(req),
           likeActorId: this.likeActorId(session),
           errorMessage: result.value.message,
+          userDirectoryById: await this.userDirectoryById(),
           userModerationById: await this.userModerationById(session),
           activeUserBan: await this.activeUserBan(session),
         });
@@ -1354,6 +1459,7 @@ class OnDraftController implements IOnDraftController {
       isAdmin: isAdminSession(session),
       likeActorId: this.likeActorId(session),
       bookmarkedForumPostIds: await this.bookmarkedForumPostIds(session),
+      userDirectoryById: await this.userDirectoryById(),
       userModerationById: await this.userModerationById(session),
       activeUserBan: await this.activeUserBan(session),
       errorMessage: null,
@@ -1438,6 +1544,7 @@ class OnDraftController implements IOnDraftController {
             session,
             isAdmin: isAdminSession(session),
             errorMessage: result.value.message,
+            userDirectoryById: await this.userDirectoryById(),
             userModerationById: await this.userModerationById(session),
             activeUserBan: await this.activeUserBan(session),
           });
@@ -1458,6 +1565,7 @@ class OnDraftController implements IOnDraftController {
       session,
       isAdmin: isAdminSession(session),
       errorMessage: null,
+      userDirectoryById: await this.userDirectoryById(),
       userModerationById: await this.userModerationById(session),
       activeUserBan: await this.activeUserBan(session),
     });
@@ -1511,6 +1619,7 @@ class OnDraftController implements IOnDraftController {
         errorMessage: result.value.message,
         values: req.body,
         creators: BIG_BOARD_CREATORS.filter((creator) => creator !== "Consensus"),
+        collegeTeamNames,
       });
       return;
     }

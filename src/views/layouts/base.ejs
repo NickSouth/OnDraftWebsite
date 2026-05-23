@@ -1,47 +1,40 @@
 <!doctype html>
-<html>
+<html data-theme="dark" class="dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>OnDraft</title>
     <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/tailwind.css" />
     <script src="/vendor/htmx/htmx.min.js" defer></script>
+    <script src="/vendor/alpinejs-focus/cdn.min.js" defer></script>
+    <script src="/vendor/alpinejs-collapse/cdn.min.js" defer></script>
+    <script src="/vendor/alpinejs/cdn.min.js" defer></script>
+    <script src="/ondraftShell.js" defer></script>
     <script src="/articleShare.js" defer></script>
+    <script src="/teamHelmetRecolor.js" defer></script>
   </head>
-  <body>
+  <body class="min-h-screen bg-slate-50 p-0 text-slate-950 antialiased dark:bg-draft-ink dark:text-slate-100">
     <% const currentSession = typeof session !== "undefined" ? session : null; %>
     <% const currentIsAdmin = typeof isAdmin !== "undefined" ? isAdmin : false; %>
-    <div class="page-shell">
-      <nav class="main-nav">
-        <a href="/" class="nav-brand">
-          OnDraft
-        </a>
-        <div class="nav-actions">
-          <% if (currentSession?.authenticatedUser) { %>
-            <% if (currentIsAdmin) { %>
-              <a href="/admin/users" class="nav-link">Manage users</a>
-            <% } %>
-            <span class="nav-status">
-              Signed in as <strong><%= currentSession.authenticatedUser.displayName %></strong>
-            </span>
-            <form method="post" action="/logout" class="nav-form">
-              <button type="submit" class="secondary-button">Log out</button>
-            </form>
-          <% } else { %>
-            <a href="/login" class="nav-link">Log in</a>
-            <a href="/register" class="nav-link">Register</a>
-          <% } %>
+    <% const currentForceOverlaySidebar = typeof forceOverlaySidebar !== "undefined" ? forceOverlaySidebar : false; %>
+    <div
+      class="min-h-screen"
+      x-data="{ sidebarOpen: false }"
+      x-init="$watch('sidebarOpen', value => { if (!value) $nextTick(() => document.body.focus?.()) })"
+    >
+      <%- include("partials/topBar", { currentSession, currentIsAdmin, forceOverlaySidebar: currentForceOverlaySidebar }) %>
+      <%- include("partials/sidebar", { currentSession, currentIsAdmin, forceOverlaySidebar: currentForceOverlaySidebar }) %>
+      <%- include("partials/beerLoader") %>
+      <div id="site-modal-outlet"></div>
+      <main id="page-content" class="mx-0 min-h-[calc(100vh-9rem)] max-w-none px-4 pb-10 pt-20 lg:px-8 <%= currentForceOverlaySidebar ? "" : "lg:mr-80" %>">
+        <div class="w-full">
+          <%- body %>
         </div>
-      </nav>
-      <% if (currentSession?.authenticatedUser && !currentSession.authenticatedUser.emailVerifiedAt) { %>
-        <section class="verification-banner">
-          <p>Verify your email before commenting or bookmarking.</p>
-          <form method="post" action="/verify-email/resend">
-            <button type="submit" class="secondary-button">Resend verification email</button>
-          </form>
-        </section>
-      <% } %>
-      <main><%- body %></main>
+      </main>
+      <div class="<%= currentForceOverlaySidebar ? "" : "lg:mr-80" %>">
+        <%- include("partials/footer") %>
+      </div>
     </div>
   </body>
 </html>

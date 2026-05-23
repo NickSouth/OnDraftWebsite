@@ -10,10 +10,11 @@
   }
 %>
 
-<section class="plain-page board-editor-page">
-  <div class="page-heading big-board-heading">
+<section class="plain-page board-editor-page od-admin-board-page">
+  <div class="page-heading big-board-heading board-editor-heading od-admin-heading">
     <div>
-      <p class="eyebrow">Admin</p>
+      <a class="od-admin-back-link" href="/bigboard">Back to big board</a>
+      <p>Draft Board Admin</p>
       <h1>Edit Big Board</h1>
     </div>
     <div class="big-board-heading-actions">
@@ -65,7 +66,7 @@
   </form>
 
   <% if (errorMessage) { %>
-    <p class="error-message"><%= errorMessage %></p>
+    <p class="od-admin-error" role="alert"><%= errorMessage %></p>
   <% } %>
 
   <form
@@ -118,7 +119,7 @@
                 <input type="hidden" name="entries[<%= index %>][id]" value="<%= entry.id %>" data-entry-id />
                 <input name="entries[<%= index %>][playerName]" value="<%= entry.playerName %>" placeholder="Player name" data-publish-section="player" />
               </td>
-              <td><input name="entries[<%= index %>][school]" value="<%= entry.school %>" placeholder="School" data-publish-section="player" /></td>
+              <td><input name="entries[<%= index %>][school]" list="college-team-options" value="<%= entry.school %>" placeholder="School" autocomplete="off" data-publish-section="player" /></td>
               <td>
                 <select name="entries[<%= index %>][position]" data-publish-section="player">
                   <option value="">Pos</option>
@@ -174,7 +175,7 @@
       <button type="button" class="secondary-button" data-add-player>Add player</button>
       <div class="board-editor-bottom-save-actions">
         <button type="submit" class="secondary-button">Save</button>
-        <button type="submit" name="action" value="exit">Save and exit</button>
+        <button type="submit" name="action" value="exit" class="save-exit-button">Save and exit</button>
         <button
           type="submit"
           form="delete-board-year-form"
@@ -194,7 +195,7 @@
         <input type="hidden" data-field="id" data-entry-id />
         <input data-field="playerName" placeholder="Player name" data-publish-section="player" />
       </td>
-      <td><input data-field="school" placeholder="School" data-publish-section="player" /></td>
+      <td><input data-field="school" list="college-team-options" placeholder="School" autocomplete="off" data-publish-section="player" /></td>
       <td>
         <select data-field="position" data-publish-section="player">
           <option value="">Pos</option>
@@ -225,6 +226,12 @@
       <td><textarea data-field="notes" placeholder="Notes"></textarea></td>
     </tr>
   </template>
+
+  <datalist id="college-team-options">
+    <% (typeof collegeTeamNames !== "undefined" ? collegeTeamNames : []).forEach((team) => { %>
+      <option value="<%= team %>"></option>
+    <% }) %>
+  </datalist>
 </section>
 
 <script>

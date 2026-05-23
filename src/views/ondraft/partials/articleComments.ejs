@@ -1,4 +1,5 @@
 <section id="article-comments-section" class="article-comments-section">
+  <% const usersById = typeof userDirectoryById !== "undefined" ? userDirectoryById : new Map(); %>
   <% const moderationById = typeof userModerationById !== "undefined" ? userModerationById : new Map(); %>
   <% const currentActiveBan = typeof activeUserBan !== "undefined" ? activeUserBan : null; %>
   <div class="section-heading">
@@ -35,10 +36,11 @@
   <% } else { %>
     <ol class="comment-list">
       <% visibleComments.forEach((comment) => { %>
+        <% const commentUser = usersById.get(comment.userId); %>
         <li class="comment-item" id="comment-<%= comment.id %>">
           <div class="comment-header">
             <div>
-              <strong><%= comment.userName %></strong>
+              <strong class="verified-name"><%= comment.userName %><% if (commentUser?.role === "admin") { %><%- include("verifiedAdminBadge") %><% } %></strong>
               <span class="muted-text"><%= new Date(comment.createdAt).toLocaleString() %></span>
             </div>
             <% const commentModeratedUser = moderationById.get(comment.userId); %>
@@ -64,10 +66,11 @@
           <% if (comment.replies && comment.replies.length > 0) { %>
             <ol class="reply-list">
               <% comment.replies.forEach((reply) => { %>
+                <% const replyUser = usersById.get(reply.userId); %>
                 <li class="reply-item" id="comment-<%= reply.id %>">
                   <div class="comment-header">
                     <div>
-                      <strong><%= reply.userName %></strong>
+                      <strong class="verified-name"><%= reply.userName %><% if (replyUser?.role === "admin") { %><%- include("verifiedAdminBadge") %><% } %></strong>
                       <span class="muted-text"><%= new Date(reply.createdAt).toLocaleString() %></span>
                     </div>
                     <% const replyModeratedUser = moderationById.get(reply.userId); %>

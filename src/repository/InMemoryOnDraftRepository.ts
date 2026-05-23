@@ -87,6 +87,15 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
     const ryanBoard = this.findBigBoard(year, "Ryan");
     const aleksBoard = this.findBigBoard(year, "Aleks");
     const entriesByPlayer = new Map<string, { Ryan?: BigBoardEntry; Aleks?: BigBoardEntry }>();
+    type ConsensusEntryDraft = {
+      entry: BigBoardEntry;
+      averageRank: number;
+      averagePosRank: number;
+      ryanRank: number;
+      ryanPosRank: number;
+      aleksRank: number;
+      aleksPosRank: number;
+    };
 
     ryanBoard?.entries.filter((entry) => entry.playerInfoPublished).forEach((entry) => {
       entriesByPlayer.set(entry.playerName, {
@@ -101,42 +110,77 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
       });
     });
 
-    const average = (values: Array<number | null | undefined>): number | null => {
+    const average = (values: Array<number | null | undefined>): number => {
       const rankedValues = values.filter((value): value is number => typeof value === "number");
       if (rankedValues.length === 0) {
-        return null;
+        return Number.MAX_SAFE_INTEGER;
       }
       return rankedValues.reduce((sum, value) => sum + value, 0) / rankedValues.length;
     };
 
-    const consensusEntries: BigBoardEntry[] = [...entriesByPlayer.values()].map(({ Ryan, Aleks }) => {
+    const compareOverall = (first: ConsensusEntryDraft, second: ConsensusEntryDraft): number => (
+      first.averageRank - second.averageRank ||
+      first.ryanRank - second.ryanRank ||
+      first.aleksRank - second.aleksRank ||
+      first.entry.playerName.localeCompare(second.entry.playerName)
+    );
+
+    const comparePosition = (first: ConsensusEntryDraft, second: ConsensusEntryDraft): number => (
+      first.averagePosRank - second.averagePosRank ||
+      first.ryanPosRank - second.ryanPosRank ||
+      first.aleksPosRank - second.aleksPosRank ||
+      (first.entry.rank ?? Number.MAX_SAFE_INTEGER) - (second.entry.rank ?? Number.MAX_SAFE_INTEGER) ||
+      first.entry.playerName.localeCompare(second.entry.playerName)
+    );
+
+    const consensusDrafts: ConsensusEntryDraft[] = [...entriesByPlayer.values()].map(({ Ryan, Aleks }) => {
       const sourceOfTruth = Ryan ?? Aleks;
       if (!sourceOfTruth) {
         throw new Error("Consensus entry cannot be created without a source player.");
       }
 
-      const rank = average([Ryan?.rank, Aleks?.rank]);
-      const posRank = average([Ryan?.posRank, Aleks?.posRank]);
+      const averageRank = average([Ryan?.rank, Aleks?.rank]);
+      const averagePosRank = average([Ryan?.posRank, Aleks?.posRank]);
       const rankDiscrepency = typeof Ryan?.rank === "number" && typeof Aleks?.rank === "number"
         ? Math.abs(Ryan.rank - Aleks.rank)
         : 0;
 
       return {
-        ...sourceOfTruth,
-        id: `consensus-${sourceOfTruth.id}`,
-        rank,
-        posRank,
-        bigDiscrepency: rankDiscrepency > 10,
+        entry: {
+          ...sourceOfTruth,
+          id: `consensus-${sourceOfTruth.id}`,
+          rank: null,
+          posRank: null,
+          bigDiscrepency: rankDiscrepency > 10,
+        },
+        averageRank,
+        averagePosRank,
+        ryanRank: Ryan?.rank ?? Number.MAX_SAFE_INTEGER,
+        ryanPosRank: Ryan?.posRank ?? Number.MAX_SAFE_INTEGER,
+        aleksRank: Aleks?.rank ?? Number.MAX_SAFE_INTEGER,
+        aleksPosRank: Aleks?.posRank ?? Number.MAX_SAFE_INTEGER,
       };
-    }).sort((first, second) => {
-      const firstRank = first.rank ?? Number.MAX_SAFE_INTEGER;
-      const secondRank = second.rank ?? Number.MAX_SAFE_INTEGER;
-      return firstRank - secondRank ||
-        (first.posRank ?? Number.MAX_SAFE_INTEGER) - (second.posRank ?? Number.MAX_SAFE_INTEGER) ||
-        first.playerName.localeCompare(second.playerName);
     });
 
-    return { year, creator: "Consensus", entries: consensusEntries };
+    consensusDrafts.sort(compareOverall);
+    consensusDrafts.forEach((draft, index) => {
+      draft.entry.rank = index + 1;
+    });
+
+    const draftsByPosition = new Map<string, ConsensusEntryDraft[]>();
+    consensusDrafts.forEach((draft) => {
+      const positionDrafts = draftsByPosition.get(draft.entry.position) ?? [];
+      positionDrafts.push(draft);
+      draftsByPosition.set(draft.entry.position, positionDrafts);
+    });
+    draftsByPosition.forEach((positionDrafts) => {
+      positionDrafts.sort(comparePosition);
+      positionDrafts.forEach((draft, index) => {
+        draft.entry.posRank = index + 1;
+      });
+    });
+
+    return { year, creator: "Consensus", entries: consensusDrafts.map((draft) => draft.entry) };
   }
 
   async createBigBoardYear(year: number): Promise<Result<void, BigBoardError>> {

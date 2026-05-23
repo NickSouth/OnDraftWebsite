@@ -1,12 +1,17 @@
-<section class="plain-page form-page">
-  <p><a href="/bigboard">Back to big board</a></p>
-  <h1>Create Big Board Entry</h1>
+<section class="od-admin-page">
+  <div class="od-admin-heading">
+    <div>
+      <a class="od-admin-back-link" href="/bigboard">Back to big board</a>
+      <p>Admin</p>
+      <h1>Create Big Board Entry</h1>
+    </div>
+  </div>
 
   <% if (errorMessage) { %>
-    <p class="error-message"><%= errorMessage %></p>
+    <p class="od-admin-error" role="alert"><%= errorMessage %></p>
   <% } %>
 
-  <form class="ondraft-form" method="post" action="/bigboard">
+  <form class="ondraft-form od-admin-form" method="post" action="/bigboard">
     <label>
       Year
       <input type="number" name="year" min="1900" max="2100" value="<%= values.year || "" %>" required />
@@ -33,7 +38,7 @@
     </label>
     <label>
       School
-      <input name="school" value="<%= values.school || "" %>" required />
+      <input name="school" list="college-team-options" value="<%= values.school || "" %>" autocomplete="off" required />
     </label>
     <label>
       Overall rank
@@ -63,6 +68,13 @@
       Writeup
       <textarea name="writeup" required><%= values.writeup || "" %></textarea>
     </label>
-    <button type="submit">Create entry</button>
+    <div class="form-actions od-admin-actions">
+      <button type="submit">Create entry</button>
+    </div>
+    <datalist id="college-team-options">
+      <% (typeof collegeTeamNames !== "undefined" ? collegeTeamNames : []).forEach((team) => { %>
+        <option value="<%= team %>"></option>
+      <% }) %>
+    </datalist>
   </form>
 </section>

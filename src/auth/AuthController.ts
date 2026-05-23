@@ -8,7 +8,7 @@ import {
   type OnDraftSessionStore,
 } from "../session/OnDraftSession";
 import type { ILoggingService } from "../service/LoggingService";
-import type { AdminUserListItem, BanDuration, IAuthService } from "./AuthService";
+import type { AccountSettings, AdminUserListItem, BanDuration, IAuthService } from "./AuthService";
 import type { AuthError } from "./errors";
 
 export interface IAuthController {
@@ -37,6 +37,7 @@ export interface IAuthController {
     displayName: string,
     email: string,
     password: string,
+    confirmPassword: string,
     mailingListConsent: boolean,
     store: OnDraftSessionStore,
   ): Promise<void>;
@@ -48,6 +49,21 @@ export interface IAuthController {
   requestEmailVerificationFromForm(
     res: Response,
     email: string,
+    store: OnDraftSessionStore,
+  ): Promise<void>;
+  showSettingsModal(
+    res: Response,
+    store: OnDraftSessionStore,
+    flashMessage?: string | null,
+    errorMessage?: string | null,
+  ): Promise<void>;
+  updateMailingListPreferenceFromSettings(
+    res: Response,
+    store: OnDraftSessionStore,
+    subscribe: boolean,
+  ): Promise<void>;
+  requestEmailVerificationFromSettings(
+    res: Response,
     store: OnDraftSessionStore,
   ): Promise<void>;
   unsubscribeMailingListFromRequest(
@@ -139,11 +155,12 @@ class AuthController implements IAuthController {
     displayName: string,
     email: string,
     password: string,
+    confirmPassword: string,
     mailingListConsent: boolean,
     store: OnDraftSessionStore,
   ): Promise<void> {
     const session = touchOnDraftSession(store);
-    const result = await this.service.register({ displayName, email, password, mailingListConsent });
+    const result = await this.service.register({ displayName, email, password, confirmPassword, mailingListConsent });
 
     if (result.ok === false) {
       const error = result.value;
@@ -214,6 +231,109 @@ class AuthController implements IAuthController {
       session,
       "success",
       "If that email needs verification, we sent a new verification link.",
+    );
+  }
+
+  private renderSettingsModal(
+    res: Response,
+    session: IOnDraftBrowserSession,
+    settings: AccountSettings,
+    flashMessage: string | null = null,
+    errorMessage: string | null = null,
+  ): void {
+    res.render("ondraft/partials/settingsModal", {
+      layout: false,
+      session,
+      settings,
+      flashMessage,
+      errorMessage,
+    });
+  }
+
+  async showSettingsModal(
+    res: Response,
+    store: OnDraftSessionStore,
+    flashMessage: string | null = null,
+    errorMessage: string | null = null,
+  ): Promise<void> {
+    const session = touchOnDraftSession(store);
+    const userId = session.authenticatedUser?.userId;
+
+    if (!userId) {
+      res.status(401).render("ondraft/partials/settingsModal", {
+        layout: false,
+        session,
+        settings: { mailingListStatus: "none" },
+        flashMessage: null,
+        errorMessage: "Log in to manage account settings.",
+      });
+      return;
+    }
+
+    const settings = await this.service.getAccountSettings({ userId });
+    if (settings.ok === false) {
+      this.logger.error(`Settings load failed: ${settings.value.message}`);
+      res.status(this.mapErrorStatus(settings.value));
+      this.renderSettingsModal(
+        res,
+        session,
+        { mailingListStatus: "none" },
+        null,
+        "We could not load settings right now.",
+      );
+      return;
+    }
+
+    this.renderSettingsModal(res, session, settings.value, flashMessage, errorMessage);
+  }
+
+  async updateMailingListPreferenceFromSettings(
+    res: Response,
+    store: OnDraftSessionStore,
+    subscribe: boolean,
+  ): Promise<void> {
+    const session = touchOnDraftSession(store);
+    const userId = session.authenticatedUser?.userId;
+
+    if (!userId) {
+      await this.showSettingsModal(res, store, null, "Log in to manage account settings.");
+      return;
+    }
+
+    const result = await this.service.updateMailingListPreference({ userId, subscribe });
+    if (result.ok === false) {
+      this.logger.error(`Mailing list settings update failed: ${result.value.message}`);
+      await this.showSettingsModal(res, store, null, "We could not update your mailing list setting.");
+      return;
+    }
+
+    const message = subscribe
+      ? result.value.mailingListStatus === "pending"
+        ? "Mailing list sign-up saved. Verify your email to finish subscribing."
+        : "You are subscribed to the OnDraft mailing list."
+      : "You are unsubscribed from the OnDraft mailing list.";
+    this.renderSettingsModal(res, session, result.value, message, null);
+  }
+
+  async requestEmailVerificationFromSettings(
+    res: Response,
+    store: OnDraftSessionStore,
+  ): Promise<void> {
+    const session = touchOnDraftSession(store);
+    const requestedEmail = session.authenticatedUser?.email ?? "";
+    const result = await this.service.requestEmailVerification({ email: requestedEmail });
+
+    if (result.ok === false) {
+      this.logger.error(`Settings verification email request failed: ${result.value.message}`);
+      await this.showSettingsModal(res, store, null, "We could not send that verification email right now.");
+      return;
+    }
+
+    await this.showSettingsModal(
+      res,
+      store,
+      "If your email still needs verification, we sent a new verification link.",
+      null,
     );
   }
 
