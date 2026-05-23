@@ -556,6 +556,14 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
     return Ok(video);
   }
 
+  async getYoutubeVideo(videoId: string): Promise<Result<Video, ArticleError>> {
+    const video = this.videos.find((existing) => existing.videoId === videoId);
+    if (!video) {
+      return Err(ArticleNotFound(`YouTube video with id "${videoId}" not found.`));
+    }
+    return Ok(video);
+  }
+
   async getYoutubeVideos(): Promise<Result<Video[], ArticleError>> {
     return Ok([...this.videos].sort((first, second) => second.createdAt.getTime() - first.createdAt.getTime()));
   }
@@ -593,6 +601,21 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
     return Ok(sorted);
   }
 
+  async updateYoutubeVideo(videoId: string, video: Video): Promise<Result<Video, ArticleError>> {
+    const videoIndex = this.videos.findIndex((existing) => existing.videoId === videoId);
+    if (videoIndex === -1) {
+      return Err(ArticleNotFound(`YouTube video with id "${videoId}" not found.`));
+    }
+    const duplicate = this.videos.find((existing) => existing.videoId === video.videoId && existing.videoId !== videoId);
+    if (duplicate) {
+      return Err(DuplicateArticle(`YouTube video with id "${video.videoId}" already exists.`));
+    }
+
+    this.videos[videoIndex] = video;
+    this.tagList = new Set([...this.tagList, ...(video.tags ?? [])]);
+    return Ok(video);
+  }
+
   async updateYoutubeVideoStats(videoId: string, stats: { thumbnailUrl?: string; viewCount?: number; youtubeStatsFetchedAt: Date }): Promise<Result<Video, ArticleError>> {
     const videoIndex = this.videos.findIndex((video) => video.videoId === videoId);
     if (videoIndex === -1) {
@@ -608,6 +631,15 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
     };
     this.videos[videoIndex] = updated;
     return Ok(updated);
+  }
+
+  async deleteYoutubeVideo(videoId: string): Promise<Result<void, ArticleError>> {
+    const videoIndex = this.videos.findIndex((video) => video.videoId === videoId);
+    if (videoIndex === -1) {
+      return Err(ArticleNotFound(`YouTube video with id "${videoId}" not found.`));
+    }
+    this.videos.splice(videoIndex, 1);
+    return Ok(undefined);
   }
 
   async getTags(): Promise<Result<string[], ArticleError>> {

@@ -149,6 +149,7 @@ class ExpressApp implements IApp {
   private exposeSessionLocals(req: Request, res: Response, next: NextFunction): void {
     const browserSession = touchOnDraftSession(sessionStore(req));
     res.locals.isAdmin = isAdminSession(browserSession);
+    res.locals.currentPath = req.path;
     next();
   }
 
@@ -375,6 +376,14 @@ class ExpressApp implements IApp {
     );
 
     this.app.get(
+      "/articles/popular",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.showPopularArticles(req, res, browserSession);
+      }),
+    );
+
+    this.app.get(
       "/bookmarks",
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
@@ -402,6 +411,19 @@ class ExpressApp implements IApp {
       }),
     );
 
+    this.app.get(
+      "/videos/:videoId/edit",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        const videoId = Array.isArray(req.params.videoId) ? req.params.videoId[0] : req.params.videoId;
+        await this.controller.showEditVideoForm(res, browserSession, videoId);
+      }),
+    );
+
     this.app.post(
       "/videos",
       asyncHandler(async (req, res) => {
@@ -411,6 +433,30 @@ class ExpressApp implements IApp {
 
         const browserSession = recordPageView(sessionStore(req));
         await this.controller.createYoutubeVideo(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/videos/:videoId",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.updateYoutubeVideo(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/videos/:videoId/delete",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.deleteYoutubeVideo(req, res, browserSession);
       }),
     );
 

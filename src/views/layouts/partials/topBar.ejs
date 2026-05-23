@@ -1,30 +1,24 @@
 <header class="fixed inset-x-0 top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur dark:border-white/10 dark:bg-draft-ink/95">
-  <div class="flex min-h-14 items-center justify-between gap-3 px-4 md:px-6">
-    <a href="/" class="od-focus-ring inline-flex items-center gap-2 rounded-md text-sm font-black uppercase tracking-wide text-slate-950 dark:text-white">
+  <div class="flex min-h-14 items-center justify-between gap-3 px-4 md:px-6 <%= forceOverlaySidebar ? "" : "lg:mr-80" %>">
+    <a href="/" class="od-focus-ring inline-flex items-center gap-2 rounded-md text-sm font-black tracking-normal text-slate-950 dark:text-white">
       <span class="grid size-9 place-items-center rounded-md bg-draft-gold text-base text-draft-ink shadow-sm" aria-hidden="true">OD</span>
-      <span>OnDraft</span>
+      <span>OnDraft Football</span>
     </a>
 
     <div class="flex min-w-0 items-center justify-end gap-2">
       <% if (currentSession?.authenticatedUser) { %>
-        <button
-          type="button"
-          class="od-focus-ring inline-flex size-10 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:hover:bg-white/15"
-          hx-get="/settings"
-          hx-target="#site-modal-outlet"
-          hx-swap="innerHTML"
-          aria-label="Open account settings"
-        >
-          <svg aria-hidden="true" viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
-            <path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.04.04a2.1 2.1 0 0 1-2.97 2.97l-.04-.04a1.8 1.8 0 0 0-1.98-.36 1.8 1.8 0 0 0-1.1 1.65V21.3a2.1 2.1 0 0 1-4.2 0v-.06a1.8 1.8 0 0 0-1.1-1.65 1.8 1.8 0 0 0-1.98.36l-.04.04a2.1 2.1 0 1 1-2.97-2.97l.04-.04A1.8 1.8 0 0 0 4.6 15a1.8 1.8 0 0 0-1.65-1.1H2.9a2.1 2.1 0 0 1 0-4.2h.06A1.8 1.8 0 0 0 4.6 8a1.8 1.8 0 0 0-.36-1.98l-.04-.04A2.1 2.1 0 1 1 7.17 3l.04.04A1.8 1.8 0 0 0 9.2 3.4a1.8 1.8 0 0 0 1.1-1.65V1.7a2.1 2.1 0 0 1 4.2 0v.06a1.8 1.8 0 0 0 1.1 1.65 1.8 1.8 0 0 0 1.98-.36l.04-.04a2.1 2.1 0 1 1 2.97 2.97l-.04.04A1.8 1.8 0 0 0 19.4 8a1.8 1.8 0 0 0 1.65 1.1h.06a2.1 2.1 0 0 1 0 4.2h-.06A1.8 1.8 0 0 0 19.4 15Z" />
-          </svg>
-        </button>
         <span class="hidden max-w-52 truncate text-sm text-slate-600 dark:text-slate-300 sm:inline">
           Signed in as <strong class="font-bold text-slate-950 dark:text-white"><%= currentSession.authenticatedUser.displayName %></strong>
         </span>
         <form method="post" action="/logout" class="m-0">
-          <button type="submit" class="od-secondary-link min-h-9 px-3 py-1.5">Log out</button>
+          <button type="submit" class="od-icon-button" aria-label="Sign out" title="Sign out">
+            <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10 17l5-5-5-5" />
+              <path d="M15 12H3" />
+              <path d="M21 19V5a2 2 0 0 0-2-2h-6" />
+              <path d="M13 21h8" />
+            </svg>
+          </button>
         </form>
       <% } else { %>
         <a href="/login" class="od-shell-link">Log in</a>

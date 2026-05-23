@@ -1,11 +1,10 @@
+- Fix video editing to rescrape from youtube api and fix tags
 - About Us Page improvements
-- Always expand/retract the side menu option, swaps to icon from hamburger on larger screen
 - Change/reset password
 - Check that email verification actually works
 - Add actual logo
 - Link other socials
 - Revisit section captions
 - Draft Board grades
-- Timestamp on autosave on board draft board, make slightly less frequent autosaves
 - Polish all not-found routing
 - Cleanup security with rate-limiting, request forms, and cookies

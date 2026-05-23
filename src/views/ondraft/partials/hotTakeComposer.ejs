@@ -14,8 +14,8 @@
       hx-swap="outerHTML"
     >
       <label>
-        Add a hot take
-        <textarea name="content" maxlength="300" required><%= values.content || "" %></textarea>
+        Your hot take
+        <textarea x-ref="hotTakeContent" name="content" maxlength="300" required><%= values.content || "" %></textarea>
       </label>
       <div class="form-actions">
         <button type="submit">Post Hot Take</button>

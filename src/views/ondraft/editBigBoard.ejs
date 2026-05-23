@@ -75,7 +75,7 @@
     method="post"
     action="/bigboard/edit"
     hx-post="/bigboard/edit/autosave"
-    hx-trigger="change delay:900ms, every 20s"
+    hx-trigger="change delay:900ms, every 40s"
     hx-target="#big-board-save-status"
     hx-swap="innerHTML"
   >
@@ -298,5 +298,16 @@
 
     form?.addEventListener("input", clearPublishState);
     form?.addEventListener("change", clearPublishState);
+
+    form?.addEventListener("htmx:afterSwap", (event) => {
+      if (event.detail?.target?.id !== "big-board-save-status" || event.detail?.xhr?.status >= 400) {
+        return;
+      }
+      const status = event.detail.target;
+      if (!status.textContent?.toLowerCase().includes("autosaved")) {
+        return;
+      }
+      status.textContent = `Autosaved at ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+    });
   })();
 </script>

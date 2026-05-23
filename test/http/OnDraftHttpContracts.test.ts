@@ -2,9 +2,15 @@ import request from "supertest";
 import fs from "node:fs";
 import path from "node:path";
 import { createComposedApp } from "../../src/composition";
+import {
+  clearPrismaTestDatabase,
+  disconnectPrismaTestDatabase,
+  resetPrismaTestDatabase,
+  usePrismaTestDatabase,
+} from "../support/prismaTestDb";
 
 function app() {
-  return createComposedApp("memory").getExpressApp();
+  return createComposedApp("prisma").getExpressApp();
 }
 
 async function adminAgent() {
@@ -35,6 +41,19 @@ function removeUploadedAssetsFromHtml(html: string) {
 }
 
 describe("OnDraft HTTP contracts", () => {
+  beforeAll(() => {
+    usePrismaTestDatabase();
+  });
+
+  beforeEach(async () => {
+    await resetPrismaTestDatabase();
+  });
+
+  afterAll(async () => {
+    await clearPrismaTestDatabase();
+    await disconnectPrismaTestDatabase();
+  });
+
   it("renders the home page for anonymous visitors", async () => {
     const response = await request(app()).get("/");
 
@@ -895,13 +914,47 @@ describe("OnDraft HTTP contracts", () => {
     expect(videos.text).toContain("Views unavailable");
     expect(videos.text).not.toContain("YOUTUBE_API_KEY");
 
-    const filtered = await request(ondraft).get("/videos?keyword=quarterback&tags=film-room&sortBy=date&sortDirection=asc");
+    const filtered = await request(ondraft).get("/videos?keyword=quarterback&sortBy=date&sortDirection=asc");
     expect(filtered.status).toBe(200);
     expect(filtered.text).toContain("Quarterback Film");
     expect(filtered.text).not.toContain("Receiver Notes");
     expect(filtered.text).toContain('value="quarterback"');
-    expect(filtered.text).toContain('value="film-room"');
+    expect(filtered.text).not.toContain('name="tags"');
     expect(filtered.text).toContain('<option value="asc" selected>Ascending</option>');
+
+    const adminVideos = await agent.get("/videos");
+    expect(adminVideos.status).toBe(200);
+    expect(adminVideos.text).toContain('href="/videos/dQw4w9WgXcQ/edit"');
+    expect(adminVideos.text).toContain('action="/videos/dQw4w9WgXcQ/delete"');
+
+    const editForm = await agent.get("/videos/dQw4w9WgXcQ/edit");
+    expect(editForm.status).toBe(200);
+    expect(editForm.text).toContain("Edit YouTube Video");
+    expect(editForm.text).toContain('value="Quarterback Film"');
+
+    const update = await agent
+      .post("/videos/dQw4w9WgXcQ")
+      .type("form")
+      .send({
+        youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        title: "Quarterback Film Updated",
+        description: "Updated quarterback processing notes.",
+        tags: "film-room,qb,updated",
+      });
+    expect(update.status).toBe(302);
+    expect(update.headers.location).toBe("/videos");
+
+    const updatedVideos = await request(ondraft).get("/videos");
+    expect(updatedVideos.text).toContain("Quarterback Film Updated");
+    expect(updatedVideos.text).toContain("Receiver Notes");
+
+    const remove = await agent.post("/videos/oHg5SJYRHA0/delete");
+    expect(remove.status).toBe(302);
+    expect(remove.headers.location).toBe("/videos");
+
+    const afterDelete = await request(ondraft).get("/videos");
+    expect(afterDelete.text).toContain("Quarterback Film Updated");
+    expect(afterDelete.text).not.toContain("Receiver Notes");
   });
 
   it("keeps plain text article creation working", async () => {
@@ -1136,10 +1189,23 @@ describe("OnDraft HTTP contracts", () => {
         contentType: "plainText",
         content: "Newer article body.",
       });
+    const currentFavorite = await admin
+      .post("/articles")
+      .type("form")
+      .send({
+        title: "Current Favorite Article",
+        author: "Ryan McWalter",
+        writeup: "Current summary.",
+        publicationDate: new Date().toISOString().slice(0, 10),
+        contentType: "plainText",
+        content: "Current article body.",
+      });
 
     const olderId = older.headers.location.split("/").pop();
     const newerId = newer.headers.location.split("/").pop();
+    const currentFavoriteId = currentFavorite.headers.location.split("/").pop();
     await request(ondraft).post(`/articles/${olderId}/like`);
+    await request(ondraft).post(`/articles/${currentFavoriteId}/like`);
     await admin
       .post(`/articles/${newerId}/comments`)
       .type("form")
@@ -1159,6 +1225,17 @@ describe("OnDraft HTTP contracts", () => {
 
     const commentsDesc = await request(ondraft).get("/articles/filter?sortBy=comments&sortDirection=desc");
     expect(commentsDesc.text.indexOf("Newer Sort Article")).toBeLessThan(commentsDesc.text.indexOf("Older Sort Article"));
+
+    const allPopular = await request(ondraft).get("/articles/popular?range=all").set("HX-Request", "true");
+    expect(allPopular.status).toBe(200);
+    expect(allPopular.text).toContain('id="popular-articles-panel"');
+    expect(allPopular.text).toContain("Older Sort Article");
+    expect(allPopular.text).toContain("Current Favorite Article");
+
+    const yearPopular = await request(ondraft).get("/articles/popular?range=year").set("HX-Request", "true");
+    expect(yearPopular.status).toBe(200);
+    expect(yearPopular.text).not.toContain("Older Sort Article");
+    expect(yearPopular.text).toContain("Current Favorite Article");
   });
 
   it("renders sanitized HTML article content unescaped", async () => {

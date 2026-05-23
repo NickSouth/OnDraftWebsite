@@ -1,11 +1,86 @@
+<% const currentViewMode = typeof viewMode !== "undefined" && viewMode === "list" ? "list" : "card"; %>
 <% if (articles.length === 0) { %>
   <div class="od-card grid min-h-48 place-items-center p-8 text-center">
     <div>
       <p class="text-xs font-black uppercase tracking-[0.18em] text-draft-amber dark:text-draft-gold">Dry tap</p>
       <p class="mt-2 font-display text-2xl font-bold text-slate-950 dark:text-white">No articles match those filters.</p>
       <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">Try a wider search or clear the filters.</p>
+      <% if (isAdmin) { %>
+        <div class="mt-5 flex flex-col justify-center gap-3 sm:flex-row">
+          <a class="od-primary-link" href="/articles/new">Create article</a>
+          <button
+            type="button"
+            class="od-secondary-link"
+            onclick="const form = document.getElementById('article-filter-form'); if (!form) return; const status = document.getElementById('article-status-field')?.value || 'published'; form.reset(); const statusField = document.getElementById('article-status-field'); if (statusField) statusField.value = status; htmx.trigger(form, 'submit');"
+          >
+            Clear filters
+          </button>
+        </div>
+      <% } %>
     </div>
   </div>
+<% } else if (currentViewMode === "list") { %>
+  <ul class="grid list-none gap-3 p-0">
+    <% articles.forEach((article) => { %>
+      <% const articleHref = isAdmin && !article.published ? `/articles/${article.id}/preview` : `/articles/${article.id}`; %>
+      <li id="article-list-item-<%= article.id %>" class="article-list-row od-card">
+        <a class="group grid min-w-0 gap-4 text-slate-950 no-underline dark:text-white sm:grid-cols-[4.5rem_minmax(0,1fr)] md:grid-cols-[4.5rem_minmax(0,1fr)_auto]" href="<%= articleHref %>">
+          <span class="relative block aspect-[16/10] overflow-hidden rounded-md bg-draft-ink sm:aspect-square">
+            <% if (article.imageUrl) { %>
+              <img class="article-list-thumb" src="<%= article.imageUrl %>" alt="" />
+            <% } else { %>
+              <span class="article-list-thumb article-list-thumb-empty">
+                <span class="rounded bg-draft-gold px-2 py-1 text-[0.62rem] font-black uppercase tracking-wide text-draft-ink">OD</span>
+              </span>
+            <% } %>
+          </span>
+          <span class="grid min-w-0 gap-2">
+            <span class="flex flex-wrap items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-draft-amber dark:text-draft-gold">
+              <span>Article</span>
+              <% if (article.publicationDate) { %>
+                <span class="text-slate-400 dark:text-slate-500">/</span>
+                <span><%= new Date(article.publicationDate).toLocaleDateString() %></span>
+              <% } %>
+              <% if (!article.published) { %>
+                <span class="rounded bg-draft-gold px-2 py-0.5 text-[0.62rem] text-draft-ink">Draft</span>
+              <% } %>
+            </span>
+            <span class="line-clamp-1 font-display text-xl font-black leading-tight tracking-normal text-slate-950 transition group-hover:text-draft-amber dark:text-white dark:group-hover:text-draft-gold"><%= article.title %></span>
+            <span class="text-sm font-bold text-slate-600 dark:text-slate-300">By <%= article.author %></span>
+          </span>
+          <span class="flex flex-wrap items-center gap-3 text-sm font-semibold text-slate-500 dark:text-slate-400 md:justify-end">
+            <span class="inline-flex items-center gap-1.5" aria-label="<%= article.likes %> likes">
+              <span aria-hidden="true">&#9825;</span>
+              <span><%= article.likes %></span>
+            </span>
+            <span class="inline-flex items-center gap-1.5" aria-label="<%= article.comments.length %> comments">
+              <svg class="size-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.9 8.9 0 0 1-4.4-1.1L3 20l1.2-4a8 8 0 0 1-1.1-4.5 8.4 8.4 0 0 1 9-8.4 8.4 8.4 0 0 1 8.9 8.4Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+              </svg>
+              <span><%= article.comments.length %></span>
+            </span>
+          </span>
+        </a>
+        <div class="flex shrink-0 items-start gap-2 sm:justify-end">
+          <% if (session.authenticatedUser) { %>
+            <%- include("bookmarkButton", { bookmark: { type: "article", articleId: article.id }, bookmarked: bookmarkedArticleIds.includes(article.id) }) %>
+          <% } %>
+          <% if (isAdmin) { %>
+            <button
+              type="button"
+              class="od-focus-ring rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-black text-red-700 transition hover:bg-red-100 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200 dark:hover:bg-red-500/20"
+              hx-delete="/articles/<%= article.id %>"
+              hx-confirm="Are you sure? Deleted articles cannot be recovered."
+              hx-target="#article-list-item-<%= article.id %>"
+              hx-swap="outerHTML"
+            >
+              Delete
+            </button>
+          <% } %>
+        </div>
+      </li>
+    <% }) %>
+  </ul>
 <% } else { %>
   <ul class="grid list-none gap-5 p-0">
     <% articles.forEach((article) => { %>
@@ -42,13 +117,21 @@
             <% } %>
             <span class="line-clamp-3 text-base leading-7 text-slate-700 dark:text-slate-200"><%= article.writeup %></span>
             <span class="flex flex-wrap gap-3 text-sm font-semibold text-slate-500 dark:text-slate-400">
-              <span><%= article.likes %> likes</span>
-              <span><%= article.comments.length %> comments</span>
+              <span class="inline-flex items-center gap-1.5" aria-label="<%= article.likes %> likes">
+                <span aria-hidden="true">&#9825;</span>
+                <span><%= article.likes %></span>
+              </span>
+              <span class="inline-flex items-center gap-1.5" aria-label="<%= article.comments.length %> comments">
+                <svg class="size-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.9 8.9 0 0 1-4.4-1.1L3 20l1.2-4a8 8 0 0 1-1.1-4.5 8.4 8.4 0 0 1 9-8.4 8.4 8.4 0 0 1 8.9 8.4Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+                </svg>
+                <span><%= article.comments.length %></span>
+              </span>
             </span>
             <% if (article.tags && article.tags.length > 0) { %>
               <span class="flex flex-wrap gap-2">
                 <% article.tags.forEach((tag) => { %>
-                  <span class="rounded bg-draft-foam px-2.5 py-1 text-xs font-black uppercase tracking-wide text-draft-amber dark:bg-white/10 dark:text-draft-gold"><%= tag %></span>
+                  <span class="rounded bg-draft-foam px-2.5 py-1 text-xs font-black text-draft-amber dark:bg-white/10 dark:text-draft-gold"><%= tag.toLowerCase() %></span>
                 <% }) %>
               </span>
             <% } %>

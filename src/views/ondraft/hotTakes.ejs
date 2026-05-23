@@ -1,5 +1,21 @@
-<section class="mx-auto grid w-full max-w-5xl gap-8">
-  <div class="grid gap-4 border-b border-slate-200 pb-6 dark:border-white/10">
+<section
+  class="mx-auto grid w-full max-w-5xl gap-8"
+  x-data="{
+    composerOpen: <%= errorMessage ? "true" : "false" %>,
+    toggleComposer() {
+      this.composerOpen = !this.composerOpen;
+      this.$nextTick(() => {
+        if (this.composerOpen) {
+          this.$refs.hotTakeContent?.focus();
+        } else {
+          this.$refs.hotTakeToggle?.focus();
+        }
+      });
+    }
+  }"
+  @keydown.escape="if (composerOpen) { composerOpen = false; $nextTick(() => $refs.hotTakeToggle?.focus()) }"
+>
+  <div class="flex flex-col gap-4 border-b border-slate-200 pb-6 dark:border-white/10 sm:flex-row sm:items-end sm:justify-between">
     <div class="max-w-3xl">
       <p class="text-xs font-black uppercase tracking-[0.2em] text-draft-amber dark:text-draft-gold">The Taproom</p>
       <h1 class="mt-2 font-display text-4xl font-black leading-tight text-slate-950 dark:text-white sm:text-5xl">
@@ -9,48 +25,123 @@
         Short-form draft arguments, instant reactions, and community notes from the OnDraft bar.
       </p>
     </div>
+    <button
+      type="button"
+      x-ref="hotTakeToggle"
+      class="od-primary-link w-full sm:w-auto"
+      :class="composerOpen ? 'border border-slate-300 bg-white text-slate-900 hover:bg-slate-50 dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/15' : ''"
+      @click="toggleComposer()"
+      :aria-expanded="composerOpen.toString()"
+      aria-controls="hot-take-composer-panel"
+      :aria-label="composerOpen ? 'Close hot take form' : 'Add hot take'"
+    >
+      <span x-show="!composerOpen">Add Hot Take</span>
+      <span x-cloak x-show="composerOpen" class="text-xl leading-none" aria-hidden="true">&times;</span>
+    </button>
   </div>
 
-  <%- include("partials/hotTakeComposer", { session, errorMessage, values, activeUserBan }) %>
+  <div id="hot-take-composer-panel" x-show="composerOpen" x-collapse>
+    <%- include("partials/hotTakeComposer", { session, errorMessage, values, activeUserBan }) %>
+  </div>
 
   <form
     id="hot-take-filter-form"
-    class="article-filter-form od-card grid gap-4 p-4 sm:p-5"
+    class="article-filter-form od-page-tools"
     hx-get="/hottakes/filter"
     hx-target="#hot-take-list"
     hx-swap="outerHTML"
+    hx-indicator="#hot-take-results-loading"
+    data-skip-global-loader
+    x-data="{
+      searchOpen: false,
+      keyword: '',
+      searchedKeyword: '',
+      get hasKeyword() { return this.keyword.trim().length > 0 },
+      get searchDirty() { return this.keyword.trim() !== this.searchedKeyword },
+      clearSearch() {
+        this.keyword = '';
+        this.searchedKeyword = '';
+        this.$nextTick(() => htmx.trigger(this.$refs.hotTakeFilterForm, 'submit'));
+      }
+    }"
+    x-ref="hotTakeFilterForm"
+    @submit="searchedKeyword = keyword.trim()"
   >
-    <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-end">
-      <label class="grid gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
-        <span>Search</span>
-        <input class="od-focus-ring min-h-11 rounded-md border border-slate-300 bg-white px-3 text-base text-slate-950 placeholder:text-slate-400 dark:border-white/15 dark:bg-draft-ink dark:text-white" name="keyword" type="search" placeholder="Search hot takes" />
-      </label>
-      <button class="od-primary-link w-full lg:w-auto" type="submit">Search</button>
-      <button
-        type="button"
-        class="od-secondary-link w-full lg:w-auto"
-        onclick="this.form.reset(); htmx.trigger(this.form, 'submit');"
-      >
-        Clear
-      </button>
+    <div class="od-page-tools-bar">
+      <div class="od-page-sort-group">
+        <label>
+          <span>Sort</span>
+          <select name="sortBy" onchange="htmx.trigger(this.form, 'submit');">
+            <option value="date" <%= sortBy === "date" ? "selected" : "" %>>Date</option>
+            <option value="likes" <%= sortBy === "likes" ? "selected" : "" %>>Likes</option>
+            <option value="comments" <%= sortBy === "comments" ? "selected" : "" %>>Comments</option>
+          </select>
+        </label>
+        <label>
+          <span>Direction</span>
+          <select name="sortDirection" onchange="htmx.trigger(this.form, 'submit');">
+            <option value="desc" <%= sortDirection === "desc" ? "selected" : "" %>>Descending</option>
+            <option value="asc" <%= sortDirection === "asc" ? "selected" : "" %>>Ascending</option>
+          </select>
+        </label>
+      </div>
+      <div class="od-page-tool-actions">
+        <button
+          type="button"
+          class="od-icon-button"
+          :class="searchOpen ? 'is-active' : ''"
+          :aria-expanded="String(searchOpen)"
+          aria-controls="hot-take-search-panel"
+          aria-label="Search hot takes"
+          title="Search hot takes"
+          @click="searchOpen = !searchOpen; $nextTick(() => searchOpen && $refs.hotTakeSearch?.focus())"
+        >
+          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+          </svg>
+        </button>
+      </div>
     </div>
 
-    <div class="grid gap-3 sm:grid-cols-2">
-      <label class="grid gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
-        <span>Sort by</span>
-        <select class="od-focus-ring min-h-11 rounded-md border border-slate-300 bg-white px-3 text-slate-950 dark:border-white/15 dark:bg-draft-ink dark:text-white" name="sortBy" onchange="htmx.trigger(this.form, 'submit');">
-          <option value="date" <%= sortBy === "date" ? "selected" : "" %>>Date</option>
-          <option value="likes" <%= sortBy === "likes" ? "selected" : "" %>>Likes</option>
-          <option value="comments" <%= sortBy === "comments" ? "selected" : "" %>>Comments</option>
-        </select>
+    <div id="hot-take-search-panel" class="od-tool-panel" x-show="searchOpen" x-collapse x-cloak>
+      <label class="od-search-field">
+        <span class="sr-only">Search hot takes</span>
+        <input class="od-search-input" x-ref="hotTakeSearch" x-model="keyword" name="keyword" type="search" placeholder="Search hot takes" />
+        <button
+          type="button"
+          class="od-search-icon-button"
+          :class="hasKeyword && searchDirty ? 'right-10' : 'right-1'"
+          x-cloak
+          x-show="hasKeyword"
+          @click="clearSearch()"
+          aria-label="Clear search"
+          title="Clear search"
+        >
+          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+            <path d="M18 6 6 18" />
+            <path d="m6 6 12 12" />
+          </svg>
+        </button>
+        <button
+          type="submit"
+          class="od-search-icon-button od-search-submit right-1"
+          x-cloak
+          x-show="hasKeyword && searchDirty"
+          aria-label="Search"
+          title="Search"
+        >
+          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M5 12h14" />
+            <path d="m13 6 6 6-6 6" />
+          </svg>
+        </button>
       </label>
-      <label class="grid gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
-        <span>Direction</span>
-        <select class="od-focus-ring min-h-11 rounded-md border border-slate-300 bg-white px-3 text-slate-950 dark:border-white/15 dark:bg-draft-ink dark:text-white" name="sortDirection" onchange="htmx.trigger(this.form, 'submit');">
-          <option value="desc" <%= sortDirection === "desc" ? "selected" : "" %>>Descending</option>
-          <option value="asc" <%= sortDirection === "asc" ? "selected" : "" %>>Ascending</option>
-        </select>
-      </label>
+    </div>
+
+    <div id="hot-take-results-loading" class="od-inline-loader htmx-indicator" role="status" aria-live="polite">
+      <span class="od-inline-loader-dot" aria-hidden="true"></span>
+      Updating hot takes
     </div>
   </form>
 

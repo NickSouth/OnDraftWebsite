@@ -15,4 +15,13 @@ export function getPrismaClient(): PrismaClient {
   return prismaClient;
 }
 
+export async function disconnectPrismaClient(): Promise<void> {
+  if (!prismaClient) {
+    return;
+  }
+
+  await prismaClient.$disconnect();
+  prismaClient = null;
+}
+
 export type OnDraftPrismaClient = PrismaClient;

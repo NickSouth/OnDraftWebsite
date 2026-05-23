@@ -852,6 +852,11 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
     }
   }
 
+  async getYoutubeVideo(videoId: string): Promise<Result<Video, ArticleError>> {
+    const video = await this.prisma.video.findUnique({ where: { videoId }, include: this.videoInclude() });
+    return video ? Ok(this.mapVideo(video)) : Err(ArticleNotFound(`YouTube video with id "${videoId}" not found.`));
+  }
+
   async getYoutubeVideos(): Promise<Result<Video[], ArticleError>> {
     const videos = await this.prisma.video.findMany({
       include: this.videoInclude(),
@@ -883,6 +888,41 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
     }));
   }
 
+  async updateYoutubeVideo(videoId: string, video: Video): Promise<Result<Video, ArticleError>> {
+    try {
+      const existing = await this.prisma.video.findUnique({ where: { videoId } });
+      if (!existing) {
+        return Err(ArticleNotFound(`YouTube video with id "${videoId}" not found.`));
+      }
+
+      const updated = await this.prisma.video.update({
+        where: { videoId },
+        data: {
+          videoId: video.videoId,
+          youtubeUrl: video.youtubeUrl,
+          title: video.title,
+          description: video.description,
+          thumbnailUrl: video.thumbnailUrl,
+          viewCount: video.viewCount,
+          youtubeStatsFetchedAt: video.youtubeStatsFetchedAt,
+          createdAt: video.createdAt,
+          updatedAt: video.updatedAt,
+          tags: {
+            deleteMany: {},
+            create: await this.tagConnections(video.tags),
+          },
+        },
+        include: this.videoInclude(),
+      });
+      return Ok(this.mapVideo(updated));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      return message.includes("Unique constraint")
+        ? Err(DuplicateArticle(`YouTube video with id "${video.videoId}" already exists.`))
+        : Err(ArticleNotFound(`YouTube video with id "${videoId}" not found.`));
+    }
+  }
+
   async updateYoutubeVideoStats(videoId: string, stats: { thumbnailUrl?: string; viewCount?: number; youtubeStatsFetchedAt: Date }): Promise<Result<Video, ArticleError>> {
     try {
       const updated = await this.prisma.video.update({
@@ -896,6 +936,15 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
         include: this.videoInclude(),
       });
       return Ok(this.mapVideo(updated));
+    } catch {
+      return Err(ArticleNotFound(`YouTube video with id "${videoId}" not found.`));
+    }
+  }
+
+  async deleteYoutubeVideo(videoId: string): Promise<Result<void, ArticleError>> {
+    try {
+      await this.prisma.video.delete({ where: { videoId } });
+      return Ok(undefined);
     } catch {
       return Err(ArticleNotFound(`YouTube video with id "${videoId}" not found.`));
     }

@@ -45,11 +45,13 @@ const collegeTeamNames = Object.keys(collegeTeam).sort((first, second) => first.
 
 export interface IOnDraftController {
   showHome(res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  showPopularArticles(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showArticles(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showFilteredArticles(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showBookmarks(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showVideos(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showCreateVideoForm(res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  showEditVideoForm(res: Response, session: IOnDraftBrowserSession, videoId: string): Promise<void>;
   showHotTakes(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showFilteredHotTakes(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
@@ -62,6 +64,8 @@ export interface IOnDraftController {
   previewArticle(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   createArticle(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   createYoutubeVideo(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  updateYoutubeVideo(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  deleteYoutubeVideo(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   updateArticle(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   likeArticle(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   toggleArticleBookmark(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
@@ -298,6 +302,26 @@ class OnDraftController implements IOnDraftController {
 
   private articleSortDirection(req: Request): ArticleFilter["sortDirection"] {
     return this.queryString(req, "sortDirection") === "asc" ? "asc" : "desc";
+  }
+
+  private articleViewMode(req: Request): "card" | "list" {
+    return this.queryString(req, "view") === "list" ? "list" : "card";
+  }
+
+  private favoritesRange(req: Request): "all" | "month" | "year" {
+    const range = this.queryString(req, "range");
+    return range === "month" || range === "year" ? range : "all";
+  }
+
+  private favoritesDateRange(range: "all" | "month" | "year"): ArticleFilter["publicationDateRange"] | undefined {
+    if (range === "all") {
+      return undefined;
+    }
+    const now = new Date();
+    const from = range === "month"
+      ? new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
+      : new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+    return { from, to: now };
   }
 
   private forumPostSortBy(req: Request): ForumPostFilter["sortBy"] {
@@ -628,6 +652,7 @@ class OnDraftController implements IOnDraftController {
 
   private buildArticleInput(req: Request, published: boolean): CreateArticleInput {
     const uploadedImage = this.articleUpload(req, "image");
+    const publicationDate = this.parseLocalDate(req.body.publicationDate);
 
     return {
       title: req.body.title,
@@ -635,7 +660,7 @@ class OnDraftController implements IOnDraftController {
       writeup: req.body.writeup,
       tags: this.parseArticleTags(req.body.tags),
       published,
-      publicationDate: new Date(req.body.publicationDate),
+      publicationDate,
       content: this.buildArticleContent(req),
       imageUrl: uploadedImage
         ? publicArticleUploadUrl(uploadedImage.filename)
@@ -645,12 +670,49 @@ class OnDraftController implements IOnDraftController {
     };
   }
 
+  private async popularArticles(range: "all" | "month" | "year"): Promise<Article[]> {
+    const result = await this.service.getFilteredArticles({
+      published: true,
+      sortBy: "likes",
+      sortDirection: "desc",
+      publicationDateRange: this.favoritesDateRange(range),
+    });
+    if (result.ok === false) {
+      this.logger.warn(`Unable to load popular articles: ${result.value.message}`);
+      return [];
+    }
+    return result.value
+      .sort((first, second) => second.likes - first.likes || second.publicationDate.getTime() - first.publicationDate.getTime())
+      .slice(0, 10);
+  }
+
+  private parseLocalDate(value: unknown): Date {
+    if (typeof value !== "string") {
+      return new Date("");
+    }
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) {
+      return new Date(value);
+    }
+    const [, year, month, day] = match;
+    return new Date(Number(year), Number(month) - 1, Number(day), 12);
+  }
+
   private buildYoutubeVideoInput(req: Request): CreateYoutubeVideoInput {
     return {
       youtubeUrl: req.body.youtubeUrl,
       title: req.body.title,
       description: req.body.description,
       tags: this.parseArticleTags(req.body.tags),
+    };
+  }
+
+  private videoFormValues(video: Video): Record<string, string> {
+    return {
+      youtubeUrl: video.youtubeUrl,
+      title: video.title,
+      description: video.description,
+      tags: video.tags.join(","),
     };
   }
 
@@ -669,15 +731,23 @@ class OnDraftController implements IOnDraftController {
     const articles = articlesResult.ok === true ? articlesResult.value : [];
     const videos = videosResult.ok === true ? videosResult.value : [];
     const latestItems = this.homeFeedItems(articles, videos).slice(0, 5);
-    const popularArticles = [...articles]
-      .sort((first, second) => second.likes - first.likes || second.publicationDate.getTime() - first.publicationDate.getTime())
-      .slice(0, 10);
+    const popularArticles = await this.popularArticles("all");
 
     res.render("ondraft/index", {
       session,
       isAdmin: isAdminSession(session),
       latestItems,
       popularArticles,
+      popularRange: "all",
+    });
+  }
+
+  async showPopularArticles(req: Request, res: Response, _session: IOnDraftBrowserSession): Promise<void> {
+    const popularRange = this.favoritesRange(req);
+    res.render("ondraft/partials/popularArticles", {
+      layout: false,
+      popularArticles: await this.popularArticles(popularRange),
+      popularRange,
     });
   }
 
@@ -697,6 +767,7 @@ class OnDraftController implements IOnDraftController {
       showingPublished,
       sortBy: this.articleSortBy(req),
       sortDirection: this.articleSortDirection(req),
+      viewMode: this.articleViewMode(req),
       bookmarkedArticleIds: await this.bookmarkedArticleIds(session),
     });
   }
@@ -772,6 +843,7 @@ class OnDraftController implements IOnDraftController {
       showingPublished,
       isAdmin: isAdminSession(session),
       session,
+      viewMode: this.articleViewMode(req),
       bookmarkedArticleIds: await this.bookmarkedArticleIds(session),
     });
   }
@@ -1078,6 +1150,28 @@ class OnDraftController implements IOnDraftController {
       isAdmin: isAdminSession(session),
       errorMessage: null,
       values: {},
+      heading: "Add YouTube Video",
+      formAction: "/videos",
+      submitLabel: "Add video",
+    });
+  }
+
+  async showEditVideoForm(res: Response, session: IOnDraftBrowserSession, videoId: string): Promise<void> {
+    this.logger.info(`Rendering edit video page for "${videoId}"`);
+    const result = await this.service.getYoutubeVideo(videoId);
+    if (result.ok === false) {
+      res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    res.render("ondraft/createVideo", {
+      session,
+      isAdmin: isAdminSession(session),
+      errorMessage: null,
+      values: this.videoFormValues(result.value),
+      heading: "Edit YouTube Video",
+      formAction: `/videos/${result.value.videoId}`,
+      submitLabel: "Save video",
     });
   }
 
@@ -1180,6 +1274,29 @@ class OnDraftController implements IOnDraftController {
         isAdmin: isAdminSession(session),
         errorMessage: result.value.message,
         values: req.body,
+        heading: "Add YouTube Video",
+        formAction: "/videos",
+        submitLabel: "Add video",
+      });
+      return;
+    }
+
+    res.redirect("/videos");
+  }
+
+  async updateYoutubeVideo(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    const videoId = this.routeParam(req, "videoId");
+    this.logger.info(`Updating YouTube video "${videoId}"`);
+    const result = await this.service.updateYoutubeVideo(videoId, this.buildYoutubeVideoInput(req));
+    if (result.ok === false) {
+      res.status(this.mapArticleErrorToStatusCode(result.value)).render("ondraft/createVideo", {
+        session,
+        isAdmin: isAdminSession(session),
+        errorMessage: result.value.message,
+        values: req.body,
+        heading: "Edit YouTube Video",
+        formAction: `/videos/${videoId}`,
+        submitLabel: "Save video",
       });
       return;
     }
@@ -1776,6 +1893,17 @@ class OnDraftController implements IOnDraftController {
       return;
     }
     res.status(200).send("");
+  }
+
+  async deleteYoutubeVideo(req: Request, res: Response, _session: IOnDraftBrowserSession): Promise<void> {
+    const videoId = this.routeParam(req, "videoId");
+    this.logger.info(`Deleting YouTube video "${videoId}"`);
+    const result = await this.service.deleteYoutubeVideo(videoId);
+    if (result.ok === false) {
+      res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+    res.redirect("/videos");
   }
 
   async deleteBigBoardEntry(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void> {

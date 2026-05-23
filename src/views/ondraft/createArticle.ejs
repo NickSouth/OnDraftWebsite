@@ -2,6 +2,18 @@
   <% const pageHeading = typeof heading !== "undefined" ? heading : "Create Article"; %>
   <% const previewAction = typeof formAction !== "undefined" ? formAction : "/articles/preview"; %>
   <% const draftSaveAction = typeof saveAction !== "undefined" ? saveAction : "/articles"; %>
+  <%
+    const selectedPublicationDate = values.publicationDate || new Date().toLocaleDateString("en-CA");
+    const selectedDateParts = selectedPublicationDate.split("-").map((part) => Number(part));
+    const selectedYear = selectedDateParts[0] || new Date().getFullYear();
+    const selectedMonth = selectedDateParts[1] || new Date().getMonth() + 1;
+    const selectedDay = selectedDateParts[2] || new Date().getDate();
+    const currentYear = new Date().getFullYear();
+    const publicationYears = [];
+    for (let year = currentYear; year >= Math.min(2018, selectedYear); year -= 1) {
+      publicationYears.push(year);
+    }
+  %>
   <div class="od-admin-heading">
     <div>
       <a class="od-admin-back-link" href="/articles">Back to articles</a>
@@ -14,7 +26,13 @@
     <p class="od-admin-error" role="alert"><%= errorMessage %></p>
   <% } %>
 
-  <form class="ondraft-form od-admin-form" method="post" action="<%= previewAction %>" enctype="multipart/form-data">
+  <form
+    class="ondraft-form od-admin-form"
+    method="post"
+    action="<%= previewAction %>"
+    enctype="multipart/form-data"
+    <%= draftSaveAction === "/articles" ? 'data-unsaved-new-article="true"' : "" %>
+  >
     <label>
       Title
       <input name="title" value="<%= values.title || "" %>" required />
@@ -23,10 +41,49 @@
       Author
       <input name="author" value="<%= values.author || session.authenticatedUser?.displayName || "" %>" required />
     </label>
-    <label>
-      Publication date
-      <input type="date" name="publicationDate" value="<%= values.publicationDate || new Date().toISOString().slice(0, 10) %>" required />
-    </label>
+    <div class="publication-date-selectors">
+      <span>Publication date</span>
+      <input type="hidden" name="publicationDate" value="<%= selectedPublicationDate %>" data-publication-date-value />
+      <div class="publication-date-grid">
+        <label>
+          Month
+          <select data-publication-month required>
+            <% [
+              "January",
+              "February",
+              "March",
+              "April",
+              "May",
+              "June",
+              "July",
+              "August",
+              "September",
+              "October",
+              "November",
+              "December",
+            ].forEach((monthName, index) => { %>
+              <option value="<%= index + 1 %>" <%= selectedMonth === index + 1 ? "selected" : "" %>><%= monthName %></option>
+            <% }) %>
+          </select>
+        </label>
+        <label>
+          Day
+          <select data-publication-day required>
+            <% for (let day = 1; day <= 31; day += 1) { %>
+              <option value="<%= day %>" <%= selectedDay === day ? "selected" : "" %>><%= day %></option>
+            <% } %>
+          </select>
+        </label>
+        <label>
+          Year
+          <select data-publication-year required>
+            <% publicationYears.forEach((year) => { %>
+              <option value="<%= year %>" <%= selectedYear === year ? "selected" : "" %>><%= year %></option>
+            <% }) %>
+          </select>
+        </label>
+      </div>
+    </div>
     <label>
       Hook
       <textarea name="writeup" maxlength="200" required><%= values.writeup || "" %></textarea>
@@ -82,4 +139,51 @@
     </div>
   </form>
   <script src="/articleTags.js" defer></script>
+  <% if (draftSaveAction === "/articles") { %>
+    <script src="/articleEditorGuard.js" defer></script>
+  <% } %>
+  <script>
+    (() => {
+      const root = document.currentScript.closest("section");
+      const dateValue = root?.querySelector("[data-publication-date-value]");
+      const monthSelect = root?.querySelector("[data-publication-month]");
+      const daySelect = root?.querySelector("[data-publication-day]");
+      const yearSelect = root?.querySelector("[data-publication-year]");
+
+      function pad(value) {
+        return String(value).padStart(2, "0");
+      }
+
+      function updateDays() {
+        if (!monthSelect || !daySelect || !yearSelect) {
+          return;
+        }
+        const selectedDay = Number(daySelect.value);
+        const month = Number(monthSelect.value);
+        const year = Number(yearSelect.value);
+        const daysInMonth = new Date(year, month, 0).getDate();
+        daySelect.innerHTML = "";
+        for (let day = 1; day <= daysInMonth; day += 1) {
+          const option = document.createElement("option");
+          option.value = String(day);
+          option.textContent = String(day);
+          option.selected = day === Math.min(selectedDay, daysInMonth);
+          daySelect.append(option);
+        }
+      }
+
+      function syncPublicationDate() {
+        if (!dateValue || !monthSelect || !daySelect || !yearSelect) {
+          return;
+        }
+        updateDays();
+        dateValue.value = `${yearSelect.value}-${pad(monthSelect.value)}-${pad(daySelect.value)}`;
+      }
+
+      [monthSelect, daySelect, yearSelect].forEach((select) => {
+        select?.addEventListener("change", syncPublicationDate);
+      });
+      syncPublicationDate();
+    })();
+  </script>
 </section>

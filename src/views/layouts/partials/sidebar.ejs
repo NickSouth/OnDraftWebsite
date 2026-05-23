@@ -6,6 +6,7 @@
   { href: "/hottakes", label: "The Taproom", kicker: "Community takes" },
   { href: "/bookmarks", label: "Saved Pints", kicker: "Your bookmarks" },
 ]; %>
+<% const activePath = typeof currentPath !== "undefined" ? currentPath : ""; %>
 
 <div
   x-cloak
@@ -17,29 +18,48 @@
 
 <aside
   id="site-sidebar"
-  class="fixed right-0 top-14 z-50 flex h-[calc(100vh-3.5rem)] w-80 max-w-[calc(100vw-1rem)] flex-col border-l border-slate-200 bg-white shadow-editorial transition-transform duration-200 dark:border-white/10 dark:bg-draft-slate <%= forceOverlaySidebar ? "" : "lg:translate-x-0" %>"
+  class="fixed right-0 top-14 z-50 flex h-[calc(100vh-3.5rem)] w-80 max-w-[calc(100vw-1rem)] flex-col border-l border-slate-200 bg-white shadow-editorial transition-transform duration-200 dark:border-white/10 dark:bg-draft-slate <%= forceOverlaySidebar ? "" : "lg:top-0 lg:h-screen lg:translate-x-0" %>"
   :class="sidebarOpen ? 'translate-x-0' : 'translate-x-full <%= forceOverlaySidebar ? "" : "lg:translate-x-0" %>'"
   x-trap.noscroll="sidebarOpen <%= forceOverlaySidebar ? "" : "&& window.innerWidth < 1024" %>"
   @keydown.escape.window="sidebarOpen = false"
 >
-  <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-white/10">
+  <div class="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4 dark:border-white/10">
     <div>
       <p class="text-xs font-black uppercase tracking-[0.14em] text-draft-amber dark:text-draft-gold">Navigate</p>
       <h2 class="text-xl font-black tracking-normal text-slate-950 dark:text-white">OnDraft Menu</h2>
     </div>
-    <button
-      type="button"
-      class="od-focus-ring inline-flex size-9 items-center justify-center rounded-md text-2xl leading-none text-slate-600 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 <%= forceOverlaySidebar ? "" : "lg:hidden" %>"
-      aria-label="Close navigation"
-      @click="sidebarOpen = false"
-    >
-      &times;
-    </button>
+    <div class="flex shrink-0 items-center gap-2">
+      <% if (currentSession?.authenticatedUser) { %>
+        <button
+          type="button"
+          class="od-focus-ring inline-flex size-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:hover:bg-white/15"
+          hx-get="/settings"
+          hx-target="#site-modal-outlet"
+          hx-swap="innerHTML"
+          aria-label="Open account settings"
+          title="Settings"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
+            <path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.04.04a2.1 2.1 0 0 1-2.97 2.97l-.04-.04a1.8 1.8 0 0 0-1.98-.36 1.8 1.8 0 0 0-1.1 1.65V21.3a2.1 2.1 0 0 1-4.2 0v-.06a1.8 1.8 0 0 0-1.1-1.65 1.8 1.8 0 0 0-1.98.36l-.04.04a2.1 2.1 0 1 1-2.97-2.97l.04-.04A1.8 1.8 0 0 0 4.6 15a1.8 1.8 0 0 0-1.65-1.1H2.9a2.1 2.1 0 0 1 0-4.2h.06A1.8 1.8 0 0 0 4.6 8a1.8 1.8 0 0 0-.36-1.98l-.04-.04A2.1 2.1 0 1 1 7.17 3l.04.04A1.8 1.8 0 0 0 9.2 3.4a1.8 1.8 0 0 0 1.1-1.65V1.7a2.1 2.1 0 0 1 4.2 0v.06a1.8 1.8 0 0 0 1.1 1.65 1.8 1.8 0 0 0 1.98-.36l.04-.04a2.1 2.1 0 1 1 2.97 2.97l-.04.04A1.8 1.8 0 0 0 19.4 8a1.8 1.8 0 0 0 1.65 1.1h.06a2.1 2.1 0 0 1 0 4.2h-.06A1.8 1.8 0 0 0 19.4 15Z" />
+          </svg>
+        </button>
+      <% } %>
+      <button
+        type="button"
+        class="od-focus-ring inline-flex size-9 items-center justify-center rounded-md text-2xl leading-none text-slate-600 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 <%= forceOverlaySidebar ? "" : "lg:hidden" %>"
+        aria-label="Close navigation"
+        @click="sidebarOpen = false"
+      >
+        &times;
+      </button>
+    </div>
   </div>
 
   <nav class="grid gap-2 overflow-y-auto p-4" aria-label="Primary">
     <% navItems.forEach((item) => { %>
-      <a href="<%= item.href %>" class="od-bartop-nav group grid grid-cols-[3.25rem_minmax(0,1fr)] gap-3">
+      <% const isActive = item.href === "/" ? activePath === "/" : activePath === item.href || activePath.startsWith(`${item.href}/`); %>
+      <a href="<%= item.href %>" class="od-bartop-nav group grid grid-cols-[3.25rem_minmax(0,1fr)] gap-3 <%= isActive ? "is-active" : "" %>" <%= isActive ? 'aria-current="page"' : "" %>>
         <span class="grid size-12 place-items-center overflow-visible" aria-hidden="true">
           <img src="/images/ui/beer-spout.png" alt="" class="h-10 w-11 object-contain opacity-90 transition group-hover:scale-105 group-hover:opacity-100" />
         </span>
@@ -53,9 +73,12 @@
     <% if (currentIsAdmin) { %>
       <div class="mt-4 border-t border-slate-200 pt-4 dark:border-white/10">
         <p class="mb-2 px-3 text-xs font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Admin</p>
-        <a href="/admin/users" class="od-shell-link flex">Manage users</a>
-        <a href="/articles/new" class="od-shell-link flex">Create article</a>
-        <a href="/bigboard/edit" class="od-shell-link flex">Edit draft board</a>
+        <% const adminUsersActive = activePath === "/admin/users" || activePath.startsWith("/admin/users/"); %>
+        <% const newArticleActive = activePath === "/articles/new"; %>
+        <% const editBoardActive = activePath === "/bigboard/edit"; %>
+        <a href="/admin/users" class="od-shell-link flex <%= adminUsersActive ? "is-active" : "" %>" <%= adminUsersActive ? 'aria-current="page"' : "" %>>Manage users</a>
+        <a href="/articles/new" class="od-shell-link flex <%= newArticleActive ? "is-active" : "" %>" <%= newArticleActive ? 'aria-current="page"' : "" %>>Create article</a>
+        <a href="/bigboard/edit" class="od-shell-link flex <%= editBoardActive ? "is-active" : "" %>" <%= editBoardActive ? 'aria-current="page"' : "" %>>Edit draft board</a>
       </div>
     <% } %>
   </nav>

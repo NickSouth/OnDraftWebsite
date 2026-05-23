@@ -2,7 +2,7 @@
   <div class="article-page-actions">
     <a href="/articles">Back to articles</a>
     <% if (isAdmin) { %>
-      <a class="button-link secondary-link" href="/articles/<%= article.id %>/edit">Edit</a>
+      <a class="<%= article.published ? "article-edit-link" : "button-link secondary-link" %>" href="/articles/<%= article.id %>/edit">Edit</a>
     <% } %>
   </div>
   <header class="article-header">
