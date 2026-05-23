@@ -8,7 +8,11 @@ import {
 
 function parseSessionData(data: string): SessionData | null {
   try {
-    return JSON.parse(data) as SessionData;
+    const parsed = JSON.parse(data) as SessionData;
+    if (typeof parsed.cookie?.expires === "string") {
+      parsed.cookie.expires = new Date(parsed.cookie.expires);
+    }
+    return parsed;
   } catch {
     return null;
   }
