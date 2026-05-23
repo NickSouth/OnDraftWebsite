@@ -1,118 +1,272 @@
-<section class="mx-auto grid w-full max-w-6xl gap-8">
+<section
+  class="mx-auto grid w-full max-w-6xl gap-8"
+  x-data="{ articleView: '<%= viewMode === "list" ? "list" : "card" %>' }"
+>
   <div class="grid gap-5 border-b border-slate-200 pb-6 dark:border-white/10 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
     <div class="max-w-3xl">
       <p class="text-xs font-black uppercase tracking-[0.2em] text-draft-amber dark:text-draft-gold">Articles On Tap</p>
       <h1 class="mt-2 font-display text-4xl font-black leading-tight text-slate-950 dark:text-white sm:text-5xl">
-        Draft coverage with the head still on it.
+        Articles
       </h1>
       <p class="mt-3 text-base leading-7 text-slate-600 dark:text-slate-300">
-        Columns, scouting reads, and draft-room arguments built for fast scanning and deep reading.
+        NFL and NFL Draft analysis as articles from our team.
       </p>
     </div>
 
     <% if (isAdmin) { %>
-      <a class="od-primary-link" href="/articles/new">Create article</a>
+      <div class="grid gap-3 sm:justify-items-end">
+        <a class="od-primary-link w-full sm:w-auto" href="/articles/new">Create article</a>
+        <div class="inline-flex w-full rounded-lg border border-slate-200 bg-white p-1 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:w-fit" aria-label="Article status">
+          <button
+            type="button"
+            class="od-focus-ring flex-1 rounded-md px-4 py-2 text-sm font-black transition sm:flex-none <%= showingPublished ? "bg-draft-gold text-draft-ink" : "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10" %>"
+            onclick="document.getElementById('article-status-field').value = 'published'; this.parentElement.querySelectorAll('button').forEach((button) => { button.classList.remove('bg-draft-gold', 'text-draft-ink'); button.classList.add('text-slate-700', 'dark:text-slate-200'); }); this.classList.add('bg-draft-gold', 'text-draft-ink'); this.classList.remove('text-slate-700', 'dark:text-slate-200'); htmx.trigger(document.querySelector('.article-filter-form'), 'submit');"
+          >
+            Published
+          </button>
+          <button
+            type="button"
+            class="od-focus-ring flex-1 rounded-md px-4 py-2 text-sm font-black transition sm:flex-none <%= showingPublished ? "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10" : "bg-draft-gold text-draft-ink" %>"
+            onclick="document.getElementById('article-status-field').value = 'draft'; this.parentElement.querySelectorAll('button').forEach((button) => { button.classList.remove('bg-draft-gold', 'text-draft-ink'); button.classList.add('text-slate-700', 'dark:text-slate-200'); }); this.classList.add('bg-draft-gold', 'text-draft-ink'); this.classList.remove('text-slate-700', 'dark:text-slate-200'); htmx.trigger(document.querySelector('.article-filter-form'), 'submit');"
+          >
+            Unpublished
+          </button>
+        </div>
+      </div>
     <% } %>
   </div>
 
-  <% if (isAdmin) { %>
-    <div class="inline-flex w-full rounded-lg border border-slate-200 bg-white p-1 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:w-fit" aria-label="Article status">
-      <button
-        type="button"
-        class="od-focus-ring flex-1 rounded-md px-4 py-2 text-sm font-black transition sm:flex-none <%= showingPublished ? "bg-draft-gold text-draft-ink" : "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10" %>"
-        onclick="document.getElementById('article-status-field').value = 'published'; this.parentElement.querySelectorAll('button').forEach((button) => { button.classList.remove('bg-draft-gold', 'text-draft-ink'); button.classList.add('text-slate-700', 'dark:text-slate-200'); }); this.classList.add('bg-draft-gold', 'text-draft-ink'); this.classList.remove('text-slate-700', 'dark:text-slate-200'); htmx.trigger(document.querySelector('.article-filter-form'), 'submit');"
-      >
-        Published
-      </button>
-      <button
-        type="button"
-        class="od-focus-ring flex-1 rounded-md px-4 py-2 text-sm font-black transition sm:flex-none <%= showingPublished ? "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10" : "bg-draft-gold text-draft-ink" %>"
-        onclick="document.getElementById('article-status-field').value = 'draft'; this.parentElement.querySelectorAll('button').forEach((button) => { button.classList.remove('bg-draft-gold', 'text-draft-ink'); button.classList.add('text-slate-700', 'dark:text-slate-200'); }); this.classList.add('bg-draft-gold', 'text-draft-ink'); this.classList.remove('text-slate-700', 'dark:text-slate-200'); htmx.trigger(document.querySelector('.article-filter-form'), 'submit');"
-      >
-        Unpublished
-      </button>
-    </div>
-  <% } %>
-
   <form
-    class="article-filter-form od-card grid gap-4 p-4 sm:p-5"
+    id="article-filter-form"
+    class="article-filter-form od-page-tools"
     hx-get="/articles/filter"
     hx-target="#articles-results"
     hx-swap="innerHTML"
-    x-data="{ filtersOpen: false }"
+    hx-indicator="#article-results-loading"
+    data-skip-global-loader
+    x-data="{
+      searchOpen: false,
+      filtersOpen: false,
+      keyword: '',
+      searchedKeyword: '',
+      get hasKeyword() { return this.keyword.trim().length > 0 },
+      get searchDirty() { return this.keyword.trim() !== this.searchedKeyword },
+      clearSearch() {
+        this.keyword = '';
+        this.searchedKeyword = '';
+        this.$nextTick(() => htmx.trigger(this.$refs.articleFilterForm, 'submit'));
+      }
+    }"
+    x-ref="articleFilterForm"
+    @submit="searchedKeyword = keyword.trim()"
   >
+    <input type="hidden" name="view" x-model="articleView" />
     <% if (isAdmin) { %>
       <input id="article-status-field" type="hidden" name="status" value="<%= showingPublished ? "published" : "draft" %>" />
     <% } %>
 
-    <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-end">
-      <label class="grid gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
-        <span>Search</span>
-        <input class="od-focus-ring min-h-11 rounded-md border border-slate-300 bg-white px-3 text-base text-slate-950 placeholder:text-slate-400 dark:border-white/15 dark:bg-draft-ink dark:text-white" name="keyword" type="search" placeholder="Search articles" />
-      </label>
-      <button class="od-primary-link w-full lg:w-auto" type="submit">Search</button>
-      <button
-        type="button"
-        class="od-secondary-link w-full lg:w-auto"
-        :aria-expanded="String(filtersOpen)"
-        aria-controls="article-filter-panel"
-        @click="filtersOpen = !filtersOpen"
-      >
-        Filters
-      </button>
-    </div>
-
-    <div class="grid gap-3 sm:grid-cols-2">
-      <label class="grid gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
-        <span>Sort by</span>
-        <select class="od-focus-ring min-h-11 rounded-md border border-slate-300 bg-white px-3 text-slate-950 dark:border-white/15 dark:bg-draft-ink dark:text-white" id="article-sort-by" name="sortBy" onchange="htmx.trigger(this.form, 'submit');">
-          <option value="date" <%= sortBy === "date" ? "selected" : "" %>>Date</option>
-          <option value="likes" <%= sortBy === "likes" ? "selected" : "" %>>Likes</option>
-          <option value="comments" <%= sortBy === "comments" ? "selected" : "" %>>Comments</option>
-        </select>
-      </label>
-      <label class="grid gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
-        <span>Direction</span>
-        <select class="od-focus-ring min-h-11 rounded-md border border-slate-300 bg-white px-3 text-slate-950 dark:border-white/15 dark:bg-draft-ink dark:text-white" id="article-sort-direction" name="sortDirection" onchange="htmx.trigger(this.form, 'submit');">
-          <option value="desc" <%= sortDirection === "desc" ? "selected" : "" %>>Descending</option>
-          <option value="asc" <%= sortDirection === "asc" ? "selected" : "" %>>Ascending</option>
-        </select>
-      </label>
-    </div>
-
-    <div id="article-filter-panel" class="grid gap-4 border-t border-slate-200 pt-4 dark:border-white/10" x-show="filtersOpen" x-collapse x-cloak>
-      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <label class="grid gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
-          <span>Author</span>
-          <input class="od-focus-ring min-h-11 rounded-md border border-slate-300 bg-white px-3 text-slate-950 dark:border-white/15 dark:bg-draft-ink dark:text-white" name="author" />
+    <div class="od-page-tools-bar">
+      <div class="od-page-sort-group">
+        <label>
+          <span>Sort</span>
+          <select id="article-sort-by" name="sortBy" onchange="htmx.trigger(this.form, 'submit');">
+            <option value="date" <%= sortBy === "date" ? "selected" : "" %>>Date</option>
+            <option value="likes" <%= sortBy === "likes" ? "selected" : "" %>>Likes</option>
+            <option value="comments" <%= sortBy === "comments" ? "selected" : "" %>>Comments</option>
+          </select>
         </label>
-        <label class="grid gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
-          <span>From</span>
-          <input class="od-focus-ring min-h-11 rounded-md border border-slate-300 bg-white px-3 text-slate-950 dark:border-white/15 dark:bg-draft-ink dark:text-white" type="date" name="dateFrom" />
-        </label>
-        <label class="grid gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
-          <span>To</span>
-          <input class="od-focus-ring min-h-11 rounded-md border border-slate-300 bg-white px-3 text-slate-950 dark:border-white/15 dark:bg-draft-ink dark:text-white" type="date" name="dateTo" />
-        </label>
-        <label class="grid gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
-          <span>Tags</span>
-          <input class="od-focus-ring min-h-11 rounded-md border border-slate-300 bg-white px-3 text-slate-950 dark:border-white/15 dark:bg-draft-ink dark:text-white" name="tags" />
+        <label>
+          <span>Direction</span>
+          <select id="article-sort-direction" name="sortDirection" onchange="htmx.trigger(this.form, 'submit');">
+            <option value="desc" <%= sortDirection === "desc" ? "selected" : "" %>>Descending</option>
+            <option value="asc" <%= sortDirection === "asc" ? "selected" : "" %>>Ascending</option>
+          </select>
         </label>
       </div>
-      <div class="flex flex-col gap-3 sm:flex-row">
-        <button class="od-primary-link" type="submit">Apply filters</button>
+
+      <div class="od-page-tool-actions">
         <button
           type="button"
-          class="od-secondary-link"
-          onclick="const status = document.getElementById('article-status-field')?.value || 'published'; this.form.reset(); const statusField = document.getElementById('article-status-field'); if (statusField) statusField.value = status; htmx.trigger(this.form, 'submit');"
+          class="od-icon-button"
+          :class="filtersOpen ? 'is-active' : ''"
+          :aria-expanded="String(filtersOpen)"
+          aria-controls="article-filter-panel"
+          aria-label="Filters"
+          title="Filters"
+          @click="filtersOpen = !filtersOpen"
         >
-          Clear
+          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M4 7h16" />
+            <path d="M7 12h10" />
+            <path d="M10 17h4" />
+          </svg>
         </button>
+        <button
+          type="button"
+          class="od-icon-button"
+          :class="searchOpen ? 'is-active' : ''"
+          :aria-expanded="String(searchOpen)"
+          aria-controls="article-search-panel"
+          aria-label="Search articles"
+          title="Search articles"
+          @click="searchOpen = !searchOpen; $nextTick(() => searchOpen && $refs.articleSearch?.focus())"
+        >
+          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div id="article-search-panel" class="od-tool-panel" x-show="searchOpen" x-collapse x-cloak>
+      <label class="od-search-field">
+        <span class="sr-only">Search articles</span>
+        <input class="od-search-input" x-ref="articleSearch" x-model="keyword" name="keyword" type="search" placeholder="Search articles" />
+        <button
+          type="button"
+          class="od-search-icon-button"
+          :class="hasKeyword && searchDirty ? 'right-10' : 'right-1'"
+          x-cloak
+          x-show="hasKeyword"
+          @click="clearSearch()"
+          aria-label="Clear search"
+          title="Clear search"
+        >
+          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+            <path d="M18 6 6 18" />
+            <path d="m6 6 12 12" />
+          </svg>
+        </button>
+        <button
+          type="submit"
+          class="od-search-icon-button od-search-submit right-1"
+          x-cloak
+          x-show="hasKeyword && searchDirty"
+          aria-label="Search"
+          title="Search"
+        >
+          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M5 12h14" />
+            <path d="m13 6 6 6-6 6" />
+          </svg>
+        </button>
+      </label>
+    </div>
+
+    <div id="article-filter-panel" class="od-tool-panel" x-show="filtersOpen" x-collapse x-cloak>
+      <div class="od-article-filter-grid">
+        <label>
+          <span>
+            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M20 21a8 8 0 0 0-16 0" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+            Author
+          </span>
+          <input name="author" />
+        </label>
+        <label>
+          <span>
+            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M8 2v4" />
+              <path d="M16 2v4" />
+              <rect x="3" y="4" width="18" height="18" rx="2" />
+              <path d="M3 10h18" />
+            </svg>
+            From
+          </span>
+          <input type="date" name="dateFrom" />
+        </label>
+        <label>
+          <span>
+            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M8 2v4" />
+              <path d="M16 2v4" />
+              <rect x="3" y="4" width="18" height="18" rx="2" />
+              <path d="M3 10h18" />
+            </svg>
+            To
+          </span>
+          <input type="date" name="dateTo" />
+        </label>
+        <label>
+          <span>
+            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M20.6 13.5 13.5 20.6a2 2 0 0 1-2.8 0L3 12.9V3h9.9l7.7 7.7a2 2 0 0 1 0 2.8Z" />
+              <path d="M7.5 7.5h.01" />
+            </svg>
+            Tags
+          </span>
+          <input name="tags" />
+        </label>
+      </div>
+      <div class="od-tool-panel-actions">
+        <button class="od-icon-button" type="submit" aria-label="Apply filters" title="Apply filters">
+          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M5 12h14" />
+            <path d="m13 6 6 6-6 6" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          class="od-icon-button"
+          onclick="const status = document.getElementById('article-status-field')?.value || 'published'; this.form.reset(); const statusField = document.getElementById('article-status-field'); if (statusField) statusField.value = status; htmx.trigger(this.form, 'submit');"
+          aria-label="Clear filters"
+          title="Clear filters"
+        >
+          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+            <path d="M18 6 6 18" />
+            <path d="m6 6 12 12" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="od-page-tools-footer">
+      <div class="od-view-toggle-group" aria-label="Article layout">
+        <button
+          type="button"
+          class="od-view-toggle"
+          :class="articleView === 'card' ? 'is-active' : ''"
+          :aria-pressed="String(articleView === 'card')"
+          aria-label="Card view"
+          title="Card view"
+          @click="articleView = 'card'; $nextTick(() => htmx.trigger($el.form, 'submit'))"
+        >
+          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <rect x="4" y="5" width="16" height="4" rx="1" />
+            <rect x="4" y="10" width="16" height="4" rx="1" />
+            <rect x="4" y="15" width="16" height="4" rx="1" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          class="od-view-toggle"
+          :class="articleView === 'list' ? 'is-active' : ''"
+          :aria-pressed="String(articleView === 'list')"
+          aria-label="List view"
+          title="List view"
+          @click="articleView = 'list'; $nextTick(() => htmx.trigger($el.form, 'submit'))"
+        >
+          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M7 6h14" />
+            <path d="M7 12h14" />
+            <path d="M7 18h14" />
+            <path d="M4 6h.01" />
+            <path d="M4 12h.01" />
+            <path d="M4 18h.01" />
+          </svg>
+        </button>
+      </div>
+      <div id="article-results-loading" class="od-inline-loader htmx-indicator" role="status" aria-live="polite">
+        <span class="od-inline-loader-dot" aria-hidden="true"></span>
+        Updating articles
       </div>
     </div>
   </form>
 
   <div id="articles-results">
-    <%- include("partials/articleList", { articles, isAdmin, showingPublished, session, bookmarkedArticleIds }) %>
+    <%- include("partials/articleList", { articles, isAdmin, showingPublished, session, viewMode, bookmarkedArticleIds }) %>
   </div>
 </section>

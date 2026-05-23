@@ -180,9 +180,12 @@ export interface IOnDraftService {
   deleteForumPost(postId: string): Promise<Result<void, ForumPostError>>;
   getSavedSchools(year: number): Promise<Result<string[], BigBoardError>>;
   createYoutubeVideo(input: CreateYoutubeVideoInput): Promise<Result<Video, ArticleError>>;
+  getYoutubeVideo(videoId: string): Promise<Result<Video, ArticleError>>;
   getYoutubeVideos(): Promise<Result<Video[], ArticleError>>;
   filterYoutubeVideos(query: VideoQuery): Promise<Result<Video[], ArticleError>>;
+  updateYoutubeVideo(videoId: string, input: CreateYoutubeVideoInput): Promise<Result<Video, ArticleError>>;
   updateYoutubeVideoStats(videoId: string, stats: { thumbnailUrl?: string; viewCount?: number; youtubeStatsFetchedAt: Date }): Promise<Result<Video, ArticleError>>;
+  deleteYoutubeVideo(videoId: string): Promise<Result<void, ArticleError>>;
   getTags(): Promise<Result<string[], ArticleError>>;
 }
 
@@ -1150,6 +1153,13 @@ class OnDraftService implements IOnDraftService {
     return await this.repository.createYoutubeVideo(video);
   }
 
+  async getYoutubeVideo(videoId: string): Promise<Result<Video, ArticleError>> {
+    if (!videoId || videoId.trim() === "") {
+      return Err(ArticleValidationError("YouTube video id is required."));
+    }
+    return await this.repository.getYoutubeVideo(videoId.trim());
+  }
+
   async getYoutubeVideos(): Promise<Result<Video[], ArticleError>> {
     const result = await this.repository.getYoutubeVideos();
     if (result.ok === false) {
@@ -1168,11 +1178,47 @@ class OnDraftService implements IOnDraftService {
     return refreshed ? await this.repository.filterYoutubeVideos(query) : result;
   }
 
+  async updateYoutubeVideo(videoId: string, input: CreateYoutubeVideoInput): Promise<Result<Video, ArticleError>> {
+    if (!videoId || videoId.trim() === "") {
+      return Err(ArticleValidationError("YouTube video id is required."));
+    }
+    const existing = await this.repository.getYoutubeVideo(videoId.trim());
+    if (existing.ok === false) {
+      return Err(existing.value);
+    }
+    const prepared = this.prepareYoutubeVideoInput(input);
+    if (prepared.ok === false) {
+      return Err(prepared.value);
+    }
+
+    const video: Video = {
+      ...existing.value,
+      youtubeUrl: prepared.value.youtubeUrl,
+      title: prepared.value.title,
+      description: prepared.value.description,
+      videoId: prepared.value.videoId,
+      tags: prepared.value.tags ?? [],
+      updatedAt: new Date(),
+      thumbnailUrl: prepared.value.videoId === existing.value.videoId ? existing.value.thumbnailUrl : undefined,
+      viewCount: prepared.value.videoId === existing.value.videoId ? existing.value.viewCount : undefined,
+      youtubeStatsFetchedAt: prepared.value.videoId === existing.value.videoId ? existing.value.youtubeStatsFetchedAt : undefined,
+    };
+
+    return await this.repository.updateYoutubeVideo(videoId.trim(), video);
+  }
+
   async updateYoutubeVideoStats(videoId: string, stats: { thumbnailUrl?: string; viewCount?: number; youtubeStatsFetchedAt: Date }): Promise<Result<Video, ArticleError>> {
     if (!videoId || videoId.trim() === "") {
       return Err(ArticleValidationError("YouTube video id is required."));
     }
     return await this.repository.updateYoutubeVideoStats(videoId.trim(), stats);
+  }
+
+  async deleteYoutubeVideo(videoId: string): Promise<Result<void, ArticleError>> {
+    if (!videoId || videoId.trim() === "") {
+      return Err(ArticleValidationError("YouTube video id is required."));
+    }
+    return await this.repository.deleteYoutubeVideo(videoId.trim());
   }
 
   async getTags(): Promise<Result<string[], ArticleError>> {

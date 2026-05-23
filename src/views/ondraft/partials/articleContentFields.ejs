@@ -3,6 +3,70 @@
     PDF
     <input type="file" name="pdf" accept="application/pdf,.pdf" />
   </label>
+  <div class="pdf-style-guide" aria-label="PDF article style guide">
+    <div>
+      <p class="pdf-style-guide-kicker">PDF style guide</p>
+      <p class="pdf-style-guide-note">Use these values when designing PDFs so the document feels at home inside OnDraft.</p>
+    </div>
+    <div class="pdf-style-guide-grid">
+      <div class="pdf-style-guide-item">
+        <span class="pdf-style-swatch bg-[#0f172a]" aria-hidden="true"></span>
+        <span>
+          <strong>Body text</strong>
+          <small>#0F172A</small>
+        </span>
+      </div>
+      <div class="pdf-style-guide-item">
+        <span class="pdf-style-swatch bg-[#020617]" aria-hidden="true"></span>
+        <span>
+          <strong>Title text</strong>
+          <small>#020617</small>
+        </span>
+      </div>
+      <div class="pdf-style-guide-item">
+        <span class="pdf-style-swatch bg-[#ffffff] ring-1 ring-slate-300" aria-hidden="true"></span>
+        <span>
+          <strong>Background</strong>
+          <small>#FFFFFF</small>
+        </span>
+      </div>
+      <div class="pdf-style-guide-item">
+        <span class="pdf-style-swatch bg-[#d99822]" aria-hidden="true"></span>
+        <span>
+          <strong>Accent</strong>
+          <small>#D99822</small>
+        </span>
+      </div>
+      <div class="pdf-style-guide-item pdf-style-guide-text-item">
+        <span class="pdf-style-sample-type font-sans" aria-hidden="true">Aa</span>
+        <span>
+          <strong>Body font</strong>
+          <small>Segoe UI / Inter / Arial</small>
+        </span>
+      </div>
+      <div class="pdf-style-guide-item pdf-style-guide-text-item">
+        <span class="pdf-style-sample-type font-display" aria-hidden="true">Aa</span>
+        <span>
+          <strong>Title font</strong>
+          <small>Georgia / Cambria</small>
+        </span>
+      </div>
+      <div class="pdf-style-guide-item pdf-style-guide-text-item">
+        <span class="pdf-style-sample-size" aria-hidden="true">16</span>
+        <span>
+          <strong>Body size</strong>
+          <small>16 pt / 1.5 line height</small>
+        </span>
+      </div>
+      <div class="pdf-style-guide-item pdf-style-guide-text-item">
+        <span class="pdf-style-sample-size" aria-hidden="true">34</span>
+        <span>
+          <strong>Title size</strong>
+          <small>32-36 pt / bold</small>
+        </span>
+      </div>
+    </div>
+  </div>
 <% } else if (values.contentType === "html") { %>
   <label>
     HTML content

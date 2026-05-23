@@ -76,9 +76,12 @@ export interface IOnDraftRepository {
     getFilteredForumPosts(filter: ForumPostFilter): Promise<Result<ForumPost[], ForumPostError>>;
     deleteForumPost(postId: string): Promise<Result<void, ForumPostError>>;
     createYoutubeVideo(video: Video): Promise<Result<Video, ArticleError>>;
+    getYoutubeVideo(videoId: string): Promise<Result<Video, ArticleError>>;
     getYoutubeVideos(): Promise<Result<Video[], ArticleError>>;
     filterYoutubeVideos(query: VideoQuery): Promise<Result<Video[], ArticleError>>;
+    updateYoutubeVideo(videoId: string, video: Video): Promise<Result<Video, ArticleError>>;
     updateYoutubeVideoStats(videoId: string, stats: { thumbnailUrl?: string; viewCount?: number; youtubeStatsFetchedAt: Date }): Promise<Result<Video, ArticleError>>;
+    deleteYoutubeVideo(videoId: string): Promise<Result<void, ArticleError>>;
     getTags(): Promise<Result<string[], ArticleError>>;
     getConsensusBigBoard(year: number): Promise<Result<ConsensusBigBoard, BigBoardError>>;
 }

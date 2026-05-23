@@ -8,7 +8,7 @@
 <button
   id="<%= targetId %>"
   type="button"
-  class="bookmark-button <%= bookmarked ? "is-bookmarked" : "" %> od-focus-ring inline-flex size-11 shrink-0 items-center justify-center rounded-md border transition <%= bookmarked ? "border-draft-gold bg-draft-foam text-draft-gold shadow-sm" : "border-slate-300 bg-white text-slate-500 hover:border-draft-gold hover:text-draft-gold dark:border-white/15 dark:bg-white/10 dark:text-slate-300" %>"
+  class="bookmark-button <%= bookmarked ? "is-bookmarked" : "" %> od-focus-ring inline-flex size-10 shrink-0 items-center justify-center rounded transition hover:text-draft-gold <%= bookmarked ? "text-draft-gold dark:text-draft-gold" : "text-slate-500 dark:text-slate-300" %>"
   aria-label="<%= bookmarked ? `Remove ${contentType} bookmark` : `Bookmark ${contentType}` %>"
   aria-pressed="<%= bookmarked ? "true" : "false" %>"
   title="<%= bookmarked ? "Remove bookmark" : "Bookmark" %>"

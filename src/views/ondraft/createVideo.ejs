@@ -3,7 +3,7 @@
     <div>
       <a class="od-admin-back-link" href="/videos">Back to videos</a>
       <p>Admin</p>
-      <h1>Add YouTube Video</h1>
+      <h1><%= typeof heading === "string" ? heading : "Add YouTube Video" %></h1>
     </div>
   </div>
 
@@ -11,7 +11,7 @@
     <p class="od-admin-error" role="alert"><%= errorMessage %></p>
   <% } %>
 
-  <form class="ondraft-form od-admin-form" method="post" action="/videos">
+  <form class="ondraft-form od-admin-form" method="post" action="<%= typeof formAction === "string" ? formAction : "/videos" %>">
     <label>
       YouTube URL
       <input name="youtubeUrl" value="<%= values.youtubeUrl || "" %>" placeholder="https://www.youtube.com/watch?v=..." required />
@@ -33,7 +33,7 @@
     </label>
 
     <div class="form-actions od-admin-actions">
-      <button type="submit">Add video</button>
+      <button type="submit"><%= typeof submitLabel === "string" ? submitLabel : "Add video" %></button>
       <a class="button-link secondary-link" href="/videos">Cancel</a>
     </div>
   </form>

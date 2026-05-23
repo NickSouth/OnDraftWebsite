@@ -13,6 +13,7 @@ import {
   recordPageView,
   touchOnDraftSession,
   OnDraftSessionStore,
+  STANDARD_SESSION_MAX_AGE_MS,
 } from "./session/OnDraftSession";
 import { ILoggingService } from "./service/LoggingService";
 
@@ -36,6 +37,7 @@ class ExpressApp implements IApp {
     private readonly controller: IOnDraftController,
     private readonly authController: IAuthController,
     private readonly logger: ILoggingService,
+    private readonly sessionStore?: session.Store,
   ) {
     this.app = express();
     this.registerMiddleware();
@@ -61,11 +63,14 @@ class ExpressApp implements IApp {
       session({
         name: "ondraft.sid",
         secret: process.env.SESSION_SECRET ?? "ondraft-template-secret",
+        store: this.sessionStore,
         resave: false,
         saveUninitialized: false,
+        rolling: true,
         cookie: {
           httpOnly: true,
           sameSite: "lax",
+          maxAge: STANDARD_SESSION_MAX_AGE_MS,
         },
       }),
     );
@@ -144,6 +149,7 @@ class ExpressApp implements IApp {
   private exposeSessionLocals(req: Request, res: Response, next: NextFunction): void {
     const browserSession = touchOnDraftSession(sessionStore(req));
     res.locals.isAdmin = isAdminSession(browserSession);
+    res.locals.currentPath = req.path;
     next();
   }
 
@@ -210,7 +216,8 @@ class ExpressApp implements IApp {
       asyncHandler(async (req, res) => {
         const email = typeof req.body.email === "string" ? req.body.email : "";
         const password = typeof req.body.password === "string" ? req.body.password : "";
-        await this.authController.loginFromForm(res, email, password, sessionStore(req));
+        const rememberMe = req.body.rememberMe === "on";
+        await this.authController.loginFromForm(res, email, password, rememberMe, sessionStore(req));
       }),
     );
 
@@ -369,6 +376,14 @@ class ExpressApp implements IApp {
     );
 
     this.app.get(
+      "/articles/popular",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.showPopularArticles(req, res, browserSession);
+      }),
+    );
+
+    this.app.get(
       "/bookmarks",
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
@@ -396,6 +411,19 @@ class ExpressApp implements IApp {
       }),
     );
 
+    this.app.get(
+      "/videos/:videoId/edit",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        const videoId = Array.isArray(req.params.videoId) ? req.params.videoId[0] : req.params.videoId;
+        await this.controller.showEditVideoForm(res, browserSession, videoId);
+      }),
+    );
+
     this.app.post(
       "/videos",
       asyncHandler(async (req, res) => {
@@ -405,6 +433,30 @@ class ExpressApp implements IApp {
 
         const browserSession = recordPageView(sessionStore(req));
         await this.controller.createYoutubeVideo(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/videos/:videoId",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.updateYoutubeVideo(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/videos/:videoId/delete",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.deleteYoutubeVideo(req, res, browserSession);
       }),
     );
 
@@ -799,6 +851,7 @@ export function CreateApp(
   controller: IOnDraftController,
   authController: IAuthController,
   logger: ILoggingService,
+  sessionStore?: session.Store,
 ): IApp {
-  return new ExpressApp(controller, authController, logger);
+  return new ExpressApp(controller, authController, logger, sessionStore);
 }
