@@ -5,13 +5,13 @@ This app was entirely built by Nick Southey for his friends and partners Ryan Mc
 The app is a content management and content hosting site.
 
 The app currently includes:
-Page for articles
-Page for videos
-Page for a draft board
-Page for community takes
-User account handling
-Admin accounts for managing content
-Generally good practice layers and programming with dependency injection and boundaries
+- Page for articles
+- Page for videos
+- Page for a draft board
+- Page for community takes
+- User account handling
+- Admin accounts for managing content
+- Generally good practice layers and programming with dependency injection and boundaries
 
 ## Dev Stack
 
