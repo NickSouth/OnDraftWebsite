@@ -13,6 +13,7 @@ import {
   recordPageView,
   touchOnDraftSession,
   OnDraftSessionStore,
+  STANDARD_SESSION_MAX_AGE_MS,
 } from "./session/OnDraftSession";
 import { ILoggingService } from "./service/LoggingService";
 
@@ -36,6 +37,7 @@ class ExpressApp implements IApp {
     private readonly controller: IOnDraftController,
     private readonly authController: IAuthController,
     private readonly logger: ILoggingService,
+    private readonly sessionStore?: session.Store,
   ) {
     this.app = express();
     this.registerMiddleware();
@@ -61,11 +63,14 @@ class ExpressApp implements IApp {
       session({
         name: "ondraft.sid",
         secret: process.env.SESSION_SECRET ?? "ondraft-template-secret",
+        store: this.sessionStore,
         resave: false,
         saveUninitialized: false,
+        rolling: true,
         cookie: {
           httpOnly: true,
           sameSite: "lax",
+          maxAge: STANDARD_SESSION_MAX_AGE_MS,
         },
       }),
     );
@@ -210,7 +215,8 @@ class ExpressApp implements IApp {
       asyncHandler(async (req, res) => {
         const email = typeof req.body.email === "string" ? req.body.email : "";
         const password = typeof req.body.password === "string" ? req.body.password : "";
-        await this.authController.loginFromForm(res, email, password, sessionStore(req));
+        const rememberMe = req.body.rememberMe === "on";
+        await this.authController.loginFromForm(res, email, password, rememberMe, sessionStore(req));
       }),
     );
 
@@ -799,6 +805,7 @@ export function CreateApp(
   controller: IOnDraftController,
   authController: IAuthController,
   logger: ILoggingService,
+  sessionStore?: session.Store,
 ): IApp {
-  return new ExpressApp(controller, authController, logger);
+  return new ExpressApp(controller, authController, logger, sessionStore);
 }

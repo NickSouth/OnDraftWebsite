@@ -30,6 +30,7 @@ export interface IAuthController {
     res: Response,
     email: string,
     password: string,
+    rememberMe: boolean,
     store: OnDraftSessionStore,
   ): Promise<void>;
   registerFromForm(
@@ -130,6 +131,7 @@ class AuthController implements IAuthController {
     res: Response,
     email: string,
     password: string,
+    rememberMe: boolean,
     store: OnDraftSessionStore,
   ): Promise<void> {
     const session = touchOnDraftSession(store);
@@ -145,7 +147,7 @@ class AuthController implements IAuthController {
       return;
     }
 
-    const nextSession = signInAuthenticatedUser(store, result.value);
+    const nextSession = signInAuthenticatedUser(store, result.value, rememberMe);
     this.logger.info(`Authenticated ${nextSession.authenticatedUser?.email ?? "unknown user"}`);
     res.redirect("/");
   }

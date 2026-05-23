@@ -65,7 +65,7 @@ function parsePositiveIntegerEnv(
 }
 
 function parseRepositoryMode(env: NodeJS.ProcessEnv): RepositoryMode {
-  return env.REPO_MODE === "prisma" ? "prisma" : "memory";
+  return env.REPO_MODE === "memory" ? "memory" : "prisma";
 }
 
 function parseEmailProvider(env: NodeJS.ProcessEnv, errors: string[]): EmailProvider {

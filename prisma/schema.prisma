@@ -4,22 +4,48 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
 }
 
 model User {
-  id                      String                    @id
-  email                   String                    @unique
-  emailVerifiedAt         DateTime?                 @map("email_verified_at")
-  displayName             String                    @map("display_name")
-  password                String
-  role                    String
-  createdAt               DateTime                  @map("created_at")
-  preferences             String
-  emailVerificationTokens EmailVerificationToken[]
-  mailingListSubscription MailingListSubscription?
+  id                       String                    @id
+  email                    String                    @unique
+  emailVerifiedAt          DateTime?                 @map("email_verified_at")
+  displayName              String                    @map("display_name")
+  passwordHash             String                    @map("password_hash")
+  role                     String
+  theme                    String                    @default("light")
+  fontSize                 String                    @default("small") @map("font_size")
+  createdAt                DateTime                  @map("created_at")
+  updatedAt                DateTime                  @updatedAt @map("updated_at")
+  bans                     UserBan[]
+  emailVerificationTokens  EmailVerificationToken[]
+  mailingListSubscription  MailingListSubscription?
+  bookmarks                Bookmark[]
+  articleComments          Comment[]
+  forumPosts               ForumPost[]
+  forumPostComments        ForumPostComment[]
+  sessions                 BrowserSession[]
 
+  @@index([role])
   @@map("users")
+}
+
+model UserBan {
+  id             String    @id
+  userId         String    @map("user_id")
+  message        String
+  bannedAt       DateTime  @map("banned_at")
+  expiresAt      DateTime? @map("expires_at")
+  bannedByUserId String    @map("banned_by_user_id")
+  liftedAt       DateTime? @map("lifted_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([bannedByUserId])
+  @@index([expiresAt])
+  @@index([liftedAt])
+  @@map("user_bans")
 }
 
 model EmailVerificationToken {
@@ -38,19 +64,268 @@ model EmailVerificationToken {
 }
 
 model MailingListSubscription {
-  id                 String                        @id
-  email              String                        @unique
-  userId             String?                       @unique @map("user_id")
+  id                 String    @id
+  email              String    @unique
+  userId             String?   @unique @map("user_id")
   status             String
-  consentSource      String                        @map("consent_source")
-  consentTextVersion String                        @map("consent_text_version")
-  consentedAt        DateTime?                     @map("consented_at")
-  unsubscribedAt     DateTime?                     @map("unsubscribed_at")
-  createdAt          DateTime                      @map("created_at")
-  updatedAt          DateTime                      @map("updated_at")
-  user               User?                         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  consentSource      String    @map("consent_source")
+  consentTextVersion String    @map("consent_text_version")
+  consentedAt        DateTime? @map("consented_at")
+  unsubscribedAt     DateTime? @map("unsubscribed_at")
+  createdAt          DateTime  @map("created_at")
+  updatedAt          DateTime  @map("updated_at")
+  user               User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([status])
   @@index([updatedAt])
   @@map("mailing_list_subscriptions")
+}
+
+model BrowserSession {
+  id                  String    @id
+  data                String    @default("{}")
+  browserId           String    @map("browser_id")
+  browserLabel        String    @map("browser_label")
+  visitCount          Int       @default(0) @map("visit_count")
+  authenticatedUserId String?   @map("authenticated_user_id")
+  signedInAt          DateTime? @map("signed_in_at")
+  rememberMe          Boolean   @default(false) @map("remember_me")
+  expiresAt           DateTime  @map("expires_at")
+  createdAt           DateTime  @map("created_at")
+  lastSeenAt          DateTime  @map("last_seen_at")
+  user                User?     @relation(fields: [authenticatedUserId], references: [id], onDelete: SetNull)
+
+  @@index([browserId])
+  @@index([authenticatedUserId])
+  @@index([expiresAt])
+  @@map("browser_sessions")
+}
+
+model Bookmark {
+  id          String     @id
+  userId      String     @map("user_id")
+  type        String
+  articleId   String?    @map("article_id")
+  forumPostId String?    @map("forum_post_id")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article     Article?   @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  forumPost   ForumPost? @relation(fields: [forumPostId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, articleId])
+  @@unique([userId, forumPostId])
+  @@index([userId])
+  @@index([type])
+  @@map("bookmarks")
+}
+
+model Article {
+  id                String        @id
+  published         Boolean       @default(true)
+  title             String
+  author            String
+  writeup           String
+  publicationDate   DateTime      @map("publication_date")
+  contentType       String        @map("content_type")
+  plainText         String?       @map("plain_text")
+  htmlBody          String?       @map("html_body")
+  pdfUrl            String?       @map("pdf_url")
+  pdfOriginalName   String?       @map("pdf_original_name")
+  pdfMimeType       String?       @map("pdf_mime_type")
+  pdfSize           Int?          @map("pdf_size")
+  imageUrl          String?       @map("image_url")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  tags              ArticleTag[]
+  comments          Comment[]
+  likes             ArticleLike[]
+  bookmarks         Bookmark[]
+
+  @@index([published])
+  @@index([publicationDate])
+  @@index([author])
+  @@map("articles")
+}
+
+model ArticleTag {
+  articleId String  @map("article_id")
+  tagId     String  @map("tag_id")
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, tagId])
+  @@index([tagId])
+  @@map("article_tags")
+}
+
+model ArticleLike {
+  articleId String   @map("article_id")
+  actorId   String   @map("actor_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, actorId])
+  @@index([actorId])
+  @@map("article_likes")
+}
+
+model Comment {
+  id              String        @id
+  articleId       String        @map("article_id")
+  parentCommentId String?       @map("parent_comment_id")
+  userId          String        @map("user_id")
+  userName        String        @map("user_name")
+  text            String
+  createdAt       DateTime      @map("created_at")
+  article         Article       @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  parent          Comment?      @relation("CommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
+  replies         Comment[]     @relation("CommentReplies")
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes           CommentLike[]
+
+  @@index([articleId])
+  @@index([parentCommentId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("comments")
+}
+
+model CommentLike {
+  commentId String   @map("comment_id")
+  actorId   String   @map("actor_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@id([commentId, actorId])
+  @@index([actorId])
+  @@map("comment_likes")
+}
+
+model ForumPost {
+  id        String             @id
+  userId    String             @map("user_id")
+  userName  String             @map("user_name")
+  content   String
+  createdAt DateTime           @map("created_at")
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments  ForumPostComment[]
+  likes     ForumPostLike[]
+  bookmarks Bookmark[]
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("forum_posts")
+}
+
+model ForumPostComment {
+  id          String    @id
+  forumPostId String    @map("forum_post_id")
+  userId      String    @map("user_id")
+  userName    String    @map("user_name")
+  text        String
+  createdAt   DateTime  @map("created_at")
+  forumPost   ForumPost @relation(fields: [forumPostId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([forumPostId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("forum_post_comments")
+}
+
+model ForumPostLike {
+  forumPostId String    @map("forum_post_id")
+  actorId     String    @map("actor_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  forumPost   ForumPost @relation(fields: [forumPostId], references: [id], onDelete: Cascade)
+
+  @@id([forumPostId, actorId])
+  @@index([actorId])
+  @@map("forum_post_likes")
+}
+
+model Video {
+  videoId               String     @id @map("video_id")
+  youtubeUrl            String     @map("youtube_url")
+  title                 String
+  description           String
+  thumbnailUrl          String?    @map("thumbnail_url")
+  viewCount             Int?       @map("view_count")
+  youtubeStatsFetchedAt DateTime?  @map("youtube_stats_fetched_at")
+  createdAt             DateTime   @map("created_at")
+  updatedAt             DateTime   @map("updated_at")
+  tags                  VideoTag[]
+
+  @@index([createdAt])
+  @@index([viewCount])
+  @@map("videos")
+}
+
+model VideoTag {
+  videoId String @map("video_id")
+  tagId   String @map("tag_id")
+  video   Video  @relation(fields: [videoId], references: [videoId], onDelete: Cascade)
+  tag     Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([videoId, tagId])
+  @@index([tagId])
+  @@map("video_tags")
+}
+
+model Tag {
+  id       String       @id
+  name     String       @unique
+  articles ArticleTag[]
+  videos   VideoTag[]
+
+  @@map("tags")
+}
+
+model BigBoard {
+  id        String          @id
+  year      Int
+  creator   String
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+  entries   BigBoardEntry[]
+
+  @@unique([year, creator])
+  @@index([year])
+  @@index([creator])
+  @@map("big_boards")
+}
+
+model BigBoardEntry {
+  id                  String   @id
+  bigBoardId          String   @map("big_board_id")
+  playerName          String   @map("player_name")
+  position            String
+  school              String
+  rank                Int?
+  posRank             Int?     @map("pos_rank")
+  heightFeet          Int?     @map("height_feet")
+  heightInches        Int?     @map("height_inches")
+  weight              Int?
+  sortOrder           Int      @default(0) @map("sort_order")
+  strengths           String   @default("")
+  weaknesses          String   @default("")
+  rundown             String   @default("")
+  notes               String   @default("")
+  playerInfoPublished Boolean  @default(false) @map("player_info_published")
+  writeupPublished    Boolean  @default(false) @map("writeup_published")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+  bigBoard            BigBoard @relation(fields: [bigBoardId], references: [id], onDelete: Cascade)
+
+  @@unique([bigBoardId, id])
+  @@unique([bigBoardId, playerName])
+  @@index([bigBoardId])
+  @@index([school])
+  @@index([position])
+  @@index([rank])
+  @@index([sortOrder])
+  @@index([posRank])
+  @@index([playerInfoPublished])
+  @@index([writeupPublished])
+  @@map("big_board_entries")
 }

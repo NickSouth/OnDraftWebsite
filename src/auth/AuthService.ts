@@ -17,6 +17,7 @@ import {
   type MailingListSubscriptionStatus,
 } from "./User";
 import type { IUserRepository } from "./UserRepository";
+import { hashPassword, verifyPassword } from "./PasswordHasher";
 
 export interface LoginInput {
   email: string;
@@ -152,7 +153,7 @@ class AuthService implements IAuthService {
       return Err(UnexpectedDependencyError(userResult.value.message));
     }
 
-    if (!userResult.value || userResult.value.password !== password) {
+    if (!userResult.value || !(await verifyPassword(password, userResult.value.password))) {
       return Err(InvalidCredentials("Invalid email or password."));
     }
 
@@ -245,12 +246,13 @@ class AuthService implements IAuthService {
     }
 
     const now = new Date();
+    const passwordHash = await hashPassword(password);
     const created = await this.users.add({
       id: randomUUID(),
       displayName,
       email,
       emailVerifiedAt: null,
-      password,
+      password: passwordHash,
       role: "user",
       ban: null,
       createdAt: now.toISOString(),
