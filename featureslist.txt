@@ -1,4 +1,5 @@
 - Fix video editing to rescrape from youtube api and fix tags
+- Bookmark not boxed when selected either
 - Less annoying autosave of draft board
 - About Us Page improvements
 - Change/reset password
