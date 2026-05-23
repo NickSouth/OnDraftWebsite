@@ -22,7 +22,7 @@ Generally good practice layers and programming with dependency injection and bou
 - **Database:** Prisma ORM (migrations in `prisma/`); uses SQLite for local/dev, Postgres supported
 - **Testing:** Jest + Supertest (tests in `test/`)
 - **Build & Tooling:** TypeScript (`tsc`), Tailwind CLI, Prisma, `ts-node` for scripts
-- **Programming AI** Codex and CoPilot across the full stack with good practice prompting
+- **Programming AI:** Codex and CoPilot across the full stack with good practice prompting
 
 ## Run
 
