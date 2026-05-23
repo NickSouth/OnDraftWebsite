@@ -7,6 +7,7 @@
     "dev": "npm run build && node dist/server.js",
     "build": "npm run build:css && tsc --outDir dist -m nodenext -t es2024 --esModuleInterop src/app.ts src/server.ts",
     "build:css": "tailwindcss -c tailwind.config.cjs -i ./src/static/tailwind.input.css -o ./src/static/tailwind.css --minify",
+    "db:seed": "prisma db seed",
     "test": "jest --runInBand",
     "test:watch": "jest --watch"
   },
@@ -24,8 +25,11 @@
   "dependencies": {
     "@alpinejs/collapse": "^3.15.12",
     "@alpinejs/focus": "^3.15.12",
+    "@prisma/adapter-better-sqlite3": "^7.8.0",
+    "@prisma/client": "^7.8.0",
     "@types/sanitize-html": "^2.16.1",
     "alpinejs": "^3.15.12",
+    "better-sqlite3": "^12.10.0",
     "dotenv": "^17.2.3",
     "ejs": "^4.0.1",
     "express": "^5.2.1",
@@ -46,6 +50,7 @@
     "@types/node": "^25.3.0",
     "@types/supertest": "^6.0.3",
     "jest": "^30.2.0",
+    "prisma": "^7.8.0",
     "supertest": "^7.2.2",
     "tailwindcss": "^3.4.17",
     "ts-jest": "^29.4.6",

@@ -11,6 +11,7 @@ export interface IAuthenticatedUserSession {
   ban: IAuthenticatedUser["ban"];
   createdAt: string;
   signedInAt: string;
+  rememberMe: boolean;
 }
 
 export interface IOnDraftBrowserSession {
@@ -26,6 +27,9 @@ export type OnDraftSessionStore = Session &
   Partial<SessionData> & {
     ondraft?: IOnDraftBrowserSession;
   };
+
+export const STANDARD_SESSION_MAX_AGE_MS = 10 * 60 * 1000;
+export const REMEMBERED_SESSION_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 
 function createBrowserLabel(browserId: string): string {
   return `Browser ${browserId.slice(0, 4).toUpperCase()}`;
@@ -84,9 +88,15 @@ export function touchOnDraftSession(
 export function signInAuthenticatedUser(
   store: OnDraftSessionStore,
   user: IAuthenticatedUser,
-  now: Date = new Date(),
+  rememberMeOrNow: boolean | Date = false,
+  nowInput?: Date,
 ): IOnDraftBrowserSession {
+  const rememberMe = typeof rememberMeOrNow === "boolean" ? rememberMeOrNow : false;
+  const now = rememberMeOrNow instanceof Date ? rememberMeOrNow : nowInput ?? new Date();
   const session = ensureOnDraftSession(store, now);
+  if (store.cookie) {
+    store.cookie.maxAge = rememberMe ? REMEMBERED_SESSION_MAX_AGE_MS : STANDARD_SESSION_MAX_AGE_MS;
+  }
   session.authenticatedUser = {
     userId: user.id,
     email: user.email,
@@ -96,6 +106,7 @@ export function signInAuthenticatedUser(
     ban: user.ban ? { ...user.ban } : null,
     createdAt: user.createdAt,
     signedInAt: now.toISOString(),
+    rememberMe,
   };
   session.lastSeenAt = now.toISOString();
   return snapshotSession(session);

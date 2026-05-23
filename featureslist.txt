@@ -1,25 +1,11 @@
-Here are features I plan to implement for the website:
-
-Bookmarking posts by users <>
-Videos Page for hyperlinks to YouTube <>
-Share button on articles <>
-Consensus Draft Board <needs debugging, pos rank should sort and display in order by pos>
-Registration email verification <>
-Mailing list on registration <>
-About Us page with links and stuff
-Automatic Content Moderation for comments and forums, check for profanity and spam <>
-Hyperlinks to articles embedded in writeups of players option for admins
-Grades on draft board
-Banning users <>
-Reporting users
-Frontend Overhaul with light mode dark mode
- - Like the picture I drew
- - Draft Board Cleanliness
- - Formatting articles better
- - Verified account checkmarks for admins
-
-Settings page to delete account, change username, reset password, modify email notification preferences, etc.
-
-Migrate to Prisma Database
-
-SHIP ITTTT
+- About Us Page improvements
+- Always expand/retract the side menu option, swaps to icon from hamburger on larger screen
+- Change/reset password
+- Check that email verification actually works
+- Add actual logo
+- Link other socials
+- Revisit section captions
+- Draft Board grades
+- Timestamp on autosave on board draft board, make slightly less frequent autosaves
+- Polish all not-found routing
+- Cleanup security with rate-limiting, request forms, and cookies
