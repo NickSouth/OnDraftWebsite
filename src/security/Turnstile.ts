@@ -16,6 +16,8 @@ function tokenFromRequest(req: Request): string {
     : "";
 }
 
+type TurnstileFailureHandler = (req: Request, res: Response) => void | Promise<void>;
+
 function renderTurnstileFailure(res: Response): void {
   res.status(400).render("ondraft/partials/error", {
     message: TURNSTILE_ERROR_MESSAGE,
@@ -31,10 +33,10 @@ export class TurnstileVerifier {
   ) {}
 
   get isEnabled(): boolean {
-    return Boolean(this.config.siteKey && this.config.secretKey);
+    return !this.config.verificationDisabled && Boolean(this.config.siteKey && this.config.secretKey);
   }
 
-  middleware(): RequestHandler {
+  middleware(onFailure?: TurnstileFailureHandler): RequestHandler {
     // Server-side Turnstile verification happens here before protected auth forms are accepted.
     return async (req: Request, res: Response, next: NextFunction) => {
       if (!this.isEnabled) {
@@ -45,7 +47,7 @@ export class TurnstileVerifier {
       const token = tokenFromRequest(req);
       if (!token) {
         this.logger.warn("Blocked protected form submission without a Turnstile token");
-        renderTurnstileFailure(res);
+        await this.fail(req, res, onFailure);
         return;
       }
 
@@ -68,22 +70,31 @@ export class TurnstileVerifier {
 
         if (!response.ok) {
           this.logger.warn(`Turnstile verification failed with status ${response.status}`);
-          renderTurnstileFailure(res);
+          await this.fail(req, res, onFailure);
           return;
         }
 
         const result = await response.json() as TurnstileSiteVerifyResponse;
         if (result.success !== true) {
           this.logger.warn("Turnstile verification rejected a protected form submission");
-          renderTurnstileFailure(res);
+          await this.fail(req, res, onFailure);
           return;
         }
 
         next();
       } catch {
         this.logger.warn("Turnstile verification request failed");
-        renderTurnstileFailure(res);
+        await this.fail(req, res, onFailure);
       }
     };
+  }
+
+  private async fail(req: Request, res: Response, onFailure?: TurnstileFailureHandler): Promise<void> {
+    res.status(400);
+    if (onFailure) {
+      await onFailure(req, res);
+      return;
+    }
+    renderTurnstileFailure(res);
   }
 }

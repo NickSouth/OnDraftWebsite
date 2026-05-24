@@ -1,2 +1,5 @@
 - Add actual logo
 - Draft Board grades
+- Ryan Bio/Headshot
+- Aleks Bio/Headshot
+- Actual social media links

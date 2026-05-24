@@ -32,6 +32,28 @@ function appWithTurnstile() {
     turnstile: {
       siteKey: "test-site-key",
       secretKey: "test-secret-key",
+      verificationDisabled: false,
+    },
+  }).getExpressApp();
+}
+
+function appWithDisabledTurnstile() {
+  return createComposedApp("prisma", undefined, {
+    port: 3000,
+    repositoryMode: "prisma",
+    email: {
+      provider: "logging",
+      from: null,
+      appBaseUrl: "http://localhost:3000",
+      resendApiKey: null,
+      verificationTokenTtlHours: 24,
+      passwordResetTokenTtlMinutes: 60,
+      mailingListUnsubscribeSecret: "test-mailing-secret",
+    },
+    turnstile: {
+      siteKey: "test-site-key",
+      secretKey: "test-secret-key",
+      verificationDisabled: true,
     },
   }).getExpressApp();
 }
@@ -162,6 +184,24 @@ describe("OnDraft HTTP contracts", () => {
 
     expect(response.status).toBe(400);
     expect(response.text).toContain("We could not verify this request. Please try again.");
+    expect(response.text).toContain("Account Login");
+    expect(response.text).toContain("<!doctype html>");
+  });
+
+  it("skips Turnstile widgets and verification when locally disabled", async () => {
+    const ondraft = appWithDisabledTurnstile();
+    const login = await request(ondraft).get("/login");
+
+    expect(login.status).toBe(200);
+    expect(login.text).not.toContain("cf-turnstile");
+
+    const response = await request(ondraft)
+      .post("/login")
+      .type("form")
+      .send({ email: "ryan@ondraftfootball.com", password: "password123" });
+
+    expect(response.status).toBe(302);
+    expect(response.headers.location).toBe("/");
   });
 
   it("verifies Turnstile server-side before accepting protected auth forms", async () => {
@@ -749,6 +789,9 @@ describe("OnDraft HTTP contracts", () => {
     expect(editor.text).toContain("Edit Big Board");
     expect(editor.text).toContain("Add player");
     expect(editor.text).toContain("Publish");
+    expect(editor.text).toContain("data-delete-board-entry");
+    expect(editor.text).toContain("Are you sure?");
+    expect(editor.text).toContain("This cannot be undone.");
     expect(editor.text).toContain('list="college-team-options"');
     expect(editor.text).toContain('<option value="Alabama"></option>');
 
@@ -845,6 +888,84 @@ describe("OnDraft HTTP contracts", () => {
     expect(visibleWithWriteup.text).not.toContain("Private eval note.");
   });
 
+  it("removes omitted draft board ranking entries when admins save the editor", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+    const uniqueSuffix = Date.now().toString();
+    const deletedEntryId = `delete-entry-${uniqueSuffix}`;
+    const keptEntryId = `keep-entry-${uniqueSuffix}`;
+    const deletedPlayerName = `Deleted Prospect ${uniqueSuffix}`;
+    const keptPlayerName = `Kept Prospect ${uniqueSuffix}`;
+
+    const saveTwoEntries = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": deletedEntryId,
+        "entries[0][playerName]": deletedPlayerName,
+        "entries[0][school]": "Alabama",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2",
+        "entries[0][weight]": "220",
+        "entries[0][strengths]": "Release",
+        "entries[0][weaknesses]": "Pressure",
+        "entries[0][rundown]": "First saved entry.",
+        "entries[0][playerInfoPublished]": "true",
+        "entries[1][id]": keptEntryId,
+        "entries[1][playerName]": keptPlayerName,
+        "entries[1][school]": "OnDraft State",
+        "entries[1][position]": "WR",
+        "entries[1][rank]": "2",
+        "entries[1][posRank]": "1",
+        "entries[1][heightLabel]": "6-0",
+        "entries[1][weight]": "195",
+        "entries[1][strengths]": "Separation",
+        "entries[1][weaknesses]": "Play strength",
+        "entries[1][rundown]": "Second saved entry.",
+        "entries[1][playerInfoPublished]": "true",
+      });
+
+    expect(saveTwoEntries.status).toBe(200);
+    expect(saveTwoEntries.text).toContain("Saved.");
+
+    const beforeDelete = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
+    expect(beforeDelete.status).toBe(200);
+    expect(beforeDelete.text).toContain(deletedPlayerName);
+    expect(beforeDelete.text).toContain(keptPlayerName);
+
+    const saveAfterDelete = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": keptEntryId,
+        "entries[0][playerName]": keptPlayerName,
+        "entries[0][school]": "OnDraft State",
+        "entries[0][position]": "WR",
+        "entries[0][rank]": "2",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-0",
+        "entries[0][weight]": "195",
+        "entries[0][strengths]": "Separation",
+        "entries[0][weaknesses]": "Play strength",
+        "entries[0][rundown]": "Second saved entry.",
+        "entries[0][playerInfoPublished]": "true",
+      });
+
+    expect(saveAfterDelete.status).toBe(200);
+    expect(saveAfterDelete.text).toContain("Saved.");
+
+    const afterDelete = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
+    expect(afterDelete.status).toBe(200);
+    expect(afterDelete.text).not.toContain(deletedPlayerName);
+    expect(afterDelete.text).toContain(keptPlayerName);
+  }, 15000);
+
   it("renders big board position and school filters and applies them through htmx", async () => {
     const ondraft = app();
     const agent = await loginAdminAgent(ondraft);
@@ -886,6 +1007,9 @@ describe("OnDraft HTTP contracts", () => {
     expect(fullBoard.text).toContain('<option value="Mock Tech"');
     expect(fullBoard.text).not.toContain("Apply filters");
     expect(fullBoard.text).not.toContain("Reset");
+    expect(fullBoard.text).toContain('id="draft-board-info-popover"');
+    expect(fullBoard.text).toContain("x-bind:hidden=\"!infoOpen\"");
+    expect(fullBoard.text).toContain("hidden");
     expect(fullBoard.text).toMatch(/>\s*Ryan\s*<\/button>/);
     expect(fullBoard.text).toMatch(/>\s*Aleks\s*<\/button>/);
     expect(fullBoard.text).toMatch(/>\s*Consensus\s*<\/button>/);
@@ -902,6 +1026,8 @@ describe("OnDraft HTTP contracts", () => {
     expect(filteredBoard.text).toContain('<option value="OnDraft State" selected>OnDraft State</option>');
     expect(filteredBoard.text).toContain("Reset");
     expect(filteredBoard.text).toContain('hx-get="/bigboard?year=2026&creator=Ryan"');
+    expect(filteredBoard.text).toContain('id="draft-board-info-popover"');
+    expect(filteredBoard.text).toContain("x-bind:hidden=\"!infoOpen\"");
 
     const resetBoard = await request(ondraft)
       .get("/bigboard?year=2026&creator=Ryan")
@@ -911,6 +1037,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(resetBoard.text).toContain("Quarterback Prospect");
     expect(resetBoard.text).toContain("Receiver Prospect");
     expect(resetBoard.text).not.toContain("Reset");
+    expect(resetBoard.text).toContain("x-bind:hidden=\"!infoOpen\"");
   });
 
   it("renders the consensus big board with sequential published rankings and discrepancy badges", async () => {

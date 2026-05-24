@@ -98,6 +98,7 @@
       <table class="board-editor-table">
         <thead>
           <tr>
+            <th><span class="sr-only">Delete</span></th>
             <th>Rank</th>
             <th>Player</th>
             <th>School</th>
@@ -116,6 +117,23 @@
         <tbody id="board-editor-rows">
           <% board.entries.forEach((entry, index) => { %>
             <tr class="board-editor-row">
+              <td class="board-editor-delete-cell">
+                <button
+                  type="button"
+                  class="board-editor-delete-row-button"
+                  data-delete-board-entry
+                  aria-label="Delete <%= entry.playerName || "draft board entry" %>"
+                  title="Delete row"
+                >
+                  <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 6h18" />
+                    <path d="M8 6V4h8v2" />
+                    <path d="M19 6l-1 14H6L5 6" />
+                    <path d="M10 11v5" />
+                    <path d="M14 11v5" />
+                  </svg>
+                </button>
+              </td>
               <td>
                 <input type="number" name="entries[<%= index %>][rank]" min="1" step="1" value="<%= entry.rank ?? "" %>" placeholder="Rank" data-publish-section="player" />
               </td>
@@ -194,6 +212,23 @@
 
   <template id="board-editor-row-template">
     <tr class="board-editor-row">
+      <td class="board-editor-delete-cell">
+        <button
+          type="button"
+          class="board-editor-delete-row-button"
+          data-delete-board-entry
+          aria-label="Delete draft board entry"
+          title="Delete row"
+        >
+          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 6h18" />
+            <path d="M8 6V4h8v2" />
+            <path d="M19 6l-1 14H6L5 6" />
+            <path d="M10 11v5" />
+            <path d="M14 11v5" />
+          </svg>
+        </button>
+      </td>
       <td><input type="number" data-field="rank" min="1" step="1" placeholder="Rank" data-publish-section="player" /></td>
       <td>
         <input type="hidden" data-field="id" data-entry-id />
@@ -236,6 +271,19 @@
       <option value="<%= team %>"></option>
     <% }) %>
   </datalist>
+
+  <div id="board-editor-delete-entry-modal" class="board-entry-delete-modal" role="dialog" aria-modal="true" aria-labelledby="board-entry-delete-title" aria-hidden="true">
+    <div class="board-entry-delete-panel">
+      <p class="board-entry-delete-kicker">Delete entry</p>
+      <h2 id="board-entry-delete-title">Are you sure?</h2>
+      <p>This cannot be undone.</p>
+      <p class="board-entry-delete-target">Selected row: <strong data-delete-entry-name>this draft board entry</strong></p>
+      <div class="board-entry-delete-actions">
+        <button type="button" class="secondary-button" data-cancel-entry-delete>Cancel</button>
+        <button type="button" class="danger-button" data-confirm-entry-delete>Delete entry</button>
+      </div>
+    </div>
+  </div>
 </section>
 
 <script>
@@ -244,6 +292,11 @@
     const template = document.querySelector("#board-editor-row-template");
     const entryIdInput = document.querySelector("#big-board-entry-id");
     const form = document.querySelector("#big-board-editor-form");
+    const deleteModal = document.querySelector("#board-editor-delete-entry-modal");
+    const deleteEntryName = deleteModal?.querySelector("[data-delete-entry-name]");
+    const cancelEntryDelete = deleteModal?.querySelector("[data-cancel-entry-delete]");
+    const confirmEntryDelete = deleteModal?.querySelector("[data-confirm-entry-delete]");
+    let pendingDeleteRow = null;
 
     function nextIndex() {
       return rows.querySelectorAll("tr").length;
@@ -254,6 +307,18 @@
         return window.crypto.randomUUID();
       }
       return `draft-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    }
+
+    function reindexRows() {
+      rows.querySelectorAll("tr").forEach((row, index) => {
+        row.querySelectorAll("input[name], select[name], textarea[name]").forEach((field) => {
+          field.name = field.name.replace(/^entries\[\d+\]\[(.+)\]$/, `entries[${index}][$1]`);
+        });
+      });
+    }
+
+    function markFormChanged() {
+      form?.dispatchEvent(new Event("change", { bubbles: true }));
     }
 
     function wireRow(row, index, id) {
@@ -268,6 +333,26 @@
       });
     }
 
+    function closeDeleteModal() {
+      pendingDeleteRow?.classList.remove("is-delete-target");
+      pendingDeleteRow = null;
+      deleteModal?.classList.remove("is-open");
+      deleteModal?.setAttribute("aria-hidden", "true");
+    }
+
+    function openDeleteModal(row) {
+      pendingDeleteRow?.classList.remove("is-delete-target");
+      pendingDeleteRow = row;
+      row.classList.add("is-delete-target");
+      const playerName = row.querySelector("input[name$='[playerName]']")?.value?.trim() || "this draft board entry";
+      if (deleteEntryName) {
+        deleteEntryName.textContent = playerName;
+      }
+      deleteModal?.classList.add("is-open");
+      deleteModal?.setAttribute("aria-hidden", "false");
+      confirmEntryDelete?.focus();
+    }
+
     document.querySelector("[data-add-player]")?.addEventListener("click", () => {
       const id = entryId();
       const row = template.content.firstElementChild.cloneNode(true);
@@ -277,6 +362,15 @@
     });
 
     form?.addEventListener("click", (event) => {
+      const deleteButton = event.target.closest("[data-delete-board-entry]");
+      if (deleteButton) {
+        const row = deleteButton.closest("tr");
+        if (row) {
+          openDeleteModal(row);
+        }
+        return;
+      }
+
       const button = event.target.closest("[data-publish-entry]");
       if (!button) {
         return;
@@ -284,6 +378,33 @@
       const row = button.closest("tr");
       const rowId = button.dataset.publishEntry || row?.querySelector("[data-entry-id]")?.value || "";
       entryIdInput.value = rowId;
+    });
+
+    cancelEntryDelete?.addEventListener("click", closeDeleteModal);
+
+    deleteModal?.addEventListener("click", (event) => {
+      if (event.target === deleteModal) {
+        closeDeleteModal();
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && deleteModal?.classList.contains("is-open")) {
+        closeDeleteModal();
+      }
+    });
+
+    confirmEntryDelete?.addEventListener("click", () => {
+      if (!pendingDeleteRow) {
+        closeDeleteModal();
+        return;
+      }
+      const row = pendingDeleteRow;
+      pendingDeleteRow = null;
+      row.remove();
+      reindexRows();
+      closeDeleteModal();
+      markFormChanged();
     });
 
     function clearPublishState(event) {

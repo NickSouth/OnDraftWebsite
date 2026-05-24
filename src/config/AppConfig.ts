@@ -14,6 +14,7 @@ export interface IEmailConfig {
 export interface ITurnstileConfig {
   siteKey: string | null;
   secretKey: string | null;
+  verificationDisabled: boolean;
 }
 
 export interface IAppConfig {
@@ -75,6 +76,22 @@ function parseRepositoryMode(env: NodeJS.ProcessEnv): RepositoryMode {
   return env.REPO_MODE === "memory" ? "memory" : "prisma";
 }
 
+function parseBooleanEnv(env: NodeJS.ProcessEnv, key: string, errors: string[]): boolean {
+  const raw = readOptionalEnv(env, key);
+  if (!raw) {
+    return false;
+  }
+  const normalized = raw.toLowerCase();
+  if (["true", "1", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+  if (["false", "0", "no", "off"].includes(normalized)) {
+    return false;
+  }
+  errors.push(`${key} must be true or false.`);
+  return false;
+}
+
 function parseEmailProvider(env: NodeJS.ProcessEnv, errors: string[]): EmailProvider {
   const rawProvider = readOptionalEnv(env, "EMAIL_PROVIDER");
   if (!rawProvider) {
@@ -128,6 +145,7 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): IAppConfig 
   );
   const turnstileSiteKey = readOptionalEnv(env, "TURNSTILE_SITE_KEY");
   const turnstileSecretKey = readOptionalEnv(env, "TURNSTILE_SECRET_KEY");
+  const turnstileVerificationDisabled = parseBooleanEnv(env, "TURNSTILE_VERIFICATION_DISABLED", errors);
 
   if (provider === "resend") {
     requireEnv(env, "EMAIL_FROM", errors);
@@ -139,6 +157,9 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): IAppConfig 
     requireEnv(env, "SESSION_SECRET", errors);
     requireEnv(env, "TURNSTILE_SITE_KEY", errors);
     requireEnv(env, "TURNSTILE_SECRET_KEY", errors);
+    if (turnstileVerificationDisabled) {
+      errors.push("TURNSTILE_VERIFICATION_DISABLED cannot be true in production.");
+    }
     if (!readOptionalEnv(env, "MAILING_LIST_UNSUBSCRIBE_SECRET") && !readOptionalEnv(env, "SESSION_SECRET")) {
       errors.push("MAILING_LIST_UNSUBSCRIBE_SECRET or SESSION_SECRET is required.");
     }
@@ -176,6 +197,7 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): IAppConfig 
     turnstile: {
       siteKey: turnstileSiteKey,
       secretKey: turnstileSecretKey,
+      verificationDisabled: turnstileVerificationDisabled,
     },
   };
 }

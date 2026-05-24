@@ -526,16 +526,18 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
     if (!board) {
       return Err(BigBoardNotFound(`Big board for ${year} by ${creator} was not found.`));
     }
-    await this.prisma.$transaction([
-      this.prisma.bigBoardEntry.deleteMany({ where: { bigBoardId: board.id } }),
-      ...entries.map((entry, index) => this.prisma.bigBoardEntry.create({
-        data: {
-          ...this.bigBoardEntryData(entry),
-          bigBoardId: board.id,
-          sortOrder: index,
+    await this.prisma.bigBoard.update({
+      where: { id: board.id },
+      data: {
+        entries: {
+          deleteMany: {},
+          create: entries.map((entry, index) => ({
+            ...this.bigBoardEntryData(entry),
+            sortOrder: index,
+          })),
         },
-      })),
-    ]);
+      },
+    });
     const updated = await this.findBigBoard(year, creator);
     return updated ? Ok(updated) : Err(BigBoardNotFound(`Big board for ${year} by ${creator} was not found.`));
   }

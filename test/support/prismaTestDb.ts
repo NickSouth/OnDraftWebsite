@@ -39,6 +39,7 @@ export function usePrismaTestDatabase(): void {
   delete process.env.RESEND_API_KEY;
   delete process.env.TURNSTILE_SITE_KEY;
   delete process.env.TURNSTILE_SECRET_KEY;
+  delete process.env.TURNSTILE_VERIFICATION_DISABLED;
 }
 
 export async function clearPrismaTestDatabase(): Promise<void> {
