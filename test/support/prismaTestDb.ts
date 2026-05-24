@@ -1,7 +1,7 @@
+import "dotenv/config";
 import { hashPassword } from "../../src/auth/PasswordHasher";
 import { disconnectPrismaClient, getPrismaClient } from "../../src/prisma/client";
 
-const TEST_DATABASE_URL = "file:./prisma/test.db";
 const ADMIN_CREATED_AT = new Date("2026-05-19T00:00:00.000Z");
 
 const ADMIN_USERS = [
@@ -28,8 +28,17 @@ const ADMIN_USERS = [
 ];
 
 export function usePrismaTestDatabase(): void {
-  process.env.DATABASE_URL = TEST_DATABASE_URL;
+  if (!process.env.TEST_DATABASE_URL) {
+    throw new Error("TEST_DATABASE_URL is required for Prisma contract tests.");
+  }
+
+  process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
   process.env.REPO_MODE = "prisma";
+  process.env.APP_BASE_URL = "http://localhost:3000";
+  process.env.EMAIL_PROVIDER = "logging";
+  delete process.env.RESEND_API_KEY;
+  delete process.env.TURNSTILE_SITE_KEY;
+  delete process.env.TURNSTILE_SECRET_KEY;
 }
 
 export async function clearPrismaTestDatabase(): Promise<void> {

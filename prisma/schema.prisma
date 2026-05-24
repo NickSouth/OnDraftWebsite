@@ -3,29 +3,29 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 model User {
-  id                       String                    @id
-  email                    String                    @unique
-  emailVerifiedAt          DateTime?                 @map("email_verified_at")
-  displayName              String                    @map("display_name")
-  passwordHash             String                    @map("password_hash")
-  role                     String
-  theme                    String                    @default("light")
-  fontSize                 String                    @default("small") @map("font_size")
-  createdAt                DateTime                  @map("created_at")
-  updatedAt                DateTime                  @updatedAt @map("updated_at")
-  bans                     UserBan[]
-  emailVerificationTokens  EmailVerificationToken[]
-  passwordResetTokens      PasswordResetToken[]
-  mailingListSubscription  MailingListSubscription?
-  bookmarks                Bookmark[]
-  articleComments          Comment[]
-  forumPosts               ForumPost[]
-  forumPostComments        ForumPostComment[]
-  sessions                 BrowserSession[]
+  id                      String                   @id
+  email                   String                   @unique
+  emailVerifiedAt         DateTime?                @map("email_verified_at")
+  displayName             String                   @map("display_name")
+  passwordHash            String                   @map("password_hash")
+  role                    String
+  theme                   String                   @default("light")
+  fontSize                String                   @default("small") @map("font_size")
+  createdAt               DateTime                 @map("created_at")
+  updatedAt               DateTime                 @updatedAt @map("updated_at")
+  bans                    UserBan[]
+  emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens     PasswordResetToken[]
+  mailingListSubscription MailingListSubscription?
+  bookmarks               Bookmark[]
+  articleComments         Comment[]
+  forumPosts              ForumPost[]
+  forumPostComments       ForumPostComment[]
+  sessions                BrowserSession[]
 
   @@index([role])
   @@map("users")
@@ -136,26 +136,26 @@ model Bookmark {
 }
 
 model Article {
-  id                String        @id
-  published         Boolean       @default(true)
-  title             String
-  author            String
-  writeup           String
-  publicationDate   DateTime      @map("publication_date")
-  contentType       String        @map("content_type")
-  plainText         String?       @map("plain_text")
-  htmlBody          String?       @map("html_body")
-  pdfUrl            String?       @map("pdf_url")
-  pdfOriginalName   String?       @map("pdf_original_name")
-  pdfMimeType       String?       @map("pdf_mime_type")
-  pdfSize           Int?          @map("pdf_size")
-  imageUrl          String?       @map("image_url")
-  createdAt         DateTime      @default(now()) @map("created_at")
-  updatedAt         DateTime      @updatedAt @map("updated_at")
-  tags              ArticleTag[]
-  comments          Comment[]
-  likes             ArticleLike[]
-  bookmarks         Bookmark[]
+  id              String        @id
+  published       Boolean       @default(true)
+  title           String
+  author          String
+  writeup         String
+  publicationDate DateTime      @map("publication_date")
+  contentType     String        @map("content_type")
+  plainText       String?       @map("plain_text")
+  htmlBody        String?       @map("html_body")
+  pdfUrl          String?       @map("pdf_url")
+  pdfOriginalName String?       @map("pdf_original_name")
+  pdfMimeType     String?       @map("pdf_mime_type")
+  pdfSize         Int?          @map("pdf_size")
+  imageUrl        String?       @map("image_url")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  tags            ArticleTag[]
+  comments        Comment[]
+  likes           ArticleLike[]
+  bookmarks       Bookmark[]
 
   @@index([published])
   @@index([publicationDate])

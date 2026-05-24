@@ -1,8 +1,9 @@
 const { spawnSync } = require("node:child_process");
-const fs = require("node:fs");
-const path = require("node:path");
+require("dotenv/config");
 
-fs.closeSync(fs.openSync(path.join(process.cwd(), "prisma", "test.db"), "a"));
+if (!process.env.TEST_DATABASE_URL) {
+  throw new Error("TEST_DATABASE_URL is required to prepare the Prisma test database.");
+}
 
 const result = spawnSync(
   "npx",
@@ -11,7 +12,7 @@ const result = spawnSync(
     cwd: process.cwd(),
     env: {
       ...process.env,
-      DATABASE_URL: "file:./prisma/test.db",
+      DATABASE_URL: process.env.TEST_DATABASE_URL,
     },
     shell: process.platform === "win32",
     stdio: "inherit",

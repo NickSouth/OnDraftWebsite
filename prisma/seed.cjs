@@ -1,14 +1,14 @@
 const { randomBytes, scryptSync } = require("node:crypto");
 require("dotenv/config");
 const { PrismaClient } = require("@prisma/client");
-const { PrismaBetterSqlite3 } = require("@prisma/adapter-better-sqlite3");
+const { PrismaPg } = require("@prisma/adapter-pg");
 
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL is required to seed the database.");
 }
 
 const prisma = new PrismaClient({
-  adapter: new PrismaBetterSqlite3({ url: process.env.DATABASE_URL }),
+  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
 });
 
 function hashPassword(password) {
