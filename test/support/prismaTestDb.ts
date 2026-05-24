@@ -18,7 +18,12 @@ const ADMIN_USERS = [
   {
     id: "user-aleks",
     email: "aleks@ondraftfootball.com",
-    displayName: "Aleks OnDraft",
+    displayName: "Aleks Ryabinkin",
+  },
+  {
+    id: "user-nick",
+    email: "nick@ondraftfootball.com",
+    displayName: "Nick Southey",
   },
 ];
 

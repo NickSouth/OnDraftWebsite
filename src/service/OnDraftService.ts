@@ -176,6 +176,7 @@ export interface IOnDraftService {
   getForumPost(postId: string): Promise<Result<ForumPost, ForumPostError>>;
   likeByForumPostId(postId: string, userId: string): Promise<Result<ForumPost, ForumPostError>>;
   commentByForumPostId(postId: string, comment: CreateCommentInput): Promise<Result<Comment, ForumPostError>>;
+  deleteForumPostComment(commentId: string): Promise<Result<void, ForumPostError>>;
   getFilteredForumPosts(filter: ForumPostFilter): Promise<Result<ForumPost[], ForumPostError>>;
   deleteForumPost(postId: string): Promise<Result<void, ForumPostError>>;
   getSavedSchools(year: number): Promise<Result<string[], BigBoardError>>;
@@ -1122,6 +1123,13 @@ class OnDraftService implements IOnDraftService {
     };
 
     return await this.repository.commentByForumPostId(postId.trim(), comment);
+  }
+
+  async deleteForumPostComment(commentId: string): Promise<Result<void, ForumPostError>> {
+    if (!commentId || commentId.trim() === "") {
+      return Err(ForumPostValidationError("Comment id is required."));
+    }
+    return await this.repository.deleteForumPostComment(commentId.trim());
   }
 
   async getFilteredForumPosts(filter: ForumPostFilter): Promise<Result<ForumPost[], ForumPostError>> {

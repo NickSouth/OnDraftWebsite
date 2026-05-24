@@ -1,6 +1,6 @@
 import { Err, Ok, Result } from "../lib/result";
 import { Article, ArticleFilter, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, Comment, ConsensusBigBoard, DraftBoardFilter, ForumPost, ForumPostFilter, Video, VideoQuery } from "../model/OnDraftContent";
-import { ArticleNotFound, BigBoardNotFound, CommentNotFound, DuplicateBigBoardYear, DuplicatePlayer, DuplicateArticle, DuplicateForumPost, type ArticleError, type BigBoardError, type IOnDraftRepository, PlayerNotFound, ForumPostError, ForumPostNotFound } from "./OnDraftRepository";
+import { ArticleNotFound, BigBoardNotFound, CommentNotFound, DuplicateBigBoardYear, DuplicatePlayer, DuplicateArticle, DuplicateForumPost, ForumPostCommentNotFound, type ArticleError, type BigBoardError, type IOnDraftRepository, PlayerNotFound, ForumPostError, ForumPostNotFound } from "./OnDraftRepository";
 
 
 class InMemoryOnDraftRepository implements IOnDraftRepository {
@@ -495,6 +495,18 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
     }
     post.comments.push(comment);
     return Ok(comment);
+  }
+
+  async deleteForumPostComment(commentId: string): Promise<Result<void, ForumPostError>> {
+    for (const post of this.forumPosts) {
+      const index = post.comments.findIndex((comment) => comment.id === commentId);
+      if (index !== -1) {
+        post.comments.splice(index, 1);
+        return Ok(undefined);
+      }
+    }
+
+    return Err(ForumPostCommentNotFound(`Comment with id "${commentId}" not found.`));
   }
 
   async getFilteredForumPosts(filter: ForumPostFilter): Promise<Result<ForumPost[], ForumPostError>> {

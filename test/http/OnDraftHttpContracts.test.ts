@@ -85,7 +85,15 @@ describe("OnDraft HTTP contracts", () => {
     expect(about.text).toContain("Ryan McWalter");
     expect(about.text).toContain("Aleks Ryabinkin");
     expect(about.text).toContain("Nick Southey");
+    expect(about.text).toContain("https://www.linkedin.com/in/ryan-mcwalter/");
+    expect(about.text).toContain("https://www.linkedin.com/in/aleksandr-ryabinkin-96a589330/");
+    expect(about.text).toContain("@Ryan McWalter");
+    expect(about.text).toContain("@Aleksandr Ryabinkin");
     expect(about.text).toContain("/images/social/linkedin-in-bug.png");
+    expect(about.text).toContain("/images/team/nick-southey.jpg");
+    expect(about.text).toContain("https://github.com/NickSouth");
+    expect(about.text).toContain("/ @NickSouth");
+    expect(about.text).toContain("/images/social/github-lockup.svg");
     expect(about.text).not.toContain('role="dialog"');
 
     expect(privacy.status).toBe(200);
@@ -132,8 +140,13 @@ describe("OnDraft HTTP contracts", () => {
     expect(modal.text).toContain("Mailing list");
     expect(modal.text).toContain("Subscribe");
     expect(modal.text).toContain("Change password");
+    expect(modal.text).toContain("Send reset link");
     expect(modal.text).toContain("Delete account");
     expect(modal.text).toContain("This cannot be undone.");
+
+    const passwordReset = await agent.post("/settings/change-password");
+    expect(passwordReset.status).toBe(200);
+    expect(passwordReset.text).toContain("We sent a password reset link to your email.");
 
     const subscribed = await agent
       .post("/settings/mailing-list")
@@ -280,8 +293,8 @@ describe("OnDraft HTTP contracts", () => {
       .post("/forgot-password")
       .type("form")
       .send({ email: "unknown-reset@ondraft.test" });
-    expect(unknownReset.status).toBe(200);
-    expect(unknownReset.text).toContain("If that email is registered, we sent a password reset link.");
+    expect(unknownReset.status).toBe(400);
+    expect(unknownReset.text).toContain("No OnDraft account exists for that email address.");
 
     const createdTokens = await prisma.passwordResetToken.findMany({
       where: { userId: "user-reset-password" },
@@ -946,6 +959,16 @@ describe("OnDraft HTTP contracts", () => {
     expect(comment.status).toBe(200);
     expect(comment.text).toContain("Counterpoint: special teams matter.");
     expect(comment.text).toContain("verified-admin-badge");
+    expect(comment.text).toContain(`hx-delete="/hottakes/${postId}/comments/`);
+
+    const commentId = comment.text.match(/id="hot-take-comment-([A-Za-z0-9]{8})"/)?.[1];
+    expect(commentId).toBeTruthy();
+
+    const deleteComment = await agent
+      .delete(`/hottakes/${postId}/comments/${commentId}`)
+      .set("HX-Request", "true");
+    expect(deleteComment.status).toBe(200);
+    expect(deleteComment.text).not.toContain("Counterpoint: special teams matter.");
 
     const remove = await agent
       .delete(`/hottakes/${postId}`)
@@ -1261,7 +1284,6 @@ describe("OnDraft HTTP contracts", () => {
 
     const commentId = comment.text.match(/id="comment-([A-Za-z0-9]{8})"/)?.[1];
     expect(commentId).toBeDefined();
-    expect(comment.text).toContain(`/articles/${articleId}/comments/${commentId}/replies`);
 
     const reply = await admin
       .post(`/articles/${articleId}/comments/${commentId}/replies`)

@@ -83,6 +83,10 @@ export interface IAuthController {
     store: OnDraftSessionStore,
     subscribe: boolean,
   ): Promise<void>;
+  changePasswordFromSettings(
+    res: Response,
+    store: OnDraftSessionStore,
+  ): Promise<void>;
   requestEmailVerificationFromSettings(
     res: Response,
     store: OnDraftSessionStore,
@@ -301,9 +305,11 @@ class AuthController implements IAuthController {
     const result = await this.service.requestPasswordReset({ email });
 
     if (result.ok === false) {
-      this.logger.error(`Password reset request failed: ${result.value.message}`);
-      res.status(500);
-      await this.showForgotPassword(res, session, null, "We could not process that request right now.");
+      const status = this.mapErrorStatus(result.value);
+      const log = status >= 500 ? this.logger.error : this.logger.warn;
+      log.call(this.logger, `Password reset request failed: ${result.value.message}`);
+      res.status(status);
+      await this.showForgotPassword(res, session, null, result.value.message);
       return;
     }
 
@@ -428,6 +434,30 @@ class AuthController implements IAuthController {
         : "You are subscribed to the OnDraft mailing list."
       : "You are unsubscribed from the OnDraft mailing list.";
     this.renderSettingsModal(res, session, result.value, message, null);
+  }
+
+  async changePasswordFromSettings(
+    res: Response,
+    store: OnDraftSessionStore,
+  ): Promise<void> {
+    const session = touchOnDraftSession(store);
+    const email = session.authenticatedUser?.email ?? "";
+
+    if (!email) {
+      await this.showSettingsModal(res, store, null, "Log in to manage account settings.");
+      return;
+    }
+
+    const result = await this.service.requestPasswordReset({ email });
+    if (result.ok === false) {
+      const status = this.mapErrorStatus(result.value);
+      const log = status >= 500 ? this.logger.error : this.logger.warn;
+      log.call(this.logger, `Settings password reset request failed: ${result.value.message}`);
+      await this.showSettingsModal(res, store, null, "We could not send that password reset email right now.");
+      return;
+    }
+
+    await this.showSettingsModal(res, store, "We sent a password reset link to your email.", null);
   }
 
   async requestEmailVerificationFromSettings(

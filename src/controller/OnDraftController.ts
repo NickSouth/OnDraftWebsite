@@ -79,6 +79,7 @@ export interface IOnDraftController {
   createHotTake(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   likeHotTake(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   commentOnHotTake(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  deleteHotTakeComment(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   deleteHotTake(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   createBigBoardEntry(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   createBigBoardYear(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
@@ -1667,6 +1668,7 @@ class OnDraftController implements IOnDraftController {
     res.render("ondraft/partials/hotTakeActions", {
       layout: false,
       post: result.value,
+      session,
       likeActorId: this.likeActorId(session),
       postBookmarked: (await this.bookmarkedForumPostIds(session)).includes(result.value.id),
     });
@@ -1749,6 +1751,51 @@ class OnDraftController implements IOnDraftController {
     res.render("ondraft/partials/hotTakeComments", {
       layout: false,
       post: postResult.value,
+      session,
+      isAdmin: isAdminSession(session),
+      errorMessage: null,
+      userDirectoryById: await this.userDirectoryById(),
+      userModerationById: await this.userModerationById(session),
+      activeUserBan: await this.activeUserBan(session),
+    });
+  }
+
+  async deleteHotTakeComment(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    const postId = this.routeParam(req, "id");
+    const commentId = this.routeParam(req, "commentId");
+    const postResult = await this.service.getForumPost(postId);
+    if (postResult.ok === false) {
+      res.status(this.mapForumPostErrorToStatusCode(postResult.value)).send(postResult.value.message);
+      return;
+    }
+
+    const comment = postResult.value.comments.find((entry) => entry.id === commentId);
+    if (!comment) {
+      res.status(404).send("Comment not found.");
+      return;
+    }
+
+    const canDelete = isAdminSession(session) || comment.userId === session.authenticatedUser?.userId;
+    if (!canDelete) {
+      res.status(403).send("You can only delete your own comments.");
+      return;
+    }
+
+    const result = await this.service.deleteForumPostComment(commentId);
+    if (result.ok === false) {
+      res.status(this.mapForumPostErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    const updatedPost = await this.service.getForumPost(postId);
+    if (updatedPost.ok === false) {
+      res.status(this.mapForumPostErrorToStatusCode(updatedPost.value)).send(updatedPost.value.message);
+      return;
+    }
+
+    res.render("ondraft/partials/hotTakeComments", {
+      layout: false,
+      post: updatedPost.value,
       session,
       isAdmin: isAdminSession(session),
       errorMessage: null,

@@ -15,7 +15,7 @@
   <% } else { %>
     <button
       type="button"
-      class="secondary-button"
+      class="danger-button"
       hx-get="/admin/users/<%= user.id %>/moderation-menu?contextId=<%= encodeURIComponent(contextId) %>"
       hx-target="#user-moderation-menu-<%= contextId %>"
       hx-swap="innerHTML"

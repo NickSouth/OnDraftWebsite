@@ -69,6 +69,13 @@ export interface UpdateMailingListPreferenceInput {
   subscribe: boolean;
 }
 
+export interface ChangePasswordInput {
+  userId: string;
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
 export type BanDuration = "1-day" | "1-month" | "1-year" | "permanent";
 
 export interface BanUserInput {
@@ -111,6 +118,7 @@ export interface IAuthService {
   updateMailingListPreference(
     input: UpdateMailingListPreferenceInput,
   ): Promise<Result<AccountSettings, AuthError>>;
+  changePassword(input: ChangePasswordInput): Promise<Result<void, AuthError>>;
   createMailingListUnsubscribeUrl(input: CreateMailingListUnsubscribeUrlInput): Promise<Result<string | null, AuthError>>;
   unsubscribeMailingList(input: UnsubscribeMailingListInput): Promise<Result<void, AuthError>>;
   exportSubscribedMailingListCsv(): Promise<Result<string, AuthError>>;
@@ -398,7 +406,7 @@ class AuthService implements IAuthService {
     const email = input.email.trim().toLowerCase();
 
     if (!email || !email.includes("@")) {
-      return Ok(undefined);
+      return Err(ValidationError("Enter the email address for your account."));
     }
 
     const userResult = await this.users.findByEmail(email);
@@ -408,7 +416,7 @@ class AuthService implements IAuthService {
 
     const user = userResult.value;
     if (!user) {
-      return Ok(undefined);
+      return Err(ValidationError("No OnDraft account exists for that email address."));
     }
 
     const now = new Date();
@@ -580,6 +588,55 @@ class AuthService implements IAuthService {
     return Ok({
       mailingListStatus: updated.value.status,
     });
+  }
+
+  async changePassword(input: ChangePasswordInput): Promise<Result<void, AuthError>> {
+    const userId = input.userId.trim();
+    const currentPassword = input.currentPassword;
+    const newPassword = input.newPassword;
+    const confirmPassword = input.confirmPassword;
+
+    if (!userId) {
+      return Err(ValidationError("User id is required."));
+    }
+
+    if (!currentPassword.trim()) {
+      return Err(ValidationError("Current password is required."));
+    }
+
+    if (newPassword.trim().length < 8) {
+      return Err(ValidationError("Password must be at least 8 characters."));
+    }
+
+    if (!confirmPassword.trim()) {
+      return Err(ValidationError("Please confirm your password."));
+    }
+
+    if (newPassword !== confirmPassword) {
+      return Err(ValidationError("Passwords must match."));
+    }
+
+    const userResult = await this.users.findById(userId);
+    if (userResult.ok === false) {
+      return Err(UnexpectedDependencyError(userResult.value.message));
+    }
+
+    const user = userResult.value;
+    if (!user) {
+      return Err(ValidationError("User not found."));
+    }
+
+    if (!(await verifyPassword(currentPassword, user.password))) {
+      return Err(InvalidCredentials("Current password is incorrect."));
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+    const updated = await this.users.updatePassword(user.id, passwordHash);
+    if (updated.ok === false) {
+      return Err(UnexpectedDependencyError(updated.value.message));
+    }
+
+    return Ok(undefined);
   }
 
   async createMailingListUnsubscribeUrl(

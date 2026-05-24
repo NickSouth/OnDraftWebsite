@@ -7,6 +7,7 @@ import { VerificationResendRateLimiter } from "./auth/VerificationResendRateLimi
 import { IApp } from "./contracts";
 import { IOnDraftController } from "./controller/OnDraftController";
 import { ARTICLE_PDF_MAX_BYTES, articleUpload } from "./uploads/articlePdfUpload";
+import { formatRelativeTime } from "./view/formatRelativeTime";
 import {
   getAuthenticatedUser,
   isAdminSession,
@@ -150,6 +151,7 @@ class ExpressApp implements IApp {
     const browserSession = touchOnDraftSession(sessionStore(req));
     res.locals.isAdmin = isAdminSession(browserSession);
     res.locals.currentPath = req.path;
+    res.locals.relativeTime = formatRelativeTime;
     next();
   }
 
@@ -192,6 +194,16 @@ class ExpressApp implements IApp {
       asyncHandler(async (req, res) => {
         const subscribe = req.body.preference === "subscribe";
         await this.authController.updateMailingListPreferenceFromSettings(res, sessionStore(req), subscribe);
+      }),
+    );
+
+    this.app.post(
+      "/settings/change-password",
+      asyncHandler(async (req, res) => {
+        await this.authController.changePasswordFromSettings(
+          res,
+          sessionStore(req),
+        );
       }),
     );
 
@@ -572,6 +584,14 @@ class ExpressApp implements IApp {
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
         await this.controller.commentOnHotTake(req, res, browserSession);
+      }),
+    );
+
+    this.app.delete(
+      "/hottakes/:id/comments/:commentId",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.deleteHotTakeComment(req, res, browserSession);
       }),
     );
 

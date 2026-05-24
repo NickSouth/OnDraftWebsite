@@ -402,7 +402,7 @@ describe("AuthService", () => {
     expect(newTokenResult.ok).toBe(true);
   });
 
-  it("creates hashed password reset tokens and does not reveal unknown emails", async () => {
+  it("creates hashed password reset tokens and rejects unknown emails", async () => {
     const users = CreateInMemoryUserRepository();
     const email = new CapturingEmailService();
     const service = CreateAuthService(users, email, {
@@ -414,7 +414,10 @@ describe("AuthService", () => {
     const unknown = await service.requestPasswordReset({ email: "missing@ondraft.test" });
 
     expect(known.ok).toBe(true);
-    expect(unknown.ok).toBe(true);
+    expect(unknown.ok).toBe(false);
+    if (!unknown.ok) {
+      expect(unknown.value.message).toBe("No OnDraft account exists for that email address.");
+    }
     expect(email.passwordResets).toHaveLength(1);
     expect(email.passwordResets[0].to).toBe("ryan@ondraftfootball.com");
 
