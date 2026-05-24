@@ -38,7 +38,7 @@
       <div>
         <h1><%= article.title %></h1>
         <p class="muted-text">
-          By <%= article.author %>
+          By <%- include("partials/profileAuthorLink", { name: article.author, showBadge: ["Ryan McWalter", "Aleks Ryabinkin", "Nick Southey"].includes(article.author), className: "font-bold text-draft-amber no-underline transition hover:text-draft-gold dark:text-draft-gold" }) %>
           <% if (article.publicationDate) { %>
             on <%= new Date(article.publicationDate).toLocaleDateString() %>
           <% } %>

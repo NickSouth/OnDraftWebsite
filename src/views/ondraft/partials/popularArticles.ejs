@@ -42,25 +42,27 @@
   <% } else { %>
     <div class="grid max-h-[720px] gap-3 overflow-y-auto px-1 py-1">
       <% popularArticles.forEach((article, index) => { %>
-        <a href="/articles/<%= article.id %>" class="od-card od-focus-ring grid gap-3 overflow-hidden text-slate-950 no-underline transition hover:-translate-y-0.5 hover:border-draft-gold dark:text-white sm:grid-cols-[3.5rem_6rem_minmax(0,1fr)_auto] sm:items-center">
-          <span class="grid size-12 place-items-center rounded-md bg-slate-100 font-display text-xl font-black text-slate-700 dark:bg-white/10 dark:text-white"><%= index + 1 %></span>
-          <span class="relative block aspect-[16/10] overflow-hidden bg-draft-ink sm:aspect-square sm:h-full sm:min-h-24">
+        <a href="/articles/<%= article.id %>" class="od-card od-focus-ring grid grid-cols-[2.75rem_4.5rem_minmax(0,1fr)] items-center gap-3 overflow-hidden p-3 text-slate-950 no-underline transition hover:-translate-y-0.5 hover:border-draft-gold dark:text-white sm:grid-cols-[3.5rem_6rem_minmax(0,1fr)_auto] sm:p-0">
+          <span class="grid size-10 place-items-center rounded-md bg-slate-100 font-display text-lg font-black text-slate-700 dark:bg-white/10 dark:text-white sm:size-12 sm:text-xl"><%= index + 1 %></span>
+          <span class="relative block aspect-square overflow-hidden rounded-md bg-draft-ink sm:h-full sm:min-h-24 sm:rounded-none">
             <% if (article.imageUrl) { %>
               <img class="article-list-thumb" src="<%= article.imageUrl %>" alt="" />
             <% } else { %>
               <span class="article-list-thumb article-list-thumb-empty">
-                <span class="rounded bg-draft-gold px-2 py-1 text-xs font-black uppercase tracking-[0.18em] text-draft-ink">OD</span>
+                <span class="grid size-8 place-items-center overflow-hidden rounded bg-white/90 ring-1 ring-slate-200 dark:bg-white/10 dark:ring-white/10" aria-hidden="true">
+                  <img class="h-7 w-8 object-contain" src="/images/brand/ondraft-logo.png" alt="" />
+                </span>
               </span>
             <% } %>
           </span>
-          <span class="grid gap-1 p-4 sm:p-0">
-            <span class="font-display text-xl font-bold"><%= article.title %></span>
-            <span class="text-sm text-slate-600 dark:text-slate-300">
+          <span class="grid min-w-0 gap-1 sm:p-0">
+            <span class="line-clamp-2 font-display text-base font-bold leading-tight sm:text-xl"><%= article.title %></span>
+            <span class="text-xs text-slate-600 dark:text-slate-300 sm:text-sm">
               by <%= article.author %> on <%= article.publicationDate.toLocaleDateString() %>
             </span>
-            <span class="text-sm text-slate-700 dark:text-slate-200"><%= article.writeup %></span>
+            <span class="hidden text-sm text-slate-700 dark:text-slate-200 sm:line-clamp-2 sm:block"><%= article.writeup %></span>
           </span>
-          <span class="mx-4 mb-4 inline-flex w-fit items-center gap-1 rounded bg-draft-foam px-3 py-1 text-sm font-black text-draft-amber dark:bg-white/10 dark:text-draft-gold sm:m-0 sm:mr-4">
+          <span class="col-span-3 inline-flex w-fit items-center gap-1 rounded bg-draft-foam px-2.5 py-1 text-xs font-black text-draft-amber dark:bg-white/10 dark:text-draft-gold sm:col-span-1 sm:m-0 sm:mr-4 sm:px-3 sm:text-sm">
             <span aria-hidden="true">&hearts;</span>
             <span><%= article.likes %></span>
           </span>

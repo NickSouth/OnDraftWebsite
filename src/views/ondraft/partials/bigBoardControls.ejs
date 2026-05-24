@@ -10,7 +10,39 @@
   <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_27rem] lg:items-start xl:grid-cols-[minmax(0,1fr)_30rem]">
     <div class="grid justify-items-start gap-4 text-left">
       <div class="w-full">
-        <p class="text-xs font-black uppercase tracking-[0.2em] text-draft-amber dark:text-draft-gold">Draft Board</p>
+        <div class="relative inline-flex items-center gap-2" x-data="{ infoOpen: false }" @keydown.escape.window="infoOpen = false">
+          <p class="text-xs font-black uppercase tracking-[0.2em] text-draft-amber dark:text-draft-gold">Draft Board</p>
+          <button
+            type="button"
+            class="draft-board-info-button"
+            aria-label="About the draft board"
+            aria-controls="draft-board-info-popover"
+            :aria-expanded="String(infoOpen)"
+            @click="infoOpen = !infoOpen"
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9.75 9.2a2.5 2.5 0 0 1 4.55 1.4c0 1.75-2.3 2.1-2.3 3.65" />
+              <path d="M12 17.4h.01" />
+            </svg>
+          </button>
+          <div
+            id="draft-board-info-popover"
+            class="draft-board-info-popover"
+            x-cloak
+            x-show="infoOpen"
+            x-transition.opacity.duration.150ms
+            @click.outside="infoOpen = false"
+          >
+            <button type="button" class="draft-board-info-close" aria-label="Close draft board note" @click="infoOpen = false">&times;</button>
+            <p>
+              These are scouting reports and rankings of upcoming NFL draft prospects by
+              <%- include("profileAuthorLink", { name: "Ryan McWalter", showBadge: false, className: "font-black text-draft-amber no-underline hover:text-draft-gold dark:text-draft-gold" }) %>
+              and
+              <%- include("profileAuthorLink", { name: "Aleks Ryabinkin", showBadge: false, className: "font-black text-draft-amber no-underline hover:text-draft-gold dark:text-draft-gold" }) %>
+              respectively. The consensus board is the average of our rankings.
+            </p>
+          </div>
+        </div>
         <label class="mt-2 flex flex-wrap items-center justify-start gap-x-4 gap-y-2 lg:flex-nowrap">
           <span class="shrink-0 font-display text-4xl font-black leading-tight text-slate-950 dark:text-white sm:text-5xl">Big Board</span>
           <span class="sr-only">Year</span>

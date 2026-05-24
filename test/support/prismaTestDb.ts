@@ -18,7 +18,12 @@ const ADMIN_USERS = [
   {
     id: "user-aleks",
     email: "aleks@ondraftfootball.com",
-    displayName: "Aleks OnDraft",
+    displayName: "Aleks Ryabinkin",
+  },
+  {
+    id: "user-nick",
+    email: "nick@ondraftfootball.com",
+    displayName: "Nick Southey",
   },
 ];
 
@@ -32,6 +37,7 @@ export async function clearPrismaTestDatabase(): Promise<void> {
 
   await prisma.$transaction([
     prisma.browserSession.deleteMany(),
+    prisma.passwordResetToken.deleteMany(),
     prisma.emailVerificationToken.deleteMany(),
     prisma.mailingListSubscription.deleteMany(),
     prisma.userBan.deleteMany(),

@@ -142,7 +142,7 @@ export function isAdminSession(session: IOnDraftBrowserSession): boolean {
     return false;
   }
 
-  const adminEmails = (process.env.ADMIN_EMAILS ?? "support@ondraftfootball.com,ryan@ondraftfootball.com,aleks@ondraftfootball.com")
+  const adminEmails = (process.env.ADMIN_EMAILS ?? "support@ondraftfootball.com,ryan@ondraftfootball.com,aleks@ondraftfootball.com,nick@ondraftfootball.com")
     .split(",")
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean);

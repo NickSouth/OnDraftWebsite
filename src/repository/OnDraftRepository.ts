@@ -73,6 +73,7 @@ export interface IOnDraftRepository {
     getForumPost(postId: string): Promise<Result<ForumPost, ForumPostError>>;
     likeByForumPostId(postId: string, userId: string): Promise<Result<ForumPost, ForumPostError>>;
     commentByForumPostId(postId: string, comment: Comment): Promise<Result<Comment, ForumPostError>>;
+    deleteForumPostComment(commentId: string): Promise<Result<void, ForumPostError>>;
     getFilteredForumPosts(filter: ForumPostFilter): Promise<Result<ForumPost[], ForumPostError>>;
     deleteForumPost(postId: string): Promise<Result<void, ForumPostError>>;
     createYoutubeVideo(video: Video): Promise<Result<Video, ArticleError>>;

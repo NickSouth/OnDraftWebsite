@@ -1,0 +1,14 @@
+<% if (typeof turnstileSiteKey === "string" && turnstileSiteKey) { %>
+  <!-- Turnstile widget renders here for high-risk auth forms; server verification runs in TurnstileVerifier middleware. -->
+  <div class="grid gap-2">
+    <div
+      class="cf-turnstile"
+      data-sitekey="<%= turnstileSiteKey %>"
+      data-theme="auto"
+    ></div>
+    <p class="text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">
+      This check helps protect OnDraft accounts from automated abuse.
+    </p>
+  </div>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+<% } %>
