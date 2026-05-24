@@ -10,7 +10,12 @@
   <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_27rem] lg:items-start xl:grid-cols-[minmax(0,1fr)_30rem]">
     <div class="grid justify-items-start gap-4 text-left">
       <div class="w-full">
-        <div class="relative inline-flex items-center gap-2" x-data="{ infoOpen: false }" @keydown.escape.window="infoOpen = false">
+        <div
+          class="relative inline-flex items-center gap-2"
+          x-data="{ infoOpen: false }"
+          @keydown.escape.window="infoOpen = false"
+          @htmx:before-request.window="infoOpen = false"
+        >
           <p class="text-xs font-black uppercase tracking-[0.2em] text-draft-amber dark:text-draft-gold">Draft Board</p>
           <button
             type="button"
