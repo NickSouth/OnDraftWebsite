@@ -1,0 +1,18 @@
+<section class="not-found-page">
+  <div class="not-found-art" aria-hidden="true">
+    <div class="spilled-mug">
+      <div class="mug-body">
+        <span class="mug-foam"></span>
+      </div>
+    </div>
+    <span class="beer-spill beer-spill-main"></span>
+    <span class="beer-spill beer-spill-small"></span>
+  </div>
+
+  <div class="not-found-copy">
+    <p>404</p>
+    <h1><%= typeof title === "string" ? title : "Not found" %></h1>
+    <p><%= typeof message === "string" ? message : "This tap is kicked. The page you wanted is not on the board." %></p>
+    <a class="od-primary-link" href="<%= typeof backHref === "string" ? backHref : "/" %>"><%= typeof backLabel === "string" ? backLabel : "Back home" %></a>
+  </div>
+</section>

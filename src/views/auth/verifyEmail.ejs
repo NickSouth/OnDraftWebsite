@@ -1,27 +1,46 @@
-<section class="page-intro">
-  <p class="eyebrow">OnDraft</p>
-  <h1>Email Verification</h1>
-  <p><%= message %></p>
-</section>
+<%
+  const isSuccess = status === "success";
+%>
 
-<section class="panel auth-panel">
-  <% if (status === "success") { %>
-    <div class="panel-header">
-      <h2>Email Verified</h2>
-      <p>Your account is ready to use.</p>
+<section class="mx-auto grid w-full max-w-xl gap-6">
+  <div class="text-left">
+    <%- include("partials/authBrand") %>
+    <h1 class="mt-2 font-display text-4xl font-black leading-tight text-slate-950 dark:text-white sm:text-5xl">Email Verification</h1>
+    <p class="mt-3 text-base leading-7 text-slate-600 dark:text-slate-300"><%= message %></p>
+  </div>
+
+  <section class="od-card grid gap-5 p-5 sm:p-6">
+    <div class="flex items-start gap-4">
+      <span class="grid size-11 shrink-0 place-items-center rounded-md <%= isSuccess ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-200" : "bg-red-500/10 text-red-700 dark:text-red-200" %>">
+        <% if (isSuccess) { %>
+          <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+        <% } else { %>
+          <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 9v4" />
+            <path d="M12 17h.01" />
+            <path d="M10.3 3.9 2.5 18a2 2 0 0 0 1.8 3h15.4a2 2 0 0 0 1.8-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+          </svg>
+        <% } %>
+      </span>
+      <div class="grid gap-2">
+        <h2 class="font-display text-2xl font-black text-slate-950 dark:text-white"><%= isSuccess ? "Email Verified" : "Verification Link Not Accepted" %></h2>
+        <p class="text-sm leading-6 text-slate-600 dark:text-slate-300">
+          <%= isSuccess ? "Your account is ready to use." : "Use the newest verification email, or request a new one before trying again." %>
+        </p>
+      </div>
     </div>
 
-    <p class="form-note">
-      <a href="/">Return to OnDraft</a>.
-    </p>
-  <% } else { %>
-    <div class="panel-header">
-      <h2>Verification Link Not Accepted</h2>
-      <p>Use the newest verification email, or request a new one before trying again.</p>
-    </div>
-
-    <p class="form-note">
-      <a href="/login">Log in</a> to request another verification email.
-    </p>
-  <% } %>
+    <% if (isSuccess) { %>
+      <a class="od-primary-link w-full sm:w-fit" href="/">Return to OnDraft</a>
+    <% } else { %>
+      <div class="grid gap-3 border-t border-slate-200 pt-5 dark:border-white/10">
+        <p class="text-sm leading-6 text-slate-600 dark:text-slate-300">
+          If you are testing locally, make sure the email provider is set to Resend and that the verification link points at your running port.
+        </p>
+        <a class="od-secondary-link w-full sm:w-fit" href="/login">Log in to request another verification email</a>
+      </div>
+    <% } %>
+  </section>
 </section>

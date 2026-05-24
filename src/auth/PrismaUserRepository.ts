@@ -5,6 +5,7 @@ import { UnexpectedDependencyError, type AuthError } from "./errors";
 import type {
   BanUserInput,
   CreateEmailVerificationTokenInput,
+  CreatePasswordResetTokenInput,
   IUserRepository,
   UpsertMailingListSubscriptionInput,
 } from "./UserRepository";
@@ -12,6 +13,7 @@ import type {
   Bookmark,
   IEmailVerificationTokenRecord,
   IMailingListSubscriptionRecord,
+  IPasswordResetTokenRecord,
   IUserBanRecord,
   IUserRecord,
   UserPreferences,
@@ -110,6 +112,24 @@ class PrismaUserRepository implements IUserRepository {
     usedAt: Date | null;
     createdAt: Date;
   }): IEmailVerificationTokenRecord {
+    return {
+      id: token.id,
+      userId: token.userId,
+      tokenHash: token.tokenHash,
+      expiresAt: token.expiresAt.toISOString(),
+      usedAt: token.usedAt?.toISOString() ?? null,
+      createdAt: token.createdAt.toISOString(),
+    };
+  }
+
+  private mapPasswordResetToken(token: {
+    id: string;
+    userId: string;
+    tokenHash: string;
+    expiresAt: Date;
+    usedAt: Date | null;
+    createdAt: Date;
+  }): IPasswordResetTokenRecord {
     return {
       id: token.id,
       userId: token.userId,
@@ -284,6 +304,19 @@ class PrismaUserRepository implements IUserRepository {
     }
   }
 
+  async updatePassword(userId: string, passwordHash: string): Promise<Result<IUserRecord, AuthError>> {
+    try {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { passwordHash },
+      });
+      const updated = await this.findUserRecord({ id: userId });
+      return updated ? Ok(updated) : Err(UnexpectedDependencyError("User not found."));
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to update the user password."));
+    }
+  }
+
   async addEmailVerificationToken(
     token: CreateEmailVerificationTokenInput,
   ): Promise<Result<IEmailVerificationTokenRecord, AuthError>> {
@@ -345,6 +378,70 @@ class PrismaUserRepository implements IUserRepository {
       return Ok(undefined);
     } catch {
       return Err(UnexpectedDependencyError("Unable to update the email verification tokens."));
+    }
+  }
+
+  async addPasswordResetToken(
+    token: CreatePasswordResetTokenInput,
+  ): Promise<Result<IPasswordResetTokenRecord, AuthError>> {
+    try {
+      const user = await this.prisma.user.findUnique({ where: { id: token.userId } });
+      if (!user) {
+        return Err(UnexpectedDependencyError("User not found."));
+      }
+      const created = await this.prisma.passwordResetToken.create({
+        data: {
+          id: token.id,
+          userId: token.userId,
+          tokenHash: token.tokenHash,
+          expiresAt: new Date(token.expiresAt),
+          createdAt: new Date(token.createdAt),
+        },
+      });
+      return Ok(this.mapPasswordResetToken(created));
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to save the password reset token."));
+    }
+  }
+
+  async findPasswordResetTokenByHash(
+    tokenHash: string,
+  ): Promise<Result<IPasswordResetTokenRecord | null, AuthError>> {
+    try {
+      const token = await this.prisma.passwordResetToken.findUnique({ where: { tokenHash } });
+      return Ok(token ? this.mapPasswordResetToken(token) : null);
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to read the password reset token."));
+    }
+  }
+
+  async markPasswordResetTokenUsed(
+    tokenId: string,
+    usedAt: string,
+  ): Promise<Result<IPasswordResetTokenRecord, AuthError>> {
+    try {
+      const updated = await this.prisma.passwordResetToken.update({
+        where: { id: tokenId },
+        data: { usedAt: new Date(usedAt) },
+      });
+      return Ok(this.mapPasswordResetToken(updated));
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to update the password reset token."));
+    }
+  }
+
+  async markUnusedPasswordResetTokensUsedForUser(
+    userId: string,
+    usedAt: string,
+  ): Promise<Result<void, AuthError>> {
+    try {
+      await this.prisma.passwordResetToken.updateMany({
+        where: { userId, usedAt: null },
+        data: { usedAt: new Date(usedAt) },
+      });
+      return Ok(undefined);
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to update the password reset tokens."));
     }
   }
 

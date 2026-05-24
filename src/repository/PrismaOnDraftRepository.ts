@@ -24,6 +24,7 @@ import {
   DuplicateBigBoardYear,
   DuplicateForumPost,
   DuplicatePlayer,
+  ForumPostCommentNotFound,
   ForumPostNotFound,
   PlayerNotFound,
   type ArticleError,
@@ -775,6 +776,15 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
       },
     });
     return Ok({ ...comment, likes: 0, likedByUserIds: [], replies: [] });
+  }
+
+  async deleteForumPostComment(commentId: string): Promise<Result<void, ForumPostError>> {
+    try {
+      await this.prisma.forumPostComment.delete({ where: { id: commentId } });
+      return Ok(undefined);
+    } catch {
+      return Err(ForumPostCommentNotFound(`Comment with id "${commentId}" not found.`));
+    }
   }
 
   async getFilteredForumPosts(filter: ForumPostFilter): Promise<Result<ForumPost[], ForumPostError>> {

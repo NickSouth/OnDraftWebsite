@@ -1,4 +1,5 @@
 import type { Request } from "express";
+import { clientIp, compositeRateLimitKey } from "../security/RateLimiter";
 import { getAuthenticatedUser } from "../session/OnDraftSession";
 import type { OnDraftSessionStore } from "../session/OnDraftSession";
 
@@ -24,7 +25,7 @@ export class VerificationResendRateLimiter {
 
   check(req: Request): VerificationResendRateLimitResult {
     const email = this.emailKey(req);
-    const keys = [`ip:${req.ip ?? "unknown"}`, `email:${email}`];
+    const keys = [`ip:${clientIp(req)}`, compositeRateLimitKey("email", email)];
     const checks = keys.map((key) => this.peek(key));
     const limited = checks.find((bucket) => bucket.limited);
 
