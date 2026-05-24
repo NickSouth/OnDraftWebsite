@@ -13,8 +13,12 @@
         <div
           class="relative inline-flex items-center gap-2"
           x-data="{ infoOpen: false }"
+          x-init="$nextTick(() => { infoOpen = false })"
           @keydown.escape.window="infoOpen = false"
           @htmx:before-request.window="infoOpen = false"
+          @htmx:beforeRequest.window="infoOpen = false"
+          @htmx:after-swap.window="infoOpen = false"
+          @htmx:afterSwap.window="infoOpen = false"
         >
           <p class="text-xs font-black uppercase tracking-[0.2em] text-draft-amber dark:text-draft-gold">Draft Board</p>
           <button
@@ -33,12 +37,14 @@
           <div
             id="draft-board-info-popover"
             class="draft-board-info-popover"
+            hidden
             x-cloak
             x-show="infoOpen"
+            x-bind:hidden="!infoOpen"
             x-transition.opacity.duration.150ms
             @click.outside="infoOpen = false"
           >
-            <button type="button" class="draft-board-info-close" aria-label="Close draft board note" @click="infoOpen = false">&times;</button>
+            <button type="button" class="draft-board-info-close" aria-label="Close draft board note" @click.stop="infoOpen = false">&times;</button>
             <p>
               These are scouting reports and rankings of upcoming NFL draft prospects by
               <%- include("profileAuthorLink", { name: "Ryan McWalter", showBadge: false, className: "font-black text-draft-amber no-underline hover:text-draft-gold dark:text-draft-gold" }) %>

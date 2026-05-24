@@ -967,6 +967,9 @@ describe("OnDraft HTTP contracts", () => {
     expect(fullBoard.text).toContain('<option value="Mock Tech"');
     expect(fullBoard.text).not.toContain("Apply filters");
     expect(fullBoard.text).not.toContain("Reset");
+    expect(fullBoard.text).toContain('id="draft-board-info-popover"');
+    expect(fullBoard.text).toContain("x-bind:hidden=\"!infoOpen\"");
+    expect(fullBoard.text).toContain("hidden");
     expect(fullBoard.text).toMatch(/>\s*Ryan\s*<\/button>/);
     expect(fullBoard.text).toMatch(/>\s*Aleks\s*<\/button>/);
     expect(fullBoard.text).toMatch(/>\s*Consensus\s*<\/button>/);
@@ -983,6 +986,8 @@ describe("OnDraft HTTP contracts", () => {
     expect(filteredBoard.text).toContain('<option value="OnDraft State" selected>OnDraft State</option>');
     expect(filteredBoard.text).toContain("Reset");
     expect(filteredBoard.text).toContain('hx-get="/bigboard?year=2026&creator=Ryan"');
+    expect(filteredBoard.text).toContain('id="draft-board-info-popover"');
+    expect(filteredBoard.text).toContain("x-bind:hidden=\"!infoOpen\"");
 
     const resetBoard = await request(ondraft)
       .get("/bigboard?year=2026&creator=Ryan")
@@ -992,6 +997,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(resetBoard.text).toContain("Quarterback Prospect");
     expect(resetBoard.text).toContain("Receiver Prospect");
     expect(resetBoard.text).not.toContain("Reset");
+    expect(resetBoard.text).toContain("x-bind:hidden=\"!infoOpen\"");
   });
 
   it("renders the consensus big board with sequential published rankings and discrepancy badges", async () => {
