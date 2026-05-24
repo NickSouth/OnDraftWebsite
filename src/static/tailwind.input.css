@@ -445,7 +445,7 @@
 
   .board-editor-table {
     @apply w-full border-collapse bg-white text-sm dark:bg-draft-slate;
-    min-width: 1380px;
+    min-width: 1428px;
     table-layout: fixed;
   }
 
@@ -485,6 +485,18 @@
     @apply text-center;
   }
 
+  .board-editor-delete-cell {
+    @apply text-center;
+  }
+
+  .board-editor-delete-row-button {
+    @apply od-focus-ring mx-auto mt-1.5 inline-grid size-9 place-items-center rounded-md text-slate-400 transition hover:bg-red-100 hover:text-red-700 dark:text-slate-500 dark:hover:bg-red-500/20 dark:hover:text-red-200;
+  }
+
+  .board-editor-row.is-delete-target td {
+    @apply bg-red-50 dark:bg-red-500/10;
+  }
+
   .publish-state {
     @apply flex min-h-11 w-full items-center justify-center;
   }
@@ -503,6 +515,38 @@
 
   .board-editor-bottom-save-actions .save-exit-button {
     @apply od-focus-ring inline-flex min-h-10 items-center justify-center rounded-md border border-sky-400 bg-sky-600 px-4 py-2 text-sm font-black text-white transition hover:border-sky-300 hover:bg-sky-500 dark:border-sky-400 dark:bg-sky-500 dark:text-white dark:hover:bg-sky-400;
+  }
+
+  .board-entry-delete-modal {
+    @apply fixed inset-0 z-[70] hidden place-items-center bg-slate-950/60 p-4 backdrop-blur-sm;
+  }
+
+  .board-entry-delete-modal.is-open {
+    @apply grid;
+  }
+
+  .board-entry-delete-panel {
+    @apply grid w-full max-w-md gap-4 rounded-lg border border-slate-200 bg-white p-5 text-slate-950 shadow-editorial dark:border-white/10 dark:bg-draft-slate dark:text-white;
+  }
+
+  .board-entry-delete-kicker {
+    @apply text-xs font-black uppercase tracking-[0.16em] text-red-700 dark:text-red-200;
+  }
+
+  .board-entry-delete-panel h2 {
+    @apply m-0 font-display text-2xl font-black leading-tight;
+  }
+
+  .board-entry-delete-panel p {
+    @apply m-0 text-sm leading-6 text-slate-600 dark:text-slate-300;
+  }
+
+  .board-entry-delete-target strong {
+    @apply font-black text-slate-950 dark:text-white;
+  }
+
+  .board-entry-delete-actions {
+    @apply flex flex-col gap-3 border-t border-slate-200 pt-4 dark:border-white/10 sm:flex-row sm:justify-end;
   }
 
   .od-admin-users-page .user-moderation-actions {

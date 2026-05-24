@@ -749,6 +749,9 @@ describe("OnDraft HTTP contracts", () => {
     expect(editor.text).toContain("Edit Big Board");
     expect(editor.text).toContain("Add player");
     expect(editor.text).toContain("Publish");
+    expect(editor.text).toContain("data-delete-board-entry");
+    expect(editor.text).toContain("Are you sure?");
+    expect(editor.text).toContain("This cannot be undone.");
     expect(editor.text).toContain('list="college-team-options"');
     expect(editor.text).toContain('<option value="Alabama"></option>');
 
@@ -844,6 +847,84 @@ describe("OnDraft HTTP contracts", () => {
     expect(visibleWithWriteup.text).toContain("Pocket movement");
     expect(visibleWithWriteup.text).not.toContain("Private eval note.");
   });
+
+  it("removes omitted draft board ranking entries when admins save the editor", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+    const uniqueSuffix = Date.now().toString();
+    const deletedEntryId = `delete-entry-${uniqueSuffix}`;
+    const keptEntryId = `keep-entry-${uniqueSuffix}`;
+    const deletedPlayerName = `Deleted Prospect ${uniqueSuffix}`;
+    const keptPlayerName = `Kept Prospect ${uniqueSuffix}`;
+
+    const saveTwoEntries = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": deletedEntryId,
+        "entries[0][playerName]": deletedPlayerName,
+        "entries[0][school]": "Alabama",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2",
+        "entries[0][weight]": "220",
+        "entries[0][strengths]": "Release",
+        "entries[0][weaknesses]": "Pressure",
+        "entries[0][rundown]": "First saved entry.",
+        "entries[0][playerInfoPublished]": "true",
+        "entries[1][id]": keptEntryId,
+        "entries[1][playerName]": keptPlayerName,
+        "entries[1][school]": "OnDraft State",
+        "entries[1][position]": "WR",
+        "entries[1][rank]": "2",
+        "entries[1][posRank]": "1",
+        "entries[1][heightLabel]": "6-0",
+        "entries[1][weight]": "195",
+        "entries[1][strengths]": "Separation",
+        "entries[1][weaknesses]": "Play strength",
+        "entries[1][rundown]": "Second saved entry.",
+        "entries[1][playerInfoPublished]": "true",
+      });
+
+    expect(saveTwoEntries.status).toBe(200);
+    expect(saveTwoEntries.text).toContain("Saved.");
+
+    const beforeDelete = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
+    expect(beforeDelete.status).toBe(200);
+    expect(beforeDelete.text).toContain(deletedPlayerName);
+    expect(beforeDelete.text).toContain(keptPlayerName);
+
+    const saveAfterDelete = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": keptEntryId,
+        "entries[0][playerName]": keptPlayerName,
+        "entries[0][school]": "OnDraft State",
+        "entries[0][position]": "WR",
+        "entries[0][rank]": "2",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-0",
+        "entries[0][weight]": "195",
+        "entries[0][strengths]": "Separation",
+        "entries[0][weaknesses]": "Play strength",
+        "entries[0][rundown]": "Second saved entry.",
+        "entries[0][playerInfoPublished]": "true",
+      });
+
+    expect(saveAfterDelete.status).toBe(200);
+    expect(saveAfterDelete.text).toContain("Saved.");
+
+    const afterDelete = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
+    expect(afterDelete.status).toBe(200);
+    expect(afterDelete.text).not.toContain(deletedPlayerName);
+    expect(afterDelete.text).toContain(keptPlayerName);
+  }, 15000);
 
   it("renders big board position and school filters and applies them through htmx", async () => {
     const ondraft = app();
