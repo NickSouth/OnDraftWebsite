@@ -13,6 +13,8 @@
 
   <% if (session.authenticatedUser && currentActiveBan) { %>
     <%- include("bannedUserNotice", { ban: currentActiveBan }) %>
+  <% } else if (session.authenticatedUser && !session.authenticatedUser.emailVerifiedAt) { %>
+    <p class="error-message">Verify your email before commenting.</p>
   <% } else if (session.authenticatedUser) { %>
     <form
       class="comment-form"
@@ -95,7 +97,7 @@
               <% }) %>
             </ol>
           <% } %>
-          <% if (session.authenticatedUser && !currentActiveBan) { %>
+          <% if (session.authenticatedUser && !currentActiveBan && session.authenticatedUser.emailVerifiedAt) { %>
             <div class="reply-thread-actions">
               <button
                 type="button"

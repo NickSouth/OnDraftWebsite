@@ -75,9 +75,10 @@
     method="post"
     action="/bigboard/edit"
     hx-post="/bigboard/edit/autosave"
-    hx-trigger="change delay:900ms, every 40s"
+    hx-trigger="change delay:2m, every 2m"
     hx-target="#big-board-save-status"
     hx-swap="innerHTML"
+    hx-indicator="#big-board-autosave-indicator"
   >
     <input type="hidden" name="year" value="<%= board.year %>" />
     <input type="hidden" name="creator" value="<%= board.creator %>" />
@@ -86,7 +87,10 @@
     <div class="board-editor-toolbar">
       <div>
         <strong><%= board.year %> <%= board.creator %></strong>
-        <span id="big-board-save-status" class="save-status"><%= statusMessage || "" %></span>
+        <span class="autosave-status-group">
+          <span id="big-board-save-status" class="save-status"><%= statusMessage || "" %></span>
+          <span id="big-board-autosave-indicator" class="autosave-mini-loader htmx-indicator" aria-hidden="true"></span>
+        </span>
       </div>
     </div>
 

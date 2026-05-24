@@ -32,6 +32,7 @@ export async function clearPrismaTestDatabase(): Promise<void> {
 
   await prisma.$transaction([
     prisma.browserSession.deleteMany(),
+    prisma.passwordResetToken.deleteMany(),
     prisma.emailVerificationToken.deleteMany(),
     prisma.mailingListSubscription.deleteMany(),
     prisma.userBan.deleteMany(),

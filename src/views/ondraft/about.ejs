@@ -1,0 +1,62 @@
+<%
+  const members = [
+    { name: "Ryan McWalter" },
+    { name: "Aleks Ryabinkin" },
+    { name: "Nick Southey", linkedInUrl: "https://www.linkedin.com/in/nick-southey-155473353", linkedInHandle: "@Nick Southey" },
+  ];
+%>
+
+<section class="mx-auto grid w-full max-w-6xl gap-8 text-slate-950 dark:text-slate-100">
+  <header class="border-b border-slate-200 pb-6 dark:border-white/10">
+    <a class="od-secondary-link mb-4 w-fit" href="/">Back to home</a>
+    <h1 class="font-display text-4xl font-black leading-tight text-draft-amber dark:text-draft-gold sm:text-5xl">About Us</h1>
+  </header>
+
+  <section class="od-card grid gap-4 p-5 sm:p-6">
+    <div>
+      <p class="m-0 text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Our Story</p>
+      <h2 class="mt-2 font-display text-3xl font-black leading-tight text-slate-950 dark:text-white">How OnDraft Came To Be</h2>
+    </div>
+    <p class="max-w-3xl text-base leading-7 text-slate-700 dark:text-slate-200">
+      Placeholder text. This section will explain how OnDraft Football started, what kind of NFL Draft coverage we want to create, and why this project exists.
+    </p>
+  </section>
+
+  <section class="grid gap-5">
+    <% members.forEach((member) => { %>
+      <article class="od-card grid gap-5 p-5 sm:grid-cols-[12rem_minmax(0,1fr)] sm:p-6 md:grid-cols-[14rem_minmax(0,1fr)]">
+        <div class="aspect-square w-full max-w-48 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white" aria-label="<%= member.name %> headshot placeholder"></div>
+        <div class="grid content-start gap-4">
+          <div>
+            <p class="m-0 text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Bio</p>
+            <h2 class="mt-2 font-display text-3xl font-black leading-tight text-slate-950 dark:text-white"><%= member.name %></h2>
+          </div>
+          <p class="text-base leading-7 text-slate-700 dark:text-slate-200">
+            Placeholder bio text. This section will include background, football interests, site responsibilities, and whatever else should introduce <%= member.name %> to OnDraft readers.
+          </p>
+          <% if (member.linkedInUrl) { %>
+            <a
+              class="od-focus-ring group flex min-h-11 w-fit items-center gap-3 rounded-md text-sm font-black text-slate-700 transition hover:text-draft-amber dark:text-slate-200 dark:hover:text-draft-gold"
+              href="<%= member.linkedInUrl %>"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="<%= member.name %> on LinkedIn"
+            >
+              <span class="grid size-11 shrink-0 place-items-center rounded-md bg-white p-2 shadow-sm ring-1 ring-slate-200 transition group-hover:ring-draft-gold dark:ring-white/10">
+                <img class="size-6 object-contain" src="/images/social/linkedin-in-bug.png" alt="LinkedIn" />
+              </span>
+              <span>/ <%= member.linkedInHandle %></span>
+            </a>
+          <% } else { %>
+            <div class="flex min-h-11 items-center gap-3">
+              <span class="grid size-11 shrink-0 place-items-center rounded-md bg-white p-2 shadow-sm ring-1 ring-slate-200 dark:ring-white/10">
+                <img class="size-6 object-contain" src="/images/social/linkedin-in-bug.png" alt="LinkedIn" />
+              </span>
+              <span class="text-sm font-black text-slate-700 dark:text-slate-200">/ @Handle</span>
+            </div>
+          <% } %>
+        </div>
+      </article>
+    <% }) %>
+  </section>
+</section>

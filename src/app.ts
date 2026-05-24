@@ -170,7 +170,13 @@ class ExpressApp implements IApp {
       }),
     );
 
-    this.app.get("/about", (_req, res) => this.renderInfoModal(res, "about"));
+    this.app.get(
+      "/about",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        res.render("ondraft/about", { session: browserSession });
+      }),
+    );
     this.app.get("/privacy", (_req, res) => this.renderInfoModal(res, "privacy"));
     this.app.get("/contact", (_req, res) => this.renderInfoModal(res, "contact"));
 
@@ -218,6 +224,59 @@ class ExpressApp implements IApp {
         const password = typeof req.body.password === "string" ? req.body.password : "";
         const rememberMe = req.body.rememberMe === "on";
         await this.authController.loginFromForm(res, email, password, rememberMe, sessionStore(req));
+      }),
+    );
+
+    this.app.get(
+      "/forgot-password",
+      asyncHandler(async (req, res) => {
+        const store = sessionStore(req);
+        const browserSession = recordPageView(store);
+        await this.authController.showForgotPassword(res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/forgot-password",
+      asyncHandler(async (req, res) => {
+        const email = typeof req.body.email === "string" ? req.body.email : "";
+        await this.authController.requestPasswordResetFromForm(res, email, sessionStore(req));
+      }),
+    );
+
+    this.app.get(
+      "/reset-password",
+      asyncHandler(async (req, res) => {
+        const store = sessionStore(req);
+        const browserSession = recordPageView(store);
+        const token = typeof req.query.token === "string" ? req.query.token : "";
+        if (!token.trim()) {
+          res.status(400);
+          await this.authController.showPasswordResetResult(
+            res,
+            browserSession,
+            "failure",
+            "We could not reset that password. The link may be expired or already used.",
+          );
+          return;
+        }
+        await this.authController.showResetPassword(res, browserSession, token);
+      }),
+    );
+
+    this.app.post(
+      "/reset-password",
+      asyncHandler(async (req, res) => {
+        const token = typeof req.body.token === "string" ? req.body.token : "";
+        const password = typeof req.body.password === "string" ? req.body.password : "";
+        const confirmPassword = typeof req.body.confirmPassword === "string" ? req.body.confirmPassword : "";
+        await this.authController.resetPasswordFromForm(
+          res,
+          token,
+          password,
+          confirmPassword,
+          sessionStore(req),
+        );
       }),
     );
 
@@ -457,6 +516,14 @@ class ExpressApp implements IApp {
 
         const browserSession = recordPageView(sessionStore(req));
         await this.controller.deleteYoutubeVideo(req, res, browserSession);
+      }),
+    );
+
+    this.app.get(
+      "/videos/:videoId",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.showVideo(req, res, browserSession);
       }),
     );
 
@@ -831,6 +898,18 @@ class ExpressApp implements IApp {
         await this.controller.createBigBoardEntry(req, res, browserSession);
       }),
     );
+
+    this.app.use((req, res) => {
+      const browserSession = recordPageView(sessionStore(req));
+      res.status(404).render("ondraft/notFound", {
+        session: browserSession,
+        isAdmin: isAdminSession(browserSession),
+        title: "Page not found",
+        message: "This tap is kicked. The page you wanted is not on the board.",
+        backHref: "/",
+        backLabel: "Back home",
+      });
+    });
 
     this.app.use((err: unknown, _req: Request, res: Response, _next: (value?: unknown) => void) => {
       const message = err instanceof Error ? err.message : "Unexpected server error.";

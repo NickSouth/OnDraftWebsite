@@ -50,6 +50,7 @@ export interface IOnDraftController {
   showFilteredArticles(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showBookmarks(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showVideos(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  showVideo(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showCreateVideoForm(res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showEditVideoForm(res: Response, session: IOnDraftBrowserSession, videoId: string): Promise<void>;
   showHotTakes(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
@@ -591,20 +592,53 @@ class OnDraftController implements IOnDraftController {
     return null;
   }
 
-  private requireVerifiedUser(res: Response, session: IOnDraftBrowserSession, message: string): boolean {
-    if (isVerifiedUserSession(session)) {
-      return true;
-    }
-
-    res.status(403).send(message);
-    return false;
-  }
-
   private renderBookmarkButton(res: Response, bookmark: Bookmark, bookmarked: boolean): void {
     res.render("ondraft/partials/bookmarkButton", {
       layout: false,
       bookmark,
       bookmarked,
+    });
+  }
+
+  private async renderArticleCommentError(req: Request, res: Response, session: IOnDraftBrowserSession, message: string, statusCode = 403): Promise<void> {
+    const articleId = this.routeParam(req, "id");
+    const articleResult = await this.service.getArticle(articleId);
+    if (articleResult.ok === false) {
+      res.status(this.mapArticleErrorToStatusCode(articleResult.value)).send(articleResult.value.message);
+      return;
+    }
+
+    res.status(statusCode).render("ondraft/partials/articleComments", {
+      layout: false,
+      article: articleResult.value,
+      session,
+      isAdmin: isAdminSession(session),
+      commentsLimit: this.commentLimit(req),
+      likeActorId: this.likeActorId(session),
+      errorMessage: message,
+      userDirectoryById: await this.userDirectoryById(),
+      userModerationById: await this.userModerationById(session),
+      activeUserBan: await this.activeUserBan(session),
+    });
+  }
+
+  private async renderHotTakeCommentError(req: Request, res: Response, session: IOnDraftBrowserSession, message: string, statusCode = 403): Promise<void> {
+    const postId = this.routeParam(req, "id");
+    const postResult = await this.service.getForumPost(postId);
+    if (postResult.ok === false) {
+      res.status(this.mapForumPostErrorToStatusCode(postResult.value)).send(postResult.value.message);
+      return;
+    }
+
+    res.status(statusCode).render("ondraft/partials/hotTakeComments", {
+      layout: false,
+      post: postResult.value,
+      session,
+      isAdmin: isAdminSession(session),
+      errorMessage: message,
+      userDirectoryById: await this.userDirectoryById(),
+      userModerationById: await this.userModerationById(session),
+      activeUserBan: await this.activeUserBan(session),
     });
   }
 
@@ -793,6 +827,24 @@ class OnDraftController implements IOnDraftController {
         sortDirection: this.videoSortDirection(req),
       },
     });
+  }
+
+  async showVideo(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    const videoId = this.routeParam(req, "videoId");
+    const result = await this.service.getYoutubeVideo(videoId);
+    if (result.ok === false) {
+      res.status(this.mapArticleErrorToStatusCode(result.value)).render("ondraft/notFound", {
+        session,
+        isAdmin: isAdminSession(session),
+        title: "Video not found",
+        message: "That Bar TV pour has gone missing.",
+        backHref: "/videos",
+        backLabel: "Back to Bar TV",
+      });
+      return;
+    }
+
+    res.redirect(result.value.youtubeUrl);
   }
 
   private articleFormValues(article: Article): Record<string, string> {
@@ -1099,11 +1151,25 @@ class OnDraftController implements IOnDraftController {
     const result = await this.service.getArticle(id);
     if (result.ok === false) {
       this.logger.error(`Failed to load article "${id}"`+ { error: result.value });
-      res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
+      res.status(this.mapArticleErrorToStatusCode(result.value)).render("ondraft/notFound", {
+        session,
+        isAdmin: isAdminSession(session),
+        title: "Article not found",
+        message: "That article is no longer on tap.",
+        backHref: "/articles",
+        backLabel: "Back to articles",
+      });
       return;
     }
     if (!result.value.published && !isAdminSession(session)) {
-      res.status(404).send("Article not found.");
+      res.status(404).render("ondraft/notFound", {
+        session,
+        isAdmin: false,
+        title: "Article not found",
+        message: "That article is no longer on tap.",
+        backHref: "/articles",
+        backLabel: "Back to articles",
+      });
       return;
     }
     res.render("ondraft/article", {
@@ -1160,7 +1226,14 @@ class OnDraftController implements IOnDraftController {
     this.logger.info(`Rendering edit video page for "${videoId}"`);
     const result = await this.service.getYoutubeVideo(videoId);
     if (result.ok === false) {
-      res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
+      res.status(this.mapArticleErrorToStatusCode(result.value)).render("ondraft/notFound", {
+        session,
+        isAdmin: isAdminSession(session),
+        title: "Video not found",
+        message: "That Bar TV pour has gone missing.",
+        backHref: "/videos",
+        backLabel: "Back to Bar TV",
+      });
       return;
     }
 
@@ -1342,9 +1415,6 @@ class OnDraftController implements IOnDraftController {
     if (!userId) {
       return;
     }
-    if (!this.requireVerifiedUser(res, session, "Verify your email to bookmark OnDraft content.")) {
-      return;
-    }
 
     const articleId = this.routeParam(req, "id");
     const article = await this.service.getArticle(articleId);
@@ -1399,7 +1469,8 @@ class OnDraftController implements IOnDraftController {
       this.renderBanResponse(res, activeBan);
       return;
     }
-    if (!this.requireVerifiedUser(res, session, "Verify your email to comment.")) {
+    if (!isVerifiedUserSession(session)) {
+      await this.renderArticleCommentError(req, res, session, "Verify your email before commenting.");
       return;
     }
 
@@ -1453,7 +1524,8 @@ class OnDraftController implements IOnDraftController {
       this.renderBanResponse(res, activeBan);
       return;
     }
-    if (!this.requireVerifiedUser(res, session, "Verify your email to comment.")) {
+    if (!isVerifiedUserSession(session)) {
+      await this.renderArticleCommentError(req, res, session, "Verify your email before commenting.");
       return;
     }
 
@@ -1605,9 +1677,6 @@ class OnDraftController implements IOnDraftController {
     if (!userId) {
       return;
     }
-    if (!this.requireVerifiedUser(res, session, "Verify your email to bookmark OnDraft content.")) {
-      return;
-    }
 
     const postId = this.routeParam(req, "id");
     const post = await this.service.getForumPost(postId);
@@ -1640,7 +1709,8 @@ class OnDraftController implements IOnDraftController {
       this.renderBanResponse(res, activeBan);
       return;
     }
-    if (!this.requireVerifiedUser(res, session, "Verify your email to comment.")) {
+    if (!isVerifiedUserSession(session)) {
+      await this.renderHotTakeCommentError(req, res, session, "Verify your email before commenting.");
       return;
     }
 

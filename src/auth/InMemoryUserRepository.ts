@@ -3,6 +3,7 @@ import { UnexpectedDependencyError, type AuthError } from "./errors";
 import type {
   BanUserInput,
   CreateEmailVerificationTokenInput,
+  CreatePasswordResetTokenInput,
   IUserRepository,
   UpsertMailingListSubscriptionInput,
 } from "./UserRepository";
@@ -10,6 +11,7 @@ import type {
   Bookmark,
   IEmailVerificationTokenRecord,
   IMailingListSubscriptionRecord,
+  IPasswordResetTokenRecord,
   IUserRecord,
   UserPreferences,
 } from "./User";
@@ -54,6 +56,7 @@ class InMemoryUserRepository implements IUserRepository {
   constructor(
     private readonly users: IUserRecord[],
     private readonly emailVerificationTokens: IEmailVerificationTokenRecord[] = [],
+    private readonly passwordResetTokens: IPasswordResetTokenRecord[] = [],
     private readonly mailingListSubscriptions: IMailingListSubscriptionRecord[] = [],
   ) {}
 
@@ -166,6 +169,19 @@ class InMemoryUserRepository implements IUserRepository {
     }
   }
 
+  async updatePassword(userId: string, passwordHash: string): Promise<Result<IUserRecord, AuthError>> {
+    try {
+      const user = this.findUser(userId);
+      if (!user) {
+        return Err(UnexpectedDependencyError("User not found."));
+      }
+      user.password = passwordHash;
+      return Ok(this.cloneUser(user));
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to update the user password."));
+    }
+  }
+
   async addEmailVerificationToken(
     token: CreateEmailVerificationTokenInput,
   ): Promise<Result<IEmailVerificationTokenRecord, AuthError>> {
@@ -231,6 +247,74 @@ class InMemoryUserRepository implements IUserRepository {
       return Ok(undefined);
     } catch {
       return Err(UnexpectedDependencyError("Unable to update the email verification tokens."));
+    }
+  }
+
+  async addPasswordResetToken(
+    token: CreatePasswordResetTokenInput,
+  ): Promise<Result<IPasswordResetTokenRecord, AuthError>> {
+    try {
+      const user = this.findUser(token.userId);
+      if (!user) {
+        return Err(UnexpectedDependencyError("User not found."));
+      }
+
+      const existing = this.passwordResetTokens.find((candidate) => candidate.tokenHash === token.tokenHash);
+      if (existing) {
+        return Err(UnexpectedDependencyError("Password reset token already exists."));
+      }
+
+      const created: IPasswordResetTokenRecord = {
+        ...token,
+        usedAt: null,
+      };
+      this.passwordResetTokens.push(created);
+      return Ok(created);
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to save the password reset token."));
+    }
+  }
+
+  async findPasswordResetTokenByHash(
+    tokenHash: string,
+  ): Promise<Result<IPasswordResetTokenRecord | null, AuthError>> {
+    try {
+      const match = this.passwordResetTokens.find((token) => token.tokenHash === tokenHash) ?? null;
+      return Ok(match);
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to read the password reset token."));
+    }
+  }
+
+  async markPasswordResetTokenUsed(
+    tokenId: string,
+    usedAt: string,
+  ): Promise<Result<IPasswordResetTokenRecord, AuthError>> {
+    try {
+      const token = this.passwordResetTokens.find((candidate) => candidate.id === tokenId) ?? null;
+      if (!token) {
+        return Err(UnexpectedDependencyError("Password reset token not found."));
+      }
+      token.usedAt = usedAt;
+      return Ok(token);
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to update the password reset token."));
+    }
+  }
+
+  async markUnusedPasswordResetTokensUsedForUser(
+    userId: string,
+    usedAt: string,
+  ): Promise<Result<void, AuthError>> {
+    try {
+      for (const token of this.passwordResetTokens) {
+        if (token.userId === userId && !token.usedAt) {
+          token.usedAt = usedAt;
+        }
+      }
+      return Ok(undefined);
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to update the password reset tokens."));
     }
   }
 

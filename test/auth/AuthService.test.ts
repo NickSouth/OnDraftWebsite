@@ -1,15 +1,24 @@
 import { CreateAuthService } from "../../src/auth/AuthService";
 import { CreateInMemoryUserRepository } from "../../src/auth/InMemoryUserRepository";
 import { createHash } from "node:crypto";
-import type { IEmailService, SendEmailVerificationEmailInput } from "../../src/email/EmailService";
+import type {
+  IEmailService,
+  SendEmailVerificationEmailInput,
+  SendPasswordResetEmailInput,
+} from "../../src/email/EmailService";
 import type { IUserRepository } from "../../src/auth/UserRepository";
 import type { IEmailConfig } from "../../src/config/AppConfig";
 
 class CapturingEmailService implements IEmailService {
   sent: SendEmailVerificationEmailInput[] = [];
+  passwordResets: SendPasswordResetEmailInput[] = [];
 
   async sendEmailVerificationEmail(input: SendEmailVerificationEmailInput): Promise<void> {
     this.sent.push(input);
+  }
+
+  async sendPasswordResetEmail(input: SendPasswordResetEmailInput): Promise<void> {
+    this.passwordResets.push(input);
   }
 }
 
@@ -24,6 +33,7 @@ function testEmailConfig(): IEmailConfig {
     appBaseUrl: "https://ondraftfootball.com",
     resendApiKey: null,
     verificationTokenTtlHours: 24,
+    passwordResetTokenTtlMinutes: 60,
     mailingListUnsubscribeSecret: "test-mailing-secret",
   };
 }
@@ -206,6 +216,7 @@ describe("AuthService", () => {
       appBaseUrl: "https://ondraftfootball.com",
       resendApiKey: null,
       verificationTokenTtlHours: 1,
+      passwordResetTokenTtlMinutes: 60,
       mailingListUnsubscribeSecret: "test-mailing-secret",
     });
 
@@ -249,6 +260,7 @@ describe("AuthService", () => {
       appBaseUrl: "https://ondraftfootball.com",
       resendApiKey: null,
       verificationTokenTtlHours: 24,
+      passwordResetTokenTtlMinutes: 60,
       mailingListUnsubscribeSecret: "test-mailing-secret",
     });
 
@@ -292,6 +304,10 @@ describe("AuthService", () => {
     expect(user.ok).toBe(true);
     expect(subscription.ok).toBe(true);
     expect(token.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.emailVerifiedAt).toBeTruthy();
+      expect(result.value.email).toBe("verify@ondraft.test");
+    }
     if (user.ok) {
       expect(user.value?.emailVerifiedAt).toBeTruthy();
     }
@@ -362,6 +378,7 @@ describe("AuthService", () => {
       appBaseUrl: "https://ondraftfootball.com",
       resendApiKey: null,
       verificationTokenTtlHours: 24,
+      passwordResetTokenTtlMinutes: 60,
       mailingListUnsubscribeSecret: "test-mailing-secret",
     });
 
@@ -385,6 +402,88 @@ describe("AuthService", () => {
     expect(newTokenResult.ok).toBe(true);
   });
 
+  it("creates hashed password reset tokens and does not reveal unknown emails", async () => {
+    const users = CreateInMemoryUserRepository();
+    const email = new CapturingEmailService();
+    const service = CreateAuthService(users, email, {
+      ...testEmailConfig(),
+      passwordResetTokenTtlMinutes: 30,
+    });
+
+    const known = await service.requestPasswordReset({ email: "ryan@ondraftfootball.com" });
+    const unknown = await service.requestPasswordReset({ email: "missing@ondraft.test" });
+
+    expect(known.ok).toBe(true);
+    expect(unknown.ok).toBe(true);
+    expect(email.passwordResets).toHaveLength(1);
+    expect(email.passwordResets[0].to).toBe("ryan@ondraftfootball.com");
+
+    const resetUrl = new URL(email.passwordResets[0].resetUrl);
+    const rawToken = resetUrl.searchParams.get("token");
+    expect(resetUrl.origin).toBe("https://ondraftfootball.com");
+    expect(resetUrl.pathname).toBe("/reset-password");
+    expect(rawToken).toBeTruthy();
+
+    const tokenHash = createHash("sha256").update(rawToken ?? "").digest("hex");
+    const persistedToken = await users.findPasswordResetTokenByHash(tokenHash);
+    expect(persistedToken.ok).toBe(true);
+    if (persistedToken.ok) {
+      expect(persistedToken.value?.tokenHash).toBe(tokenHash);
+      expect(persistedToken.value?.tokenHash).not.toBe(rawToken);
+      expect(persistedToken.value?.usedAt).toBeNull();
+      const createdAt = new Date(persistedToken.value?.createdAt ?? "").getTime();
+      const expiresAt = new Date(persistedToken.value?.expiresAt ?? "").getTime();
+      expect(expiresAt - createdAt).toBe(30 * 60 * 1000);
+    }
+  });
+
+  it("resets password with a valid token and prevents token reuse", async () => {
+    const users = CreateInMemoryUserRepository();
+    const email = new CapturingEmailService();
+    const service = CreateAuthService(users, email, testEmailConfig());
+
+    await service.requestPasswordReset({ email: "ryan@ondraftfootball.com" });
+    const token = new URL(email.passwordResets[0].resetUrl).searchParams.get("token") ?? "";
+
+    const mismatch = await service.resetPassword({
+      token,
+      password: "new-password-123",
+      confirmPassword: "different-password",
+    });
+    expect(mismatch.ok).toBe(false);
+    if (!mismatch.ok) {
+      expect(mismatch.value.message).toBe("Passwords must match.");
+    }
+
+    const reset = await service.resetPassword({
+      token,
+      password: "new-password-123",
+      confirmPassword: "new-password-123",
+    });
+    expect(reset.ok).toBe(true);
+
+    const oldPassword = await service.authenticate({
+      email: "ryan@ondraftfootball.com",
+      password: "password123",
+    });
+    const newPassword = await service.authenticate({
+      email: "ryan@ondraftfootball.com",
+      password: "new-password-123",
+    });
+    const reused = await service.resetPassword({
+      token,
+      password: "another-password-123",
+      confirmPassword: "another-password-123",
+    });
+
+    expect(oldPassword.ok).toBe(false);
+    expect(newPassword.ok).toBe(true);
+    expect(reused.ok).toBe(false);
+    if (!reused.ok) {
+      expect(reused.value.message).toBe("We could not reset that password. The link may be expired or already used.");
+    }
+  });
+
   it("accepts verification email requests for verified accounts without sending", async () => {
     const users = CreateInMemoryUserRepository();
     const email = new CapturingEmailService();
@@ -394,6 +493,7 @@ describe("AuthService", () => {
       appBaseUrl: "https://ondraftfootball.com",
       resendApiKey: null,
       verificationTokenTtlHours: 24,
+      passwordResetTokenTtlMinutes: 60,
       mailingListUnsubscribeSecret: "test-mailing-secret",
     });
 
@@ -412,6 +512,7 @@ describe("AuthService", () => {
       appBaseUrl: "https://ondraftfootball.com",
       resendApiKey: null,
       verificationTokenTtlHours: 24,
+      passwordResetTokenTtlMinutes: 60,
       mailingListUnsubscribeSecret: "test-mailing-secret",
     });
 

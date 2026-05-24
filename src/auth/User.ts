@@ -50,6 +50,15 @@ export interface IEmailVerificationTokenRecord {
   createdAt: string;
 }
 
+export interface IPasswordResetTokenRecord {
+  id: string;
+  userId: string;
+  tokenHash: string;
+  expiresAt: string;
+  usedAt: string | null;
+  createdAt: string;
+}
+
 export type MailingListSubscriptionStatus = "pending" | "subscribed" | "unsubscribed";
 
 export interface IMailingListSubscriptionRecord {

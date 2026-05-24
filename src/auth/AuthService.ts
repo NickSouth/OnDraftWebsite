@@ -38,6 +38,16 @@ export interface RequestEmailVerificationInput {
   email: string;
 }
 
+export interface RequestPasswordResetInput {
+  email: string;
+}
+
+export interface ResetPasswordInput {
+  token: string;
+  password: string;
+  confirmPassword: string;
+}
+
 export interface CreateMailingListUnsubscribeUrlInput {
   email: string;
 }
@@ -93,8 +103,10 @@ export interface AdminUserListItem {
 export interface IAuthService {
   authenticate(input: LoginInput): Promise<Result<IAuthenticatedUser, AuthError>>;
   register(input: RegisterInput): Promise<Result<IAuthenticatedUser, AuthError>>;
-  verifyEmail(input: VerifyEmailInput): Promise<Result<void, AuthError>>;
+  verifyEmail(input: VerifyEmailInput): Promise<Result<IAuthenticatedUser, AuthError>>;
   requestEmailVerification(input: RequestEmailVerificationInput): Promise<Result<void, AuthError>>;
+  requestPasswordReset(input: RequestPasswordResetInput): Promise<Result<void, AuthError>>;
+  resetPassword(input: ResetPasswordInput): Promise<Result<void, AuthError>>;
   getAccountSettings(input: AccountSettingsInput): Promise<Result<AccountSettings, AuthError>>;
   updateMailingListPreference(
     input: UpdateMailingListPreferenceInput,
@@ -116,6 +128,10 @@ class NullEmailService implements IEmailService {
   async sendEmailVerificationEmail(): Promise<void> {
     return Promise.resolve();
   }
+
+  async sendPasswordResetEmail(): Promise<void> {
+    return Promise.resolve();
+  }
 }
 
 class AuthService implements IAuthService {
@@ -128,6 +144,7 @@ class AuthService implements IAuthService {
       appBaseUrl: "http://localhost:3000",
       resendApiKey: null,
       verificationTokenTtlHours: 24,
+      passwordResetTokenTtlMinutes: 60,
       mailingListUnsubscribeSecret: "ondraft-local-mailing-list-unsubscribe-secret",
     },
   ) {}
@@ -294,7 +311,7 @@ class AuthService implements IAuthService {
     return Ok(toAuthenticatedUser(created.value));
   }
 
-  async verifyEmail(input: VerifyEmailInput): Promise<Result<void, AuthError>> {
+  async verifyEmail(input: VerifyEmailInput): Promise<Result<IAuthenticatedUser, AuthError>> {
     const rawToken = input.token.trim();
     if (!rawToken) {
       return Err(ValidationError(EMAIL_VERIFICATION_FAILED_MESSAGE));
@@ -316,7 +333,7 @@ class AuthService implements IAuthService {
       return Err(UnexpectedDependencyError(userResult.value.message));
     }
 
-    const user = userResult.value;
+    let user = userResult.value;
     if (!user) {
       return Err(ValidationError(EMAIL_VERIFICATION_FAILED_MESSAGE));
     }
@@ -332,6 +349,7 @@ class AuthService implements IAuthService {
       if (verified.ok === false) {
         return Err(UnexpectedDependencyError(verified.value.message));
       }
+      user = verified.value;
     }
 
     const subscriptionResult = await this.users.findMailingListSubscriptionByUserId(user.id);
@@ -353,7 +371,7 @@ class AuthService implements IAuthService {
       }
     }
 
-    return Ok(undefined);
+    return Ok(toAuthenticatedUser(user));
   }
 
   async requestEmailVerification(input: RequestEmailVerificationInput): Promise<Result<void, AuthError>> {
@@ -374,6 +392,121 @@ class AuthService implements IAuthService {
     }
 
     return this.sendVerificationEmail(user, { invalidateExistingTokens: true });
+  }
+
+  async requestPasswordReset(input: RequestPasswordResetInput): Promise<Result<void, AuthError>> {
+    const email = input.email.trim().toLowerCase();
+
+    if (!email || !email.includes("@")) {
+      return Ok(undefined);
+    }
+
+    const userResult = await this.users.findByEmail(email);
+    if (userResult.ok === false) {
+      return Err(UnexpectedDependencyError(userResult.value.message));
+    }
+
+    const user = userResult.value;
+    if (!user) {
+      return Ok(undefined);
+    }
+
+    const now = new Date();
+    const usedAt = now.toISOString();
+    const invalidated = await this.users.markUnusedPasswordResetTokensUsedForUser(user.id, usedAt);
+    if (invalidated.ok === false) {
+      return Err(UnexpectedDependencyError(invalidated.value.message));
+    }
+
+    const rawToken = randomBytes(32).toString("base64url");
+    const tokenHash = createHash("sha256").update(rawToken).digest("hex");
+    const expiresAt = new Date(
+      now.getTime() + this.emailConfig.passwordResetTokenTtlMinutes * 60 * 1000,
+    );
+    const tokenResult = await this.users.addPasswordResetToken({
+      id: randomUUID(),
+      userId: user.id,
+      tokenHash,
+      expiresAt: expiresAt.toISOString(),
+      createdAt: usedAt,
+    });
+
+    if (tokenResult.ok === false) {
+      return Err(UnexpectedDependencyError(tokenResult.value.message));
+    }
+
+    const resetUrl = new URL("/reset-password", this.emailConfig.appBaseUrl);
+    resetUrl.searchParams.set("token", rawToken);
+    try {
+      await this.email.sendPasswordResetEmail({
+        to: user.email,
+        resetUrl: resetUrl.toString(),
+      });
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to send the password reset message."));
+    }
+
+    return Ok(undefined);
+  }
+
+  async resetPassword(input: ResetPasswordInput): Promise<Result<void, AuthError>> {
+    const rawToken = input.token.trim();
+    const password = input.password;
+    const confirmPassword = input.confirmPassword;
+
+    if (!rawToken) {
+      return Err(ValidationError("We could not reset that password. The link may be expired or already used."));
+    }
+
+    if (password.trim().length < 8) {
+      return Err(ValidationError("Password must be at least 8 characters."));
+    }
+
+    if (!confirmPassword.trim()) {
+      return Err(ValidationError("Please confirm your password."));
+    }
+
+    if (password !== confirmPassword) {
+      return Err(ValidationError("Passwords must match."));
+    }
+
+    const tokenHash = createHash("sha256").update(rawToken).digest("hex");
+    const tokenResult = await this.users.findPasswordResetTokenByHash(tokenHash);
+    if (tokenResult.ok === false) {
+      return Err(UnexpectedDependencyError(tokenResult.value.message));
+    }
+
+    const token = tokenResult.value;
+    if (!token || token.usedAt || new Date(token.expiresAt).getTime() <= Date.now()) {
+      return Err(ValidationError("We could not reset that password. The link may be expired or already used."));
+    }
+
+    const userResult = await this.users.findById(token.userId);
+    if (userResult.ok === false) {
+      return Err(UnexpectedDependencyError(userResult.value.message));
+    }
+    if (!userResult.value) {
+      return Err(ValidationError("We could not reset that password. The link may be expired or already used."));
+    }
+
+    const now = new Date().toISOString();
+    const passwordHash = await hashPassword(password);
+    const updatedPassword = await this.users.updatePassword(token.userId, passwordHash);
+    if (updatedPassword.ok === false) {
+      return Err(UnexpectedDependencyError(updatedPassword.value.message));
+    }
+
+    const used = await this.users.markPasswordResetTokenUsed(token.id, now);
+    if (used.ok === false) {
+      return Err(UnexpectedDependencyError(used.value.message));
+    }
+
+    const invalidated = await this.users.markUnusedPasswordResetTokensUsedForUser(token.userId, now);
+    if (invalidated.ok === false) {
+      return Err(UnexpectedDependencyError(invalidated.value.message));
+    }
+
+    return Ok(undefined);
   }
 
   async getAccountSettings(input: AccountSettingsInput): Promise<Result<AccountSettings, AuthError>> {

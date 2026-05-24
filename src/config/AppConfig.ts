@@ -7,6 +7,7 @@ export interface IEmailConfig {
   appBaseUrl: string;
   resendApiKey: string | null;
   verificationTokenTtlHours: number;
+  passwordResetTokenTtlMinutes: number;
   mailingListUnsubscribeSecret: string;
 }
 
@@ -113,6 +114,12 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): IAppConfig 
     24,
     errors,
   );
+  const passwordResetTokenTtlMinutes = parsePositiveIntegerEnv(
+    env,
+    "PASSWORD_RESET_TOKEN_TTL_MINUTES",
+    60,
+    errors,
+  );
 
   if (provider === "resend") {
     requireEnv(env, "EMAIL_FROM", errors);
@@ -145,6 +152,7 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): IAppConfig 
       appBaseUrl,
       resendApiKey,
       verificationTokenTtlHours,
+      passwordResetTokenTtlMinutes,
       mailingListUnsubscribeSecret,
     },
   };

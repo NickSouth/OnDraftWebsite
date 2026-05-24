@@ -13,6 +13,7 @@ describe("loadAppConfig", () => {
     expect(config.email.provider).toBe("logging");
     expect(config.email.appBaseUrl).toBe("http://localhost:3000");
     expect(config.email.verificationTokenTtlHours).toBe(24);
+    expect(config.email.passwordResetTokenTtlMinutes).toBe(60);
   });
 
   it("requires resend settings when the resend provider is selected", () => {
@@ -37,8 +38,10 @@ describe("loadAppConfig", () => {
     const config = loadAppConfig({
       NODE_ENV: "test",
       EMAIL_VERIFICATION_TOKEN_TTL_HOURS: "6",
+      PASSWORD_RESET_TOKEN_TTL_MINUTES: "30",
     });
 
     expect(config.email.verificationTokenTtlHours).toBe(6);
+    expect(config.email.passwordResetTokenTtlMinutes).toBe(30);
   });
 });

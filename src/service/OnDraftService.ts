@@ -663,6 +663,26 @@ class OnDraftService implements IOnDraftService {
     }
     return updated;
   }
+
+  private async fetchYoutubeStatsForVideo(videoId: string): Promise<Pick<Video, "thumbnailUrl" | "viewCount" | "youtubeStatsFetchedAt">> {
+    if (!this.youtubeStats) {
+      return {};
+    }
+
+    const stats = await this.youtubeStats.fetchVideoStats([videoId]);
+    if (stats.ok === false) {
+      return {};
+    }
+
+    const videoStats = stats.value.get(videoId);
+    return videoStats
+      ? {
+          thumbnailUrl: videoStats.thumbnailUrl,
+          viewCount: videoStats.viewCount,
+          youtubeStatsFetchedAt: new Date(),
+        }
+      : {};
+  }
   
   private prepareArticleInput(input: CreateArticleInput): Result<CreateArticleInput, ArticleError> {
     const sanitizedInput: CreateArticleInput = {
@@ -1121,20 +1141,7 @@ class OnDraftService implements IOnDraftService {
       return Err(prepared.value);
     }
 
-    let thumbnailUrl: string | undefined;
-    let viewCount: number | undefined;
-    let youtubeStatsFetchedAt: Date | undefined;
-    if (this.youtubeStats) {
-      const stats = await this.youtubeStats.fetchVideoStats([prepared.value.videoId]);
-      if (stats.ok === true) {
-        const videoStats = stats.value.get(prepared.value.videoId);
-        if (videoStats) {
-          thumbnailUrl = videoStats.thumbnailUrl;
-          viewCount = videoStats.viewCount;
-          youtubeStatsFetchedAt = new Date();
-        }
-      }
-    }
+    const youtubeStats = await this.fetchYoutubeStatsForVideo(prepared.value.videoId);
 
     const now = new Date();
     const video: Video = {
@@ -1145,9 +1152,7 @@ class OnDraftService implements IOnDraftService {
       tags: prepared.value.tags ?? [],
       createdAt: now,
       updatedAt: now,
-      thumbnailUrl,
-      viewCount,
-      youtubeStatsFetchedAt,
+      ...youtubeStats,
     };
 
     return await this.repository.createYoutubeVideo(video);
@@ -1191,6 +1196,7 @@ class OnDraftService implements IOnDraftService {
       return Err(prepared.value);
     }
 
+    const youtubeStats = await this.fetchYoutubeStatsForVideo(prepared.value.videoId);
     const video: Video = {
       ...existing.value,
       youtubeUrl: prepared.value.youtubeUrl,
@@ -1199,9 +1205,9 @@ class OnDraftService implements IOnDraftService {
       videoId: prepared.value.videoId,
       tags: prepared.value.tags ?? [],
       updatedAt: new Date(),
-      thumbnailUrl: prepared.value.videoId === existing.value.videoId ? existing.value.thumbnailUrl : undefined,
-      viewCount: prepared.value.videoId === existing.value.videoId ? existing.value.viewCount : undefined,
-      youtubeStatsFetchedAt: prepared.value.videoId === existing.value.videoId ? existing.value.youtubeStatsFetchedAt : undefined,
+      thumbnailUrl: youtubeStats.thumbnailUrl ?? (prepared.value.videoId === existing.value.videoId ? existing.value.thumbnailUrl : undefined),
+      viewCount: youtubeStats.viewCount ?? (prepared.value.videoId === existing.value.videoId ? existing.value.viewCount : undefined),
+      youtubeStatsFetchedAt: youtubeStats.youtubeStatsFetchedAt ?? (prepared.value.videoId === existing.value.videoId ? existing.value.youtubeStatsFetchedAt : undefined),
     };
 
     return await this.repository.updateYoutubeVideo(videoId.trim(), video);

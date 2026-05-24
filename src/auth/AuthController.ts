@@ -14,6 +14,14 @@ import type { AuthError } from "./errors";
 export interface IAuthController {
   showLogin(res: Response, session: IOnDraftBrowserSession, pageError?: string | null): Promise<void>;
   showRegister(res: Response, session: IOnDraftBrowserSession, pageError?: string | null): Promise<void>;
+  showForgotPassword(res: Response, session: IOnDraftBrowserSession, pageMessage?: string | null, pageError?: string | null): Promise<void>;
+  showResetPassword(res: Response, session: IOnDraftBrowserSession, token: string, pageError?: string | null): Promise<void>;
+  showPasswordResetResult(
+    res: Response,
+    session: IOnDraftBrowserSession,
+    status: "success" | "failure",
+    message: string,
+  ): Promise<void>;
   showVerifyEmailResult(
     res: Response,
     session: IOnDraftBrowserSession,
@@ -50,6 +58,18 @@ export interface IAuthController {
   requestEmailVerificationFromForm(
     res: Response,
     email: string,
+    store: OnDraftSessionStore,
+  ): Promise<void>;
+  requestPasswordResetFromForm(
+    res: Response,
+    email: string,
+    store: OnDraftSessionStore,
+  ): Promise<void>;
+  resetPasswordFromForm(
+    res: Response,
+    token: string,
+    password: string,
+    confirmPassword: string,
     store: OnDraftSessionStore,
   ): Promise<void>;
   showSettingsModal(
@@ -107,6 +127,33 @@ class AuthController implements IAuthController {
     pageError: string | null = null,
   ): Promise<void> {
     res.render("auth/register", { pageError, session });
+  }
+
+  async showForgotPassword(
+    res: Response,
+    session: IOnDraftBrowserSession,
+    pageMessage: string | null = null,
+    pageError: string | null = null,
+  ): Promise<void> {
+    res.render("auth/forgotPassword", { pageMessage, pageError, session });
+  }
+
+  async showResetPassword(
+    res: Response,
+    session: IOnDraftBrowserSession,
+    token: string,
+    pageError: string | null = null,
+  ): Promise<void> {
+    res.render("auth/resetPassword", { token, pageError, session });
+  }
+
+  async showPasswordResetResult(
+    res: Response,
+    session: IOnDraftBrowserSession,
+    status: "success" | "failure",
+    message: string,
+  ): Promise<void> {
+    res.render("auth/passwordResetResult", { status, message, session });
   }
 
   async showVerifyEmailResult(
@@ -197,10 +244,19 @@ class AuthController implements IAuthController {
       return;
     }
 
+    let nextSession = session;
+    if (session.authenticatedUser?.userId === result.value.id) {
+      nextSession = signInAuthenticatedUser(
+        store,
+        result.value,
+        session.authenticatedUser.rememberMe,
+      );
+    }
+
     this.logger.info("Email verification completed");
     await this.showVerifyEmailResult(
       res,
-      session,
+      nextSession,
       "success",
       "Your email has been verified.",
     );
@@ -233,6 +289,63 @@ class AuthController implements IAuthController {
       session,
       "success",
       "If that email needs verification, we sent a new verification link.",
+    );
+  }
+
+  async requestPasswordResetFromForm(
+    res: Response,
+    email: string,
+    store: OnDraftSessionStore,
+  ): Promise<void> {
+    const session = touchOnDraftSession(store);
+    const result = await this.service.requestPasswordReset({ email });
+
+    if (result.ok === false) {
+      this.logger.error(`Password reset request failed: ${result.value.message}`);
+      res.status(500);
+      await this.showForgotPassword(res, session, null, "We could not process that request right now.");
+      return;
+    }
+
+    this.logger.info("Password reset request accepted");
+    await this.showForgotPassword(
+      res,
+      session,
+      "If that email is registered, we sent a password reset link.",
+      null,
+    );
+  }
+
+  async resetPasswordFromForm(
+    res: Response,
+    token: string,
+    password: string,
+    confirmPassword: string,
+    store: OnDraftSessionStore,
+  ): Promise<void> {
+    const session = touchOnDraftSession(store);
+    const result = await this.service.resetPassword({ token, password, confirmPassword });
+
+    if (result.ok === false) {
+      const error = result.value;
+      const status = this.mapErrorStatus(error);
+      const log = status >= 500 ? this.logger.error : this.logger.warn;
+      log.call(this.logger, `Password reset failed: ${error.message}`);
+      res.status(status);
+      if (error.name === "ValidationError" && token.trim()) {
+        await this.showResetPassword(res, session, token, error.message);
+      } else {
+        await this.showPasswordResetResult(res, session, "failure", error.message);
+      }
+      return;
+    }
+
+    this.logger.info("Password reset completed");
+    await this.showPasswordResetResult(
+      res,
+      session,
+      "success",
+      "Your password has been reset. You can log in with your new password.",
     );
   }
 

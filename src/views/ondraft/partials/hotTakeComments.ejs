@@ -30,6 +30,8 @@
 
   <% if (session.authenticatedUser && currentActiveBan) { %>
     <%- include("bannedUserNotice", { ban: currentActiveBan }) %>
+  <% } else if (session.authenticatedUser && !session.authenticatedUser.emailVerifiedAt) { %>
+    <p class="error-message">Verify your email before commenting.</p>
   <% } else if (session.authenticatedUser) { %>
     <form
       class="comment-form reply-form hot-take-comment-form"

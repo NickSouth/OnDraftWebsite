@@ -1,7 +1,10 @@
 import request from "supertest";
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { createComposedApp } from "../../src/composition";
+import { getPrismaClient } from "../../src/prisma/client";
+import { hashPassword } from "../../src/auth/PasswordHasher";
 import {
   clearPrismaTestDatabase,
   disconnectPrismaTestDatabase,
@@ -60,18 +63,30 @@ describe("OnDraft HTTP contracts", () => {
     expect(response.status).toBe(200);
     expect(response.text).toContain("Articles On Tap");
     expect(response.text).toContain("Log in");
-    expect(response.text).toContain('hx-get="/about"');
+    expect(response.text).toContain('href="/about"');
+    expect(response.text).not.toContain('hx-get="/about"');
     expect(response.text).toContain('hx-target="#site-modal-outlet"');
+    expect(response.text).toContain("/images/social/youtube-icon.svg");
+    expect(response.text).toContain("/images/social/x-icon.svg");
+    expect(response.text).toContain("/images/social/tiktok-icon.svg");
+    expect(response.text).toContain("https://www.venmo.com/u/OnDraft-Football");
+    expect(response.text).not.toContain("[PLACEHOLDER FOR SOCIAL MEDIA LINKS]");
   });
 
-  it("renders footer informational pages as modal content", async () => {
+  it("renders about as a full page and footer legal pages as modal content", async () => {
     const about = await request(app()).get("/about");
     const privacy = await request(app()).get("/privacy");
     const contact = await request(app()).get("/contact");
 
     expect(about.status).toBe(200);
-    expect(about.text).toContain('role="dialog"');
-    expect(about.text).toContain("This is a work in progress website by Nick Southey");
+    expect(about.text).toContain("<h1");
+    expect(about.text).toContain("About Us");
+    expect(about.text).toContain("Our Story");
+    expect(about.text).toContain("Ryan McWalter");
+    expect(about.text).toContain("Aleks Ryabinkin");
+    expect(about.text).toContain("Nick Southey");
+    expect(about.text).toContain("/images/social/linkedin-in-bug.png");
+    expect(about.text).not.toContain('role="dialog"');
 
     expect(privacy.status).toBe(200);
     expect(privacy.text).toContain("OnDraft Football");
@@ -184,6 +199,157 @@ describe("OnDraft HTTP contracts", () => {
     expect(ondraft.status).toBe(200);
     expect(ondraft.text).toContain("New Analyst");
     expect(ondraft.text).not.toContain("Resend verification email");
+  });
+
+  it("verifies an email token through the routed verification page", async () => {
+    const ondraft = app();
+    const prisma = getPrismaClient();
+    const rawToken = "fresh-http-verification-token";
+    const tokenHash = createHash("sha256").update(rawToken).digest("hex");
+    await prisma.user.create({
+      data: {
+        id: "user-needs-verification",
+        email: "needs-verification@ondraft.test",
+        displayName: "Needs Verification",
+        passwordHash: await hashPassword("password123"),
+        role: "user",
+        theme: "light",
+        fontSize: "small",
+        createdAt: new Date(),
+      },
+    });
+    await prisma.emailVerificationToken.create({
+      data: {
+        id: "email-token-http",
+        userId: "user-needs-verification",
+        tokenHash,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        createdAt: new Date(),
+      },
+    });
+
+    const agent = request.agent(ondraft);
+    await agent
+      .post("/login")
+      .type("form")
+      .send({ email: "needs-verification@ondraft.test", password: "password123" });
+
+    const beforeSettings = await agent.get("/settings");
+    expect(beforeSettings.status).toBe(200);
+    expect(beforeSettings.text).toContain("Email verification");
+
+    const verified = await agent.get(`/verify-email?token=${encodeURIComponent(rawToken)}`);
+
+    expect(verified.status).toBe(200);
+    expect(verified.text).toContain("Email Verified");
+    expect(verified.text).toContain("Your email has been verified.");
+
+    const user = await prisma.user.findUnique({ where: { id: "user-needs-verification" } });
+    expect(user?.emailVerifiedAt).toBeInstanceOf(Date);
+
+    const afterSettings = await agent.get("/settings");
+    expect(afterSettings.status).toBe(200);
+    expect(afterSettings.text).not.toContain("Email verification");
+    expect(afterSettings.text).not.toContain("Resend verify email");
+  });
+
+  it("requests and completes password reset through routed pages", async () => {
+    const ondraft = app();
+    const prisma = getPrismaClient();
+    await prisma.user.create({
+      data: {
+        id: "user-reset-password",
+        email: "reset-reader@ondraft.test",
+        displayName: "Reset Reader",
+        passwordHash: await hashPassword("password123"),
+        role: "user",
+        theme: "light",
+        fontSize: "small",
+        createdAt: new Date(),
+      },
+    });
+
+    const requestReset = await request(ondraft)
+      .post("/forgot-password")
+      .type("form")
+      .send({ email: "reset-reader@ondraft.test" });
+    expect(requestReset.status).toBe(200);
+    expect(requestReset.text).toContain("If that email is registered, we sent a password reset link.");
+
+    const unknownReset = await request(ondraft)
+      .post("/forgot-password")
+      .type("form")
+      .send({ email: "unknown-reset@ondraft.test" });
+    expect(unknownReset.status).toBe(200);
+    expect(unknownReset.text).toContain("If that email is registered, we sent a password reset link.");
+
+    const createdTokens = await prisma.passwordResetToken.findMany({
+      where: { userId: "user-reset-password" },
+    });
+    expect(createdTokens).toHaveLength(1);
+    expect(createdTokens[0].tokenHash).not.toContain("reset-http-token");
+
+    const rawToken = "reset-http-token";
+    const tokenHash = createHash("sha256").update(rawToken).digest("hex");
+    await prisma.passwordResetToken.create({
+      data: {
+        id: "password-token-http",
+        userId: "user-reset-password",
+        tokenHash,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        createdAt: new Date(),
+      },
+    });
+
+    const form = await request(ondraft).get(`/reset-password?token=${encodeURIComponent(rawToken)}`);
+    expect(form.status).toBe(200);
+    expect(form.text).toContain("Choose New Password");
+    expect(form.text).toContain("Confirm new password");
+
+    const mismatch = await request(ondraft)
+      .post("/reset-password")
+      .type("form")
+      .send({
+        token: rawToken,
+        password: "new-password-123",
+        confirmPassword: "different-password",
+      });
+    expect(mismatch.status).toBe(400);
+    expect(mismatch.text).toContain("Passwords must match.");
+
+    const reset = await request(ondraft)
+      .post("/reset-password")
+      .type("form")
+      .send({
+        token: rawToken,
+        password: "new-password-123",
+        confirmPassword: "new-password-123",
+      });
+    expect(reset.status).toBe(200);
+    expect(reset.text).toContain("Your password has been reset.");
+
+    const oldLogin = await request(ondraft)
+      .post("/login")
+      .type("form")
+      .send({ email: "reset-reader@ondraft.test", password: "password123" });
+    expect(oldLogin.status).toBe(401);
+
+    const newLogin = await request(ondraft)
+      .post("/login")
+      .type("form")
+      .send({ email: "reset-reader@ondraft.test", password: "new-password-123" });
+    expect(newLogin.status).toBe(302);
+
+    const reused = await request(ondraft)
+      .post("/reset-password")
+      .type("form")
+      .send({
+        token: rawToken,
+        password: "another-password-123",
+        confirmPassword: "another-password-123",
+      });
+    expect(reused.status).toBe(400);
+    expect(reused.text).toContain("expired or already used");
   });
 
   it("rejects registration when password confirmation does not match", async () => {
@@ -1073,7 +1239,14 @@ describe("OnDraft HTTP contracts", () => {
       .send({ text: "Good read." });
 
     expect(unverifiedComment.status).toBe(403);
-    expect(unverifiedComment.text).toContain("Verify your email to comment.");
+    expect(unverifiedComment.text).toContain("Verify your email before commenting.");
+    expect(unverifiedComment.text).toContain('id="article-comments-section"');
+
+    const unverifiedBookmark = await reader
+      .post(`/articles/${articleId}/bookmark`)
+      .set("HX-Request", "true");
+    expect(unverifiedBookmark.status).toBe(200);
+    expect(unverifiedBookmark.text).toContain("is-bookmarked");
 
     const comment = await admin
       .post(`/articles/${articleId}/comments`)
@@ -1189,6 +1362,8 @@ describe("OnDraft HTTP contracts", () => {
         contentType: "plainText",
         content: "Newer article body.",
       });
+    const currentFavoriteDate = new Date();
+    currentFavoriteDate.setDate(currentFavoriteDate.getDate() - 1);
     const currentFavorite = await admin
       .post("/articles")
       .type("form")
@@ -1196,7 +1371,7 @@ describe("OnDraft HTTP contracts", () => {
         title: "Current Favorite Article",
         author: "Ryan McWalter",
         writeup: "Current summary.",
-        publicationDate: new Date().toISOString().slice(0, 10),
+        publicationDate: currentFavoriteDate.toISOString().slice(0, 10),
         contentType: "plainText",
         content: "Current article body.",
       });
@@ -1419,6 +1594,22 @@ describe("OnDraft HTTP contracts", () => {
 
     const missing = await agent.get(`/articles/${articleId}`);
     expect(missing.status).toBe(404);
+    expect(missing.text).toContain("Article not found");
+    expect(missing.text).toContain("spilled-mug");
+  });
+
+  it("renders themed not-found pages for missing videos and routes", async () => {
+    const ondraft = app();
+
+    const missingVideo = await request(ondraft).get("/videos/not-a-video");
+    expect(missingVideo.status).toBe(404);
+    expect(missingVideo.text).toContain("Video not found");
+    expect(missingVideo.text).toContain("spilled-mug");
+
+    const missingPage = await request(ondraft).get("/missing-page");
+    expect(missingPage.status).toBe(404);
+    expect(missingPage.text).toContain("Page not found");
+    expect(missingPage.text).toContain("spilled-mug");
   });
 
   it("renders uploaded PDF articles as in-page article canvases", async () => {
