@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "npm run build && node dist/server.js",
+    "start": "node dist/server.js",
     "build": "npm run build:css && tsc --outDir dist -m nodenext -t es2024 --esModuleInterop src/app.ts src/server.ts",
     "build:css": "tailwindcss -c tailwind.config.cjs -i ./src/static/tailwind.input.css -o ./src/static/tailwind.css --minify",
     "db:seed": "prisma db seed",
