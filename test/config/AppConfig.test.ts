@@ -16,6 +16,7 @@ describe("loadAppConfig", () => {
     expect(config.email.passwordResetTokenTtlMinutes).toBe(60);
     expect(config.turnstile.siteKey).toBeNull();
     expect(config.turnstile.secretKey).toBeNull();
+    expect(config.turnstile.verificationDisabled).toBe(false);
   });
 
   it("requires resend settings when the resend provider is selected", () => {
@@ -83,5 +84,35 @@ describe("loadAppConfig", () => {
     expect(config.email.passwordResetTokenTtlMinutes).toBe(30);
     expect(config.turnstile.siteKey).toBe("site-key");
     expect(config.turnstile.secretKey).toBe("secret-key");
+    expect(config.turnstile.verificationDisabled).toBe(false);
+  });
+
+  it("allows disabling Turnstile verification outside production", () => {
+    const config = loadAppConfig({
+      NODE_ENV: "development",
+      TURNSTILE_SITE_KEY: "site-key",
+      TURNSTILE_SECRET_KEY: "secret-key",
+      TURNSTILE_VERIFICATION_DISABLED: "true",
+    });
+
+    expect(config.turnstile.siteKey).toBe("site-key");
+    expect(config.turnstile.secretKey).toBe("secret-key");
+    expect(config.turnstile.verificationDisabled).toBe(true);
+  });
+
+  it("rejects disabling Turnstile verification in production", () => {
+    expect(() =>
+      loadAppConfig({
+        NODE_ENV: "production",
+        EMAIL_PROVIDER: "resend",
+        EMAIL_FROM: "support@ondraftfootball.com",
+        RESEND_API_KEY: "re_test",
+        APP_BASE_URL: "https://ondraftfootball.com",
+        SESSION_SECRET: "test-session-secret",
+        TURNSTILE_SITE_KEY: "site-key",
+        TURNSTILE_SECRET_KEY: "secret-key",
+        TURNSTILE_VERIFICATION_DISABLED: "true",
+      }),
+    ).toThrow(/TURNSTILE_VERIFICATION_DISABLED cannot be true in production/);
   });
 });

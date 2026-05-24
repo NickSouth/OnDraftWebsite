@@ -102,7 +102,7 @@ class ExpressApp implements IApp {
     private readonly authController: IAuthController,
     private readonly logger: ILoggingService,
     private readonly sessionStore?: session.Store,
-    private readonly turnstileConfig: ITurnstileConfig = { siteKey: null, secretKey: null },
+    private readonly turnstileConfig: ITurnstileConfig = { siteKey: null, secretKey: null, verificationDisabled: false },
     private readonly siteBaseUrl = "http://localhost:3000",
   ) {
     this.app = express();
@@ -276,7 +276,7 @@ class ExpressApp implements IApp {
     res.locals.currentAbsoluteUrl = currentAbsoluteUrl;
     res.locals.defaultPreviewImageUrl = defaultPreviewImageUrl;
     res.locals.relativeTime = formatRelativeTime;
-    res.locals.turnstileSiteKey = this.turnstileConfig.siteKey;
+    res.locals.turnstileSiteKey = this.turnstileConfig.verificationDisabled ? null : this.turnstileConfig.siteKey;
     next();
   }
 
@@ -359,7 +359,9 @@ class ExpressApp implements IApp {
     this.app.post(
       "/login",
       this.loginRateLimit,
-      this.turnstileVerifier.middleware(),
+      this.turnstileVerifier.middleware(async (_req, res) => {
+        await this.authController.showLogin(res, touchOnDraftSession(sessionStore(_req)), "We could not verify this request. Please try again.");
+      }),
       asyncHandler(async (req, res) => {
         const email = typeof req.body.email === "string" ? req.body.email : "";
         const password = typeof req.body.password === "string" ? req.body.password : "";
@@ -380,7 +382,9 @@ class ExpressApp implements IApp {
     this.app.post(
       "/forgot-password",
       this.passwordResetRateLimit,
-      this.turnstileVerifier.middleware(),
+      this.turnstileVerifier.middleware(async (req, res) => {
+        await this.authController.showForgotPassword(res, touchOnDraftSession(sessionStore(req)), null, "We could not verify this request. Please try again.");
+      }),
       asyncHandler(async (req, res) => {
         const email = typeof req.body.email === "string" ? req.body.email : "";
         await this.authController.requestPasswordResetFromForm(res, email, sessionStore(req));
@@ -413,7 +417,10 @@ class ExpressApp implements IApp {
       "/reset-password",
       this.preventTokenCaching,
       this.tokenAttemptRateLimit,
-      this.turnstileVerifier.middleware(),
+      this.turnstileVerifier.middleware(async (req, res) => {
+        const token = typeof req.body.token === "string" ? req.body.token : "";
+        await this.authController.showResetPassword(res, touchOnDraftSession(sessionStore(req)), token, "We could not verify this request. Please try again.");
+      }),
       asyncHandler(async (req, res) => {
         const token = typeof req.body.token === "string" ? req.body.token : "";
         const password = typeof req.body.password === "string" ? req.body.password : "";
@@ -446,7 +453,9 @@ class ExpressApp implements IApp {
     this.app.post(
       "/register",
       this.accountCreationRateLimit,
-      this.turnstileVerifier.middleware(),
+      this.turnstileVerifier.middleware(async (req, res) => {
+        await this.authController.showRegister(res, touchOnDraftSession(sessionStore(req)), "We could not verify this request. Please try again.");
+      }),
       asyncHandler(async (req, res) => {
         const displayName = typeof req.body.displayName === "string" ? req.body.displayName : "";
         const email = typeof req.body.email === "string" ? req.body.email : "";

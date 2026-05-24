@@ -32,6 +32,28 @@ function appWithTurnstile() {
     turnstile: {
       siteKey: "test-site-key",
       secretKey: "test-secret-key",
+      verificationDisabled: false,
+    },
+  }).getExpressApp();
+}
+
+function appWithDisabledTurnstile() {
+  return createComposedApp("prisma", undefined, {
+    port: 3000,
+    repositoryMode: "prisma",
+    email: {
+      provider: "logging",
+      from: null,
+      appBaseUrl: "http://localhost:3000",
+      resendApiKey: null,
+      verificationTokenTtlHours: 24,
+      passwordResetTokenTtlMinutes: 60,
+      mailingListUnsubscribeSecret: "test-mailing-secret",
+    },
+    turnstile: {
+      siteKey: "test-site-key",
+      secretKey: "test-secret-key",
+      verificationDisabled: true,
     },
   }).getExpressApp();
 }
@@ -162,6 +184,24 @@ describe("OnDraft HTTP contracts", () => {
 
     expect(response.status).toBe(400);
     expect(response.text).toContain("We could not verify this request. Please try again.");
+    expect(response.text).toContain("Account Login");
+    expect(response.text).toContain("<!doctype html>");
+  });
+
+  it("skips Turnstile widgets and verification when locally disabled", async () => {
+    const ondraft = appWithDisabledTurnstile();
+    const login = await request(ondraft).get("/login");
+
+    expect(login.status).toBe(200);
+    expect(login.text).not.toContain("cf-turnstile");
+
+    const response = await request(ondraft)
+      .post("/login")
+      .type("form")
+      .send({ email: "ryan@ondraftfootball.com", password: "password123" });
+
+    expect(response.status).toBe(302);
+    expect(response.headers.location).toBe("/");
   });
 
   it("verifies Turnstile server-side before accepting protected auth forms", async () => {
