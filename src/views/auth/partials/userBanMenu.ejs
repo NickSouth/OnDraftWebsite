@@ -1,4 +1,12 @@
 <div class="moderation-menu">
+  <button
+    type="button"
+    class="moderation-menu-close"
+    aria-label="Close ban menu"
+    onclick="this.closest('.moderation-menu')?.remove();"
+  >
+    &times;
+  </button>
   <% if (errorMessage) { %>
     <p class="error-message"><%= errorMessage %></p>
   <% } %>
@@ -37,7 +45,7 @@
           <option value="permanent">Permanent</option>
         </select>
       </label>
-      <button type="submit">Ban user</button>
+      <button type="submit">Ban <%= user.displayName %></button>
     </form>
   <% } %>
 </div>

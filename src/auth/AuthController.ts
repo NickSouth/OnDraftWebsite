@@ -1,4 +1,4 @@
-import type { Response } from "express";
+import type { Request, Response } from "express";
 import {
   getAuthenticatedUser,
   signInAuthenticatedUser,
@@ -14,6 +14,14 @@ import type { AuthError } from "./errors";
 export interface IAuthController {
   showLogin(res: Response, session: IOnDraftBrowserSession, pageError?: string | null): Promise<void>;
   showRegister(res: Response, session: IOnDraftBrowserSession, pageError?: string | null): Promise<void>;
+  showForgotPassword(res: Response, session: IOnDraftBrowserSession, pageMessage?: string | null, pageError?: string | null): Promise<void>;
+  showResetPassword(res: Response, session: IOnDraftBrowserSession, token: string, pageError?: string | null): Promise<void>;
+  showPasswordResetResult(
+    res: Response,
+    session: IOnDraftBrowserSession,
+    status: "success" | "failure",
+    message: string,
+  ): Promise<void>;
   showVerifyEmailResult(
     res: Response,
     session: IOnDraftBrowserSession,
@@ -27,20 +35,20 @@ export interface IAuthController {
     message: string,
   ): Promise<void>;
   loginFromForm(
+    req: Request,
     res: Response,
     email: string,
     password: string,
     rememberMe: boolean,
-    store: OnDraftSessionStore,
   ): Promise<void>;
   registerFromForm(
+    req: Request,
     res: Response,
     displayName: string,
     email: string,
     password: string,
     confirmPassword: string,
     mailingListConsent: boolean,
-    store: OnDraftSessionStore,
   ): Promise<void>;
   verifyEmailFromRequest(
     res: Response,
@@ -50,6 +58,18 @@ export interface IAuthController {
   requestEmailVerificationFromForm(
     res: Response,
     email: string,
+    store: OnDraftSessionStore,
+  ): Promise<void>;
+  requestPasswordResetFromForm(
+    res: Response,
+    email: string,
+    store: OnDraftSessionStore,
+  ): Promise<void>;
+  resetPasswordFromForm(
+    res: Response,
+    token: string,
+    password: string,
+    confirmPassword: string,
     store: OnDraftSessionStore,
   ): Promise<void>;
   showSettingsModal(
@@ -62,6 +82,10 @@ export interface IAuthController {
     res: Response,
     store: OnDraftSessionStore,
     subscribe: boolean,
+  ): Promise<void>;
+  changePasswordFromSettings(
+    res: Response,
+    store: OnDraftSessionStore,
   ): Promise<void>;
   requestEmailVerificationFromSettings(
     res: Response,
@@ -77,7 +101,7 @@ export interface IAuthController {
   showUserModerationMenu(res: Response, store: OnDraftSessionStore, userId: string, contextId: string): Promise<void>;
   banUserFromForm(res: Response, store: OnDraftSessionStore, userId: string, contextId: string, message: string, duration: string): Promise<void>;
   unbanUserFromForm(res: Response, store: OnDraftSessionStore, userId: string, contextId: string): Promise<void>;
-  logoutFromForm(res: Response, store: OnDraftSessionStore): Promise<void>;
+  logoutFromForm(req: Request, res: Response): Promise<void>;
 }
 
 class AuthController implements IAuthController {
@@ -91,6 +115,30 @@ class AuthController implements IAuthController {
     if (error.name === "UserAlreadyExists") return 409;
     if (error.name === "ValidationError") return 400;
     return 500;
+  }
+
+  private regenerateSession(req: Request): Promise<void> {
+    return new Promise((resolve, reject) => {
+      req.session.regenerate((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
+  }
+
+  private destroySession(req: Request): Promise<void> {
+    return new Promise((resolve, reject) => {
+      req.session.destroy((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
   }
 
   async showLogin(
@@ -107,6 +155,33 @@ class AuthController implements IAuthController {
     pageError: string | null = null,
   ): Promise<void> {
     res.render("auth/register", { pageError, session });
+  }
+
+  async showForgotPassword(
+    res: Response,
+    session: IOnDraftBrowserSession,
+    pageMessage: string | null = null,
+    pageError: string | null = null,
+  ): Promise<void> {
+    res.render("auth/forgotPassword", { pageMessage, pageError, session });
+  }
+
+  async showResetPassword(
+    res: Response,
+    session: IOnDraftBrowserSession,
+    token: string,
+    pageError: string | null = null,
+  ): Promise<void> {
+    res.render("auth/resetPassword", { token, pageError, session });
+  }
+
+  async showPasswordResetResult(
+    res: Response,
+    session: IOnDraftBrowserSession,
+    status: "success" | "failure",
+    message: string,
+  ): Promise<void> {
+    res.render("auth/passwordResetResult", { status, message, session });
   }
 
   async showVerifyEmailResult(
@@ -128,12 +203,13 @@ class AuthController implements IAuthController {
   }
 
   async loginFromForm(
+    req: Request,
     res: Response,
     email: string,
     password: string,
     rememberMe: boolean,
-    store: OnDraftSessionStore,
   ): Promise<void> {
+    const store = req.session as OnDraftSessionStore;
     const session = touchOnDraftSession(store);
     const result = await this.service.authenticate({ email, password });
 
@@ -147,20 +223,25 @@ class AuthController implements IAuthController {
       return;
     }
 
-    const nextSession = signInAuthenticatedUser(store, result.value, rememberMe);
+    const currentSession = touchOnDraftSession(store);
+    await this.regenerateSession(req);
+    const nextStore = req.session as OnDraftSessionStore;
+    nextStore.ondraft = { ...currentSession, authenticatedUser: null };
+    const nextSession = signInAuthenticatedUser(nextStore, result.value, rememberMe);
     this.logger.info(`Authenticated ${nextSession.authenticatedUser?.email ?? "unknown user"}`);
     res.redirect("/");
   }
 
   async registerFromForm(
+    req: Request,
     res: Response,
     displayName: string,
     email: string,
     password: string,
     confirmPassword: string,
     mailingListConsent: boolean,
-    store: OnDraftSessionStore,
   ): Promise<void> {
+    const store = req.session as OnDraftSessionStore;
     const session = touchOnDraftSession(store);
     const result = await this.service.register({ displayName, email, password, confirmPassword, mailingListConsent });
 
@@ -174,7 +255,11 @@ class AuthController implements IAuthController {
       return;
     }
 
-    const nextSession = signInAuthenticatedUser(store, result.value);
+    const currentSession = touchOnDraftSession(store);
+    await this.regenerateSession(req);
+    const nextStore = req.session as OnDraftSessionStore;
+    nextStore.ondraft = { ...currentSession, authenticatedUser: null };
+    const nextSession = signInAuthenticatedUser(nextStore, result.value);
     this.logger.info(`Registered ${nextSession.authenticatedUser?.email ?? "unknown user"}`);
     res.redirect("/");
   }
@@ -197,10 +282,19 @@ class AuthController implements IAuthController {
       return;
     }
 
+    let nextSession = session;
+    if (session.authenticatedUser?.userId === result.value.id) {
+      nextSession = signInAuthenticatedUser(
+        store,
+        result.value,
+        session.authenticatedUser.rememberMe,
+      );
+    }
+
     this.logger.info("Email verification completed");
     await this.showVerifyEmailResult(
       res,
-      session,
+      nextSession,
       "success",
       "Your email has been verified.",
     );
@@ -233,6 +327,65 @@ class AuthController implements IAuthController {
       session,
       "success",
       "If that email needs verification, we sent a new verification link.",
+    );
+  }
+
+  async requestPasswordResetFromForm(
+    res: Response,
+    email: string,
+    store: OnDraftSessionStore,
+  ): Promise<void> {
+    const session = touchOnDraftSession(store);
+    const result = await this.service.requestPasswordReset({ email });
+
+    if (result.ok === false) {
+      const status = this.mapErrorStatus(result.value);
+      const log = status >= 500 ? this.logger.error : this.logger.warn;
+      log.call(this.logger, `Password reset request failed: ${result.value.message}`);
+      res.status(status);
+      await this.showForgotPassword(res, session, null, result.value.message);
+      return;
+    }
+
+    this.logger.info("Password reset request accepted");
+    await this.showForgotPassword(
+      res,
+      session,
+      "If that email is registered, we sent a password reset link.",
+      null,
+    );
+  }
+
+  async resetPasswordFromForm(
+    res: Response,
+    token: string,
+    password: string,
+    confirmPassword: string,
+    store: OnDraftSessionStore,
+  ): Promise<void> {
+    const session = touchOnDraftSession(store);
+    const result = await this.service.resetPassword({ token, password, confirmPassword });
+
+    if (result.ok === false) {
+      const error = result.value;
+      const status = this.mapErrorStatus(error);
+      const log = status >= 500 ? this.logger.error : this.logger.warn;
+      log.call(this.logger, `Password reset failed: ${error.message}`);
+      res.status(status);
+      if (error.name === "ValidationError" && token.trim()) {
+        await this.showResetPassword(res, session, token, error.message);
+      } else {
+        await this.showPasswordResetResult(res, session, "failure", error.message);
+      }
+      return;
+    }
+
+    this.logger.info("Password reset completed");
+    await this.showPasswordResetResult(
+      res,
+      session,
+      "success",
+      "Your password has been reset. You can log in with your new password.",
     );
   }
 
@@ -315,6 +468,30 @@ class AuthController implements IAuthController {
         : "You are subscribed to the OnDraft mailing list."
       : "You are unsubscribed from the OnDraft mailing list.";
     this.renderSettingsModal(res, session, result.value, message, null);
+  }
+
+  async changePasswordFromSettings(
+    res: Response,
+    store: OnDraftSessionStore,
+  ): Promise<void> {
+    const session = touchOnDraftSession(store);
+    const email = session.authenticatedUser?.email ?? "";
+
+    if (!email) {
+      await this.showSettingsModal(res, store, null, "Log in to manage account settings.");
+      return;
+    }
+
+    const result = await this.service.requestPasswordReset({ email });
+    if (result.ok === false) {
+      const status = this.mapErrorStatus(result.value);
+      const log = status >= 500 ? this.logger.error : this.logger.warn;
+      log.call(this.logger, `Settings password reset request failed: ${result.value.message}`);
+      await this.showSettingsModal(res, store, null, "We could not send that password reset email right now.");
+      return;
+    }
+
+    await this.showSettingsModal(res, store, "We sent a password reset link to your email.", null);
   }
 
   async requestEmailVerificationFromSettings(
@@ -495,7 +672,8 @@ class AuthController implements IAuthController {
     this.renderUserModerationActions(res, user.value, contextId);
   }
 
-  async logoutFromForm(res: Response, store: OnDraftSessionStore): Promise<void> {
+  async logoutFromForm(req: Request, res: Response): Promise<void> {
+    const store = req.session as OnDraftSessionStore;
     const currentUser = getAuthenticatedUser(store);
 
     if (currentUser) {
@@ -503,6 +681,12 @@ class AuthController implements IAuthController {
     }
 
     signOutAuthenticatedUser(store);
+    await this.destroySession(req);
+    res.clearCookie("ondraft.sid", {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    });
     res.redirect("/");
   }
 }

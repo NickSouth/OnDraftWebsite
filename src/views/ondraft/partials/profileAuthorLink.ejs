@@ -1,0 +1,16 @@
+<%
+  const authorName = typeof name === "string" ? name : "";
+  const authorClassName = typeof className !== "undefined" ? className : "";
+  const showAdminBadge = typeof showBadge !== "undefined" ? showBadge : false;
+  const profileAnchors = {
+    "Ryan McWalter": "ryan-mcwalter",
+    "Aleks Ryabinkin": "aleks-ryabinkin",
+    "Nick Southey": "nick-southey",
+  };
+  const profileAnchor = profileAnchors[authorName];
+%>
+<% if (profileAnchor) { %>
+  <a class="<%= authorClassName %>" href="/about#<%= profileAnchor %>"><%= authorName %><% if (showAdminBadge) { %><%- include("verifiedAdminBadge") %><% } %></a>
+<% } else { %>
+  <span class="<%= authorClassName %>"><%= authorName %><% if (showAdminBadge) { %><%- include("verifiedAdminBadge") %><% } %></span>
+<% } %>

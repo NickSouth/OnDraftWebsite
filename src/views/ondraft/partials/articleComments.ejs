@@ -2,6 +2,7 @@
   <% const usersById = typeof userDirectoryById !== "undefined" ? userDirectoryById : new Map(); %>
   <% const moderationById = typeof userModerationById !== "undefined" ? userModerationById : new Map(); %>
   <% const currentActiveBan = typeof activeUserBan !== "undefined" ? activeUserBan : null; %>
+  <% const formatRelative = typeof relativeTime === "function" ? relativeTime : (value) => new Date(value).toLocaleString(); %>
   <div class="section-heading">
     <h2>Comments</h2>
     <p class="muted-text"><%= article.comments.length %> total</p>
@@ -13,6 +14,8 @@
 
   <% if (session.authenticatedUser && currentActiveBan) { %>
     <%- include("bannedUserNotice", { ban: currentActiveBan }) %>
+  <% } else if (session.authenticatedUser && !session.authenticatedUser.emailVerifiedAt) { %>
+    <p class="error-message">Verify your email before commenting.</p>
   <% } else if (session.authenticatedUser) { %>
     <form
       class="comment-form"
@@ -40,24 +43,27 @@
         <li class="comment-item" id="comment-<%= comment.id %>">
           <div class="comment-header">
             <div>
-              <strong class="verified-name"><%= comment.userName %><% if (commentUser?.role === "admin") { %><%- include("verifiedAdminBadge") %><% } %></strong>
-              <span class="muted-text"><%= new Date(comment.createdAt).toLocaleString() %></span>
+              <%- include("profileAuthorLink", { name: comment.userName, showBadge: commentUser?.role === "admin", className: `verified-name font-bold no-underline ${comment.userId === session.authenticatedUser?.userId ? "owner-name" : ""}` }) %>
+              <span class="muted-text posted-time"><%= formatRelative(comment.createdAt) %></span>
             </div>
-            <% const commentModeratedUser = moderationById.get(comment.userId); %>
-            <% if (isAdmin && commentModeratedUser) { %>
-              <%- include("../../auth/partials/userModerationActions", { user: commentModeratedUser, contextId: `article-comment-${comment.id}`, errorMessage: null }) %>
-            <% } %>
-            <% if (isAdmin || comment.userId === session.authenticatedUser?.userId) { %>
-              <button
-                type="button"
-                class="secondary-button"
-                hx-delete="/articles/<%= article.id %>/comments/<%= comment.id %>?limit=<%= commentsLimit %>"
-                hx-target="#article-comments-section"
-                hx-swap="outerHTML"
-              >
-                Delete
-              </button>
-            <% } %>
+            <div class="comment-admin-actions">
+              <% const commentModeratedUser = moderationById.get(comment.userId); %>
+              <% if (isAdmin && commentModeratedUser) { %>
+                <%- include("../../auth/partials/userModerationActions", { user: commentModeratedUser, contextId: `article-comment-${comment.id}`, errorMessage: null }) %>
+              <% } %>
+              <% if (isAdmin || comment.userId === session.authenticatedUser?.userId) { %>
+                <button
+                  type="button"
+                  class="secondary-button"
+                  hx-delete="/articles/<%= article.id %>/comments/<%= comment.id %>?limit=<%= commentsLimit %>"
+                  hx-confirm="Delete this comment?"
+                  hx-target="#article-comments-section"
+                  hx-swap="outerHTML"
+                >
+                  Delete
+                </button>
+              <% } %>
+            </div>
           </div>
           <p class="comment-text"><%= comment.text %></p>
           <div class="comment-actions">
@@ -70,50 +76,43 @@
                 <li class="reply-item" id="comment-<%= reply.id %>">
                   <div class="comment-header">
                     <div>
-                      <strong class="verified-name"><%= reply.userName %><% if (replyUser?.role === "admin") { %><%- include("verifiedAdminBadge") %><% } %></strong>
-                      <span class="muted-text"><%= new Date(reply.createdAt).toLocaleString() %></span>
+                      <%- include("profileAuthorLink", { name: reply.userName, showBadge: replyUser?.role === "admin", className: `verified-name font-bold no-underline ${reply.userId === session.authenticatedUser?.userId ? "owner-name" : ""}` }) %>
+                      <span class="muted-text posted-time"><%= formatRelative(reply.createdAt) %></span>
                     </div>
-                    <% const replyModeratedUser = moderationById.get(reply.userId); %>
-                    <% if (isAdmin && replyModeratedUser) { %>
-                      <%- include("../../auth/partials/userModerationActions", { user: replyModeratedUser, contextId: `article-reply-${reply.id}`, errorMessage: null }) %>
-                    <% } %>
-                    <% if (isAdmin || reply.userId === session.authenticatedUser?.userId) { %>
-                      <button
-                        type="button"
-                        class="secondary-button"
-                        hx-delete="/articles/<%= article.id %>/comments/<%= reply.id %>?limit=<%= commentsLimit %>"
-                        hx-target="#article-comments-section"
-                        hx-swap="outerHTML"
-                      >
-                        Delete
-                      </button>
-                    <% } %>
+                    <div class="comment-admin-actions">
+                      <% const replyModeratedUser = moderationById.get(reply.userId); %>
+                      <% if (isAdmin && replyModeratedUser) { %>
+                        <%- include("../../auth/partials/userModerationActions", { user: replyModeratedUser, contextId: `article-reply-${reply.id}`, errorMessage: null }) %>
+                      <% } %>
+                      <% if (isAdmin || reply.userId === session.authenticatedUser?.userId) { %>
+                        <button
+                          type="button"
+                          class="secondary-button"
+                          hx-delete="/articles/<%= article.id %>/comments/<%= reply.id %>?limit=<%= commentsLimit %>"
+                          hx-confirm="Delete this comment?"
+                          hx-target="#article-comments-section"
+                          hx-swap="outerHTML"
+                        >
+                          Delete
+                        </button>
+                      <% } %>
+                    </div>
                   </div>
                   <p class="comment-text"><%= reply.text %></p>
-                  <%- include("commentLikeButton", { comment: reply, likeActorId }) %>
+                  <div class="comment-actions">
+                    <%- include("commentLikeButton", { comment: reply, likeActorId }) %>
+                  </div>
                 </li>
               <% }) %>
             </ol>
           <% } %>
-          <% if (session.authenticatedUser && !currentActiveBan) { %>
-            <div class="reply-thread-actions">
-              <button
-                type="button"
-                class="secondary-button"
-                aria-expanded="false"
-                aria-controls="reply-form-<%= comment.id %>"
-                onclick="const form = document.getElementById('reply-form-<%= comment.id %>'); const expanded = this.getAttribute('aria-expanded') === 'true'; this.setAttribute('aria-expanded', String(!expanded)); form.hidden = expanded;"
-              >
-                Reply
-              </button>
-            </div>
+          <% if (session.authenticatedUser && !currentActiveBan && session.authenticatedUser.emailVerifiedAt) { %>
             <form
               id="reply-form-<%= comment.id %>"
               class="comment-form reply-form"
               hx-post="/articles/<%= article.id %>/comments/<%= comment.id %>/replies?limit=<%= commentsLimit %>"
               hx-target="#article-comments-section"
               hx-swap="outerHTML"
-              hidden
             >
               <label>
                 Reply

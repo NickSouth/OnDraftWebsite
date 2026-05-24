@@ -40,5 +40,7 @@ export function createComposedApp(
     authController,
     resolvedLogger,
     prisma ? CreatePrismaSessionStore(prisma) : undefined,
+    config.turnstile,
+    config.email.appBaseUrl,
   );
 }

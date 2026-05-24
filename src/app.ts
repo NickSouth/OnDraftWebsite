@@ -6,7 +6,16 @@ import { IAuthController } from "./auth/AuthController";
 import { VerificationResendRateLimiter } from "./auth/VerificationResendRateLimiter";
 import { IApp } from "./contracts";
 import { IOnDraftController } from "./controller/OnDraftController";
+import {
+  clientIp,
+  compositeRateLimitKey,
+  createRateLimitMiddleware,
+  normalizedBodyEmail,
+  RateLimiter,
+} from "./security/RateLimiter";
+import { TurnstileVerifier } from "./security/Turnstile";
 import { ARTICLE_PDF_MAX_BYTES, articleUpload } from "./uploads/articlePdfUpload";
+import { formatRelativeTime } from "./view/formatRelativeTime";
 import {
   getAuthenticatedUser,
   isAdminSession,
@@ -16,6 +25,7 @@ import {
   STANDARD_SESSION_MAX_AGE_MS,
 } from "./session/OnDraftSession";
 import { ILoggingService } from "./service/LoggingService";
+import type { ITurnstileConfig } from "./config/AppConfig";
 
 type AsyncRequestHandler = RequestHandler;
 
@@ -29,23 +39,84 @@ function sessionStore(req: Request): OnDraftSessionStore {
   return req.session as OnDraftSessionStore;
 }
 
+function sessionSecret(): string {
+  const secret = process.env.SESSION_SECRET?.trim();
+  if (secret) {
+    return secret;
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("SESSION_SECRET is required in production.");
+  }
+
+  return "ondraft-template-secret";
+}
+
 class ExpressApp implements IApp {
   private readonly app: express.Express;
   private readonly verificationResendRateLimiter = new VerificationResendRateLimiter();
+  private readonly loginRateLimit = createRateLimitMiddleware(
+    new RateLimiter({
+      keyPrefix: "login",
+      limit: 20,
+      windowMs: 15 * 60 * 1000,
+      key: (req) => compositeRateLimitKey(clientIp(req), normalizedBodyEmail(req)),
+    }),
+  );
+  private readonly accountCreationRateLimit = createRateLimitMiddleware(
+    new RateLimiter({
+      keyPrefix: "account-create",
+      limit: 10,
+      windowMs: 60 * 60 * 1000,
+      key: clientIp,
+    }),
+  );
+  private readonly passwordResetRateLimit = createRateLimitMiddleware(
+    new RateLimiter({
+      keyPrefix: "password-reset",
+      limit: 5,
+      windowMs: 60 * 60 * 1000,
+      key: (req) => compositeRateLimitKey(clientIp(req), normalizedBodyEmail(req)),
+    }),
+  );
+  private readonly tokenAttemptRateLimit = createRateLimitMiddleware(
+    new RateLimiter({
+      keyPrefix: "token-attempt",
+      limit: 30,
+      windowMs: 15 * 60 * 1000,
+      key: clientIp,
+    }),
+  );
+  private readonly publicMutationRateLimit = createRateLimitMiddleware(
+    new RateLimiter({
+      keyPrefix: "public-mutation",
+      limit: 120,
+      windowMs: 10 * 60 * 1000,
+      key: clientIp,
+    }),
+  );
+  private readonly turnstileVerifier: TurnstileVerifier;
 
   constructor(
     private readonly controller: IOnDraftController,
     private readonly authController: IAuthController,
     private readonly logger: ILoggingService,
     private readonly sessionStore?: session.Store,
+    private readonly turnstileConfig: ITurnstileConfig = { siteKey: null, secretKey: null },
+    private readonly siteBaseUrl = "http://localhost:3000",
   ) {
     this.app = express();
+    this.turnstileVerifier = new TurnstileVerifier(this.turnstileConfig, this.logger);
     this.registerMiddleware();
     this.registerTemplating();
     this.registerRoutes();
   }
 
   private registerMiddleware(): void {
+    this.app.disable("x-powered-by");
+    this.app.set("trust proxy", process.env.NODE_ENV === "production" ? 1 : false);
+    this.app.use((req, res, next) => this.setSecurityHeaders(req, res, next));
+    this.app.use((req, res, next) => this.blockCrossOriginStateChanges(req, res, next));
     this.app.use(express.static(path.join(process.cwd(), "src/static")));
     this.app.use("/vendor/htmx", express.static(path.join(process.cwd(), "node_modules", "htmx.org", "dist")));
     this.app.use("/vendor/alpinejs", express.static(path.join(process.cwd(), "node_modules", "alpinejs", "dist")));
@@ -62,21 +133,71 @@ class ExpressApp implements IApp {
     this.app.use(
       session({
         name: "ondraft.sid",
-        secret: process.env.SESSION_SECRET ?? "ondraft-template-secret",
+        secret: sessionSecret(),
         store: this.sessionStore,
         resave: false,
         saveUninitialized: false,
         rolling: true,
         cookie: {
           httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
           sameSite: "lax",
           maxAge: STANDARD_SESSION_MAX_AGE_MS,
         },
       }),
     );
     this.app.use(Layouts);
-    this.app.use(express.urlencoded({ extended: true }));
+    this.app.use(express.urlencoded({ extended: true, limit: "100kb", parameterLimit: 200 }));
     this.app.use((req, res, next) => this.exposeSessionLocals(req, res, next));
+  }
+
+  private setSecurityHeaders(_req: Request, res: Response, next: NextFunction): void {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+    res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+    next();
+  }
+
+  private preventTokenCaching(_req: Request, res: Response, next: NextFunction): void {
+    res.setHeader("Cache-Control", "no-store, private");
+    next();
+  }
+
+  private blockCrossOriginStateChanges(req: Request, res: Response, next: NextFunction): void {
+    if (["GET", "HEAD", "OPTIONS"].includes(req.method)) {
+      next();
+      return;
+    }
+
+    const source = req.get("origin") ?? req.get("referer");
+    if (!source) {
+      next();
+      return;
+    }
+
+    try {
+      const sourceUrl = new URL(source);
+      const sameHost = sourceUrl.host === req.get("host");
+      if (sameHost) {
+        next();
+        return;
+      }
+    } catch {
+      this.logger.warn("Blocked state-changing request with an invalid origin");
+      res.status(403).render("ondraft/partials/error", {
+        message: "Request blocked.",
+        layout: false,
+      });
+      return;
+    }
+
+    this.logger.warn("Blocked cross-origin state-changing request");
+    res.status(403).render("ondraft/partials/error", {
+      message: "Request blocked.",
+      layout: false,
+    });
   }
 
   private registerTemplating(): void {
@@ -148,8 +269,14 @@ class ExpressApp implements IApp {
 
   private exposeSessionLocals(req: Request, res: Response, next: NextFunction): void {
     const browserSession = touchOnDraftSession(sessionStore(req));
+    const currentAbsoluteUrl = new URL(req.originalUrl || req.path, this.siteBaseUrl).toString();
+    const defaultPreviewImageUrl = new URL("/images/brand/ondraft-logo.png", this.siteBaseUrl).toString();
     res.locals.isAdmin = isAdminSession(browserSession);
     res.locals.currentPath = req.path;
+    res.locals.currentAbsoluteUrl = currentAbsoluteUrl;
+    res.locals.defaultPreviewImageUrl = defaultPreviewImageUrl;
+    res.locals.relativeTime = formatRelativeTime;
+    res.locals.turnstileSiteKey = this.turnstileConfig.siteKey;
     next();
   }
 
@@ -170,7 +297,13 @@ class ExpressApp implements IApp {
       }),
     );
 
-    this.app.get("/about", (_req, res) => this.renderInfoModal(res, "about"));
+    this.app.get(
+      "/about",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        res.render("ondraft/about", { session: browserSession });
+      }),
+    );
     this.app.get("/privacy", (_req, res) => this.renderInfoModal(res, "privacy"));
     this.app.get("/contact", (_req, res) => this.renderInfoModal(res, "contact"));
 
@@ -190,7 +323,19 @@ class ExpressApp implements IApp {
     );
 
     this.app.post(
+      "/settings/change-password",
+      this.passwordResetRateLimit,
+      asyncHandler(async (req, res) => {
+        await this.authController.changePasswordFromSettings(
+          res,
+          sessionStore(req),
+        );
+      }),
+    );
+
+    this.app.post(
       "/settings/resend-verification",
+      (req, res, next) => this.limitVerificationResend(req, res, next),
       asyncHandler(async (req, res) => {
         await this.authController.requestEmailVerificationFromSettings(res, sessionStore(req));
       }),
@@ -213,11 +358,73 @@ class ExpressApp implements IApp {
 
     this.app.post(
       "/login",
+      this.loginRateLimit,
+      this.turnstileVerifier.middleware(),
       asyncHandler(async (req, res) => {
         const email = typeof req.body.email === "string" ? req.body.email : "";
         const password = typeof req.body.password === "string" ? req.body.password : "";
         const rememberMe = req.body.rememberMe === "on";
-        await this.authController.loginFromForm(res, email, password, rememberMe, sessionStore(req));
+        await this.authController.loginFromForm(req, res, email, password, rememberMe);
+      }),
+    );
+
+    this.app.get(
+      "/forgot-password",
+      asyncHandler(async (req, res) => {
+        const store = sessionStore(req);
+        const browserSession = recordPageView(store);
+        await this.authController.showForgotPassword(res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/forgot-password",
+      this.passwordResetRateLimit,
+      this.turnstileVerifier.middleware(),
+      asyncHandler(async (req, res) => {
+        const email = typeof req.body.email === "string" ? req.body.email : "";
+        await this.authController.requestPasswordResetFromForm(res, email, sessionStore(req));
+      }),
+    );
+
+    this.app.get(
+      "/reset-password",
+      this.preventTokenCaching,
+      this.tokenAttemptRateLimit,
+      asyncHandler(async (req, res) => {
+        const store = sessionStore(req);
+        const browserSession = recordPageView(store);
+        const token = typeof req.query.token === "string" ? req.query.token : "";
+        if (!token.trim()) {
+          res.status(400);
+          await this.authController.showPasswordResetResult(
+            res,
+            browserSession,
+            "failure",
+            "We could not reset that password. The link may be expired or already used.",
+          );
+          return;
+        }
+        await this.authController.showResetPassword(res, browserSession, token);
+      }),
+    );
+
+    this.app.post(
+      "/reset-password",
+      this.preventTokenCaching,
+      this.tokenAttemptRateLimit,
+      this.turnstileVerifier.middleware(),
+      asyncHandler(async (req, res) => {
+        const token = typeof req.body.token === "string" ? req.body.token : "";
+        const password = typeof req.body.password === "string" ? req.body.password : "";
+        const confirmPassword = typeof req.body.confirmPassword === "string" ? req.body.confirmPassword : "";
+        await this.authController.resetPasswordFromForm(
+          res,
+          token,
+          password,
+          confirmPassword,
+          sessionStore(req),
+        );
       }),
     );
 
@@ -238,6 +445,8 @@ class ExpressApp implements IApp {
 
     this.app.post(
       "/register",
+      this.accountCreationRateLimit,
+      this.turnstileVerifier.middleware(),
       asyncHandler(async (req, res) => {
         const displayName = typeof req.body.displayName === "string" ? req.body.displayName : "";
         const email = typeof req.body.email === "string" ? req.body.email : "";
@@ -245,19 +454,21 @@ class ExpressApp implements IApp {
         const confirmPassword = typeof req.body.confirmPassword === "string" ? req.body.confirmPassword : "";
         const mailingListConsent = req.body.mailingListConsent === "on";
         await this.authController.registerFromForm(
+          req,
           res,
           displayName,
           email,
           password,
           confirmPassword,
           mailingListConsent,
-          sessionStore(req),
         );
       }),
     );
 
     this.app.get(
       "/verify-email",
+      this.preventTokenCaching,
+      this.tokenAttemptRateLimit,
       asyncHandler(async (req, res) => {
         const token = typeof req.query.token === "string" ? req.query.token : "";
         await this.authController.verifyEmailFromRequest(res, token, sessionStore(req));
@@ -266,6 +477,8 @@ class ExpressApp implements IApp {
 
     this.app.post(
       "/verify-email",
+      this.preventTokenCaching,
+      this.tokenAttemptRateLimit,
       asyncHandler(async (req, res) => {
         const token = typeof req.body.token === "string" ? req.body.token : "";
         await this.authController.verifyEmailFromRequest(res, token, sessionStore(req));
@@ -283,6 +496,8 @@ class ExpressApp implements IApp {
 
     this.app.get(
       "/mailing-list/unsubscribe",
+      this.preventTokenCaching,
+      this.tokenAttemptRateLimit,
       asyncHandler(async (req, res) => {
         const token = typeof req.query.token === "string" ? req.query.token : "";
         await this.authController.unsubscribeMailingListFromRequest(res, token, sessionStore(req));
@@ -291,6 +506,8 @@ class ExpressApp implements IApp {
 
     this.app.post(
       "/mailing-list/unsubscribe",
+      this.preventTokenCaching,
+      this.tokenAttemptRateLimit,
       asyncHandler(async (req, res) => {
         const token = typeof req.body.token === "string" ? req.body.token : "";
         await this.authController.unsubscribeMailingListFromRequest(res, token, sessionStore(req));
@@ -362,8 +579,9 @@ class ExpressApp implements IApp {
 
     this.app.post(
       "/logout",
+      this.publicMutationRateLimit,
       asyncHandler(async (req, res) => {
-        await this.authController.logoutFromForm(res, sessionStore(req));
+        await this.authController.logoutFromForm(req, res);
       }),
     );
 
@@ -461,6 +679,14 @@ class ExpressApp implements IApp {
     );
 
     this.app.get(
+      "/videos/:videoId",
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.showVideo(req, res, browserSession);
+      }),
+    );
+
+    this.app.get(
       "/hottakes",
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
@@ -478,6 +704,7 @@ class ExpressApp implements IApp {
 
     this.app.post(
       "/hottakes",
+      this.publicMutationRateLimit,
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
         await this.controller.createHotTake(req, res, browserSession);
@@ -486,6 +713,7 @@ class ExpressApp implements IApp {
 
     this.app.post(
       "/hottakes/:id/like",
+      this.publicMutationRateLimit,
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
         await this.controller.likeHotTake(req, res, browserSession);
@@ -494,6 +722,7 @@ class ExpressApp implements IApp {
 
     this.app.post(
       "/hottakes/:id/bookmark",
+      this.publicMutationRateLimit,
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
         await this.controller.toggleForumPostBookmark(req, res, browserSession);
@@ -502,6 +731,7 @@ class ExpressApp implements IApp {
 
     this.app.post(
       "/hottakes/:id/comments",
+      this.publicMutationRateLimit,
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
         await this.controller.commentOnHotTake(req, res, browserSession);
@@ -509,7 +739,17 @@ class ExpressApp implements IApp {
     );
 
     this.app.delete(
+      "/hottakes/:id/comments/:commentId",
+      this.publicMutationRateLimit,
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.deleteHotTakeComment(req, res, browserSession);
+      }),
+    );
+
+    this.app.delete(
       "/hottakes/:id",
+      this.publicMutationRateLimit,
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
         await this.controller.deleteHotTake(req, res, browserSession);
@@ -653,6 +893,7 @@ class ExpressApp implements IApp {
 
     this.app.post(
       "/articles/:id/like",
+      this.publicMutationRateLimit,
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
         await this.controller.likeArticle(req, res, browserSession);
@@ -661,6 +902,7 @@ class ExpressApp implements IApp {
 
     this.app.post(
       "/articles/:id/bookmark",
+      this.publicMutationRateLimit,
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
         await this.controller.toggleArticleBookmark(req, res, browserSession);
@@ -677,6 +919,7 @@ class ExpressApp implements IApp {
 
     this.app.post(
       "/articles/:id/comments",
+      this.publicMutationRateLimit,
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
         await this.controller.commentOnArticle(req, res, browserSession);
@@ -685,6 +928,7 @@ class ExpressApp implements IApp {
 
     this.app.post(
       "/articles/:id/comments/:commentId/replies",
+      this.publicMutationRateLimit,
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
         await this.controller.commentReply(req, res, browserSession);
@@ -693,6 +937,7 @@ class ExpressApp implements IApp {
 
     this.app.post(
       "/comments/:commentId/like",
+      this.publicMutationRateLimit,
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
         await this.controller.likeComment(req, res, browserSession);
@@ -701,6 +946,7 @@ class ExpressApp implements IApp {
 
     this.app.delete(
       "/articles/:id/comments/:commentId",
+      this.publicMutationRateLimit,
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
         await this.controller.deleteComment(req, res, browserSession);
@@ -832,8 +1078,33 @@ class ExpressApp implements IApp {
       }),
     );
 
+    this.app.use((req, res) => {
+      const browserSession = recordPageView(sessionStore(req));
+      res.status(404).render("ondraft/notFound", {
+        session: browserSession,
+        isAdmin: isAdminSession(browserSession),
+        title: "Page not found",
+        message: "This tap is kicked. The page you wanted is not on the board.",
+        backHref: "/",
+        backLabel: "Back home",
+      });
+    });
+
     this.app.use((err: unknown, _req: Request, res: Response, _next: (value?: unknown) => void) => {
       const message = err instanceof Error ? err.message : "Unexpected server error.";
+      const status = typeof (err as { status?: unknown }).status === "number"
+        ? (err as { status: number }).status
+        : typeof (err as { statusCode?: unknown }).statusCode === "number"
+          ? (err as { statusCode: number }).statusCode
+          : 500;
+      if (status === 413) {
+        this.logger.warn("Rejected oversized request body");
+        res.status(413).render("ondraft/partials/error", {
+          message: "Request body is too large.",
+          layout: false,
+        });
+        return;
+      }
       this.logger.error(message);
       res.status(500).render("ondraft/partials/error", {
         message: "Unexpected server error.",
@@ -852,6 +1123,8 @@ export function CreateApp(
   authController: IAuthController,
   logger: ILoggingService,
   sessionStore?: session.Store,
+  turnstileConfig?: ITurnstileConfig,
+  siteBaseUrl?: string,
 ): IApp {
-  return new ExpressApp(controller, authController, logger, sessionStore);
+  return new ExpressApp(controller, authController, logger, sessionStore, turnstileConfig, siteBaseUrl);
 }

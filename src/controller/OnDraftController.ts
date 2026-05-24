@@ -50,6 +50,7 @@ export interface IOnDraftController {
   showFilteredArticles(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showBookmarks(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showVideos(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  showVideo(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showCreateVideoForm(res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showEditVideoForm(res: Response, session: IOnDraftBrowserSession, videoId: string): Promise<void>;
   showHotTakes(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
@@ -78,6 +79,7 @@ export interface IOnDraftController {
   createHotTake(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   likeHotTake(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   commentOnHotTake(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  deleteHotTakeComment(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   deleteHotTake(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   createBigBoardEntry(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   createBigBoardYear(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
@@ -591,20 +593,53 @@ class OnDraftController implements IOnDraftController {
     return null;
   }
 
-  private requireVerifiedUser(res: Response, session: IOnDraftBrowserSession, message: string): boolean {
-    if (isVerifiedUserSession(session)) {
-      return true;
-    }
-
-    res.status(403).send(message);
-    return false;
-  }
-
   private renderBookmarkButton(res: Response, bookmark: Bookmark, bookmarked: boolean): void {
     res.render("ondraft/partials/bookmarkButton", {
       layout: false,
       bookmark,
       bookmarked,
+    });
+  }
+
+  private async renderArticleCommentError(req: Request, res: Response, session: IOnDraftBrowserSession, message: string, statusCode = 403): Promise<void> {
+    const articleId = this.routeParam(req, "id");
+    const articleResult = await this.service.getArticle(articleId);
+    if (articleResult.ok === false) {
+      res.status(this.mapArticleErrorToStatusCode(articleResult.value)).send(articleResult.value.message);
+      return;
+    }
+
+    res.status(statusCode).render("ondraft/partials/articleComments", {
+      layout: false,
+      article: articleResult.value,
+      session,
+      isAdmin: isAdminSession(session),
+      commentsLimit: this.commentLimit(req),
+      likeActorId: this.likeActorId(session),
+      errorMessage: message,
+      userDirectoryById: await this.userDirectoryById(),
+      userModerationById: await this.userModerationById(session),
+      activeUserBan: await this.activeUserBan(session),
+    });
+  }
+
+  private async renderHotTakeCommentError(req: Request, res: Response, session: IOnDraftBrowserSession, message: string, statusCode = 403): Promise<void> {
+    const postId = this.routeParam(req, "id");
+    const postResult = await this.service.getForumPost(postId);
+    if (postResult.ok === false) {
+      res.status(this.mapForumPostErrorToStatusCode(postResult.value)).send(postResult.value.message);
+      return;
+    }
+
+    res.status(statusCode).render("ondraft/partials/hotTakeComments", {
+      layout: false,
+      post: postResult.value,
+      session,
+      isAdmin: isAdminSession(session),
+      errorMessage: message,
+      userDirectoryById: await this.userDirectoryById(),
+      userModerationById: await this.userModerationById(session),
+      activeUserBan: await this.activeUserBan(session),
     });
   }
 
@@ -793,6 +828,24 @@ class OnDraftController implements IOnDraftController {
         sortDirection: this.videoSortDirection(req),
       },
     });
+  }
+
+  async showVideo(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    const videoId = this.routeParam(req, "videoId");
+    const result = await this.service.getYoutubeVideo(videoId);
+    if (result.ok === false) {
+      res.status(this.mapArticleErrorToStatusCode(result.value)).render("ondraft/notFound", {
+        session,
+        isAdmin: isAdminSession(session),
+        title: "Video not found",
+        message: "That Bar TV pour has gone missing.",
+        backHref: "/videos",
+        backLabel: "Back to Bar TV",
+      });
+      return;
+    }
+
+    res.redirect(result.value.youtubeUrl);
   }
 
   private articleFormValues(article: Article): Record<string, string> {
@@ -1099,24 +1152,51 @@ class OnDraftController implements IOnDraftController {
     const result = await this.service.getArticle(id);
     if (result.ok === false) {
       this.logger.error(`Failed to load article "${id}"`+ { error: result.value });
-      res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
+      res.status(this.mapArticleErrorToStatusCode(result.value)).render("ondraft/notFound", {
+        session,
+        isAdmin: isAdminSession(session),
+        title: "Article not found",
+        message: "That article is no longer on tap.",
+        backHref: "/articles",
+        backLabel: "Back to articles",
+      });
       return;
     }
     if (!result.value.published && !isAdminSession(session)) {
-      res.status(404).send("Article not found.");
+      res.status(404).render("ondraft/notFound", {
+        session,
+        isAdmin: false,
+        title: "Article not found",
+        message: "That article is no longer on tap.",
+        backHref: "/articles",
+        backLabel: "Back to articles",
+      });
       return;
     }
+    const article = result.value;
     res.render("ondraft/article", {
       session,
       isAdmin: isAdminSession(session),
-      article: result.value,
+      article,
       commentsLimit: 10,
       likeActorId: this.likeActorId(session),
-      articleBookmarked: (await this.bookmarkedArticleIds(session)).includes(result.value.id),
+      articleBookmarked: (await this.bookmarkedArticleIds(session)).includes(article.id),
       userDirectoryById: await this.userDirectoryById(),
       userModerationById: await this.userModerationById(session),
       activeUserBan: await this.activeUserBan(session),
+      metaTitle: `${article.title} | OnDraft Football`,
+      metaDescription: article.writeup || `Read ${article.title} on OnDraft Football.`,
+      metaImage: this.absoluteMetadataUrl(res, article.imageUrl ?? "/images/brand/ondraft-logo.png"),
+      metaUrl: this.absoluteMetadataUrl(res, `/articles/${article.id}`),
+      metaType: "article",
     });
+  }
+
+  private absoluteMetadataUrl(res: Response, value: string): string {
+    const baseUrl = typeof res.locals.currentAbsoluteUrl === "string"
+      ? res.locals.currentAbsoluteUrl
+      : "http://localhost:3000/";
+    return new URL(value, baseUrl).toString();
   }
 
   private async renderArticleActions(res: Response, article: Article, session: IOnDraftBrowserSession): Promise<void> {
@@ -1160,7 +1240,14 @@ class OnDraftController implements IOnDraftController {
     this.logger.info(`Rendering edit video page for "${videoId}"`);
     const result = await this.service.getYoutubeVideo(videoId);
     if (result.ok === false) {
-      res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
+      res.status(this.mapArticleErrorToStatusCode(result.value)).render("ondraft/notFound", {
+        session,
+        isAdmin: isAdminSession(session),
+        title: "Video not found",
+        message: "That Bar TV pour has gone missing.",
+        backHref: "/videos",
+        backLabel: "Back to Bar TV",
+      });
       return;
     }
 
@@ -1342,9 +1429,6 @@ class OnDraftController implements IOnDraftController {
     if (!userId) {
       return;
     }
-    if (!this.requireVerifiedUser(res, session, "Verify your email to bookmark OnDraft content.")) {
-      return;
-    }
 
     const articleId = this.routeParam(req, "id");
     const article = await this.service.getArticle(articleId);
@@ -1399,7 +1483,8 @@ class OnDraftController implements IOnDraftController {
       this.renderBanResponse(res, activeBan);
       return;
     }
-    if (!this.requireVerifiedUser(res, session, "Verify your email to comment.")) {
+    if (!isVerifiedUserSession(session)) {
+      await this.renderArticleCommentError(req, res, session, "Verify your email before commenting.");
       return;
     }
 
@@ -1453,7 +1538,8 @@ class OnDraftController implements IOnDraftController {
       this.renderBanResponse(res, activeBan);
       return;
     }
-    if (!this.requireVerifiedUser(res, session, "Verify your email to comment.")) {
+    if (!isVerifiedUserSession(session)) {
+      await this.renderArticleCommentError(req, res, session, "Verify your email before commenting.");
       return;
     }
 
@@ -1595,6 +1681,7 @@ class OnDraftController implements IOnDraftController {
     res.render("ondraft/partials/hotTakeActions", {
       layout: false,
       post: result.value,
+      session,
       likeActorId: this.likeActorId(session),
       postBookmarked: (await this.bookmarkedForumPostIds(session)).includes(result.value.id),
     });
@@ -1603,9 +1690,6 @@ class OnDraftController implements IOnDraftController {
   async toggleForumPostBookmark(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
     const userId = this.requireAuthenticatedUser(res, session);
     if (!userId) {
-      return;
-    }
-    if (!this.requireVerifiedUser(res, session, "Verify your email to bookmark OnDraft content.")) {
       return;
     }
 
@@ -1640,7 +1724,8 @@ class OnDraftController implements IOnDraftController {
       this.renderBanResponse(res, activeBan);
       return;
     }
-    if (!this.requireVerifiedUser(res, session, "Verify your email to comment.")) {
+    if (!isVerifiedUserSession(session)) {
+      await this.renderHotTakeCommentError(req, res, session, "Verify your email before commenting.");
       return;
     }
 
@@ -1679,6 +1764,51 @@ class OnDraftController implements IOnDraftController {
     res.render("ondraft/partials/hotTakeComments", {
       layout: false,
       post: postResult.value,
+      session,
+      isAdmin: isAdminSession(session),
+      errorMessage: null,
+      userDirectoryById: await this.userDirectoryById(),
+      userModerationById: await this.userModerationById(session),
+      activeUserBan: await this.activeUserBan(session),
+    });
+  }
+
+  async deleteHotTakeComment(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    const postId = this.routeParam(req, "id");
+    const commentId = this.routeParam(req, "commentId");
+    const postResult = await this.service.getForumPost(postId);
+    if (postResult.ok === false) {
+      res.status(this.mapForumPostErrorToStatusCode(postResult.value)).send(postResult.value.message);
+      return;
+    }
+
+    const comment = postResult.value.comments.find((entry) => entry.id === commentId);
+    if (!comment) {
+      res.status(404).send("Comment not found.");
+      return;
+    }
+
+    const canDelete = isAdminSession(session) || comment.userId === session.authenticatedUser?.userId;
+    if (!canDelete) {
+      res.status(403).send("You can only delete your own comments.");
+      return;
+    }
+
+    const result = await this.service.deleteForumPostComment(commentId);
+    if (result.ok === false) {
+      res.status(this.mapForumPostErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+
+    const updatedPost = await this.service.getForumPost(postId);
+    if (updatedPost.ok === false) {
+      res.status(this.mapForumPostErrorToStatusCode(updatedPost.value)).send(updatedPost.value.message);
+      return;
+    }
+
+    res.render("ondraft/partials/hotTakeComments", {
+      layout: false,
+      post: updatedPost.value,
       session,
       isAdmin: isAdminSession(session),
       errorMessage: null,

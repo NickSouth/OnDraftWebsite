@@ -4,6 +4,7 @@ import type {
   Bookmark,
   IEmailVerificationTokenRecord,
   IMailingListSubscriptionRecord,
+  IPasswordResetTokenRecord,
   IUserBanRecord,
   IUserRecord,
   MailingListSubscriptionStatus,
@@ -11,6 +12,14 @@ import type {
 } from "./User";
 
 export interface CreateEmailVerificationTokenInput {
+  id: string;
+  userId: string;
+  tokenHash: string;
+  expiresAt: string;
+  createdAt: string;
+}
+
+export interface CreatePasswordResetTokenInput {
   id: string;
   userId: string;
   tokenHash: string;
@@ -43,6 +52,7 @@ export interface IUserRepository {
   banUser(input: BanUserInput): Promise<Result<IUserRecord, AuthError>>;
   unbanUser(userId: string): Promise<Result<IUserRecord, AuthError>>;
   setEmailVerified(userId: string, verifiedAt: string): Promise<Result<IUserRecord, AuthError>>;
+  updatePassword(userId: string, passwordHash: string): Promise<Result<IUserRecord, AuthError>>;
   addEmailVerificationToken(
     token: CreateEmailVerificationTokenInput,
   ): Promise<Result<IEmailVerificationTokenRecord, AuthError>>;
@@ -54,6 +64,20 @@ export interface IUserRepository {
     usedAt: string,
   ): Promise<Result<IEmailVerificationTokenRecord, AuthError>>;
   markUnusedEmailVerificationTokensUsedForUser(
+    userId: string,
+    usedAt: string,
+  ): Promise<Result<void, AuthError>>;
+  addPasswordResetToken(
+    token: CreatePasswordResetTokenInput,
+  ): Promise<Result<IPasswordResetTokenRecord, AuthError>>;
+  findPasswordResetTokenByHash(
+    tokenHash: string,
+  ): Promise<Result<IPasswordResetTokenRecord | null, AuthError>>;
+  markPasswordResetTokenUsed(
+    tokenId: string,
+    usedAt: string,
+  ): Promise<Result<IPasswordResetTokenRecord, AuthError>>;
+  markUnusedPasswordResetTokensUsedForUser(
     userId: string,
     usedAt: string,
   ): Promise<Result<void, AuthError>>;

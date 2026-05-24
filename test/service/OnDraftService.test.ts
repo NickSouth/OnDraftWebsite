@@ -766,6 +766,7 @@ describe("OnDraftService YouTube videos", () => {
   });
 
   it("creates videos, refreshes cached stats, and filters by keyword and tags", async () => {
+    let quarterbackViewCount = 25;
     const statsService: IYoutubeVideoStatsService = {
       async fetchVideoStats(videoIds) {
         return {
@@ -773,7 +774,7 @@ describe("OnDraftService YouTube videos", () => {
           value: new Map(videoIds.map((videoId) => [videoId, {
             videoId,
             thumbnailUrl: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
-            viewCount: videoId === "dQw4w9WgXcQ" ? 25 : 10,
+            viewCount: videoId === "dQw4w9WgXcQ" ? quarterbackViewCount : 10,
           }])),
         };
       },
@@ -808,6 +809,21 @@ describe("OnDraftService YouTube videos", () => {
     expect(popularity.ok).toBe(true);
     if (popularity.ok === true) {
       expect(popularity.value.map((video) => video.title)).toEqual(["Quarterback Film", "Receiver Notes"]);
+    }
+
+    quarterbackViewCount = 99;
+    const updated = await ondraftService.updateYoutubeVideo("dQw4w9WgXcQ", {
+      youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      title: "Quarterback Film Updated",
+      description: "Updated QB processing.",
+      tags: ["Film Room", "QB"],
+    });
+
+    expect(updated.ok).toBe(true);
+    if (updated.ok === true) {
+      expect(updated.value.title).toBe("Quarterback Film Updated");
+      expect(updated.value.thumbnailUrl).toContain("maxresdefault");
+      expect(updated.value.viewCount).toBe(99);
     }
   });
 });

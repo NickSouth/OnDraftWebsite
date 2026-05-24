@@ -3,6 +3,7 @@
   <% const moderationById = typeof userModerationById !== "undefined" ? userModerationById : new Map(); %>
   <% const currentIsAdmin = typeof isAdmin !== "undefined" ? isAdmin : false; %>
   <% const currentActiveBan = typeof activeUserBan !== "undefined" ? activeUserBan : null; %>
+  <% const formatRelative = typeof relativeTime === "function" ? relativeTime : (value) => new Date(value).toLocaleString(); %>
   <% if (errorMessage) { %>
     <p class="error-message"><%= errorMessage %></p>
   <% } %>
@@ -11,16 +12,30 @@
     <ol class="reply-list hot-take-comment-list">
       <% post.comments.forEach((comment) => { %>
         <% const commentUser = usersById.get(comment.userId); %>
-        <li class="reply-item">
+        <li class="reply-item" id="hot-take-comment-<%= comment.id %>">
           <div class="comment-header">
             <div>
-              <strong class="verified-name"><%= comment.userName %><% if (commentUser?.role === "admin") { %><%- include("verifiedAdminBadge") %><% } %></strong>
-              <span class="muted-text"><%= new Date(comment.createdAt).toLocaleString() %></span>
+              <%- include("profileAuthorLink", { name: comment.userName, showBadge: commentUser?.role === "admin", className: `verified-name font-bold no-underline ${comment.userId === session.authenticatedUser?.userId ? "owner-name" : ""}` }) %>
+              <span class="muted-text posted-time"><%= formatRelative(comment.createdAt) %></span>
             </div>
-            <% const commentModeratedUser = moderationById.get(comment.userId); %>
-            <% if (currentIsAdmin && commentModeratedUser) { %>
-              <%- include("../../auth/partials/userModerationActions", { user: commentModeratedUser, contextId: `hot-take-comment-${post.id}-${comment.id}`, errorMessage: null }) %>
-            <% } %>
+            <div class="comment-admin-actions">
+              <% const commentModeratedUser = moderationById.get(comment.userId); %>
+              <% if (currentIsAdmin && commentModeratedUser) { %>
+                <%- include("../../auth/partials/userModerationActions", { user: commentModeratedUser, contextId: `hot-take-comment-${post.id}-${comment.id}`, errorMessage: null }) %>
+              <% } %>
+              <% if (currentIsAdmin || comment.userId === session.authenticatedUser?.userId) { %>
+                <button
+                  type="button"
+                  class="secondary-button"
+                  hx-delete="/hottakes/<%= post.id %>/comments/<%= comment.id %>"
+                  hx-confirm="Delete this comment?"
+                  hx-target="#hot-take-comments-<%= post.id %>"
+                  hx-swap="outerHTML"
+                >
+                  Delete
+                </button>
+              <% } %>
+            </div>
           </div>
           <p class="comment-text"><%= comment.text %></p>
         </li>
@@ -30,6 +45,8 @@
 
   <% if (session.authenticatedUser && currentActiveBan) { %>
     <%- include("bannedUserNotice", { ban: currentActiveBan }) %>
+  <% } else if (session.authenticatedUser && !session.authenticatedUser.emailVerifiedAt) { %>
+    <p class="error-message">Verify your email before commenting.</p>
   <% } else if (session.authenticatedUser) { %>
     <form
       class="comment-form reply-form hot-take-comment-form"

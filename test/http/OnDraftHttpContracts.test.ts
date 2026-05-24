@@ -1,7 +1,10 @@
 import request from "supertest";
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { createComposedApp } from "../../src/composition";
+import { getPrismaClient } from "../../src/prisma/client";
+import { hashPassword } from "../../src/auth/PasswordHasher";
 import {
   clearPrismaTestDatabase,
   disconnectPrismaTestDatabase,
@@ -11,6 +14,26 @@ import {
 
 function app() {
   return createComposedApp("prisma").getExpressApp();
+}
+
+function appWithTurnstile() {
+  return createComposedApp("prisma", undefined, {
+    port: 3000,
+    repositoryMode: "prisma",
+    email: {
+      provider: "logging",
+      from: null,
+      appBaseUrl: "http://localhost:3000",
+      resendApiKey: null,
+      verificationTokenTtlHours: 24,
+      passwordResetTokenTtlMinutes: 60,
+      mailingListUnsubscribeSecret: "test-mailing-secret",
+    },
+    turnstile: {
+      siteKey: "test-site-key",
+      secretKey: "test-secret-key",
+    },
+  }).getExpressApp();
 }
 
 async function adminAgent() {
@@ -58,20 +81,145 @@ describe("OnDraft HTTP contracts", () => {
     const response = await request(app()).get("/");
 
     expect(response.status).toBe(200);
+    expect(response.headers["x-powered-by"]).toBeUndefined();
+    expect(response.headers["x-content-type-options"]).toBe("nosniff");
+    expect(response.headers["x-frame-options"]).toBe("DENY");
+    expect(response.headers["referrer-policy"]).toBe("strict-origin-when-cross-origin");
     expect(response.text).toContain("Articles On Tap");
     expect(response.text).toContain("Log in");
-    expect(response.text).toContain('hx-get="/about"');
+    expect(response.text).toContain('href="/about"');
+    expect(response.text).not.toContain('hx-get="/about"');
     expect(response.text).toContain('hx-target="#site-modal-outlet"');
+    expect(response.text).toContain("/images/brand/ondraft-logo.png");
+    expect(response.text).toContain('<meta property="og:image" content="http://localhost:3000/images/brand/ondraft-logo.png"');
+    expect(response.text).toContain('<meta name="twitter:image" content="http://localhost:3000/images/brand/ondraft-logo.png"');
+    expect(response.text).toContain("/images/social/youtube-icon.svg");
+    expect(response.text).toContain("/images/social/x-icon.svg");
+    expect(response.text).toContain("/images/social/tiktok-icon.svg");
+    expect(response.text).toContain("https://www.venmo.com/u/OnDraft-Football");
+    expect(response.text).not.toContain("[PLACEHOLDER FOR SOCIAL MEDIA LINKS]");
   });
 
-  it("renders footer informational pages as modal content", async () => {
+  it("blocks cross-origin state-changing requests when an origin is present", async () => {
+    const response = await request(app())
+      .post("/login")
+      .set("Origin", "https://evil.example")
+      .type("form")
+      .send({ email: "ryan@ondraftfootball.com", password: "password123" });
+
+    expect(response.status).toBe(403);
+    expect(response.text).toContain("Request blocked.");
+  });
+
+  it("rate limits repeated login attempts", async () => {
+    const ondraft = app();
+
+    for (let index = 0; index < 20; index += 1) {
+      const attempt = await request(ondraft)
+        .post("/login")
+        .type("form")
+        .send({ email: "rate-limit@ondraft.test", password: "" });
+      expect(attempt.status).toBe(400);
+    }
+
+    const limited = await request(ondraft)
+      .post("/login")
+      .type("form")
+      .send({ email: "rate-limit@ondraft.test", password: "" });
+
+    expect(limited.status).toBe(429);
+    expect(limited.headers["retry-after"]).toBeTruthy();
+    expect(limited.text).toContain("Too many requests.");
+  });
+
+  it("keeps token-bearing pages out of caches", async () => {
+    const response = await request(app()).get("/reset-password?token=test-token");
+
+    expect(response.status).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store, private");
+  });
+
+  it("renders Turnstile only on high-risk auth forms when configured", async () => {
+    const ondraft = appWithTurnstile();
+
+    const login = await request(ondraft).get("/login");
+    const register = await request(ondraft).get("/register");
+    const forgotPassword = await request(ondraft).get("/forgot-password");
+    const home = await request(ondraft).get("/");
+
+    expect(login.text).toContain('class="cf-turnstile"');
+    expect(register.text).toContain('class="cf-turnstile"');
+    expect(forgotPassword.text).toContain('class="cf-turnstile"');
+    expect(login.text).toContain('data-sitekey="test-site-key"');
+    expect(home.text).not.toContain("cf-turnstile");
+  });
+
+  it("rejects protected auth forms when Turnstile token is missing", async () => {
+    const response = await request(appWithTurnstile())
+      .post("/login")
+      .type("form")
+      .send({ email: "ryan@ondraftfootball.com", password: "password123" });
+
+    expect(response.status).toBe(400);
+    expect(response.text).toContain("We could not verify this request. Please try again.");
+  });
+
+  it("verifies Turnstile server-side before accepting protected auth forms", async () => {
+    const originalFetch = global.fetch;
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    try {
+      const response = await request(appWithTurnstile())
+        .post("/login")
+        .type("form")
+        .send({
+          email: "ryan@ondraftfootball.com",
+          password: "password123",
+          "cf-turnstile-response": "valid-turnstile-token",
+        });
+
+      expect(response.status).toBe(302);
+      expect(response.headers.location).toBe("/");
+      expect(fetchMock).toHaveBeenCalledWith(
+        "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+        expect.objectContaining({
+          method: "POST",
+        }),
+      );
+      const [, options] = fetchMock.mock.calls[0];
+      expect(String(options.body)).toContain("secret=test-secret-key");
+      expect(String(options.body)).toContain("response=valid-turnstile-token");
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it("renders about as a full page and footer legal pages as modal content", async () => {
     const about = await request(app()).get("/about");
     const privacy = await request(app()).get("/privacy");
     const contact = await request(app()).get("/contact");
 
     expect(about.status).toBe(200);
-    expect(about.text).toContain('role="dialog"');
-    expect(about.text).toContain("This is a work in progress website by Nick Southey");
+    expect(about.text).toContain("<h1");
+    expect(about.text).toContain("About Us");
+    expect(about.text).toContain("Our Story");
+    expect(about.text).toContain("Ryan McWalter");
+    expect(about.text).toContain("Aleks Ryabinkin");
+    expect(about.text).toContain("Nick Southey");
+    expect(about.text).toContain("https://www.linkedin.com/in/ryan-mcwalter/");
+    expect(about.text).toContain("https://www.linkedin.com/in/aleksandr-ryabinkin-96a589330/");
+    expect(about.text).toContain("@Ryan McWalter");
+    expect(about.text).toContain("@Aleksandr Ryabinkin");
+    expect(about.text).toContain("/images/social/linkedin-in-bug.png");
+    expect(about.text).toContain("/images/team/nick-southey.jpg");
+    expect(about.text).toContain("https://github.com/NickSouth");
+    expect(about.text).toContain("/ @NickSouth");
+    expect(about.text).toContain("/images/social/github-lockup.svg");
+    expect(about.text).not.toContain('role="dialog"');
 
     expect(privacy.status).toBe(200);
     expect(privacy.text).toContain("OnDraft Football");
@@ -79,7 +227,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(privacy.text).toContain("support@ondraftfootball.com");
 
     expect(contact.status).toBe(200);
-    expect(contact.text).toContain("For all inquiries and issues");
+    expect(contact.text).toContain("For all business inquiries or suggestions");
   });
 
   it("logs in a demo user and renders the home page", async () => {
@@ -117,8 +265,13 @@ describe("OnDraft HTTP contracts", () => {
     expect(modal.text).toContain("Mailing list");
     expect(modal.text).toContain("Subscribe");
     expect(modal.text).toContain("Change password");
+    expect(modal.text).toContain("Send reset link");
     expect(modal.text).toContain("Delete account");
     expect(modal.text).toContain("This cannot be undone.");
+
+    const passwordReset = await agent.post("/settings/change-password");
+    expect(passwordReset.status).toBe(200);
+    expect(passwordReset.text).toContain("We sent a password reset link to your email.");
 
     const subscribed = await agent
       .post("/settings/mailing-list")
@@ -184,6 +337,157 @@ describe("OnDraft HTTP contracts", () => {
     expect(ondraft.status).toBe(200);
     expect(ondraft.text).toContain("New Analyst");
     expect(ondraft.text).not.toContain("Resend verification email");
+  });
+
+  it("verifies an email token through the routed verification page", async () => {
+    const ondraft = app();
+    const prisma = getPrismaClient();
+    const rawToken = "fresh-http-verification-token";
+    const tokenHash = createHash("sha256").update(rawToken).digest("hex");
+    await prisma.user.create({
+      data: {
+        id: "user-needs-verification",
+        email: "needs-verification@ondraft.test",
+        displayName: "Needs Verification",
+        passwordHash: await hashPassword("password123"),
+        role: "user",
+        theme: "light",
+        fontSize: "small",
+        createdAt: new Date(),
+      },
+    });
+    await prisma.emailVerificationToken.create({
+      data: {
+        id: "email-token-http",
+        userId: "user-needs-verification",
+        tokenHash,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        createdAt: new Date(),
+      },
+    });
+
+    const agent = request.agent(ondraft);
+    await agent
+      .post("/login")
+      .type("form")
+      .send({ email: "needs-verification@ondraft.test", password: "password123" });
+
+    const beforeSettings = await agent.get("/settings");
+    expect(beforeSettings.status).toBe(200);
+    expect(beforeSettings.text).toContain("Email verification");
+
+    const verified = await agent.get(`/verify-email?token=${encodeURIComponent(rawToken)}`);
+
+    expect(verified.status).toBe(200);
+    expect(verified.text).toContain("Email Verified");
+    expect(verified.text).toContain("Your email has been verified.");
+
+    const user = await prisma.user.findUnique({ where: { id: "user-needs-verification" } });
+    expect(user?.emailVerifiedAt).toBeInstanceOf(Date);
+
+    const afterSettings = await agent.get("/settings");
+    expect(afterSettings.status).toBe(200);
+    expect(afterSettings.text).not.toContain("Email verification");
+    expect(afterSettings.text).not.toContain("Resend verify email");
+  });
+
+  it("requests and completes password reset through routed pages", async () => {
+    const ondraft = app();
+    const prisma = getPrismaClient();
+    await prisma.user.create({
+      data: {
+        id: "user-reset-password",
+        email: "reset-reader@ondraft.test",
+        displayName: "Reset Reader",
+        passwordHash: await hashPassword("password123"),
+        role: "user",
+        theme: "light",
+        fontSize: "small",
+        createdAt: new Date(),
+      },
+    });
+
+    const requestReset = await request(ondraft)
+      .post("/forgot-password")
+      .type("form")
+      .send({ email: "reset-reader@ondraft.test" });
+    expect(requestReset.status).toBe(200);
+    expect(requestReset.text).toContain("If that email is registered, we sent a password reset link.");
+
+    const unknownReset = await request(ondraft)
+      .post("/forgot-password")
+      .type("form")
+      .send({ email: "unknown-reset@ondraft.test" });
+    expect(unknownReset.status).toBe(400);
+    expect(unknownReset.text).toContain("No OnDraft account exists for that email address.");
+
+    const createdTokens = await prisma.passwordResetToken.findMany({
+      where: { userId: "user-reset-password" },
+    });
+    expect(createdTokens).toHaveLength(1);
+    expect(createdTokens[0].tokenHash).not.toContain("reset-http-token");
+
+    const rawToken = "reset-http-token";
+    const tokenHash = createHash("sha256").update(rawToken).digest("hex");
+    await prisma.passwordResetToken.create({
+      data: {
+        id: "password-token-http",
+        userId: "user-reset-password",
+        tokenHash,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        createdAt: new Date(),
+      },
+    });
+
+    const form = await request(ondraft).get(`/reset-password?token=${encodeURIComponent(rawToken)}`);
+    expect(form.status).toBe(200);
+    expect(form.text).toContain("Choose New Password");
+    expect(form.text).toContain("Confirm new password");
+
+    const mismatch = await request(ondraft)
+      .post("/reset-password")
+      .type("form")
+      .send({
+        token: rawToken,
+        password: "new-password-123",
+        confirmPassword: "different-password",
+      });
+    expect(mismatch.status).toBe(400);
+    expect(mismatch.text).toContain("Passwords must match.");
+
+    const reset = await request(ondraft)
+      .post("/reset-password")
+      .type("form")
+      .send({
+        token: rawToken,
+        password: "new-password-123",
+        confirmPassword: "new-password-123",
+      });
+    expect(reset.status).toBe(200);
+    expect(reset.text).toContain("Your password has been reset.");
+
+    const oldLogin = await request(ondraft)
+      .post("/login")
+      .type("form")
+      .send({ email: "reset-reader@ondraft.test", password: "password123" });
+    expect(oldLogin.status).toBe(401);
+
+    const newLogin = await request(ondraft)
+      .post("/login")
+      .type("form")
+      .send({ email: "reset-reader@ondraft.test", password: "new-password-123" });
+    expect(newLogin.status).toBe(302);
+
+    const reused = await request(ondraft)
+      .post("/reset-password")
+      .type("form")
+      .send({
+        token: rawToken,
+        password: "another-password-123",
+        confirmPassword: "another-password-123",
+      });
+    expect(reused.status).toBe(400);
+    expect(reused.text).toContain("expired or already used");
   });
 
   it("rejects registration when password confirmation does not match", async () => {
@@ -780,6 +1084,16 @@ describe("OnDraft HTTP contracts", () => {
     expect(comment.status).toBe(200);
     expect(comment.text).toContain("Counterpoint: special teams matter.");
     expect(comment.text).toContain("verified-admin-badge");
+    expect(comment.text).toContain(`hx-delete="/hottakes/${postId}/comments/`);
+
+    const commentId = comment.text.match(/id="hot-take-comment-([A-Za-z0-9]{8})"/)?.[1];
+    expect(commentId).toBeTruthy();
+
+    const deleteComment = await agent
+      .delete(`/hottakes/${postId}/comments/${commentId}`)
+      .set("HX-Request", "true");
+    expect(deleteComment.status).toBe(200);
+    expect(deleteComment.text).not.toContain("Counterpoint: special teams matter.");
 
     const remove = await agent
       .delete(`/hottakes/${postId}`)
@@ -980,6 +1294,8 @@ describe("OnDraft HTTP contracts", () => {
 
     expect(article.status).toBe(200);
     expect(article.text).toContain("A regular article body.");
+    expect(article.text).toContain('<meta property="og:type" content="article"');
+    expect(article.text).toContain('<meta property="og:image" content="http://localhost:3000/images/article-defaults/');
     expect(article.text).toContain('class="icon-button article-share-button"');
     expect(article.text).toContain('data-share-url="/articles/');
     expect(article.text).toContain("Share");
@@ -1073,7 +1389,14 @@ describe("OnDraft HTTP contracts", () => {
       .send({ text: "Good read." });
 
     expect(unverifiedComment.status).toBe(403);
-    expect(unverifiedComment.text).toContain("Verify your email to comment.");
+    expect(unverifiedComment.text).toContain("Verify your email before commenting.");
+    expect(unverifiedComment.text).toContain('id="article-comments-section"');
+
+    const unverifiedBookmark = await reader
+      .post(`/articles/${articleId}/bookmark`)
+      .set("HX-Request", "true");
+    expect(unverifiedBookmark.status).toBe(200);
+    expect(unverifiedBookmark.text).toContain("is-bookmarked");
 
     const comment = await admin
       .post(`/articles/${articleId}/comments`)
@@ -1088,7 +1411,6 @@ describe("OnDraft HTTP contracts", () => {
 
     const commentId = comment.text.match(/id="comment-([A-Za-z0-9]{8})"/)?.[1];
     expect(commentId).toBeDefined();
-    expect(comment.text).toContain(`/articles/${articleId}/comments/${commentId}/replies`);
 
     const reply = await admin
       .post(`/articles/${articleId}/comments/${commentId}/replies`)
@@ -1189,6 +1511,8 @@ describe("OnDraft HTTP contracts", () => {
         contentType: "plainText",
         content: "Newer article body.",
       });
+    const currentFavoriteDate = new Date();
+    currentFavoriteDate.setDate(currentFavoriteDate.getDate() - 1);
     const currentFavorite = await admin
       .post("/articles")
       .type("form")
@@ -1196,7 +1520,7 @@ describe("OnDraft HTTP contracts", () => {
         title: "Current Favorite Article",
         author: "Ryan McWalter",
         writeup: "Current summary.",
-        publicationDate: new Date().toISOString().slice(0, 10),
+        publicationDate: currentFavoriteDate.toISOString().slice(0, 10),
         contentType: "plainText",
         content: "Current article body.",
       });
@@ -1419,6 +1743,22 @@ describe("OnDraft HTTP contracts", () => {
 
     const missing = await agent.get(`/articles/${articleId}`);
     expect(missing.status).toBe(404);
+    expect(missing.text).toContain("Article not found");
+    expect(missing.text).toContain("spilled-mug");
+  });
+
+  it("renders themed not-found pages for missing videos and routes", async () => {
+    const ondraft = app();
+
+    const missingVideo = await request(ondraft).get("/videos/not-a-video");
+    expect(missingVideo.status).toBe(404);
+    expect(missingVideo.text).toContain("Video not found");
+    expect(missingVideo.text).toContain("spilled-mug");
+
+    const missingPage = await request(ondraft).get("/missing-page");
+    expect(missingPage.status).toBe(404);
+    expect(missingPage.text).toContain("Page not found");
+    expect(missingPage.text).toContain("spilled-mug");
   });
 
   it("renders uploaded PDF articles as in-page article canvases", async () => {
@@ -1472,6 +1812,8 @@ describe("OnDraft HTTP contracts", () => {
     expect(article.status).toBe(200);
     expect(article.text).toContain('class="article-cover-thumb"');
     expect(article.text).toContain("/uploads/articles/");
+    expect(article.text).toMatch(/<meta property="og:image" content="http:\/\/localhost:3000\/uploads\/articles\/[^"]+cover\.png"/);
+    expect(article.text).toMatch(/<meta name="twitter:image" content="http:\/\/localhost:3000\/uploads\/articles\/[^"]+cover\.png"/);
 
     const articles = await agent.get("/articles");
 

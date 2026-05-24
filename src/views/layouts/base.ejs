@@ -3,7 +3,29 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>OnDraft</title>
+    <%
+      const resolvedMetaTitle = typeof metaTitle !== "undefined" && metaTitle ? metaTitle : "OnDraft Football";
+      const resolvedMetaDescription = typeof metaDescription !== "undefined" && metaDescription
+        ? metaDescription
+        : "NFL and NFL Draft analysis, opinions, videos, community hot takes, and draft boards from OnDraft Football.";
+      const resolvedMetaImage = typeof metaImage !== "undefined" && metaImage ? metaImage : defaultPreviewImageUrl;
+      const resolvedMetaUrl = typeof metaUrl !== "undefined" && metaUrl ? metaUrl : currentAbsoluteUrl;
+      const resolvedMetaType = typeof metaType !== "undefined" && metaType ? metaType : "website";
+    %>
+    <title><%= resolvedMetaTitle %></title>
+    <meta name="description" content="<%= resolvedMetaDescription %>" />
+    <link rel="canonical" href="<%= resolvedMetaUrl %>" />
+    <meta property="og:site_name" content="OnDraft Football" />
+    <meta property="og:type" content="<%= resolvedMetaType %>" />
+    <meta property="og:title" content="<%= resolvedMetaTitle %>" />
+    <meta property="og:description" content="<%= resolvedMetaDescription %>" />
+    <meta property="og:url" content="<%= resolvedMetaUrl %>" />
+    <meta property="og:image" content="<%= resolvedMetaImage %>" />
+    <meta property="og:image:alt" content="OnDraft Football logo" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="<%= resolvedMetaTitle %>" />
+    <meta name="twitter:description" content="<%= resolvedMetaDescription %>" />
+    <meta name="twitter:image" content="<%= resolvedMetaImage %>" />
     <link rel="stylesheet" href="/styles.css" />
     <link rel="stylesheet" href="/tailwind.css" />
     <script src="/vendor/htmx/htmx.min.js" defer></script>
