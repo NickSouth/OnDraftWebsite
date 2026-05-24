@@ -87,6 +87,7 @@ class ResendEmailService implements IEmailService {
 
 function renderEmailVerificationHtml(verificationUrl: string): string {
   const escapedVerificationUrl = escapeHtmlAttribute(verificationUrl);
+  const escapedLogoUrl = escapeHtmlAttribute(buildBrandLogoUrl(verificationUrl));
   return [
     "<!doctype html>",
     '<html lang="en">',
@@ -97,6 +98,7 @@ function renderEmailVerificationHtml(verificationUrl: string): string {
     '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;overflow:hidden;border:1px solid #cbd5e1;border-radius:8px;background:#ffffff;box-shadow:0 24px 70px rgba(7,17,31,0.14);">',
     "<tr>",
     '<td style="background:#0b1220;padding:28px 28px 24px;border-bottom:4px solid #d99822;">',
+    `<img src="${escapedLogoUrl}" width="96" height="57" alt="OnDraft Football" style="display:block;width:96px;height:auto;margin:0 0 14px;border:0;" />`,
     '<p style="margin:0 0 8px;color:#d99822;font-size:12px;font-weight:900;letter-spacing:0.16em;text-transform:uppercase;">OnDraft Football</p>',
     '<h1 style="margin:0;color:#ffffff;font-family:Georgia,Cambria,Times New Roman,serif;font-size:32px;line-height:1.1;font-weight:900;">Verify your OnDraft email</h1>',
     "</td>",
@@ -139,6 +141,7 @@ function renderEmailVerificationText(verificationUrl: string): string {
 
 function renderPasswordResetHtml(resetUrl: string): string {
   const escapedResetUrl = escapeHtmlAttribute(resetUrl);
+  const escapedLogoUrl = escapeHtmlAttribute(buildBrandLogoUrl(resetUrl));
   return [
     "<!doctype html>",
     '<html lang="en">',
@@ -149,6 +152,7 @@ function renderPasswordResetHtml(resetUrl: string): string {
     '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;overflow:hidden;border:1px solid #cbd5e1;border-radius:8px;background:#ffffff;box-shadow:0 24px 70px rgba(7,17,31,0.14);">',
     "<tr>",
     '<td style="background:#0b1220;padding:28px 28px 24px;border-bottom:4px solid #d99822;">',
+    `<img src="${escapedLogoUrl}" width="96" height="57" alt="OnDraft Football" style="display:block;width:96px;height:auto;margin:0 0 14px;border:0;" />`,
     '<p style="margin:0 0 8px;color:#d99822;font-size:12px;font-weight:900;letter-spacing:0.16em;text-transform:uppercase;">OnDraft Football</p>',
     '<h1 style="margin:0;color:#ffffff;font-family:Georgia,Cambria,Times New Roman,serif;font-size:32px;line-height:1.1;font-weight:900;">Reset your password</h1>',
     "</td>",
@@ -191,6 +195,10 @@ function renderPasswordResetText(resetUrl: string): string {
 
 function redactVerificationToken(verificationUrl: string): string {
   return redactToken(verificationUrl);
+}
+
+function buildBrandLogoUrl(actionUrl: string): string {
+  return new URL("/images/brand/ondraft-logo.png", actionUrl).toString();
 }
 
 function redactToken(verificationUrl: string): string {

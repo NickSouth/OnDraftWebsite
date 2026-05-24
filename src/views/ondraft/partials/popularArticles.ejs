@@ -49,7 +49,9 @@
               <img class="article-list-thumb" src="<%= article.imageUrl %>" alt="" />
             <% } else { %>
               <span class="article-list-thumb article-list-thumb-empty">
-                <span class="rounded bg-draft-gold px-2 py-1 text-xs font-black uppercase tracking-[0.18em] text-draft-ink">OD</span>
+                <span class="grid size-8 place-items-center overflow-hidden rounded bg-white/90 ring-1 ring-slate-200 dark:bg-white/10 dark:ring-white/10" aria-hidden="true">
+                  <img class="h-7 w-8 object-contain" src="/images/brand/ondraft-logo.png" alt="" />
+                </span>
               </span>
             <% } %>
           </span>

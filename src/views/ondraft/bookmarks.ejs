@@ -48,7 +48,9 @@
                   <img class="article-list-thumb aspect-[16/10]" src="<%= article.imageUrl %>" alt="" />
                 <% } else { %>
                   <span class="article-list-thumb article-list-thumb-empty aspect-[16/10]">
-                    <span class="rounded bg-draft-gold px-3 py-2 text-xs font-black uppercase tracking-[0.18em] text-draft-ink">OnDraft</span>
+                    <span class="grid size-14 place-items-center overflow-hidden rounded-lg bg-white/90 ring-1 ring-slate-200 dark:bg-white/10 dark:ring-white/10" aria-hidden="true">
+                      <img class="h-12 w-14 object-contain" src="/images/brand/ondraft-logo.png" alt="" />
+                    </span>
                   </span>
                 <% } %>
               </a>

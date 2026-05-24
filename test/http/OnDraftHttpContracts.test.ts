@@ -16,6 +16,26 @@ function app() {
   return createComposedApp("prisma").getExpressApp();
 }
 
+function appWithTurnstile() {
+  return createComposedApp("prisma", undefined, {
+    port: 3000,
+    repositoryMode: "prisma",
+    email: {
+      provider: "logging",
+      from: null,
+      appBaseUrl: "http://localhost:3000",
+      resendApiKey: null,
+      verificationTokenTtlHours: 24,
+      passwordResetTokenTtlMinutes: 60,
+      mailingListUnsubscribeSecret: "test-mailing-secret",
+    },
+    turnstile: {
+      siteKey: "test-site-key",
+      secretKey: "test-secret-key",
+    },
+  }).getExpressApp();
+}
+
 async function adminAgent() {
   const agent = request.agent(app());
   await agent
@@ -61,16 +81,121 @@ describe("OnDraft HTTP contracts", () => {
     const response = await request(app()).get("/");
 
     expect(response.status).toBe(200);
+    expect(response.headers["x-powered-by"]).toBeUndefined();
+    expect(response.headers["x-content-type-options"]).toBe("nosniff");
+    expect(response.headers["x-frame-options"]).toBe("DENY");
+    expect(response.headers["referrer-policy"]).toBe("strict-origin-when-cross-origin");
     expect(response.text).toContain("Articles On Tap");
     expect(response.text).toContain("Log in");
     expect(response.text).toContain('href="/about"');
     expect(response.text).not.toContain('hx-get="/about"');
     expect(response.text).toContain('hx-target="#site-modal-outlet"');
+    expect(response.text).toContain("/images/brand/ondraft-logo.png");
+    expect(response.text).toContain('<meta property="og:image" content="http://localhost:3000/images/brand/ondraft-logo.png"');
+    expect(response.text).toContain('<meta name="twitter:image" content="http://localhost:3000/images/brand/ondraft-logo.png"');
     expect(response.text).toContain("/images/social/youtube-icon.svg");
     expect(response.text).toContain("/images/social/x-icon.svg");
     expect(response.text).toContain("/images/social/tiktok-icon.svg");
     expect(response.text).toContain("https://www.venmo.com/u/OnDraft-Football");
     expect(response.text).not.toContain("[PLACEHOLDER FOR SOCIAL MEDIA LINKS]");
+  });
+
+  it("blocks cross-origin state-changing requests when an origin is present", async () => {
+    const response = await request(app())
+      .post("/login")
+      .set("Origin", "https://evil.example")
+      .type("form")
+      .send({ email: "ryan@ondraftfootball.com", password: "password123" });
+
+    expect(response.status).toBe(403);
+    expect(response.text).toContain("Request blocked.");
+  });
+
+  it("rate limits repeated login attempts", async () => {
+    const ondraft = app();
+
+    for (let index = 0; index < 20; index += 1) {
+      const attempt = await request(ondraft)
+        .post("/login")
+        .type("form")
+        .send({ email: "rate-limit@ondraft.test", password: "" });
+      expect(attempt.status).toBe(400);
+    }
+
+    const limited = await request(ondraft)
+      .post("/login")
+      .type("form")
+      .send({ email: "rate-limit@ondraft.test", password: "" });
+
+    expect(limited.status).toBe(429);
+    expect(limited.headers["retry-after"]).toBeTruthy();
+    expect(limited.text).toContain("Too many requests.");
+  });
+
+  it("keeps token-bearing pages out of caches", async () => {
+    const response = await request(app()).get("/reset-password?token=test-token");
+
+    expect(response.status).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store, private");
+  });
+
+  it("renders Turnstile only on high-risk auth forms when configured", async () => {
+    const ondraft = appWithTurnstile();
+
+    const login = await request(ondraft).get("/login");
+    const register = await request(ondraft).get("/register");
+    const forgotPassword = await request(ondraft).get("/forgot-password");
+    const home = await request(ondraft).get("/");
+
+    expect(login.text).toContain('class="cf-turnstile"');
+    expect(register.text).toContain('class="cf-turnstile"');
+    expect(forgotPassword.text).toContain('class="cf-turnstile"');
+    expect(login.text).toContain('data-sitekey="test-site-key"');
+    expect(home.text).not.toContain("cf-turnstile");
+  });
+
+  it("rejects protected auth forms when Turnstile token is missing", async () => {
+    const response = await request(appWithTurnstile())
+      .post("/login")
+      .type("form")
+      .send({ email: "ryan@ondraftfootball.com", password: "password123" });
+
+    expect(response.status).toBe(400);
+    expect(response.text).toContain("We could not verify this request. Please try again.");
+  });
+
+  it("verifies Turnstile server-side before accepting protected auth forms", async () => {
+    const originalFetch = global.fetch;
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    try {
+      const response = await request(appWithTurnstile())
+        .post("/login")
+        .type("form")
+        .send({
+          email: "ryan@ondraftfootball.com",
+          password: "password123",
+          "cf-turnstile-response": "valid-turnstile-token",
+        });
+
+      expect(response.status).toBe(302);
+      expect(response.headers.location).toBe("/");
+      expect(fetchMock).toHaveBeenCalledWith(
+        "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+        expect.objectContaining({
+          method: "POST",
+        }),
+      );
+      const [, options] = fetchMock.mock.calls[0];
+      expect(String(options.body)).toContain("secret=test-secret-key");
+      expect(String(options.body)).toContain("response=valid-turnstile-token");
+    } finally {
+      global.fetch = originalFetch;
+    }
   });
 
   it("renders about as a full page and footer legal pages as modal content", async () => {
@@ -102,7 +227,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(privacy.text).toContain("support@ondraftfootball.com");
 
     expect(contact.status).toBe(200);
-    expect(contact.text).toContain("For all inquiries and issues");
+    expect(contact.text).toContain("For all business inquiries or suggestions");
   });
 
   it("logs in a demo user and renders the home page", async () => {
@@ -1169,6 +1294,8 @@ describe("OnDraft HTTP contracts", () => {
 
     expect(article.status).toBe(200);
     expect(article.text).toContain("A regular article body.");
+    expect(article.text).toContain('<meta property="og:type" content="article"');
+    expect(article.text).toContain('<meta property="og:image" content="http://localhost:3000/images/article-defaults/');
     expect(article.text).toContain('class="icon-button article-share-button"');
     expect(article.text).toContain('data-share-url="/articles/');
     expect(article.text).toContain("Share");
@@ -1685,6 +1812,8 @@ describe("OnDraft HTTP contracts", () => {
     expect(article.status).toBe(200);
     expect(article.text).toContain('class="article-cover-thumb"');
     expect(article.text).toContain("/uploads/articles/");
+    expect(article.text).toMatch(/<meta property="og:image" content="http:\/\/localhost:3000\/uploads\/articles\/[^"]+cover\.png"/);
+    expect(article.text).toMatch(/<meta name="twitter:image" content="http:\/\/localhost:3000\/uploads\/articles\/[^"]+cover\.png"/);
 
     const articles = await agent.get("/articles");
 

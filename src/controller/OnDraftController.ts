@@ -1173,17 +1173,30 @@ class OnDraftController implements IOnDraftController {
       });
       return;
     }
+    const article = result.value;
     res.render("ondraft/article", {
       session,
       isAdmin: isAdminSession(session),
-      article: result.value,
+      article,
       commentsLimit: 10,
       likeActorId: this.likeActorId(session),
-      articleBookmarked: (await this.bookmarkedArticleIds(session)).includes(result.value.id),
+      articleBookmarked: (await this.bookmarkedArticleIds(session)).includes(article.id),
       userDirectoryById: await this.userDirectoryById(),
       userModerationById: await this.userModerationById(session),
       activeUserBan: await this.activeUserBan(session),
+      metaTitle: `${article.title} | OnDraft Football`,
+      metaDescription: article.writeup || `Read ${article.title} on OnDraft Football.`,
+      metaImage: this.absoluteMetadataUrl(res, article.imageUrl ?? "/images/brand/ondraft-logo.png"),
+      metaUrl: this.absoluteMetadataUrl(res, `/articles/${article.id}`),
+      metaType: "article",
     });
+  }
+
+  private absoluteMetadataUrl(res: Response, value: string): string {
+    const baseUrl = typeof res.locals.currentAbsoluteUrl === "string"
+      ? res.locals.currentAbsoluteUrl
+      : "http://localhost:3000/";
+    return new URL(value, baseUrl).toString();
   }
 
   private async renderArticleActions(res: Response, article: Article, session: IOnDraftBrowserSession): Promise<void> {

@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import multer from "multer";
 
 export const ARTICLE_PDF_MAX_BYTES = 5 * 1024 * 1024;
@@ -29,8 +30,8 @@ const storage = multer.diskStorage({
       .replace(/[^a-zA-Z0-9-]/g, "-")
       .replace(/-+/g, "-")
       .replace(/^-|-$/g, "")
-      .slice(0, 80) || "article";
-    cb(null, `${Date.now()}-${safeBase}${extension}`);
+      .slice(0, 36) || "article";
+    cb(null, `${Date.now()}-${randomUUID()}-${safeBase}${extension}`);
   },
 });
 
@@ -38,7 +39,10 @@ export const articleUpload = multer({
   storage,
   limits: {
     fileSize: ARTICLE_PDF_MAX_BYTES,
+    fieldSize: 100 * 1024,
+    fields: 40,
     files: 2,
+    parts: 45,
   },
   fileFilter: (_req, file, cb) => {
     if (file.fieldname === "pdf") {

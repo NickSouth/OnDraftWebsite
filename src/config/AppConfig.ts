@@ -11,10 +11,16 @@ export interface IEmailConfig {
   mailingListUnsubscribeSecret: string;
 }
 
+export interface ITurnstileConfig {
+  siteKey: string | null;
+  secretKey: string | null;
+}
+
 export interface IAppConfig {
   port: number;
   repositoryMode: RepositoryMode;
   email: IEmailConfig;
+  turnstile: ITurnstileConfig;
 }
 
 function readOptionalEnv(env: NodeJS.ProcessEnv, key: string): string | null {
@@ -120,6 +126,8 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): IAppConfig 
     60,
     errors,
   );
+  const turnstileSiteKey = readOptionalEnv(env, "TURNSTILE_SITE_KEY");
+  const turnstileSecretKey = readOptionalEnv(env, "TURNSTILE_SECRET_KEY");
 
   if (provider === "resend") {
     requireEnv(env, "EMAIL_FROM", errors);
@@ -128,9 +136,19 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): IAppConfig 
 
   if (env.NODE_ENV === "production") {
     requireEnv(env, "APP_BASE_URL", errors);
+    requireEnv(env, "SESSION_SECRET", errors);
+    requireEnv(env, "TURNSTILE_SITE_KEY", errors);
+    requireEnv(env, "TURNSTILE_SECRET_KEY", errors);
     if (!readOptionalEnv(env, "MAILING_LIST_UNSUBSCRIBE_SECRET") && !readOptionalEnv(env, "SESSION_SECRET")) {
       errors.push("MAILING_LIST_UNSUBSCRIBE_SECRET or SESSION_SECRET is required.");
     }
+  }
+
+  if (turnstileSiteKey && !turnstileSecretKey) {
+    errors.push("TURNSTILE_SECRET_KEY is required when TURNSTILE_SITE_KEY is set.");
+  }
+  if (turnstileSecretKey && !turnstileSiteKey) {
+    errors.push("TURNSTILE_SITE_KEY is required when TURNSTILE_SECRET_KEY is set.");
   }
 
   parseUrl(appBaseUrl, "APP_BASE_URL", errors);
@@ -154,6 +172,10 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): IAppConfig 
       verificationTokenTtlHours,
       passwordResetTokenTtlMinutes,
       mailingListUnsubscribeSecret,
+    },
+    turnstile: {
+      siteKey: turnstileSiteKey,
+      secretKey: turnstileSecretKey,
     },
   };
 }

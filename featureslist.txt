@@ -1,3 +1,2 @@
 - Add actual logo
 - Draft Board grades
-- Cleanup security with rate-limiting, request forms, and cookies

@@ -1,4 +1,4 @@
-import type { Response } from "express";
+import type { Request, Response } from "express";
 import {
   getAuthenticatedUser,
   signInAuthenticatedUser,
@@ -35,20 +35,20 @@ export interface IAuthController {
     message: string,
   ): Promise<void>;
   loginFromForm(
+    req: Request,
     res: Response,
     email: string,
     password: string,
     rememberMe: boolean,
-    store: OnDraftSessionStore,
   ): Promise<void>;
   registerFromForm(
+    req: Request,
     res: Response,
     displayName: string,
     email: string,
     password: string,
     confirmPassword: string,
     mailingListConsent: boolean,
-    store: OnDraftSessionStore,
   ): Promise<void>;
   verifyEmailFromRequest(
     res: Response,
@@ -101,7 +101,7 @@ export interface IAuthController {
   showUserModerationMenu(res: Response, store: OnDraftSessionStore, userId: string, contextId: string): Promise<void>;
   banUserFromForm(res: Response, store: OnDraftSessionStore, userId: string, contextId: string, message: string, duration: string): Promise<void>;
   unbanUserFromForm(res: Response, store: OnDraftSessionStore, userId: string, contextId: string): Promise<void>;
-  logoutFromForm(res: Response, store: OnDraftSessionStore): Promise<void>;
+  logoutFromForm(req: Request, res: Response): Promise<void>;
 }
 
 class AuthController implements IAuthController {
@@ -115,6 +115,30 @@ class AuthController implements IAuthController {
     if (error.name === "UserAlreadyExists") return 409;
     if (error.name === "ValidationError") return 400;
     return 500;
+  }
+
+  private regenerateSession(req: Request): Promise<void> {
+    return new Promise((resolve, reject) => {
+      req.session.regenerate((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
+  }
+
+  private destroySession(req: Request): Promise<void> {
+    return new Promise((resolve, reject) => {
+      req.session.destroy((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
   }
 
   async showLogin(
@@ -179,12 +203,13 @@ class AuthController implements IAuthController {
   }
 
   async loginFromForm(
+    req: Request,
     res: Response,
     email: string,
     password: string,
     rememberMe: boolean,
-    store: OnDraftSessionStore,
   ): Promise<void> {
+    const store = req.session as OnDraftSessionStore;
     const session = touchOnDraftSession(store);
     const result = await this.service.authenticate({ email, password });
 
@@ -198,20 +223,25 @@ class AuthController implements IAuthController {
       return;
     }
 
-    const nextSession = signInAuthenticatedUser(store, result.value, rememberMe);
+    const currentSession = touchOnDraftSession(store);
+    await this.regenerateSession(req);
+    const nextStore = req.session as OnDraftSessionStore;
+    nextStore.ondraft = { ...currentSession, authenticatedUser: null };
+    const nextSession = signInAuthenticatedUser(nextStore, result.value, rememberMe);
     this.logger.info(`Authenticated ${nextSession.authenticatedUser?.email ?? "unknown user"}`);
     res.redirect("/");
   }
 
   async registerFromForm(
+    req: Request,
     res: Response,
     displayName: string,
     email: string,
     password: string,
     confirmPassword: string,
     mailingListConsent: boolean,
-    store: OnDraftSessionStore,
   ): Promise<void> {
+    const store = req.session as OnDraftSessionStore;
     const session = touchOnDraftSession(store);
     const result = await this.service.register({ displayName, email, password, confirmPassword, mailingListConsent });
 
@@ -225,7 +255,11 @@ class AuthController implements IAuthController {
       return;
     }
 
-    const nextSession = signInAuthenticatedUser(store, result.value);
+    const currentSession = touchOnDraftSession(store);
+    await this.regenerateSession(req);
+    const nextStore = req.session as OnDraftSessionStore;
+    nextStore.ondraft = { ...currentSession, authenticatedUser: null };
+    const nextSession = signInAuthenticatedUser(nextStore, result.value);
     this.logger.info(`Registered ${nextSession.authenticatedUser?.email ?? "unknown user"}`);
     res.redirect("/");
   }
@@ -638,7 +672,8 @@ class AuthController implements IAuthController {
     this.renderUserModerationActions(res, user.value, contextId);
   }
 
-  async logoutFromForm(res: Response, store: OnDraftSessionStore): Promise<void> {
+  async logoutFromForm(req: Request, res: Response): Promise<void> {
+    const store = req.session as OnDraftSessionStore;
     const currentUser = getAuthenticatedUser(store);
 
     if (currentUser) {
@@ -646,6 +681,12 @@ class AuthController implements IAuthController {
     }
 
     signOutAuthenticatedUser(store);
+    await this.destroySession(req);
+    res.clearCookie("ondraft.sid", {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    });
     res.redirect("/");
   }
 }
