@@ -338,7 +338,12 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
         where: { bigBoard: { year } },
         select: { school: true },
       });
-      return Ok([...new Set(entries.map((entry) => entry.school))].sort((a, b) => a.localeCompare(b)));
+
+      const schools: string[] = Array.from(
+        new Set(entries.map((entry): string => entry.school))
+      ).sort((a, b) => a.localeCompare(b));
+
+      return Ok(schools);
     } catch {
       return Err(BigBoardNotFound(`Big boards for ${year} were not found.`));
     }
