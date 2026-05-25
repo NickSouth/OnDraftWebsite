@@ -7,6 +7,7 @@ import { loadAppConfig, type IAppConfig } from "./config/AppConfig";
 import type { IApp } from "./contracts";
 import { CreateOnDraftController } from "./controller/OnDraftController";
 import { CreateEmailService } from "./email/EmailService";
+import type { IEmailService } from "./email/EmailService";
 import { CreateInMemoryOnDraftRepository } from "./repository/InMemoryOnDraftRepository";
 import { CreatePrismaOnDraftRepository } from "./repository/PrismaOnDraftRepository";
 import { CreateOnDraftService } from "./service/OnDraftService";
@@ -21,12 +22,13 @@ export function createComposedApp(
   mode: "memory" | "prisma",
   logger?: ILoggingService,
   config: IAppConfig = loadAppConfig(),
+  overrides: { emailService?: IEmailService } = {},
 ): IApp {
   const resolvedLogger = logger ?? CreateLoggingService();
 
   const prisma = mode === "prisma" ? getPrismaClient() : null;
   const repository = prisma ? CreatePrismaOnDraftRepository(prisma) : CreateInMemoryOnDraftRepository();
-  const emailService = CreateEmailService(config.email, resolvedLogger);
+  const emailService = overrides.emailService ?? CreateEmailService(config.email, resolvedLogger);
 
   const youtubeStats = CreateYoutubeVideoStatsService();
   const service = CreateOnDraftService(repository, youtubeStats);

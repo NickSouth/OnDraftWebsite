@@ -5,3 +5,4 @@
 - Actual social media links
 - Character count on hot takes 
 - Comment lengths
+- Save and exit with empty draft board rows breaks the page

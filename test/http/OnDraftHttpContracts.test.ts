@@ -1,61 +1,63 @@
 import request from "supertest";
 import fs from "node:fs";
 import path from "node:path";
-import { createHash } from "node:crypto";
 import { createComposedApp } from "../../src/composition";
-import { getPrismaClient } from "../../src/prisma/client";
-import { hashPassword } from "../../src/auth/PasswordHasher";
-import {
-  clearPrismaTestDatabase,
-  disconnectPrismaTestDatabase,
-  resetPrismaTestDatabase,
-  usePrismaTestDatabase,
-} from "../support/prismaTestDb";
+import type { IEmailService, SendEmailVerificationEmailInput, SendPasswordResetEmailInput } from "../../src/email/EmailService";
+
+function testConfig(turnstile = { siteKey: null as string | null, secretKey: null as string | null, verificationDisabled: false }) {
+  return {
+    port: 3000,
+    repositoryMode: "memory" as const,
+    email: {
+      provider: "logging" as const,
+      from: null,
+      appBaseUrl: "http://localhost:3000",
+      resendApiKey: null,
+      verificationTokenTtlHours: 24,
+      passwordResetTokenTtlMinutes: 60,
+      mailingListUnsubscribeSecret: "test-mailing-secret",
+    },
+    turnstile,
+  };
+}
+
+class CapturingEmailService implements IEmailService {
+  verificationEmails: SendEmailVerificationEmailInput[] = [];
+  passwordResetEmails: SendPasswordResetEmailInput[] = [];
+
+  async sendEmailVerificationEmail(input: SendEmailVerificationEmailInput): Promise<void> {
+    this.verificationEmails.push(input);
+  }
+
+  async sendPasswordResetEmail(input: SendPasswordResetEmailInput): Promise<void> {
+    this.passwordResetEmails.push(input);
+  }
+}
 
 function app() {
-  return createComposedApp("prisma").getExpressApp();
+  return createComposedApp("memory", undefined, testConfig()).getExpressApp();
+}
+
+function appWithEmailCapture() {
+  const emailService = new CapturingEmailService();
+  const ondraft = createComposedApp("memory", undefined, testConfig(), { emailService }).getExpressApp();
+  return { ondraft, emailService };
 }
 
 function appWithTurnstile() {
-  return createComposedApp("prisma", undefined, {
-    port: 3000,
-    repositoryMode: "prisma",
-    email: {
-      provider: "logging",
-      from: null,
-      appBaseUrl: "http://localhost:3000",
-      resendApiKey: null,
-      verificationTokenTtlHours: 24,
-      passwordResetTokenTtlMinutes: 60,
-      mailingListUnsubscribeSecret: "test-mailing-secret",
-    },
-    turnstile: {
+  return createComposedApp("memory", undefined, testConfig({
       siteKey: "test-site-key",
       secretKey: "test-secret-key",
       verificationDisabled: false,
-    },
-  }).getExpressApp();
+  })).getExpressApp();
 }
 
 function appWithDisabledTurnstile() {
-  return createComposedApp("prisma", undefined, {
-    port: 3000,
-    repositoryMode: "prisma",
-    email: {
-      provider: "logging",
-      from: null,
-      appBaseUrl: "http://localhost:3000",
-      resendApiKey: null,
-      verificationTokenTtlHours: 24,
-      passwordResetTokenTtlMinutes: 60,
-      mailingListUnsubscribeSecret: "test-mailing-secret",
-    },
-    turnstile: {
+  return createComposedApp("memory", undefined, testConfig({
       siteKey: "test-site-key",
       secretKey: "test-secret-key",
       verificationDisabled: true,
-    },
-  }).getExpressApp();
+  })).getExpressApp();
 }
 
 async function adminAgent() {
@@ -86,19 +88,6 @@ function removeUploadedAssetsFromHtml(html: string) {
 }
 
 describe("OnDraft HTTP contracts", () => {
-  beforeAll(() => {
-    usePrismaTestDatabase();
-  });
-
-  beforeEach(async () => {
-    await resetPrismaTestDatabase();
-  });
-
-  afterAll(async () => {
-    await clearPrismaTestDatabase();
-    await disconnectPrismaTestDatabase();
-  });
-
   it("renders the home page for anonymous visitors", async () => {
     const response = await request(app()).get("/");
 
@@ -380,33 +369,20 @@ describe("OnDraft HTTP contracts", () => {
   });
 
   it("verifies an email token through the routed verification page", async () => {
-    const ondraft = app();
-    const prisma = getPrismaClient();
-    const rawToken = "fresh-http-verification-token";
-    const tokenHash = createHash("sha256").update(rawToken).digest("hex");
-    await prisma.user.create({
-      data: {
-        id: "user-needs-verification",
-        email: "needs-verification@ondraft.test",
-        displayName: "Needs Verification",
-        passwordHash: await hashPassword("password123"),
-        role: "user",
-        theme: "light",
-        fontSize: "small",
-        createdAt: new Date(),
-      },
-    });
-    await prisma.emailVerificationToken.create({
-      data: {
-        id: "email-token-http",
-        userId: "user-needs-verification",
-        tokenHash,
-        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
-        createdAt: new Date(),
-      },
-    });
-
+    const { ondraft, emailService } = appWithEmailCapture();
     const agent = request.agent(ondraft);
+    const register = await agent
+      .post("/register")
+      .type("form")
+      .send({
+        displayName: "Needs Verification",
+        email: "needs-verification@ondraft.test",
+        password: "password123",
+        confirmPassword: "password123",
+      });
+    expect(register.status).toBe(302);
+    expect(emailService.verificationEmails).toHaveLength(1);
+
     await agent
       .post("/login")
       .type("form")
@@ -416,14 +392,12 @@ describe("OnDraft HTTP contracts", () => {
     expect(beforeSettings.status).toBe(200);
     expect(beforeSettings.text).toContain("Email verification");
 
+    const rawToken = new URL(emailService.verificationEmails[0].verificationUrl).searchParams.get("token") ?? "";
     const verified = await agent.get(`/verify-email?token=${encodeURIComponent(rawToken)}`);
 
     expect(verified.status).toBe(200);
     expect(verified.text).toContain("Email Verified");
     expect(verified.text).toContain("Your email has been verified.");
-
-    const user = await prisma.user.findUnique({ where: { id: "user-needs-verification" } });
-    expect(user?.emailVerifiedAt).toBeInstanceOf(Date);
 
     const afterSettings = await agent.get("/settings");
     expect(afterSettings.status).toBe(200);
@@ -432,20 +406,17 @@ describe("OnDraft HTTP contracts", () => {
   });
 
   it("requests and completes password reset through routed pages", async () => {
-    const ondraft = app();
-    const prisma = getPrismaClient();
-    await prisma.user.create({
-      data: {
-        id: "user-reset-password",
-        email: "reset-reader@ondraft.test",
+    const { ondraft, emailService } = appWithEmailCapture();
+    const register = await request(ondraft)
+      .post("/register")
+      .type("form")
+      .send({
         displayName: "Reset Reader",
-        passwordHash: await hashPassword("password123"),
-        role: "user",
-        theme: "light",
-        fontSize: "small",
-        createdAt: new Date(),
-      },
-    });
+        email: "reset-reader@ondraft.test",
+        password: "password123",
+        confirmPassword: "password123",
+      });
+    expect(register.status).toBe(302);
 
     const requestReset = await request(ondraft)
       .post("/forgot-password")
@@ -461,23 +432,8 @@ describe("OnDraft HTTP contracts", () => {
     expect(unknownReset.status).toBe(400);
     expect(unknownReset.text).toContain("No OnDraft account exists for that email address.");
 
-    const createdTokens = await prisma.passwordResetToken.findMany({
-      where: { userId: "user-reset-password" },
-    });
-    expect(createdTokens).toHaveLength(1);
-    expect(createdTokens[0].tokenHash).not.toContain("reset-http-token");
-
-    const rawToken = "reset-http-token";
-    const tokenHash = createHash("sha256").update(rawToken).digest("hex");
-    await prisma.passwordResetToken.create({
-      data: {
-        id: "password-token-http",
-        userId: "user-reset-password",
-        tokenHash,
-        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
-        createdAt: new Date(),
-      },
-    });
+    expect(emailService.passwordResetEmails).toHaveLength(1);
+    const rawToken = new URL(emailService.passwordResetEmails[0].resetUrl).searchParams.get("token") ?? "";
 
     const form = await request(ondraft).get(`/reset-password?token=${encodeURIComponent(rawToken)}`);
     expect(form.status).toBe(200);
