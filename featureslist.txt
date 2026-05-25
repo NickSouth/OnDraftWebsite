@@ -3,3 +3,5 @@
 - Ryan Bio/Headshot
 - Aleks Bio/Headshot
 - Actual social media links
+- Character count on hot takes 
+- Comment lengths
