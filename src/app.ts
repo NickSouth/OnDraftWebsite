@@ -147,7 +147,7 @@ class ExpressApp implements IApp {
       }),
     );
     this.app.use(Layouts);
-    this.app.use(express.urlencoded({ extended: true, limit: "100kb", parameterLimit: 200 }));
+    this.app.use(express.urlencoded({ extended: true, limit: "1mb", parameterLimit: 5000 }));
     this.app.use((req, res, next) => this.exposeSessionLocals(req, res, next));
   }
 

@@ -922,6 +922,45 @@ describe("OnDraft HTTP contracts", () => {
     expect(afterDelete.text).toContain(keptPlayerName);
   }, 15000);
 
+  it("accepts large admin draft board editor saves", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+    const payload: Record<string, string> = {
+      year: "2026",
+      creator: "Ryan",
+    };
+
+    for (let index = 0; index < 18; index += 1) {
+      const row = `entries[${index}]`;
+      payload[`${row}[id]`] = `large-entry-${index}`;
+      payload[`${row}[playerName]`] = `Large Prospect ${index + 1}`;
+      payload[`${row}[school]`] = "OnDraft State";
+      payload[`${row}[position]`] = index % 2 === 0 ? "QB" : "WR";
+      payload[`${row}[rank]`] = String(index + 1);
+      payload[`${row}[posRank]`] = String(index + 1);
+      payload[`${row}[heightLabel]`] = "6-2";
+      payload[`${row}[weight]`] = "220";
+      payload[`${row}[strengths]`] = `Strength ${index} `.repeat(260);
+      payload[`${row}[weaknesses]`] = `Weakness ${index} `.repeat(260);
+      payload[`${row}[rundown]`] = `Rundown ${index} `.repeat(260);
+      payload[`${row}[notes]`] = `Private note ${index} `.repeat(120);
+      payload[`${row}[playerInfoPublished]`] = "true";
+      payload[`${row}[writeupPublished]`] = "true";
+    }
+
+    const save = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send(payload);
+
+    expect(save.status).toBe(200);
+    expect(save.text).toContain("Saved.");
+
+    const board = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
+    expect(board.status).toBe(200);
+    expect(board.text).toContain("Large Prospect 18");
+  }, 15000);
+
   it("renders big board position and school filters and applies them through htmx", async () => {
     const ondraft = app();
     const agent = await loginAdminAgent(ondraft);
