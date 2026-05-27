@@ -432,7 +432,34 @@
     function closeHeightPicker(picker) {
       picker.classList.remove("is-open");
       picker.querySelector("[data-height-toggle]")?.setAttribute("aria-expanded", "false");
-      picker.querySelector("[data-height-panel]")?.setAttribute("aria-hidden", "true");
+      const panel = picker.querySelector("[data-height-panel]");
+      panel?.setAttribute("aria-hidden", "true");
+      if (panel) {
+        panel.style.left = "";
+        panel.style.top = "";
+      }
+    }
+
+    function positionHeightPicker(picker) {
+      const trigger = picker.querySelector("[data-height-toggle]");
+      const panel = picker.querySelector("[data-height-panel]");
+      if (!trigger || !panel) {
+        return;
+      }
+
+      const gutter = 8;
+      const triggerRect = trigger.getBoundingClientRect();
+      const panelWidth = panel.offsetWidth || 256;
+      const panelHeight = panel.offsetHeight || 104;
+      const maxLeft = Math.max(gutter, window.innerWidth - panelWidth - gutter);
+      const left = Math.min(Math.max(gutter, triggerRect.left), maxLeft);
+      const hasRoomBelow = window.innerHeight - triggerRect.bottom >= panelHeight + gutter;
+      const top = hasRoomBelow
+        ? triggerRect.bottom + 4
+        : Math.max(gutter, triggerRect.top - panelHeight - 4);
+
+      panel.style.left = `${left}px`;
+      panel.style.top = `${top}px`;
     }
 
     function openHeightPicker(picker) {
@@ -444,6 +471,11 @@
       picker.classList.add("is-open");
       picker.querySelector("[data-height-toggle]")?.setAttribute("aria-expanded", "true");
       picker.querySelector("[data-height-panel]")?.setAttribute("aria-hidden", "false");
+      positionHeightPicker(picker);
+    }
+
+    function positionOpenHeightPickers() {
+      document.querySelectorAll("[data-height-picker].is-open").forEach(positionHeightPicker);
     }
 
     function wireHeightPicker(picker) {
@@ -488,6 +520,9 @@
       }
       document.querySelectorAll("[data-height-picker].is-open").forEach(closeHeightPicker);
     });
+
+    window.addEventListener("scroll", positionOpenHeightPickers, true);
+    window.addEventListener("resize", positionOpenHeightPickers);
 
     function closeDeleteModal() {
       pendingDeleteRow?.classList.remove("is-delete-target");
