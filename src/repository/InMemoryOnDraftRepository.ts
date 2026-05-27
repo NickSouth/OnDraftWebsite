@@ -2,6 +2,59 @@ import { Err, Ok, Result } from "../lib/result";
 import { Article, ArticleFilter, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, Comment, ConsensusBigBoard, DraftBoardFilter, ForumPost, ForumPostFilter, Video, VideoQuery } from "../model/OnDraftContent";
 import { ArticleNotFound, BigBoardNotFound, CommentNotFound, DuplicateBigBoardYear, DuplicatePlayer, DuplicateArticle, DuplicateForumPost, ForumPostCommentNotFound, type ArticleError, type BigBoardError, type IOnDraftRepository, PlayerNotFound, ForumPostError, ForumPostNotFound } from "./OnDraftRepository";
 
+const MEMORY_LOAD_TEST_SCHOOLS = [
+  "Air Force",
+  "Akron",
+  "Alabama",
+  "Appalachian State",
+  "Arizona",
+  "Arizona State",
+  "Arkansas",
+  "Arkansas State",
+  "Army",
+  "Auburn",
+  "Ball State",
+  "Baylor",
+  "Boise State",
+  "Boston College",
+  "Bowling Green",
+  "Buffalo",
+  "BYU",
+  "California",
+  "Central Michigan",
+  "Charlotte",
+  "Cincinnati",
+  "Clemson",
+  "Coastal Carolina",
+  "Colorado",
+  "Colorado State",
+  "Delaware",
+  "Duke",
+  "East Carolina",
+  "Eastern Michigan",
+  "FIU",
+  "Florida",
+  "Florida Atlantic",
+  "Florida State",
+  "Fresno State",
+  "Georgia",
+  "Georgia Southern",
+  "Georgia State",
+  "Georgia Tech",
+  "Hawaii",
+  "Houston",
+  "Illinois",
+  "Indiana",
+  "Iowa",
+  "Iowa State",
+  "Jacksonville State",
+  "James Madison",
+  "Kansas",
+  "Kansas State",
+  "Kennesaw State",
+  "Kent State",
+];
+const MEMORY_LOAD_TEST_POSITIONS = ["QB", "RB", "WR", "TE", "OT", "IOL", "EDGE", "IDL", "LB", "CB", "S"] as const;
 
 class InMemoryOnDraftRepository implements IOnDraftRepository {
   private bigBoards: BigBoard[] = [];
@@ -12,6 +65,48 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
 
   constructor() {
     this.createBigBoardYearSync(new Date().getFullYear());
+    if (process.env.ONDRAFT_MEMORY_LOAD_TEST === "true") {
+      this.seedMemoryLoadTestBigBoards(new Date().getFullYear());
+    }
+  }
+
+  private seedMemoryLoadTestBigBoards(year: number): void {
+    const ryanBoard = this.findBigBoard(year, "Ryan");
+    const aleksBoard = this.findBigBoard(year, "Aleks");
+    if (!ryanBoard || !aleksBoard) {
+      return;
+    }
+    ryanBoard.entries = this.createMemoryLoadTestEntries("Ryan");
+    aleksBoard.entries = this.createMemoryLoadTestEntries("Aleks");
+  }
+
+  private createMemoryLoadTestEntries(creator: "Ryan" | "Aleks"): BigBoardEntry[] {
+    const positionCounts = new Map<string, number>();
+    return MEMORY_LOAD_TEST_SCHOOLS.map((school, index) => {
+      const position = MEMORY_LOAD_TEST_POSITIONS[index % MEMORY_LOAD_TEST_POSITIONS.length];
+      const nextPosRank = (positionCounts.get(position) ?? 0) + 1;
+      positionCounts.set(position, nextPosRank);
+      const rank = creator === "Aleks" ? MEMORY_LOAD_TEST_SCHOOLS.length - index : index + 1;
+      const inches = Number(((index % 12) + (index % 4 === 0 ? 0.5 : 0)).toFixed(3));
+      return {
+        id: `memory-load-${creator.toLowerCase()}-${String(index + 1).padStart(2, "0")}`,
+        playerName: `Load Test Player ${String(index + 1).padStart(2, "0")}`,
+        position,
+        school,
+        rank,
+        posRank: nextPosRank,
+        height: { feet: 6, inches },
+        weight: 185 + index,
+        playerInfoPublished: true,
+        writeup: {
+          strengths: "",
+          weaknesses: "",
+          rundown: "",
+        },
+        writeupPublished: false,
+        notes: `Generated memory load-test entry for ${creator}.`,
+      };
+    });
   }
 
   private findBigBoard(year: number, creator: BigBoardCreator): BigBoard | undefined {

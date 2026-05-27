@@ -1,11 +1,40 @@
 (() => {
   const TEMPLATE_SRC = "/teamHelmetTemplate.png";
+  const helmetImageCache = new Map();
+  const stats = {
+    templateReads: 0,
+    generatedImages: 0,
+    cacheHits: 0,
+    observedHelmets: 0,
+    visibleHelmets: 0,
+  };
   const loadedTemplate = new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => resolve(image);
     image.onerror = reject;
     image.src = TEMPLATE_SRC;
   });
+  let loadedTemplatePixels = null;
+
+  function templatePixels() {
+    loadedTemplatePixels ??= loadedTemplate.then((template) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = template.naturalWidth || template.width;
+      canvas.height = template.naturalHeight || template.height;
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (!context) {
+        throw new Error("Canvas context unavailable.");
+      }
+      context.drawImage(template, 0, 0);
+      stats.templateReads += 1;
+      return {
+        width: canvas.width,
+        height: canvas.height,
+        pixels: context.getImageData(0, 0, canvas.width, canvas.height),
+      };
+    });
+    return loadedTemplatePixels;
+  }
 
   function parseHexColor(value) {
     const normalized = typeof value === "string" ? value.trim().replace(/^#/, "") : "";
@@ -84,26 +113,31 @@
     return hslToRgb(hue, saturation, adjustedLightness);
   }
 
-  async function recolorHelmet(element) {
-    if (element.dataset.recoloredHelmet === "true") {
-      return;
-    }
-    const primary = parseHexColor(element.dataset.primaryColor) || [17, 17, 17];
-    const secondary = parseHexColor(element.dataset.secondaryColor) || [248, 250, 252];
+  function colorCacheKey(primary, secondary) {
+    return `${primary.join(",")}:${secondary.join(",")}`;
+  }
+
+  function cloneTemplatePixels(context, templatePixels) {
+    const pixels = typeof context.createImageData === "function"
+      ? context.createImageData(templatePixels.width, templatePixels.height)
+      : new ImageData(templatePixels.width, templatePixels.height);
+    pixels.data.set(templatePixels.pixels.data);
+    return pixels;
+  }
+
+  async function generateRecoloredHelmet(primary, secondary) {
     const primaryHsl = rgbToHsl(primary[0], primary[1], primary[2]);
     const secondaryHsl = rgbToHsl(secondary[0], secondary[1], secondary[2]);
-
-    const template = await loadedTemplate;
+    const sourcePixels = await templatePixels();
     const canvas = document.createElement("canvas");
-    canvas.width = template.naturalWidth || template.width;
-    canvas.height = template.naturalHeight || template.height;
+    canvas.width = sourcePixels.width;
+    canvas.height = sourcePixels.height;
     const context = canvas.getContext("2d", { willReadFrequently: true });
     if (!context) {
-      return;
+      throw new Error("Canvas context unavailable.");
     }
 
-    context.drawImage(template, 0, 0);
-    const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+    const pixels = cloneTemplatePixels(context, sourcePixels);
     for (let index = 0; index < pixels.data.length; index += 4) {
       if (pixels.data[index + 3] === 0) {
         continue;
@@ -122,19 +156,79 @@
       }
     }
     context.putImageData(pixels, 0, 0);
-    element.src = canvas.toDataURL("image/png");
+    stats.generatedImages += 1;
+    return canvas.toDataURL("image/png");
+  }
+
+  function cachedHelmetSource(primary, secondary) {
+    const key = colorCacheKey(primary, secondary);
+    const cached = helmetImageCache.get(key);
+    if (cached) {
+      stats.cacheHits += 1;
+      return cached;
+    }
+
+    const generated = generateRecoloredHelmet(primary, secondary).catch((error) => {
+      helmetImageCache.delete(key);
+      throw error;
+    });
+    helmetImageCache.set(key, generated);
+    return generated;
+  }
+
+  async function recolorHelmet(element) {
+    if (element.dataset.recoloredHelmet === "true") {
+      return;
+    }
+    const primary = parseHexColor(element.dataset.primaryColor) || [17, 17, 17];
+    const secondary = parseHexColor(element.dataset.secondaryColor) || [248, 250, 252];
+    element.src = await cachedHelmetSource(primary, secondary);
     element.dataset.recoloredHelmet = "true";
     element.style.opacity = "1";
   }
 
-  function recolorHelmets(root = document) {
-    root.querySelectorAll("[data-team-helmet]").forEach((element) => {
+  const helmetObserver = "IntersectionObserver" in window
+    ? new window.IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) {
+          return;
+        }
+        helmetObserver.unobserve(entry.target);
+        stats.visibleHelmets += 1;
+        recolorHelmet(entry.target).catch(() => {
+          entry.target.style.opacity = "1";
+        });
+      });
+    }, { rootMargin: "300px 0px" })
+    : null;
+
+  function watchHelmet(element) {
+    if (element.dataset.recoloredHelmet === "true" || element.dataset.helmetObserved === "true") {
+      return;
+    }
+    if (!helmetObserver) {
+      stats.visibleHelmets += 1;
       recolorHelmet(element).catch(() => {
         element.style.opacity = "1";
       });
+      return;
+    }
+    element.dataset.helmetObserved = "true";
+    stats.observedHelmets += 1;
+    helmetObserver.observe(element);
+  }
+
+  function recolorHelmets(root = document) {
+    root.querySelectorAll("[data-team-helmet]").forEach((element) => {
+      watchHelmet(element);
     });
   }
 
   document.addEventListener("DOMContentLoaded", () => recolorHelmets());
   document.body.addEventListener("htmx:afterSwap", (event) => recolorHelmets(event.target));
+  window.__teamHelmetRecolor = {
+    recolorHelmets,
+    stats,
+    cacheSize: () => helmetImageCache.size,
+  };
 })();
