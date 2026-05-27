@@ -445,7 +445,7 @@
 
   .board-editor-table {
     @apply w-full border-collapse bg-white text-sm dark:bg-draft-slate;
-    min-width: 1428px;
+    min-width: 1620px;
     table-layout: fixed;
   }
 
@@ -456,6 +456,11 @@
 
   .board-editor-table th {
     @apply sticky top-0 z-10 bg-slate-100 p-2 text-left text-xs font-black uppercase tracking-wide text-slate-600 dark:bg-draft-ink dark:text-slate-300;
+  }
+
+  .board-editor-table th:nth-child(6),
+  .board-editor-table td:nth-child(6) {
+    width: 17rem;
   }
 
   .board-editor-table input,
@@ -470,6 +475,22 @@
 
   .board-editor-table select option {
     @apply bg-white text-slate-950 dark:bg-draft-ink dark:text-white;
+  }
+
+  .board-editor-table .height-picker {
+    @apply grid min-w-64 grid-cols-[4.25rem_5rem_6.25rem] gap-1 p-1;
+  }
+
+  .board-editor-table .height-picker label {
+    @apply grid gap-1;
+  }
+
+  .board-editor-table .height-picker span {
+    @apply px-1 text-[0.62rem] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400;
+  }
+
+  .board-editor-table .height-picker select {
+    @apply m-0 min-h-10 px-2 py-1;
   }
 
   .board-editor-table input,

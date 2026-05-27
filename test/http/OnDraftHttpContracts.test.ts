@@ -757,7 +757,10 @@ describe("OnDraft HTTP contracts", () => {
     expect(editor.text).toContain("This cannot be undone.");
     expect(editor.text).toContain('list="college-team-options"');
     expect(editor.text).toContain('<option value="Alabama"></option>');
-    expect(editor.text).toContain('<option value="6-2.375">6&#39;2 3/8&#34;</option>');
+    expect(editor.text).toContain("data-height-picker");
+    expect(editor.text).toContain("data-height-feet");
+    expect(editor.text).toContain("data-height-inches");
+    expect(editor.text).toContain("data-height-fraction");
 
     const draft = await agent
       .post("/bigboard/edit")
