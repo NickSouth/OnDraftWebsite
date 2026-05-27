@@ -242,6 +242,10 @@ describe("OnDraft HTTP contracts", () => {
     expect(about.text).toContain("https://www.linkedin.com/in/ryan-mcwalter/");
     expect(about.text).toContain("https://www.linkedin.com/in/aleksandr-ryabinkin-96a589330/");
     expect(about.text).toContain("@Ryan McWalter");
+    expect(about.text).toContain("/images/team/ryan-mcwalter.jpg");
+    expect(about.text).toContain("mailto:ryan@ondraftfootball.com");
+    expect(about.text).toContain("/files/ryan-mcwalter-resume.docx");
+    expect(about.text).toContain("/ Resume");
     expect(about.text).toContain("@Aleksandr Ryabinkin");
     expect(about.text).toContain("/images/social/linkedin-in-bug.png");
     expect(about.text).toContain("/images/team/nick-southey.jpg");
@@ -750,6 +754,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(editor.text).toContain("This cannot be undone.");
     expect(editor.text).toContain('list="college-team-options"');
     expect(editor.text).toContain('<option value="Alabama"></option>');
+    expect(editor.text).toContain('<option value="6-2.375">6&#39;2 3/8&#34;</option>');
 
     const draft = await agent
       .post("/bigboard/edit")
@@ -763,7 +768,7 @@ describe("OnDraft HTTP contracts", () => {
         "entries[0][position]": "QB",
         "entries[0][rank]": "1",
         "entries[0][posRank]": "1",
-        "entries[0][heightLabel]": "6-2",
+        "entries[0][heightLabel]": "6-2.375",
         "entries[0][weight]": "220",
         "entries[0][strengths]": "Pocket movement",
         "entries[0][weaknesses]": "Pressure answers",
@@ -790,7 +795,7 @@ describe("OnDraft HTTP contracts", () => {
         "entries[0][position]": "QB",
         "entries[0][rank]": "1",
         "entries[0][posRank]": "1",
-        "entries[0][heightLabel]": "6-2",
+        "entries[0][heightLabel]": "6-2.375",
         "entries[0][weight]": "220",
         "entries[0][strengths]": "Pocket movement",
         "entries[0][weaknesses]": "Pressure answers",
@@ -809,6 +814,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(visibleWithoutWriteup.text).toContain('src="/teamHelmetTemplate.png"');
     expect(visibleWithoutWriteup.text).toContain('data-primary-color="#690014"');
     expect(visibleWithoutWriteup.text).toContain('data-secondary-color="#F1F2F3"');
+    expect(visibleWithoutWriteup.text).toContain("6&#39;2 3/8&#34;");
     expect(visibleWithoutWriteup.text).not.toContain("Starter traits.");
     expect(visibleWithoutWriteup.text).not.toContain("Private eval note.");
 
@@ -824,7 +830,7 @@ describe("OnDraft HTTP contracts", () => {
         "entries[0][position]": "QB",
         "entries[0][rank]": "1",
         "entries[0][posRank]": "1",
-        "entries[0][heightLabel]": "6-2",
+        "entries[0][heightLabel]": "6-2.375",
         "entries[0][weight]": "220",
         "entries[0][strengths]": "Pocket movement",
         "entries[0][weaknesses]": "Pressure answers",
@@ -960,6 +966,70 @@ describe("OnDraft HTTP contracts", () => {
     expect(board.status).toBe(200);
     expect(board.text).toContain("Large Prospect 18");
   }, 15000);
+
+  it("ignores blank draft board editor rows when saving and exiting", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+    const save = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": "kept-after-blank",
+        "entries[0][playerName]": "Kept After Blank",
+        "entries[0][school]": "OnDraft State",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2.125",
+        "entries[0][weight]": "220",
+        "entries[0][strengths]": "Timing",
+        "entries[0][weaknesses]": "Pressure",
+        "entries[0][rundown]": "Clean saved row.",
+        "entries[0][playerInfoPublished]": "true",
+        "entries[1][id]": "blank-row",
+        "entries[1][playerName]": "",
+        "entries[1][school]": "",
+        "entries[1][position]": "",
+        "entries[1][rank]": "",
+        "entries[1][posRank]": "",
+        "entries[1][heightLabel]": "",
+        "entries[1][weight]": "",
+        "entries[1][strengths]": "",
+        "entries[1][weaknesses]": "",
+        "entries[1][rundown]": "",
+        "entries[1][notes]": "",
+        action: "exit",
+      });
+
+    expect(save.status).toBe(302);
+    expect(save.headers.location).toBe("/bigboard?year=2026&creator=Ryan");
+
+    const board = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
+    expect(board.status).toBe(200);
+    expect(board.text).toContain("Kept After Blank");
+    expect(board.text).toContain("6&#39;2 1/8&#34;");
+    expect(board.text).not.toContain("blank-row");
+  });
+
+  it("renders a friendly full page when draft board saves exceed the body limit", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+    const response = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": "too-large-row",
+        "entries[0][notes]": "x".repeat(1024 * 1024 + 1),
+      });
+
+    expect(response.status).toBe(413);
+    expect(response.text).toContain("<!doctype html>");
+    expect(response.text).toContain("That save is too large to process at once.");
+  });
 
   it("renders big board position and school filters and applies them through htmx", async () => {
     const ondraft = app();

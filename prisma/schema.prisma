@@ -320,7 +320,7 @@ model BigBoardEntry {
   rank                Int?
   posRank             Int?     @map("pos_rank")
   heightFeet          Int?     @map("height_feet")
-  heightInches        Int?     @map("height_inches")
+  heightInches        Float?   @map("height_inches")
   weight              Int?
   sortOrder           Int      @default(0) @map("sort_order")
   strengths           String   @default("")

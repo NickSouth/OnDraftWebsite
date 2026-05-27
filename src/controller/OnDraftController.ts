@@ -199,7 +199,7 @@ class OnDraftController implements IOnDraftController {
     if (typeof value !== "string" || value.trim() === "") {
       return null;
     }
-    const match = value.match(/^(\d+)-(\d+)$/);
+    const match = value.match(/^(\d+)-(\d+(?:\.\d+)?)$/);
     if (!match) {
       return null;
     }
@@ -247,13 +247,29 @@ class OnDraftController implements IOnDraftController {
         playerInfoPublished: this.formBoolean(entry.playerInfoPublished),
         writeupPublished: this.formBoolean(entry.writeupPublished),
       };
-    });
+    }).filter((entry) => !this.isBlankBigBoardEntryInput(entry));
 
     return {
       year: this.parseBigBoardYear(req.body.year),
       creator: this.parseBigBoardCreator(req.body.creator),
       entries,
     };
+  }
+
+  private isBlankBigBoardEntryInput(entry: BigBoardEditableEntryInput): boolean {
+    return entry.playerName.trim() === ""
+      && entry.school.trim() === ""
+      && entry.position.trim() === ""
+      && entry.rank === null
+      && entry.posRank === null
+      && entry.height === null
+      && entry.weight === null
+      && entry.strengths.trim() === ""
+      && entry.weaknesses.trim() === ""
+      && entry.rundown.trim() === ""
+      && entry.notes.trim() === ""
+      && !entry.playerInfoPublished
+      && !entry.writeupPublished;
   }
 
   private bigBoardEditHref(board: BigBoard): string {

@@ -1,11 +1,28 @@
 <%
+  const heightFractions = [
+    { value: 0, label: "" },
+    { value: 0.125, label: " 1/8" },
+    { value: 0.25, label: " 1/4" },
+    { value: 0.375, label: " 3/8" },
+    { value: 0.5, label: " 1/2" },
+    { value: 0.625, label: " 5/8" },
+    { value: 0.75, label: " 3/4" },
+    { value: 0.875, label: " 7/8" },
+  ];
+  const heightValue = (feet, inches) => `${feet}-${Number(inches.toFixed(3))}`;
+  const selectedHeightValue = (height) => height ? heightValue(height.feet, height.inches) : "";
   const heightOptions = [];
   for (let feet = 5; feet <= 7; feet += 1) {
     for (let inches = 0; inches <= 11; inches += 1) {
       if (feet === 7 && inches > 0) {
         continue;
       }
-      heightOptions.push({ value: `${feet}-${inches}`, label: `${feet}'${inches}"` });
+      heightFractions.forEach((fraction) => {
+        heightOptions.push({
+          value: heightValue(feet, inches + fraction.value),
+          label: `${feet}'${inches}${fraction.label}"`,
+        });
+      });
     }
   }
 %>
@@ -154,7 +171,7 @@
                 <select name="entries[<%= index %>][heightLabel]" data-publish-section="player">
                   <option value="">Height</option>
                   <% heightOptions.forEach((height) => { %>
-                    <option value="<%= height.value %>" <%= entry.height && entry.height.feet + "-" + entry.height.inches === height.value ? "selected" : "" %>><%= height.label %></option>
+                    <option value="<%= height.value %>" <%= selectedHeightValue(entry.height) === height.value ? "selected" : "" %>><%= height.label %></option>
                   <% }) %>
                 </select>
               </td>

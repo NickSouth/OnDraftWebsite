@@ -1099,7 +1099,7 @@ class ExpressApp implements IApp {
       });
     });
 
-    this.app.use((err: unknown, _req: Request, res: Response, _next: (value?: unknown) => void) => {
+    this.app.use((err: unknown, req: Request, res: Response, _next: (value?: unknown) => void) => {
       const message = err instanceof Error ? err.message : "Unexpected server error.";
       const status = typeof (err as { status?: unknown }).status === "number"
         ? (err as { status: number }).status
@@ -1108,9 +1108,27 @@ class ExpressApp implements IApp {
           : 500;
       if (status === 413) {
         this.logger.warn("Rejected oversized request body");
+        const userMessage = "That save is too large to process at once. Try saving fewer rows or shorter notes.";
+        if (req.get("HX-Request") === "true") {
+          res.status(413).render("ondraft/partials/error", {
+            message: userMessage,
+            layout: false,
+          });
+          return;
+        }
+        const browserSession = recordPageView(sessionStore(req));
+        const currentAbsoluteUrl = new URL(req.originalUrl || req.path, this.siteBaseUrl).toString();
         res.status(413).render("ondraft/partials/error", {
-          message: "Request body is too large.",
-          layout: false,
+          session: browserSession,
+          isAdmin: isAdminSession(browserSession),
+          currentPath: req.path,
+          currentAbsoluteUrl,
+          defaultPreviewImageUrl: new URL("/images/brand/ondraft-logo.png", this.siteBaseUrl).toString(),
+          relativeTime: formatRelativeTime,
+          turnstileSiteKey: this.turnstileConfig.verificationDisabled ? null : this.turnstileConfig.siteKey,
+          metaTitle: "Save too large | OnDraft Football",
+          metaDescription: "The submitted OnDraft form was too large to process.",
+          message: userMessage,
         });
         return;
       }
