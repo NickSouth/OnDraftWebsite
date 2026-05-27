@@ -246,6 +246,9 @@ describe("OnDraft HTTP contracts", () => {
     expect(about.text).toContain("mailto:ryan@ondraftfootball.com");
     expect(about.text).toContain("/files/ryan-mcwalter-resume.docx");
     expect(about.text).toContain("/ Resume");
+    expect(about.text).toContain("https://x.com/rymcw3");
+    expect(about.text).toContain("/images/social/x-icon.svg");
+    expect(about.text).toContain("/ @rymcw3");
     expect(about.text).toContain("@Aleksandr Ryabinkin");
     expect(about.text).toContain("/images/social/linkedin-in-bug.png");
     expect(about.text).toContain("/images/team/nick-southey.jpg");
