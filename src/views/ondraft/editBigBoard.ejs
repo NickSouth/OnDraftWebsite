@@ -1,13 +1,21 @@
 <%
-  const heightOptions = [];
-  for (let feet = 5; feet <= 7; feet += 1) {
-    for (let inches = 0; inches <= 11; inches += 1) {
-      if (feet === 7 && inches > 0) {
-        continue;
-      }
-      heightOptions.push({ value: `${feet}-${inches}`, label: `${feet}'${inches}"` });
-    }
-  }
+  const heightFractionOptions = [
+    { value: 0, label: "0" },
+    { value: 0.125, label: " 1/8" },
+    { value: 0.25, label: " 1/4" },
+    { value: 0.375, label: " 3/8" },
+    { value: 0.5, label: " 1/2" },
+    { value: 0.625, label: " 5/8" },
+    { value: 0.75, label: " 3/4" },
+    { value: 0.875, label: " 7/8" },
+  ];
+  const heightFeetOptions = [5, 6, 7];
+  const heightInchOptions = Array.from({ length: 12 }, (_, index) => index);
+  const heightValue = (feet, inches) => `${feet}-${Number(inches.toFixed(3))}`;
+  const selectedHeightValue = (height) => height ? heightValue(height.feet, height.inches) : "";
+  const selectedHeightFeet = (height) => height ? height.feet : "";
+  const selectedHeightInches = (height) => height ? Math.floor(height.inches) : "";
+  const selectedHeightFraction = (height) => height ? Number((height.inches - Math.floor(height.inches)).toFixed(3)) : 0;
 %>
 
 <section class="plain-page board-editor-page od-admin-board-page">
@@ -151,12 +159,43 @@
                 </select>
               </td>
               <td>
-                <select name="entries[<%= index %>][heightLabel]" data-publish-section="player">
-                  <option value="">Height</option>
-                  <% heightOptions.forEach((height) => { %>
-                    <option value="<%= height.value %>" <%= entry.height && entry.height.feet + "-" + entry.height.inches === height.value ? "selected" : "" %>><%= height.label %></option>
-                  <% }) %>
-                </select>
+                <div class="height-picker" data-height-picker>
+                  <input type="hidden" name="entries[<%= index %>][heightLabel]" value="<%= selectedHeightValue(entry.height) %>" data-height-label />
+                  <button type="button" class="height-picker-trigger" data-height-toggle aria-expanded="false">
+                    <span data-height-display>Height</span>
+                    <svg class="size-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                  <div class="height-picker-panel" data-height-panel aria-hidden="true">
+                    <label>
+                      <span>Feet</span>
+                      <select data-height-feet data-publish-section="player" aria-label="Height feet">
+                        <option value="">--</option>
+                        <% heightFeetOptions.forEach((feet) => { %>
+                          <option value="<%= feet %>" <%= selectedHeightFeet(entry.height) === feet ? "selected" : "" %>><%= feet %></option>
+                        <% }) %>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Inches</span>
+                      <select data-height-inches data-publish-section="player" aria-label="Height inches">
+                        <option value="">--</option>
+                        <% heightInchOptions.forEach((inches) => { %>
+                          <option value="<%= inches %>" <%= selectedHeightInches(entry.height) === inches ? "selected" : "" %>><%= inches %></option>
+                        <% }) %>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Fraction</span>
+                      <select data-height-fraction data-publish-section="player" aria-label="Height fraction">
+                        <% heightFractionOptions.forEach((fraction) => { %>
+                          <option value="<%= fraction.value %>" <%= selectedHeightFraction(entry.height) === fraction.value ? "selected" : "" %>><%= fraction.label %></option>
+                        <% }) %>
+                      </select>
+                    </label>
+                  </div>
+                </div>
               </td>
               <td><input type="number" name="entries[<%= index %>][weight]" min="1" step="1" value="<%= entry.weight ?? "" %>" placeholder="lbs" data-publish-section="player" /></td>
               <td>
@@ -244,12 +283,43 @@
         </select>
       </td>
       <td>
-        <select data-field="heightLabel" data-publish-section="player">
-          <option value="">Height</option>
-          <% heightOptions.forEach((height) => { %>
-            <option value="<%= height.value %>"><%= height.label %></option>
-          <% }) %>
-        </select>
+        <div class="height-picker" data-height-picker>
+          <input type="hidden" data-field="heightLabel" data-height-label />
+          <button type="button" class="height-picker-trigger" data-height-toggle aria-expanded="false">
+            <span data-height-display>Height</span>
+            <svg class="size-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" />
+            </svg>
+          </button>
+          <div class="height-picker-panel" data-height-panel aria-hidden="true">
+            <label>
+              <span>Feet</span>
+              <select data-height-feet data-publish-section="player" aria-label="Height feet">
+                <option value="">--</option>
+                <% heightFeetOptions.forEach((feet) => { %>
+                  <option value="<%= feet %>"><%= feet %></option>
+                <% }) %>
+              </select>
+            </label>
+            <label>
+              <span>Inches</span>
+              <select data-height-inches data-publish-section="player" aria-label="Height inches">
+                <option value="">--</option>
+                <% heightInchOptions.forEach((inches) => { %>
+                  <option value="<%= inches %>"><%= inches %></option>
+                <% }) %>
+              </select>
+            </label>
+            <label>
+              <span>Fraction</span>
+              <select data-height-fraction data-publish-section="player" aria-label="Height fraction">
+                <% heightFractionOptions.forEach((fraction) => { %>
+                  <option value="<%= fraction.value %>"><%= fraction.label %></option>
+                <% }) %>
+              </select>
+            </label>
+          </div>
+        </div>
       </td>
       <td><input type="number" data-field="weight" min="1" step="1" placeholder="lbs" data-publish-section="player" /></td>
       <td><input type="number" data-field="posRank" min="1" step="1" placeholder="Pos rank" data-publish-section="player" /></td>
@@ -321,6 +391,107 @@
       form?.dispatchEvent(new Event("change", { bubbles: true }));
     }
 
+    function formatHeightDisplay(feet, inches, fraction) {
+      if (feet === "" || inches === "") {
+        return "Height";
+      }
+      const fractionLabel = fraction === "" || Number(fraction) === 0
+        ? ""
+        : ` ${{
+          0.125: "1/8",
+          0.25: "1/4",
+          0.375: "3/8",
+          0.5: "1/2",
+          0.625: "5/8",
+          0.75: "3/4",
+          0.875: "7/8",
+        }[Number(fraction)] ?? ""}`;
+      return `${feet}'${inches}${fractionLabel}"`;
+    }
+
+    function syncHeightPicker(picker) {
+      const feet = picker.querySelector("[data-height-feet]")?.value || "";
+      const inches = picker.querySelector("[data-height-inches]")?.value || "";
+      const fraction = picker.querySelector("[data-height-fraction]")?.value || "0";
+      const hidden = picker.querySelector("[data-height-label]");
+      const display = picker.querySelector("[data-height-display]");
+      if (!hidden) {
+        return;
+      }
+      if (display) {
+        display.textContent = formatHeightDisplay(feet, inches, fraction);
+      }
+      if (feet === "" || inches === "") {
+        hidden.value = "";
+        return;
+      }
+      const totalInches = Number(inches) + Number(fraction);
+      hidden.value = `${feet}-${Number(totalInches.toFixed(3))}`;
+    }
+
+    function closeHeightPicker(picker) {
+      picker.classList.remove("is-open");
+      picker.querySelector("[data-height-toggle]")?.setAttribute("aria-expanded", "false");
+      const panel = picker.querySelector("[data-height-panel]");
+      panel?.setAttribute("aria-hidden", "true");
+      if (panel) {
+        panel.style.left = "";
+        panel.style.top = "";
+      }
+    }
+
+    function positionHeightPicker(picker) {
+      const trigger = picker.querySelector("[data-height-toggle]");
+      const panel = picker.querySelector("[data-height-panel]");
+      if (!trigger || !panel) {
+        return;
+      }
+
+      const gutter = 8;
+      const triggerRect = trigger.getBoundingClientRect();
+      const panelWidth = panel.offsetWidth || 256;
+      const panelHeight = panel.offsetHeight || 104;
+      const maxLeft = Math.max(gutter, window.innerWidth - panelWidth - gutter);
+      const left = Math.min(Math.max(gutter, triggerRect.left), maxLeft);
+      const hasRoomBelow = window.innerHeight - triggerRect.bottom >= panelHeight + gutter;
+      const top = hasRoomBelow
+        ? triggerRect.bottom + 4
+        : Math.max(gutter, triggerRect.top - panelHeight - 4);
+
+      panel.style.left = `${left}px`;
+      panel.style.top = `${top}px`;
+    }
+
+    function openHeightPicker(picker) {
+      document.querySelectorAll("[data-height-picker].is-open").forEach((openPicker) => {
+        if (openPicker !== picker) {
+          closeHeightPicker(openPicker);
+        }
+      });
+      picker.classList.add("is-open");
+      picker.querySelector("[data-height-toggle]")?.setAttribute("aria-expanded", "true");
+      picker.querySelector("[data-height-panel]")?.setAttribute("aria-hidden", "false");
+      positionHeightPicker(picker);
+    }
+
+    function positionOpenHeightPickers() {
+      document.querySelectorAll("[data-height-picker].is-open").forEach(positionHeightPicker);
+    }
+
+    function wireHeightPicker(picker) {
+      syncHeightPicker(picker);
+      picker.querySelector("[data-height-toggle]")?.addEventListener("click", () => {
+        if (picker.classList.contains("is-open")) {
+          closeHeightPicker(picker);
+          return;
+        }
+        openHeightPicker(picker);
+      });
+      picker.querySelectorAll("[data-height-feet], [data-height-inches], [data-height-fraction]").forEach((field) => {
+        field.addEventListener("change", () => syncHeightPicker(picker));
+      });
+    }
+
     function wireRow(row, index, id) {
       row.querySelectorAll("[data-field]").forEach((field) => {
         field.name = `entries[${index}][${field.dataset.field}]`;
@@ -328,10 +499,30 @@
           field.value = id;
         }
       });
+      row.querySelectorAll("[data-height-picker]").forEach(wireHeightPicker);
       row.querySelectorAll("[data-publish-entry]").forEach((button) => {
         button.dataset.publishEntry = id;
       });
     }
+
+    document.querySelectorAll("[data-height-picker]").forEach(wireHeightPicker);
+
+    document.addEventListener("click", (event) => {
+      if (event.target.closest("[data-height-picker]")) {
+        return;
+      }
+      document.querySelectorAll("[data-height-picker].is-open").forEach(closeHeightPicker);
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") {
+        return;
+      }
+      document.querySelectorAll("[data-height-picker].is-open").forEach(closeHeightPicker);
+    });
+
+    window.addEventListener("scroll", positionOpenHeightPickers, true);
+    window.addEventListener("resize", positionOpenHeightPickers);
 
     function closeDeleteModal() {
       pendingDeleteRow?.classList.remove("is-delete-target");

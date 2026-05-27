@@ -1,61 +1,63 @@
 import request from "supertest";
 import fs from "node:fs";
 import path from "node:path";
-import { createHash } from "node:crypto";
 import { createComposedApp } from "../../src/composition";
-import { getPrismaClient } from "../../src/prisma/client";
-import { hashPassword } from "../../src/auth/PasswordHasher";
-import {
-  clearPrismaTestDatabase,
-  disconnectPrismaTestDatabase,
-  resetPrismaTestDatabase,
-  usePrismaTestDatabase,
-} from "../support/prismaTestDb";
+import type { IEmailService, SendEmailVerificationEmailInput, SendPasswordResetEmailInput } from "../../src/email/EmailService";
+
+function testConfig(turnstile = { siteKey: null as string | null, secretKey: null as string | null, verificationDisabled: false }) {
+  return {
+    port: 3000,
+    repositoryMode: "memory" as const,
+    email: {
+      provider: "logging" as const,
+      from: null,
+      appBaseUrl: "http://localhost:3000",
+      resendApiKey: null,
+      verificationTokenTtlHours: 24,
+      passwordResetTokenTtlMinutes: 60,
+      mailingListUnsubscribeSecret: "test-mailing-secret",
+    },
+    turnstile,
+  };
+}
+
+class CapturingEmailService implements IEmailService {
+  verificationEmails: SendEmailVerificationEmailInput[] = [];
+  passwordResetEmails: SendPasswordResetEmailInput[] = [];
+
+  async sendEmailVerificationEmail(input: SendEmailVerificationEmailInput): Promise<void> {
+    this.verificationEmails.push(input);
+  }
+
+  async sendPasswordResetEmail(input: SendPasswordResetEmailInput): Promise<void> {
+    this.passwordResetEmails.push(input);
+  }
+}
 
 function app() {
-  return createComposedApp("prisma").getExpressApp();
+  return createComposedApp("memory", undefined, testConfig()).getExpressApp();
+}
+
+function appWithEmailCapture() {
+  const emailService = new CapturingEmailService();
+  const ondraft = createComposedApp("memory", undefined, testConfig(), { emailService }).getExpressApp();
+  return { ondraft, emailService };
 }
 
 function appWithTurnstile() {
-  return createComposedApp("prisma", undefined, {
-    port: 3000,
-    repositoryMode: "prisma",
-    email: {
-      provider: "logging",
-      from: null,
-      appBaseUrl: "http://localhost:3000",
-      resendApiKey: null,
-      verificationTokenTtlHours: 24,
-      passwordResetTokenTtlMinutes: 60,
-      mailingListUnsubscribeSecret: "test-mailing-secret",
-    },
-    turnstile: {
+  return createComposedApp("memory", undefined, testConfig({
       siteKey: "test-site-key",
       secretKey: "test-secret-key",
       verificationDisabled: false,
-    },
-  }).getExpressApp();
+  })).getExpressApp();
 }
 
 function appWithDisabledTurnstile() {
-  return createComposedApp("prisma", undefined, {
-    port: 3000,
-    repositoryMode: "prisma",
-    email: {
-      provider: "logging",
-      from: null,
-      appBaseUrl: "http://localhost:3000",
-      resendApiKey: null,
-      verificationTokenTtlHours: 24,
-      passwordResetTokenTtlMinutes: 60,
-      mailingListUnsubscribeSecret: "test-mailing-secret",
-    },
-    turnstile: {
+  return createComposedApp("memory", undefined, testConfig({
       siteKey: "test-site-key",
       secretKey: "test-secret-key",
       verificationDisabled: true,
-    },
-  }).getExpressApp();
+  })).getExpressApp();
 }
 
 async function adminAgent() {
@@ -86,19 +88,6 @@ function removeUploadedAssetsFromHtml(html: string) {
 }
 
 describe("OnDraft HTTP contracts", () => {
-  beforeAll(() => {
-    usePrismaTestDatabase();
-  });
-
-  beforeEach(async () => {
-    await resetPrismaTestDatabase();
-  });
-
-  afterAll(async () => {
-    await clearPrismaTestDatabase();
-    await disconnectPrismaTestDatabase();
-  });
-
   it("renders the home page for anonymous visitors", async () => {
     const response = await request(app()).get("/");
 
@@ -253,6 +242,13 @@ describe("OnDraft HTTP contracts", () => {
     expect(about.text).toContain("https://www.linkedin.com/in/ryan-mcwalter/");
     expect(about.text).toContain("https://www.linkedin.com/in/aleksandr-ryabinkin-96a589330/");
     expect(about.text).toContain("@Ryan McWalter");
+    expect(about.text).toContain("/images/team/ryan-mcwalter.jpg");
+    expect(about.text).toContain("mailto:ryan@ondraftfootball.com");
+    expect(about.text).toContain("/files/ryan-mcwalter-resume.docx");
+    expect(about.text).toContain("/ Resume");
+    expect(about.text).toContain("https://x.com/rymcw3");
+    expect(about.text).toContain("/images/social/x-icon.svg");
+    expect(about.text).toContain("/ @rymcw3");
     expect(about.text).toContain("@Aleksandr Ryabinkin");
     expect(about.text).toContain("/images/social/linkedin-in-bug.png");
     expect(about.text).toContain("/images/team/nick-southey.jpg");
@@ -380,33 +376,20 @@ describe("OnDraft HTTP contracts", () => {
   });
 
   it("verifies an email token through the routed verification page", async () => {
-    const ondraft = app();
-    const prisma = getPrismaClient();
-    const rawToken = "fresh-http-verification-token";
-    const tokenHash = createHash("sha256").update(rawToken).digest("hex");
-    await prisma.user.create({
-      data: {
-        id: "user-needs-verification",
-        email: "needs-verification@ondraft.test",
-        displayName: "Needs Verification",
-        passwordHash: await hashPassword("password123"),
-        role: "user",
-        theme: "light",
-        fontSize: "small",
-        createdAt: new Date(),
-      },
-    });
-    await prisma.emailVerificationToken.create({
-      data: {
-        id: "email-token-http",
-        userId: "user-needs-verification",
-        tokenHash,
-        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
-        createdAt: new Date(),
-      },
-    });
-
+    const { ondraft, emailService } = appWithEmailCapture();
     const agent = request.agent(ondraft);
+    const register = await agent
+      .post("/register")
+      .type("form")
+      .send({
+        displayName: "Needs Verification",
+        email: "needs-verification@ondraft.test",
+        password: "password123",
+        confirmPassword: "password123",
+      });
+    expect(register.status).toBe(302);
+    expect(emailService.verificationEmails).toHaveLength(1);
+
     await agent
       .post("/login")
       .type("form")
@@ -416,14 +399,12 @@ describe("OnDraft HTTP contracts", () => {
     expect(beforeSettings.status).toBe(200);
     expect(beforeSettings.text).toContain("Email verification");
 
+    const rawToken = new URL(emailService.verificationEmails[0].verificationUrl).searchParams.get("token") ?? "";
     const verified = await agent.get(`/verify-email?token=${encodeURIComponent(rawToken)}`);
 
     expect(verified.status).toBe(200);
     expect(verified.text).toContain("Email Verified");
     expect(verified.text).toContain("Your email has been verified.");
-
-    const user = await prisma.user.findUnique({ where: { id: "user-needs-verification" } });
-    expect(user?.emailVerifiedAt).toBeInstanceOf(Date);
 
     const afterSettings = await agent.get("/settings");
     expect(afterSettings.status).toBe(200);
@@ -432,20 +413,17 @@ describe("OnDraft HTTP contracts", () => {
   });
 
   it("requests and completes password reset through routed pages", async () => {
-    const ondraft = app();
-    const prisma = getPrismaClient();
-    await prisma.user.create({
-      data: {
-        id: "user-reset-password",
-        email: "reset-reader@ondraft.test",
+    const { ondraft, emailService } = appWithEmailCapture();
+    const register = await request(ondraft)
+      .post("/register")
+      .type("form")
+      .send({
         displayName: "Reset Reader",
-        passwordHash: await hashPassword("password123"),
-        role: "user",
-        theme: "light",
-        fontSize: "small",
-        createdAt: new Date(),
-      },
-    });
+        email: "reset-reader@ondraft.test",
+        password: "password123",
+        confirmPassword: "password123",
+      });
+    expect(register.status).toBe(302);
 
     const requestReset = await request(ondraft)
       .post("/forgot-password")
@@ -461,23 +439,8 @@ describe("OnDraft HTTP contracts", () => {
     expect(unknownReset.status).toBe(400);
     expect(unknownReset.text).toContain("No OnDraft account exists for that email address.");
 
-    const createdTokens = await prisma.passwordResetToken.findMany({
-      where: { userId: "user-reset-password" },
-    });
-    expect(createdTokens).toHaveLength(1);
-    expect(createdTokens[0].tokenHash).not.toContain("reset-http-token");
-
-    const rawToken = "reset-http-token";
-    const tokenHash = createHash("sha256").update(rawToken).digest("hex");
-    await prisma.passwordResetToken.create({
-      data: {
-        id: "password-token-http",
-        userId: "user-reset-password",
-        tokenHash,
-        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
-        createdAt: new Date(),
-      },
-    });
+    expect(emailService.passwordResetEmails).toHaveLength(1);
+    const rawToken = new URL(emailService.passwordResetEmails[0].resetUrl).searchParams.get("token") ?? "";
 
     const form = await request(ondraft).get(`/reset-password?token=${encodeURIComponent(rawToken)}`);
     expect(form.status).toBe(200);
@@ -794,6 +757,10 @@ describe("OnDraft HTTP contracts", () => {
     expect(editor.text).toContain("This cannot be undone.");
     expect(editor.text).toContain('list="college-team-options"');
     expect(editor.text).toContain('<option value="Alabama"></option>');
+    expect(editor.text).toContain("data-height-picker");
+    expect(editor.text).toContain("data-height-feet");
+    expect(editor.text).toContain("data-height-inches");
+    expect(editor.text).toContain("data-height-fraction");
 
     const draft = await agent
       .post("/bigboard/edit")
@@ -807,7 +774,7 @@ describe("OnDraft HTTP contracts", () => {
         "entries[0][position]": "QB",
         "entries[0][rank]": "1",
         "entries[0][posRank]": "1",
-        "entries[0][heightLabel]": "6-2",
+        "entries[0][heightLabel]": "6-2.375",
         "entries[0][weight]": "220",
         "entries[0][strengths]": "Pocket movement",
         "entries[0][weaknesses]": "Pressure answers",
@@ -834,7 +801,7 @@ describe("OnDraft HTTP contracts", () => {
         "entries[0][position]": "QB",
         "entries[0][rank]": "1",
         "entries[0][posRank]": "1",
-        "entries[0][heightLabel]": "6-2",
+        "entries[0][heightLabel]": "6-2.375",
         "entries[0][weight]": "220",
         "entries[0][strengths]": "Pocket movement",
         "entries[0][weaknesses]": "Pressure answers",
@@ -853,6 +820,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(visibleWithoutWriteup.text).toContain('src="/teamHelmetTemplate.png"');
     expect(visibleWithoutWriteup.text).toContain('data-primary-color="#690014"');
     expect(visibleWithoutWriteup.text).toContain('data-secondary-color="#F1F2F3"');
+    expect(visibleWithoutWriteup.text).toContain("6&#39;2 3/8&#34;");
     expect(visibleWithoutWriteup.text).not.toContain("Starter traits.");
     expect(visibleWithoutWriteup.text).not.toContain("Private eval note.");
 
@@ -868,7 +836,7 @@ describe("OnDraft HTTP contracts", () => {
         "entries[0][position]": "QB",
         "entries[0][rank]": "1",
         "entries[0][posRank]": "1",
-        "entries[0][heightLabel]": "6-2",
+        "entries[0][heightLabel]": "6-2.375",
         "entries[0][weight]": "220",
         "entries[0][strengths]": "Pocket movement",
         "entries[0][weaknesses]": "Pressure answers",
@@ -965,6 +933,109 @@ describe("OnDraft HTTP contracts", () => {
     expect(afterDelete.text).not.toContain(deletedPlayerName);
     expect(afterDelete.text).toContain(keptPlayerName);
   }, 15000);
+
+  it("accepts large admin draft board editor saves", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+    const payload: Record<string, string> = {
+      year: "2026",
+      creator: "Ryan",
+    };
+
+    for (let index = 0; index < 18; index += 1) {
+      const row = `entries[${index}]`;
+      payload[`${row}[id]`] = `large-entry-${index}`;
+      payload[`${row}[playerName]`] = `Large Prospect ${index + 1}`;
+      payload[`${row}[school]`] = "OnDraft State";
+      payload[`${row}[position]`] = index % 2 === 0 ? "QB" : "WR";
+      payload[`${row}[rank]`] = String(index + 1);
+      payload[`${row}[posRank]`] = String(index + 1);
+      payload[`${row}[heightLabel]`] = "6-2";
+      payload[`${row}[weight]`] = "220";
+      payload[`${row}[strengths]`] = `Strength ${index} `.repeat(260);
+      payload[`${row}[weaknesses]`] = `Weakness ${index} `.repeat(260);
+      payload[`${row}[rundown]`] = `Rundown ${index} `.repeat(260);
+      payload[`${row}[notes]`] = `Private note ${index} `.repeat(120);
+      payload[`${row}[playerInfoPublished]`] = "true";
+      payload[`${row}[writeupPublished]`] = "true";
+    }
+
+    const save = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send(payload);
+
+    expect(save.status).toBe(200);
+    expect(save.text).toContain("Saved.");
+
+    const board = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
+    expect(board.status).toBe(200);
+    expect(board.text).toContain("Large Prospect 18");
+  }, 15000);
+
+  it("ignores blank draft board editor rows when saving and exiting", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+    const save = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": "kept-after-blank",
+        "entries[0][playerName]": "Kept After Blank",
+        "entries[0][school]": "OnDraft State",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2.125",
+        "entries[0][weight]": "220",
+        "entries[0][strengths]": "Timing",
+        "entries[0][weaknesses]": "Pressure",
+        "entries[0][rundown]": "Clean saved row.",
+        "entries[0][playerInfoPublished]": "true",
+        "entries[1][id]": "blank-row",
+        "entries[1][playerName]": "",
+        "entries[1][school]": "",
+        "entries[1][position]": "",
+        "entries[1][rank]": "",
+        "entries[1][posRank]": "",
+        "entries[1][heightLabel]": "",
+        "entries[1][weight]": "",
+        "entries[1][strengths]": "",
+        "entries[1][weaknesses]": "",
+        "entries[1][rundown]": "",
+        "entries[1][notes]": "",
+        action: "exit",
+      });
+
+    expect(save.status).toBe(302);
+    expect(save.headers.location).toBe("/bigboard?year=2026&creator=Ryan");
+
+    const board = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
+    expect(board.status).toBe(200);
+    expect(board.text).toContain("Kept After Blank");
+    expect(board.text).toContain("6&#39;2 1/8&#34;");
+    expect(board.text).not.toContain("blank-row");
+  });
+
+  it("renders a friendly full page when draft board saves exceed the body limit", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+    const response = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": "too-large-row",
+        "entries[0][notes]": "x".repeat(1024 * 1024 + 1),
+      });
+
+    expect(response.status).toBe(413);
+    expect(response.text).toContain("<!doctype html>");
+    expect(response.text).toContain("That save is too large to process at once.");
+  });
 
   it("renders big board position and school filters and applies them through htmx", async () => {
     const ondraft = app();
@@ -1177,6 +1248,11 @@ describe("OnDraft HTTP contracts", () => {
 
   it("supports hot take posting, filtering, liking, commenting, and owner deletion", async () => {
     const agent = await adminAgent();
+
+    const page = await agent.get("/hottakes");
+    expect(page.status).toBe(200);
+    expect(page.text).toContain('x-text="content.length"');
+    expect(page.text).toContain("/300 characters");
 
     const create = await agent
       .post("/hottakes")

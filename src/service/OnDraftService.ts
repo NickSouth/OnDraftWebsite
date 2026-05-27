@@ -410,12 +410,20 @@ class OnDraftService implements IOnDraftService {
     return Number.isInteger(normalized) ? normalized : null;
   }
 
+  private normalizeNullableNumber(value: number | string | null | undefined): number | null {
+    if (value === null || value === undefined || value === "") {
+      return null;
+    }
+    const normalized = typeof value === "number" ? value : Number(value);
+    return Number.isFinite(normalized) ? normalized : null;
+  }
+
   private normalizeHeight(height: Height | null | undefined): Height | null {
     if (!height) {
       return null;
     }
     const feet = this.normalizeNullableInteger(height.feet);
-    const inches = this.normalizeNullableInteger(height.inches);
+    const inches = this.normalizeNullableNumber(height.inches);
     if (feet === null || inches === null) {
       return null;
     }

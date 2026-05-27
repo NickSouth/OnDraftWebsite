@@ -28,7 +28,7 @@ export type OnDraftSessionStore = Session &
     ondraft?: IOnDraftBrowserSession;
   };
 
-export const STANDARD_SESSION_MAX_AGE_MS = 10 * 60 * 1000;
+export const STANDARD_SESSION_MAX_AGE_MS = 30 * 60 * 1000;
 export const REMEMBERED_SESSION_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 
 function createBrowserLabel(browserId: string): string {
@@ -66,6 +66,16 @@ function snapshotSession(session: IOnDraftBrowserSession): IOnDraftBrowserSessio
   return { ...session };
 }
 
+function sessionMaxAge(session: IOnDraftBrowserSession): number {
+  return session.authenticatedUser?.rememberMe ? REMEMBERED_SESSION_MAX_AGE_MS : STANDARD_SESSION_MAX_AGE_MS;
+}
+
+function refreshCookieMaxAge(store: OnDraftSessionStore, session: IOnDraftBrowserSession): void {
+  if (store.cookie) {
+    store.cookie.maxAge = sessionMaxAge(session);
+  }
+}
+
 export function recordPageView(
   store: OnDraftSessionStore,
   now: Date = new Date(),
@@ -73,6 +83,7 @@ export function recordPageView(
   const session = ensureOnDraftSession(store, now);
   session.visitCount += 1;
   session.lastSeenAt = now.toISOString();
+  refreshCookieMaxAge(store, session);
   return snapshotSession(session);
 }
 
@@ -82,6 +93,7 @@ export function touchOnDraftSession(
 ): IOnDraftBrowserSession {
   const session = ensureOnDraftSession(store, now);
   session.lastSeenAt = now.toISOString();
+  refreshCookieMaxAge(store, session);
   return snapshotSession(session);
 }
 
@@ -94,9 +106,6 @@ export function signInAuthenticatedUser(
   const rememberMe = typeof rememberMeOrNow === "boolean" ? rememberMeOrNow : false;
   const now = rememberMeOrNow instanceof Date ? rememberMeOrNow : nowInput ?? new Date();
   const session = ensureOnDraftSession(store, now);
-  if (store.cookie) {
-    store.cookie.maxAge = rememberMe ? REMEMBERED_SESSION_MAX_AGE_MS : STANDARD_SESSION_MAX_AGE_MS;
-  }
   session.authenticatedUser = {
     userId: user.id,
     email: user.email,
@@ -109,6 +118,7 @@ export function signInAuthenticatedUser(
     rememberMe,
   };
   session.lastSeenAt = now.toISOString();
+  refreshCookieMaxAge(store, session);
   return snapshotSession(session);
 }
 
@@ -119,6 +129,7 @@ export function signOutAuthenticatedUser(
   const session = ensureOnDraftSession(store, now);
   session.authenticatedUser = null;
   session.lastSeenAt = now.toISOString();
+  refreshCookieMaxAge(store, session);
   return snapshotSession(session);
 }
 

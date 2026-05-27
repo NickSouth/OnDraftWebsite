@@ -12,14 +12,16 @@
       hx-include="#hot-take-filter-form"
       hx-target="#hot-take-list"
       hx-swap="outerHTML"
+      x-data="{ content: '' }"
+      x-init="content = $refs.hotTakeContent.value"
     >
       <label>
         Your hot take
-        <textarea x-ref="hotTakeContent" name="content" maxlength="300" required><%= values.content || "" %></textarea>
+        <textarea x-ref="hotTakeContent" x-model="content" name="content" maxlength="300" required><%= values.content || "" %></textarea>
       </label>
       <div class="form-actions">
         <button type="submit">Post Hot Take</button>
-        <span class="muted-text">300 characters max</span>
+        <span class="muted-text"><span x-text="content.length">0</span>/300 characters</span>
       </div>
     </form>
   <% } else { %>
