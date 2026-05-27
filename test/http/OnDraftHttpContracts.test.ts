@@ -1243,6 +1243,11 @@ describe("OnDraft HTTP contracts", () => {
   it("supports hot take posting, filtering, liking, commenting, and owner deletion", async () => {
     const agent = await adminAgent();
 
+    const page = await agent.get("/hottakes");
+    expect(page.status).toBe(200);
+    expect(page.text).toContain('x-text="content.length"');
+    expect(page.text).toContain("/300 characters");
+
     const create = await agent
       .post("/hottakes")
       .type("form")
