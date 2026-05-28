@@ -1,9 +1,18 @@
 - Add actual logo
-- Draft Board grades
-- Ryan Bio/Headshot
+    - Add to about us page
+- Draft Board grading system
 - Aleks Bio/Headshot
 - Actual social media links
-- Character count on hot takes 
-- Comment lengths
-- Save and exit with empty draft board rows breaks the page
-- Add fractional heights as player options
+- Comment length limiting and overflow control, UI icon for this
+- Better loading between navigation
+- Newsletter functionality
+    - Send via resent from no-reply
+    - Template that fills with date, this week/month from OnDraft
+        - Select articles/videos to push
+        - Add updates to the site
+        - Save draft/send buttons
+- Tags that are assigned to active articles/videos dropdown in the tag search
+- Past tags dropdown next to tag adding on article and video creation with checkboxes
+- Fix video tag creation
+- Add images for HTML articles
+- Deselect Bookmarks from the bookmark menu
