@@ -3,16 +3,18 @@
 - Draft Board grading system
 - Aleks Bio/Headshot
 - Actual social media links
-- Comment length limiting and overflow control, UI icon for this
-- Better loading between navigation
 - Newsletter functionality
     - Send via resent from no-reply
     - Template that fills with date, this week/month from OnDraft
         - Select articles/videos to push
         - Add updates to the site
         - Save draft/send buttons
-- Tags that are assigned to active articles/videos dropdown in the tag search
-- Past tags dropdown next to tag adding on article and video creation with checkboxes
-- Fix video tag creation
 - Add images for HTML articles
-- Deselect Bookmarks from the bookmark menu
+- rethink draft board editor entirely
+- Make fields sticky for context as you scroll down on draft board
+- Tag feature frontend work. Make the checkbox dropdown actually a dropdown and much smaller in both places
+    - Should drop down, allow selection, and then have an exit button
+    - Video library filters should move from to the bottom right\
+    - Dropdown should have an expand and retract arrow and be scrollable instead of expanding infitely, with a clear button appearing in the editing box
+    - Feature seems to work perfectly on the backend
+- Revisit skeleton loaders, they seem to not be super accurate to actual expected format
