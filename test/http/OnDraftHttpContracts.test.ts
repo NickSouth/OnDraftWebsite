@@ -111,7 +111,8 @@ describe("OnDraft HTTP contracts", () => {
     expect(response.text).toContain('id="site-loader"');
     expect(response.text).toContain('id="loading-skeleton-templates"');
     expect(response.text).toContain('data-page-skeleton="articles"');
-    expect(response.text).toContain('data-result-skeleton="article-results"');
+    expect(response.text).toContain('data-result-skeleton="article-results-card"');
+    expect(response.text).toContain('data-result-skeleton="article-results-list"');
     expect(response.text).toContain("od-loading-card");
     expect(response.text).not.toContain("[PLACEHOLDER FOR SOCIAL MEDIA LINKS]");
   });
@@ -126,6 +127,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(response.text).toContain("htmx:afterSettle");
     expect(response.text).toContain("showRouteSkeleton");
     expect(response.text).toContain("showResultSkeleton");
+    expect(response.text).toContain("resolvedResultSkeletonName");
     expect(response.text).toContain("data-loading-skeleton");
   });
 

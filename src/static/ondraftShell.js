@@ -1,8 +1,8 @@
 (() => {
   let loaderTimeout = null;
   let skeletonTimeout = null;
-  const skeletonDelay = 140;
-  const fallbackDelay = 450;
+  const skeletonDelay = 300;
+  const fallbackDelay = 650;
   const spellcheckSelector = [
     "textarea",
     "[contenteditable='true']",
@@ -107,6 +107,18 @@
     return { name, targetSelector };
   };
 
+  const resolvedResultSkeletonName = (name, source) => {
+    if (name === "article-results") {
+      const configured = source instanceof Element ? source.closest("[data-loading-skeleton]") : null;
+      const view = configured?.querySelector('input[name="view"]')?.value;
+      return view === "list" ? "article-results-list" : "article-results-card";
+    }
+    if (name === "big-board-results") {
+      return window.localStorage.getItem("bigBoardView") === "list" ? "big-board-results-list" : "big-board-results-card";
+    }
+    return name;
+  };
+
   const showResultSkeleton = (source) => {
     const config = skeletonConfigFrom(source);
     if (!config) {
@@ -114,7 +126,8 @@
     }
 
     const target = document.querySelector(config.targetSelector);
-    const content = templateContent(`[data-result-skeleton="${config.name}"]`);
+    const skeletonName = resolvedResultSkeletonName(config.name, source);
+    const content = templateContent(`[data-result-skeleton="${skeletonName}"]`);
     if (!target || !content) {
       return false;
     }

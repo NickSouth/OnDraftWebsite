@@ -70,7 +70,7 @@
           <div class="od-loading-bar size-10 rounded-md"></div>
         </div>
       </div>
-      <div data-skeleton-include="article-results"></div>
+      <div data-skeleton-include="article-results-card"></div>
     </section>
   </template>
 
@@ -117,7 +117,7 @@
           </div>
         </div>
       </div>
-      <div data-skeleton-include="big-board-results"></div>
+      <div data-skeleton-include="big-board-results-card"></div>
     </section>
   </template>
 
@@ -149,7 +149,7 @@
         <div class="od-loading-bar h-12 w-72"></div>
         <div class="od-loading-bar h-5 w-full max-w-xl"></div>
       </div>
-      <div data-skeleton-include="article-results"></div>
+      <div data-skeleton-include="article-results-card"></div>
     </section>
   </template>
 
@@ -191,37 +191,100 @@
     </section>
   </template>
 
-  <template data-result-skeleton="article-results">
-    <div class="od-result-skeleton article-grid grid gap-5 sm:grid-cols-2 lg:grid-cols-3" aria-live="polite" aria-label="Loading articles">
-      <% for (let index = 0; index < 6; index += 1) { %>
-        <article class="od-card grid gap-4 overflow-hidden p-4">
-          <div class="od-loading-card aspect-[16/10]"></div>
-          <div class="od-loading-bar h-3 w-24"></div>
-          <div class="od-loading-bar h-7 w-full"></div>
-          <div class="od-loading-bar h-4 w-11/12"></div>
-          <div class="od-loading-bar h-4 w-3/4"></div>
-          <div class="flex justify-between border-t border-slate-200 pt-3 dark:border-white/10">
-            <div class="od-loading-bar h-6 w-20 rounded"></div>
-            <div class="od-loading-bar h-6 w-16 rounded"></div>
+  <template data-result-skeleton="article-results-card">
+    <ul class="od-result-skeleton grid list-none gap-5 p-0" aria-live="polite" aria-label="Loading articles">
+      <% for (let index = 0; index < 5; index += 1) { %>
+        <li class="od-card grid overflow-hidden lg:grid-cols-[18rem_minmax(0,1fr)_auto]">
+          <div class="relative block aspect-[16/10] overflow-hidden bg-draft-ink lg:aspect-auto lg:min-h-56">
+            <div class="od-loading-card h-full rounded-none"></div>
           </div>
-        </article>
+          <div class="grid min-w-0 content-start gap-3 p-4 sm:p-6">
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="od-loading-bar h-3 w-16"></div>
+              <div class="od-loading-bar h-3 w-20"></div>
+            </div>
+            <div class="od-loading-bar h-8 w-full max-w-2xl sm:h-10"></div>
+            <div class="od-loading-bar h-4 w-40"></div>
+            <div class="grid gap-2">
+              <div class="od-loading-bar h-4 w-full"></div>
+              <div class="od-loading-bar h-4 w-11/12"></div>
+              <div class="od-loading-bar h-4 w-4/5"></div>
+            </div>
+            <div class="flex flex-wrap gap-3">
+              <div class="od-loading-bar h-5 w-14"></div>
+              <div class="od-loading-bar h-5 w-16"></div>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <div class="od-loading-bar h-6 w-16 rounded"></div>
+              <div class="od-loading-bar h-6 w-20 rounded"></div>
+            </div>
+          </div>
+          <div class="flex items-start gap-2 border-t border-slate-200 p-4 dark:border-white/10 lg:border-l lg:border-t-0">
+            <div class="od-loading-bar size-9 rounded-md"></div>
+            <div class="od-loading-bar h-9 w-16 rounded-md"></div>
+          </div>
+        </li>
       <% } %>
-    </div>
+    </ul>
+  </template>
+
+  <template data-result-skeleton="article-results-list">
+    <ul class="od-result-skeleton grid list-none gap-3 p-0" aria-live="polite" aria-label="Loading articles">
+      <% for (let index = 0; index < 8; index += 1) { %>
+        <li class="article-list-row od-card">
+          <div class="grid min-w-0 grid-cols-[4rem_minmax(0,1fr)] gap-3 text-slate-950 dark:text-white md:grid-cols-[4.5rem_minmax(0,1fr)_auto]">
+            <div class="relative block aspect-square overflow-hidden rounded-md bg-draft-ink">
+              <div class="od-loading-card h-full rounded-none"></div>
+            </div>
+            <div class="grid min-w-0 gap-2">
+              <div class="flex flex-wrap items-center gap-2">
+                <div class="od-loading-bar h-3 w-16"></div>
+                <div class="od-loading-bar h-3 w-20"></div>
+              </div>
+              <div class="od-loading-bar h-6 w-full max-w-xl"></div>
+              <div class="od-loading-bar h-4 w-36"></div>
+            </div>
+            <div class="col-span-2 flex flex-wrap items-center gap-3 md:col-span-1 md:justify-end">
+              <div class="od-loading-bar h-5 w-14"></div>
+              <div class="od-loading-bar h-5 w-16"></div>
+            </div>
+          </div>
+          <div class="flex shrink-0 items-start gap-2 sm:justify-end">
+            <div class="od-loading-bar size-9 rounded-md"></div>
+            <div class="od-loading-bar h-9 w-16 rounded-md"></div>
+          </div>
+        </li>
+      <% } %>
+    </ul>
   </template>
 
   <template data-result-skeleton="video-results">
     <div class="od-result-skeleton video-grid grid gap-5" aria-live="polite" aria-label="Loading videos">
       <% for (let index = 0; index < 3; index += 1) { %>
         <article class="video-card od-card grid overflow-hidden lg:grid-cols-[24rem_minmax(0,1fr)]">
-          <div class="od-loading-card min-h-40 rounded-none sm:min-h-56"></div>
-          <div class="grid gap-4 p-4 sm:p-6">
-            <div class="od-loading-bar h-3 w-20"></div>
-            <div class="od-loading-bar h-8 w-full max-w-lg"></div>
-            <div class="od-loading-bar h-4 w-full"></div>
-            <div class="od-loading-bar h-4 w-4/5"></div>
+          <div class="block overflow-hidden bg-draft-ink">
+            <div class="od-loading-card h-full min-h-40 rounded-none sm:min-h-56"></div>
+          </div>
+          <div class="video-card-copy grid content-between gap-4 p-4 sm:gap-5 sm:p-6">
+            <div class="grid gap-2">
+              <div class="od-loading-bar h-3 w-20"></div>
+              <div class="od-loading-bar h-8 w-full max-w-lg sm:h-10"></div>
+              <div class="hidden gap-2 sm:grid">
+                <div class="od-loading-bar h-4 w-full"></div>
+                <div class="od-loading-bar h-4 w-4/5"></div>
+              </div>
+              <div class="od-loading-bar h-9 w-36 rounded-md sm:hidden"></div>
+            </div>
             <div class="flex flex-wrap gap-2">
               <div class="od-loading-bar h-6 w-20 rounded"></div>
               <div class="od-loading-bar h-6 w-16 rounded"></div>
+            </div>
+            <div class="video-card-footer mt-auto flex flex-col gap-3 border-t border-slate-200 pt-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
+              <div class="od-loading-bar h-5 w-28"></div>
+              <div class="flex flex-wrap items-center gap-2">
+                <div class="od-loading-bar h-9 w-16 rounded-md"></div>
+                <div class="od-loading-bar h-9 w-20 rounded-md"></div>
+              </div>
             </div>
           </div>
         </article>
@@ -229,51 +292,105 @@
     </div>
   </template>
 
-  <template data-result-skeleton="big-board-results">
-    <div class="od-result-skeleton big-board-results grid gap-4" aria-live="polite" aria-label="Loading draft board">
-      <div class="mb-1 flex justify-end">
-        <div class="od-loading-bar h-11 w-24 rounded-md"></div>
+  <template data-result-skeleton="big-board-results-card">
+    <div id="big-board-results" class="od-result-skeleton big-board-results" aria-live="polite" aria-label="Loading draft board">
+      <div class="mb-4 flex justify-end">
+        <div class="inline-flex rounded-md border border-slate-200 bg-white p-1 dark:border-white/10 dark:bg-draft-slate">
+          <div class="od-loading-bar size-10 rounded"></div>
+          <div class="od-loading-bar size-10 rounded"></div>
+        </div>
       </div>
-      <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        <% for (let index = 0; index < 9; index += 1) { %>
-          <article class="od-card grid gap-3 p-4">
-            <div class="flex items-start justify-between gap-3">
-              <div class="grid gap-2">
-                <div class="od-loading-bar h-4 w-20"></div>
-                <div class="od-loading-bar h-7 w-44"></div>
+      <ol class="ranking-list grid list-none p-0">
+        <% for (let index = 0; index < 8; index += 1) { %>
+          <li class="border-b border-slate-200 last:border-b-0 dark:border-white/10">
+            <div class="relative grid gap-3 overflow-hidden rounded-md p-2 sm:min-h-32 sm:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)] sm:items-center">
+              <span class="pointer-events-none absolute inset-y-0 right-0 left-[31rem] hidden bg-slate-200/55 [clip-path:polygon(3rem_0,100%_0,100%_100%,0_100%)] dark:bg-white/[0.06] lg:block" aria-hidden="true"></span>
+              <span class="relative z-10 flex items-center gap-2">
+                <div class="od-loading-bar h-12 w-12"></div>
+              </span>
+              <span class="relative z-10 flex justify-center">
+                <div class="od-loading-bar h-20 w-28 rounded-md"></div>
+              </span>
+              <div class="relative z-10 grid gap-3">
+                <div class="grid gap-3 lg:grid-cols-[minmax(0,18rem)_minmax(12rem,1fr)] lg:items-start">
+                  <div class="grid gap-2">
+                    <div class="od-loading-bar h-8 w-full max-w-xs"></div>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <div class="od-loading-bar h-7 w-16 rounded"></div>
+                      <div class="od-loading-bar h-5 w-32"></div>
+                    </div>
+                  </div>
+                  <div class="flex flex-wrap gap-2">
+                    <div class="od-loading-bar h-8 w-20 rounded-md"></div>
+                    <div class="od-loading-bar h-8 w-20 rounded-md"></div>
+                    <div class="od-loading-bar h-8 w-20 rounded-md"></div>
+                    <div class="od-loading-bar h-8 w-20 rounded-md"></div>
+                  </div>
+                </div>
               </div>
-              <div class="od-loading-bar size-12 rounded-md"></div>
             </div>
-            <div class="grid grid-cols-3 gap-2">
-              <div class="od-loading-bar h-10 rounded-md"></div>
-              <div class="od-loading-bar h-10 rounded-md"></div>
-              <div class="od-loading-bar h-10 rounded-md"></div>
-            </div>
-          </article>
+          </li>
         <% } %>
+      </ol>
+    </div>
+  </template>
+
+  <template data-result-skeleton="big-board-results-list">
+    <div id="big-board-results" class="od-result-skeleton big-board-results" aria-live="polite" aria-label="Loading draft board">
+      <div class="mb-4 flex justify-end">
+        <div class="inline-flex rounded-md border border-slate-200 bg-white p-1 dark:border-white/10 dark:bg-draft-slate">
+          <div class="od-loading-bar size-10 rounded"></div>
+          <div class="od-loading-bar size-10 rounded"></div>
+        </div>
       </div>
+      <ol class="grid list-none divide-y divide-slate-200 rounded-md border border-slate-200 bg-white p-0 dark:divide-white/10 dark:border-white/10 dark:bg-draft-slate">
+        <% for (let index = 0; index < 12; index += 1) { %>
+          <li class="grid gap-3 px-3 py-3 sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:items-center">
+            <div class="od-loading-bar h-8 w-8"></div>
+            <div class="grid min-w-0 gap-2 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:items-center">
+              <div class="od-loading-bar hidden h-14 w-16 rounded-md sm:block"></div>
+              <div class="grid gap-2">
+                <div class="od-loading-bar h-6 w-full max-w-sm"></div>
+                <div class="od-loading-bar h-4 w-48"></div>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-2 sm:justify-end">
+              <div class="od-loading-bar h-6 w-16 rounded"></div>
+              <div class="od-loading-bar h-6 w-16 rounded"></div>
+              <div class="od-loading-bar h-6 w-16 rounded"></div>
+            </div>
+          </li>
+        <% } %>
+      </ol>
     </div>
   </template>
 
   <template data-result-skeleton="hot-takes">
-    <ul id="hot-take-list" class="od-result-skeleton comment-list hot-take-list" aria-live="polite" aria-label="Loading hot takes">
-      <% for (let index = 0; index < 4; index += 1) { %>
-        <li class="comment-item hot-take-item">
-          <div class="grid gap-3">
-            <div class="flex items-center gap-3">
-              <div class="od-loading-bar size-9 rounded-full"></div>
-              <div class="od-loading-bar h-4 w-40"></div>
+    <div id="hot-take-list" class="od-result-skeleton hot-take-list" aria-live="polite" aria-label="Loading hot takes">
+      <ol class="comment-list">
+        <% for (let index = 0; index < 4; index += 1) { %>
+          <li class="comment-item hot-take-item">
+            <div class="comment-header">
+              <div class="flex flex-wrap items-center gap-2">
+                <div class="od-loading-bar h-5 w-32"></div>
+                <div class="od-loading-bar h-4 w-20"></div>
+              </div>
+              <div class="comment-admin-actions">
+                <div class="od-loading-bar h-9 w-16 rounded-md"></div>
+              </div>
             </div>
-            <div class="od-loading-bar h-5 w-full"></div>
-            <div class="od-loading-bar h-5 w-5/6"></div>
+            <div class="grid gap-2 py-1">
+              <div class="od-loading-bar h-5 w-full"></div>
+              <div class="od-loading-bar h-5 w-5/6"></div>
+            </div>
             <div class="flex gap-2">
               <div class="od-loading-bar h-8 w-16 rounded-md"></div>
               <div class="od-loading-bar h-8 w-16 rounded-md"></div>
             </div>
-          </div>
-        </li>
-      <% } %>
-    </ul>
+          </li>
+        <% } %>
+      </ol>
+    </div>
   </template>
 
   <template data-result-skeleton="popular-articles">
@@ -285,16 +402,17 @@
         </div>
         <div class="od-loading-bar h-10 w-full rounded-md sm:w-72"></div>
       </div>
-      <div class="grid gap-3">
+      <div class="grid max-h-[720px] gap-3 overflow-y-auto px-1 py-1">
         <% for (let index = 0; index < 5; index += 1) { %>
-          <div class="od-card grid grid-cols-[2.75rem_4.5rem_minmax(0,1fr)] items-center gap-3 p-3 sm:grid-cols-[3.5rem_6rem_minmax(0,1fr)_auto]">
+          <div class="od-card grid grid-cols-[2.75rem_4.5rem_minmax(0,1fr)] items-center gap-3 overflow-hidden p-3 sm:grid-cols-[3.5rem_6rem_minmax(0,1fr)_auto] sm:p-0">
             <div class="od-loading-bar size-10 rounded-md sm:size-12"></div>
-            <div class="od-loading-card aspect-square"></div>
+            <div class="od-loading-card aspect-square sm:h-full sm:min-h-24 sm:rounded-none"></div>
             <div class="grid gap-2">
               <div class="od-loading-bar h-5 w-full"></div>
               <div class="od-loading-bar h-4 w-52"></div>
+              <div class="od-loading-bar hidden h-4 w-full sm:block"></div>
             </div>
-            <div class="od-loading-bar col-span-3 h-7 w-16 rounded sm:col-span-1"></div>
+            <div class="od-loading-bar col-span-3 h-7 w-16 rounded sm:col-span-1 sm:mr-4"></div>
           </div>
         <% } %>
       </div>
