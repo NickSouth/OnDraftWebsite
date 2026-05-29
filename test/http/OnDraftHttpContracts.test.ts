@@ -113,6 +113,16 @@ describe("OnDraft HTTP contracts", () => {
     expect(response.text).not.toContain("[PLACEHOLDER FOR SOCIAL MEDIA LINKS]");
   });
 
+  it("enables spellcheck for editable text fields from the shell script", async () => {
+    const response = await request(app()).get("/ondraftShell.js");
+
+    expect(response.status).toBe(200);
+    expect(response.text).toContain("spellcheckSelector");
+    expect(response.text).toContain('field.setAttribute("spellcheck", "true")');
+    expect(response.text).toContain("MutationObserver");
+    expect(response.text).toContain("htmx:afterSettle");
+  });
+
   it("blocks cross-origin state-changing requests when an origin is present", async () => {
     const response = await request(app())
       .post("/login")

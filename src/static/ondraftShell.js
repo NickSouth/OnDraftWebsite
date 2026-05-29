@@ -1,5 +1,25 @@
 (() => {
   let loaderTimeout = null;
+  const spellcheckSelector = [
+    "textarea",
+    "[contenteditable='true']",
+    "input:not([type])",
+    "input[type='text']",
+    "input[type='search']",
+  ].join(",");
+
+  const enableSpellcheck = (root = document) => {
+    if (!(root instanceof Document || root instanceof Element || root instanceof DocumentFragment)) {
+      return;
+    }
+    const fields = root.matches?.(spellcheckSelector)
+      ? [root]
+      : [...root.querySelectorAll(spellcheckSelector)];
+    fields.forEach((field) => {
+      field.setAttribute("spellcheck", "true");
+    });
+  };
+
   const isLocalNavigation = (link, event) => {
     if (!link || event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
       return false;
@@ -57,14 +77,29 @@
 
   document.addEventListener("htmx:afterRequest", hideLoader);
   document.addEventListener("htmx:beforeSwap", hideLoader);
-  document.addEventListener("htmx:afterSettle", hideLoader);
+  document.addEventListener("htmx:afterSettle", (event) => {
+    hideLoader();
+    enableSpellcheck(event.detail?.target || document);
+  });
   document.addEventListener("htmx:responseError", hideLoader);
   document.addEventListener("htmx:sendError", hideLoader);
-  window.addEventListener("load", hideLoader);
+  window.addEventListener("load", () => {
+    hideLoader();
+    enableSpellcheck();
+  });
   window.addEventListener("pageshow", hideLoader);
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) {
       hideLoader();
     }
   });
+
+  new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        enableSpellcheck(node);
+      });
+    });
+  }).observe(document.documentElement, { childList: true, subtree: true });
+  enableSpellcheck();
 })();
