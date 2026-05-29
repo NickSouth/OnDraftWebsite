@@ -675,6 +675,15 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
     return Ok([...this.videos].sort((first, second) => second.createdAt.getTime() - first.createdAt.getTime()));
   }
 
+  async getVideoTags(): Promise<Result<string[], ArticleError>> {
+    const tags = new Set<string>();
+    this.videos.forEach((video) => {
+      video.tags.forEach((tag) => tags.add(tag));
+    });
+
+    return Ok([...tags].sort((a, b) => a.localeCompare(b)));
+  }
+
   async filterYoutubeVideos(query: VideoQuery): Promise<Result<Video[], ArticleError>> {
     const filtered = this.videos.filter((video) => {
       if (query.keyword) {
@@ -689,6 +698,13 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
         const videoTags = video.tags.map((tag) => tag.toLowerCase());
         const requiredTags = query.tags.map((tag) => tag.toLowerCase());
         if (!requiredTags.every((tag) => videoTags.includes(tag))) {
+          return false;
+        }
+      }
+
+      if (query.dateRange) {
+        const createdAt = video.createdAt.getTime();
+        if (createdAt < query.dateRange.from.getTime() || createdAt > query.dateRange.to.getTime()) {
           return false;
         }
       }

@@ -134,6 +134,10 @@ export type Video = {
 export type VideoQuery = {
   keyword?: string;
   tags?: string[];
+  dateRange?: {
+    from: Date;
+    to: Date;
+  };
   sortBy?: "date" | "popularity";
   sortDirection?: "asc" | "desc";
 }

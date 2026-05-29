@@ -417,6 +417,8 @@ class OnDraftController implements IOnDraftController {
 
   private buildVideoQuery(req: Request): VideoQuery {
     const keyword = this.queryString(req, "keyword");
+    const dateFrom = this.queryDate(req, "dateFrom");
+    const dateTo = this.queryDate(req, "dateTo");
     const tags = this.queryString(req, "tags")
       ?.split(",")
       .map((tag) => tag.trim())
@@ -431,6 +433,12 @@ class OnDraftController implements IOnDraftController {
     }
     if (tags && tags.length > 0) {
       query.tags = tags;
+    }
+    if (dateFrom || dateTo) {
+      query.dateRange = {
+        from: dateFrom ?? new Date(0),
+        to: dateTo ?? new Date(),
+      };
     }
     return query;
   }
@@ -660,18 +668,21 @@ class OnDraftController implements IOnDraftController {
   }
 
   private async getArticleTagSuggestions(): Promise<string[]> {
-    const tags = new Set<string>();
     const articleTags = await this.service.getArticleTags();
     if (articleTags.ok === true) {
-      articleTags.value.forEach((tag) => tags.add(tag));
+      return [...articleTags.value].sort((first, second) => first.localeCompare(second));
     }
 
-    const videos = await this.service.getYoutubeVideos();
-    if (videos.ok === true) {
-      videos.value.forEach((video) => video.tags.forEach((tag) => tags.add(tag)));
+    return [];
+  }
+
+  private async getVideoTagSuggestions(): Promise<string[]> {
+    const videoTags = await this.service.getVideoTags();
+    if (videoTags.ok === true) {
+      return [...videoTags.value].sort((first, second) => first.localeCompare(second));
     }
 
-    return [...tags].sort((first, second) => first.localeCompare(second));
+    return [];
   }
 
   private buildArticleContent(req: Request): ArticleContent {
@@ -829,6 +840,14 @@ class OnDraftController implements IOnDraftController {
       sortBy: this.articleSortBy(req),
       sortDirection: this.articleSortDirection(req),
       viewMode: this.articleViewMode(req),
+      articleTags: await this.getArticleTagSuggestions(),
+      values: {
+        keyword: this.queryString(req, "keyword") ?? "",
+        author: this.queryString(req, "author") ?? "",
+        tags: this.queryString(req, "tags") ?? "",
+        dateFrom: this.queryString(req, "dateFrom") ?? "",
+        dateTo: this.queryString(req, "dateTo") ?? "",
+      },
       bookmarkedArticleIds: await this.bookmarkedArticleIds(session),
     });
   }
@@ -847,9 +866,12 @@ class OnDraftController implements IOnDraftController {
       session,
       isAdmin: isAdminSession(session),
       videos: result.value,
+      videoTags: await this.getVideoTagSuggestions(),
       values: {
         keyword: this.queryString(req, "keyword") ?? "",
         tags: this.queryString(req, "tags") ?? "",
+        dateFrom: this.queryString(req, "dateFrom") ?? "",
+        dateTo: this.queryString(req, "dateTo") ?? "",
         sortBy: this.videoSortBy(req),
         sortDirection: this.videoSortDirection(req),
       },
@@ -1256,7 +1278,7 @@ class OnDraftController implements IOnDraftController {
       isAdmin: isAdminSession(session),
       errorMessage: null,
       values: {},
-      existingTags: await this.getArticleTagSuggestions(),
+      existingTags: await this.getVideoTagSuggestions(),
       heading: "Add YouTube Video",
       formAction: "/videos",
       submitLabel: "Add video",
@@ -1283,7 +1305,7 @@ class OnDraftController implements IOnDraftController {
       isAdmin: isAdminSession(session),
       errorMessage: null,
       values: this.videoFormValues(result.value),
-      existingTags: await this.getArticleTagSuggestions(),
+      existingTags: await this.getVideoTagSuggestions(),
       heading: "Edit YouTube Video",
       formAction: `/videos/${result.value.videoId}`,
       submitLabel: "Save video",
@@ -1389,7 +1411,7 @@ class OnDraftController implements IOnDraftController {
         isAdmin: isAdminSession(session),
         errorMessage: result.value.message,
         values: req.body,
-        existingTags: await this.getArticleTagSuggestions(),
+        existingTags: await this.getVideoTagSuggestions(),
         heading: "Add YouTube Video",
         formAction: "/videos",
         submitLabel: "Add video",
@@ -1410,7 +1432,7 @@ class OnDraftController implements IOnDraftController {
         isAdmin: isAdminSession(session),
         errorMessage: result.value.message,
         values: req.body,
-        existingTags: await this.getArticleTagSuggestions(),
+        existingTags: await this.getVideoTagSuggestions(),
         heading: "Edit YouTube Video",
         formAction: `/videos/${videoId}`,
         submitLabel: "Save video",

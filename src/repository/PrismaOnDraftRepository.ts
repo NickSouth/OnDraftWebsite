@@ -882,6 +882,14 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
     return Ok(videos.map((video) => this.mapVideo(video)));
   }
 
+  async getVideoTags(): Promise<Result<string[], ArticleError>> {
+    const tags = await this.prisma.tag.findMany({
+      where: { videos: { some: {} } },
+      orderBy: { name: "asc" },
+    });
+    return Ok(tags.map((tag) => tag.name));
+  }
+
   async filterYoutubeVideos(query: VideoQuery): Promise<Result<Video[], ArticleError>> {
     const all = await this.getYoutubeVideos();
     if (all.ok === false) return all;
@@ -893,6 +901,10 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
       if (query.tags && query.tags.length > 0) {
         const videoTags = video.tags.map((tag) => tag.toLowerCase());
         if (!query.tags.map((tag) => tag.toLowerCase()).every((tag) => videoTags.includes(tag))) return false;
+      }
+      if (query.dateRange) {
+        const createdAt = video.createdAt.getTime();
+        if (createdAt < query.dateRange.from.getTime() || createdAt > query.dateRange.to.getTime()) return false;
       }
       return true;
     });

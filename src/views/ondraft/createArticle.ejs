@@ -88,21 +88,44 @@
       Hook
       <textarea name="writeup" maxlength="200" required><%= values.writeup || "" %></textarea>
     </label>
+    <%
+      const selectedArticleTags = (values.tags || "").split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean);
+      const articleTagOptions = [...new Set([...(existingTags || []), ...selectedArticleTags])].sort((first, second) => first.localeCompare(second));
+    %>
     <div
       class="tag-editor"
-      data-existing-tags="<%= JSON.stringify(existingTags || []).replace(/</g, "\\u003c") %>"
+      data-tag-editor
     >
       <label for="tag-entry">Tags</label>
       <div class="tag-editor-box">
         <div class="tag-chip-list" data-tag-list></div>
-        <input id="tag-entry" data-tag-input list="article-tag-suggestions" autocomplete="off" />
+        <input id="tag-entry" data-tag-input autocomplete="off" placeholder="Add a new tag" />
+        <button
+          type="button"
+          class="tag-editor-toggle"
+          data-tag-toggle
+          aria-expanded="false"
+          aria-controls="article-tag-options"
+        >
+          Existing tags
+          <span data-tag-count>Any tags</span>
+        </button>
       </div>
       <input type="hidden" name="tags" value="<%= values.tags || "" %>" data-tag-value />
-      <datalist id="article-tag-suggestions">
-        <% (existingTags || []).forEach((tag) => { %>
-          <option value="<%= tag %>"></option>
-        <% }) %>
-      </datalist>
+      <div id="article-tag-options" class="tag-editor-menu" data-tag-menu hidden>
+        <% if (articleTagOptions.length > 0) { %>
+          <div class="tag-option-list">
+            <% articleTagOptions.forEach((tag) => { %>
+              <label class="tag-option">
+                <input type="checkbox" value="<%= tag %>" data-tag-checkbox <%= selectedArticleTags.includes(tag) ? "checked" : "" %> />
+                <span><%= tag %></span>
+              </label>
+            <% }) %>
+          </div>
+        <% } else { %>
+          <p class="tag-empty">No saved article tags yet.</p>
+        <% } %>
+      </div>
     </div>
     <label>
       Thumbnail - leave blank for generic thumbnail

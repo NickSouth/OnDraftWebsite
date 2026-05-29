@@ -1,5 +1,6 @@
 <section
   class="mx-auto grid w-full max-w-6xl gap-8"
+  data-keyword="<%= values.keyword || "" %>"
   x-data="{ articleView: '<%= viewMode === "list" ? "list" : "card" %>' }"
 >
   <div class="grid gap-5 border-b border-slate-200 pb-6 dark:border-white/10 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
@@ -39,6 +40,7 @@
   <form
     id="article-filter-form"
     class="article-filter-form od-page-tools"
+    data-keyword="<%= values.keyword || "" %>"
     hx-get="/articles/filter"
     hx-target="#articles-results"
     hx-swap="innerHTML"
@@ -47,8 +49,8 @@
     x-data="{
       searchOpen: false,
       filtersOpen: false,
-      keyword: '',
-      searchedKeyword: '',
+      keyword: $el.dataset.keyword || '',
+      searchedKeyword: ($el.dataset.keyword || '').trim(),
       get hasKeyword() { return this.keyword.trim().length > 0 },
       get searchDirty() { return this.keyword.trim() !== this.searchedKeyword },
       clearSearch() {
@@ -155,6 +157,10 @@
     </div>
 
     <div id="article-filter-panel" class="od-tool-panel" x-show="filtersOpen" x-collapse x-cloak>
+      <%
+        const selectedArticleFilterTags = (values.tags || "").split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean);
+        const articleFilterTagOptions = [...new Set([...(articleTags || []), ...selectedArticleFilterTags])].sort((first, second) => first.localeCompare(second));
+      %>
       <div class="od-article-filter-grid">
         <label>
           <span>
@@ -164,7 +170,56 @@
             </svg>
             Author
           </span>
-          <input name="author" />
+          <input name="author" value="<%= values.author || "" %>" />
+        </label>
+        <div class="od-filter-field tag-editor" data-tag-editor>
+          <span>
+            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M20.6 13.5 13.5 20.6a2 2 0 0 1-2.8 0L3 12.9V3h9.9l7.7 7.7a2 2 0 0 1 0 2.8Z" />
+              <path d="M7.5 7.5h.01" />
+            </svg>
+            Tags
+          </span>
+          <div class="tag-editor-box">
+            <div class="tag-chip-list" data-tag-list></div>
+            <button
+              type="button"
+              class="tag-editor-toggle"
+              data-tag-toggle
+              aria-expanded="false"
+              aria-controls="article-filter-tag-options"
+            >
+              Select tags
+              <span data-tag-count>Any tags</span>
+            </button>
+          </div>
+          <input type="hidden" name="tags" value="<%= values.tags || "" %>" data-tag-value />
+          <div id="article-filter-tag-options" class="tag-editor-menu" data-tag-menu hidden>
+            <% if (articleFilterTagOptions.length > 0) { %>
+              <div class="tag-option-list">
+                <% articleFilterTagOptions.forEach((tag) => { %>
+                  <label class="tag-option">
+                    <input type="checkbox" value="<%= tag %>" data-tag-checkbox <%= selectedArticleFilterTags.includes(tag) ? "checked" : "" %> />
+                    <span><%= tag %></span>
+                  </label>
+                <% }) %>
+              </div>
+            <% } else { %>
+              <p class="tag-empty">No article tags yet.</p>
+            <% } %>
+          </div>
+        </div>
+        <label>
+          <span>
+            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M8 2v4" />
+              <path d="M16 2v4" />
+              <rect x="3" y="4" width="18" height="18" rx="2" />
+              <path d="M3 10h18" />
+            </svg>
+            To
+          </span>
+          <input type="date" name="dateTo" value="<%= values.dateTo || "" %>" />
         </label>
         <label>
           <span>
@@ -176,29 +231,7 @@
             </svg>
             From
           </span>
-          <input type="date" name="dateFrom" />
-        </label>
-        <label>
-          <span>
-            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path d="M8 2v4" />
-              <path d="M16 2v4" />
-              <rect x="3" y="4" width="18" height="18" rx="2" />
-              <path d="M3 10h18" />
-            </svg>
-            To
-          </span>
-          <input type="date" name="dateTo" />
-        </label>
-        <label>
-          <span>
-            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path d="M20.6 13.5 13.5 20.6a2 2 0 0 1-2.8 0L3 12.9V3h9.9l7.7 7.7a2 2 0 0 1 0 2.8Z" />
-              <path d="M7.5 7.5h.01" />
-            </svg>
-            Tags
-          </span>
-          <input name="tags" />
+          <input type="date" name="dateFrom" value="<%= values.dateFrom || "" %>" />
         </label>
       </div>
       <div class="od-tool-panel-actions">
@@ -211,7 +244,7 @@
         <button
           type="button"
           class="od-icon-button"
-          onclick="const status = document.getElementById('article-status-field')?.value || 'published'; this.form.reset(); const statusField = document.getElementById('article-status-field'); if (statusField) statusField.value = status; htmx.trigger(this.form, 'submit');"
+          onclick="const status = document.getElementById('article-status-field')?.value || 'published'; this.form.reset(); this.form.querySelectorAll('[data-tag-value]').forEach((input) => { input.value = ''; input.dispatchEvent(new Event('change', { bubbles: true })); }); const statusField = document.getElementById('article-status-field'); if (statusField) statusField.value = status; htmx.trigger(this.form, 'submit');"
           aria-label="Clear filters"
           title="Clear filters"
         >
@@ -269,4 +302,5 @@
   <div id="articles-results">
     <%- include("partials/articleList", { articles, isAdmin, showingPublished, session, viewMode, bookmarkedArticleIds }) %>
   </div>
+  <script src="/articleTags.js" defer></script>
 </section>

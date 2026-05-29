@@ -852,6 +852,20 @@ describe("OnDraftService YouTube videos", () => {
       expect(filtered.value[0].viewCount).toBe(25);
     }
 
+    const videoTags = await ondraftService.getVideoTags();
+    expect(videoTags.ok).toBe(true);
+    if (videoTags.ok === true) {
+      expect(videoTags.value).toEqual(["film-room", "qb", "wr"]);
+    }
+
+    const excludedByDate = await ondraftService.filterYoutubeVideos({
+      dateRange: { from: new Date("2000-01-01T00:00:00.000Z"), to: new Date("2000-01-02T00:00:00.000Z") },
+    });
+    expect(excludedByDate.ok).toBe(true);
+    if (excludedByDate.ok === true) {
+      expect(excludedByDate.value).toEqual([]);
+    }
+
     const popularity = await ondraftService.filterYoutubeVideos({ sortBy: "popularity", sortDirection: "desc" });
     expect(popularity.ok).toBe(true);
     if (popularity.ok === true) {

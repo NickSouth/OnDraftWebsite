@@ -73,12 +73,13 @@
   }
 
   .od-page-sort-group label,
-  .od-article-filter-grid label {
+  .od-article-filter-grid > label,
+  .od-article-filter-grid > .od-filter-field {
     @apply grid gap-1.5 text-xs font-black uppercase tracking-[0.12em] text-slate-600 dark:text-slate-300;
   }
 
   .od-page-sort-group select,
-  .od-article-filter-grid input {
+  .od-article-filter-grid > label > input {
     @apply od-focus-ring h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold normal-case tracking-normal text-slate-950 placeholder:text-slate-400 dark:border-white/15 dark:bg-draft-ink dark:text-white;
   }
 
@@ -94,7 +95,8 @@
     @apply grid gap-3 sm:grid-cols-2;
   }
 
-  .od-article-filter-grid label > span {
+  .od-article-filter-grid > label > span,
+  .od-article-filter-grid > .od-filter-field > span {
     @apply inline-flex items-center gap-1.5;
   }
 
@@ -282,8 +284,9 @@
     @apply grid size-10 shrink-0 place-items-center rounded-md border border-slate-300 bg-white text-sm font-black text-slate-950 shadow-sm dark:border-white/15 dark:bg-white/10 dark:text-white;
   }
 
-  .od-admin-form .tag-editor {
-    @apply grid gap-2;
+  .od-admin-form .tag-editor,
+  .tag-editor {
+    @apply relative grid gap-2;
   }
 
   .od-admin-form .publication-date-selectors {
@@ -294,7 +297,8 @@
     @apply grid gap-3 sm:grid-cols-[minmax(0,1fr)_7rem_8rem];
   }
 
-  .od-admin-form .tag-editor-box {
+  .od-admin-form .tag-editor-box,
+  .tag-editor-box {
     @apply flex min-h-12 flex-wrap items-center gap-2 py-2;
   }
 
@@ -302,16 +306,51 @@
     @apply min-h-8 flex-1 border-0 bg-transparent p-0 shadow-none focus-visible:outline-none dark:bg-transparent;
   }
 
-  .od-admin-form .tag-chip-list {
+  .od-filter-field .tag-editor-box {
+    @apply od-focus-ring min-h-10 rounded-md border border-slate-300 bg-white px-2 text-sm font-semibold normal-case tracking-normal text-slate-950 dark:border-white/15 dark:bg-draft-ink dark:text-white;
+  }
+
+  .od-admin-form .tag-chip-list,
+  .tag-chip-list {
     @apply flex flex-wrap gap-2;
   }
 
-  .od-admin-form .tag-chip {
+  .od-admin-form .tag-chip,
+  .tag-chip {
     @apply inline-flex items-center gap-2 rounded bg-draft-foam px-2.5 py-1 text-xs font-black uppercase tracking-wide text-draft-amber dark:bg-white/10 dark:text-draft-gold;
   }
 
-  .od-admin-form .tag-chip-remove {
+  .od-admin-form .tag-chip-remove,
+  .tag-chip-remove {
     @apply od-focus-ring inline-flex size-5 items-center justify-center rounded bg-white/70 text-sm leading-none text-draft-amber transition hover:bg-white dark:bg-white/10 dark:text-draft-gold;
+  }
+
+  .tag-editor-toggle {
+    @apply od-focus-ring inline-flex min-h-8 items-center gap-2 rounded-md border border-slate-300 bg-white px-2.5 text-xs font-black uppercase tracking-[0.12em] text-slate-700 transition hover:border-draft-gold hover:bg-draft-foam hover:text-draft-amber dark:border-white/15 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 dark:hover:text-draft-gold;
+  }
+
+  .tag-editor-toggle span {
+    @apply rounded bg-slate-100 px-2 py-0.5 text-[0.65rem] text-slate-500 dark:bg-white/10 dark:text-slate-300;
+  }
+
+  .tag-editor-menu {
+    @apply absolute left-0 top-full z-40 mt-2 grid max-h-64 w-full min-w-64 gap-2 overflow-y-auto rounded-md border border-slate-200 bg-white p-2 text-slate-950 shadow-editorial dark:border-white/10 dark:bg-draft-ink dark:text-white;
+  }
+
+  .tag-option-list {
+    @apply grid gap-1;
+  }
+
+  .tag-option {
+    @apply flex cursor-pointer items-center gap-2 rounded px-2 py-2 text-sm font-bold normal-case tracking-normal text-slate-700 transition hover:bg-draft-foam hover:text-draft-amber dark:text-slate-200 dark:hover:bg-white/10 dark:hover:text-draft-gold;
+  }
+
+  .tag-option input {
+    @apply size-4 accent-draft-gold;
+  }
+
+  .tag-empty {
+    @apply m-0 rounded bg-slate-50 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-500 dark:bg-white/5 dark:text-slate-300;
   }
 
   .od-admin-actions {

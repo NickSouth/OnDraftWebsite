@@ -27,21 +27,41 @@
       <textarea name="description" required><%= values.description || "" %></textarea>
     </label>
 
-    <div
-      class="tag-editor"
-      data-existing-tags="<%= JSON.stringify(existingTags || []).replace(/</g, "\\u003c") %>"
-    >
+    <%
+      const selectedVideoTags = (values.tags || "").split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean);
+      const videoTagOptions = [...new Set([...(existingTags || []), ...selectedVideoTags])].sort((first, second) => first.localeCompare(second));
+    %>
+    <div class="tag-editor" data-tag-editor>
       <label for="video-tag-entry">Tags</label>
       <div class="tag-editor-box">
         <div class="tag-chip-list" data-tag-list></div>
-        <input id="video-tag-entry" data-tag-input list="video-tag-suggestions" autocomplete="off" />
+        <input id="video-tag-entry" data-tag-input autocomplete="off" placeholder="Add a new tag" />
+        <button
+          type="button"
+          class="tag-editor-toggle"
+          data-tag-toggle
+          aria-expanded="false"
+          aria-controls="video-tag-options"
+        >
+          Existing tags
+          <span data-tag-count>Any tags</span>
+        </button>
       </div>
       <input type="hidden" name="tags" value="<%= values.tags || "" %>" data-tag-value />
-      <datalist id="video-tag-suggestions">
-        <% (existingTags || []).forEach((tag) => { %>
-          <option value="<%= tag %>"></option>
-        <% }) %>
-      </datalist>
+      <div id="video-tag-options" class="tag-editor-menu" data-tag-menu hidden>
+        <% if (videoTagOptions.length > 0) { %>
+          <div class="tag-option-list">
+            <% videoTagOptions.forEach((tag) => { %>
+              <label class="tag-option">
+                <input type="checkbox" value="<%= tag %>" data-tag-checkbox <%= selectedVideoTags.includes(tag) ? "checked" : "" %> />
+                <span><%= tag %></span>
+              </label>
+            <% }) %>
+          </div>
+        <% } else { %>
+          <p class="tag-empty">No saved video tags yet.</p>
+        <% } %>
+      </div>
     </div>
 
     <div class="form-actions od-admin-actions">

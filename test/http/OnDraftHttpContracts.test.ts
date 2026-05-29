@@ -1413,6 +1413,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(form.text).toContain("Add YouTube Video");
     expect(form.text).toContain('class="tag-editor"');
     expect(form.text).toContain('data-tag-input');
+    expect(form.text).toContain('data-tag-toggle');
     expect(form.text).toContain('data-tag-value');
     expect(form.text).toContain('<script src="/articleTags.js" defer></script>');
 
@@ -1459,15 +1460,25 @@ describe("OnDraft HTTP contracts", () => {
     expect(videos.text).toContain("Receiver Notes");
     expect(videos.text).toContain("https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg");
     expect(videos.text).toContain("Views unavailable");
+    expect(videos.text).toContain('id="video-filter-panel"');
+    expect(videos.text).toContain('name="dateFrom"');
+    expect(videos.text).toContain('name="dateTo"');
+    expect(videos.text).toContain('value="film-room" data-tag-checkbox');
     expect(videos.text).not.toContain("YOUTUBE_API_KEY");
 
-    const filtered = await request(ondraft).get("/videos?keyword=quarterback&sortBy=date&sortDirection=asc");
+    const filtered = await request(ondraft).get("/videos?keyword=quarterback&tags=qb&sortBy=date&sortDirection=asc");
     expect(filtered.status).toBe(200);
     expect(filtered.text).toContain("Quarterback Film");
     expect(filtered.text).not.toContain("Receiver Notes");
     expect(filtered.text).toContain('value="quarterback"');
-    expect(filtered.text).not.toContain('name="tags"');
+    expect(filtered.text).toContain('name="tags" value="qb" data-tag-value');
+    expect(filtered.text).toContain('value="qb" data-tag-checkbox checked');
     expect(filtered.text).toContain('<option value="asc" selected>Ascending</option>');
+
+    const dateExcluded = await request(ondraft).get("/videos?dateTo=2000-01-01");
+    expect(dateExcluded.status).toBe(200);
+    expect(dateExcluded.text).not.toContain("Quarterback Film");
+    expect(dateExcluded.text).not.toContain("Receiver Notes");
 
     const adminVideos = await agent.get("/videos");
     expect(adminVideos.status).toBe(200);
@@ -1479,7 +1490,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(editForm.text).toContain("Edit YouTube Video");
     expect(editForm.text).toContain('value="Quarterback Film"');
     expect(editForm.text).toContain('value="film-room,qb" data-tag-value');
-    expect(editForm.text).toContain('<option value="film-room"></option>');
+    expect(editForm.text).toContain('value="film-room" data-tag-checkbox checked');
 
     const update = await agent
       .post("/videos/dQw4w9WgXcQ")
@@ -1541,6 +1552,15 @@ describe("OnDraft HTTP contracts", () => {
     expect(articles.text).toContain("A short plain text summary.");
     expect(articles.text).toContain("draft");
     expect(articles.text).toContain("film-room");
+    expect(articles.text).toContain('id="article-filter-tag-options"');
+    expect(articles.text).toContain('value="draft" data-tag-checkbox');
+    expect(articles.text).toContain('name="tags" value="" data-tag-value');
+
+    const tagFiltered = await agent.get("/articles?tags=film-room");
+    expect(tagFiltered.status).toBe(200);
+    expect(tagFiltered.text).toContain("Plain Text Film Room");
+    expect(tagFiltered.text).toContain('name="tags" value="film-room" data-tag-value');
+    expect(tagFiltered.text).toContain('value="film-room" data-tag-checkbox checked');
   });
 
   it("keeps plain text article content escaped", async () => {
@@ -1782,6 +1802,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(articlesPage.status).toBe(200);
     expect(articlesPage.text).toContain('name="sortBy"');
     expect(articlesPage.text).toContain('name="sortDirection"');
+    expect(articlesPage.text).toMatch(/Author[\s\S]*Tags[\s\S]*To[\s\S]*From/);
     expect(articlesPage.text).toContain("htmx.trigger(this.form, 'submit')");
 
     const dateAsc = await request(ondraft).get("/articles/filter?sortBy=date&sortDirection=asc");

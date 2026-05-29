@@ -184,6 +184,7 @@ export interface IOnDraftService {
   createYoutubeVideo(input: CreateYoutubeVideoInput): Promise<Result<Video, ArticleError>>;
   getYoutubeVideo(videoId: string): Promise<Result<Video, ArticleError>>;
   getYoutubeVideos(): Promise<Result<Video[], ArticleError>>;
+  getVideoTags(): Promise<Result<string[], ArticleError>>;
   filterYoutubeVideos(query: VideoQuery): Promise<Result<Video[], ArticleError>>;
   updateYoutubeVideo(videoId: string, input: CreateYoutubeVideoInput): Promise<Result<Video, ArticleError>>;
   updateYoutubeVideoStats(videoId: string, stats: { thumbnailUrl?: string; viewCount?: number; youtubeStatsFetchedAt: Date }): Promise<Result<Video, ArticleError>>;
@@ -1200,6 +1201,10 @@ class OnDraftService implements IOnDraftService {
     }
     const refreshed = await this.refreshStaleYoutubeStats(result.value);
     return refreshed ? await this.repository.getYoutubeVideos() : result;
+  }
+
+  async getVideoTags(): Promise<Result<string[], ArticleError>> {
+    return await this.repository.getVideoTags();
   }
 
   async filterYoutubeVideos(query: VideoQuery): Promise<Result<Video[], ArticleError>> {
