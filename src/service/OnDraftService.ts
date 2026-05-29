@@ -22,7 +22,8 @@ const ARTICLE_WRITEUP_MAX_LENGTH = 200;
 const ARTICLE_TAG_MAX_LENGTH = 24;
 const ARTICLE_TAG_MAX_COUNT = 12;
 const ARTICLE_TAG_PATTERN = /^[a-z0-9-]+$/;
-const COMMENT_TEXT_MAX_LENGTH = 1000;
+const COMMENT_TEXT_MAX_WORDS = 200;
+const COMMENT_TEXT_MAX_LENGTH = 2000;
 const DEFAULT_BIG_BOARD_CREATOR: BigBoardCreator = "Ryan";
 const HOT_TAKE_MAX_LENGTH = 300;
 const VIDEO_DESCRIPTION_MAX_LENGTH = 500;
@@ -558,8 +559,11 @@ class OnDraftService implements IOnDraftService {
     if (input.userId.trim() === "" || input.userName.trim() === "" || input.text.trim() === "") {
       return Err(ArticleValidationError("User, user name, and comment text cannot be empty."));
     }
+    if (this.wordCount(input.text) > COMMENT_TEXT_MAX_WORDS) {
+      return Err(ArticleValidationError(`Comment text cannot be more than ${COMMENT_TEXT_MAX_WORDS} words.`));
+    }
     if (input.text.length > COMMENT_TEXT_MAX_LENGTH) {
-      return Err(ArticleValidationError(`Comment text cannot be more than ${COMMENT_TEXT_MAX_LENGTH} characters.`));
+      return Err(ArticleValidationError("Comment text is too long."));
     }
     if (!input.isAdmin && this.containsBannedPhrase(input.text)) {
       return Err(ArticleValidationError(PROFANITY_VALIDATION_MESSAGE));
@@ -590,8 +594,11 @@ class OnDraftService implements IOnDraftService {
     if (input.userId.trim() === "" || input.userName.trim() === "" || input.text.trim() === "") {
       return Err(ForumPostValidationError("User, user name, and comment text cannot be empty."));
     }
+    if (this.wordCount(input.text) > COMMENT_TEXT_MAX_WORDS) {
+      return Err(ForumPostValidationError(`Comment text cannot be more than ${COMMENT_TEXT_MAX_WORDS} words.`));
+    }
     if (input.text.length > COMMENT_TEXT_MAX_LENGTH) {
-      return Err(ForumPostValidationError(`Comment text cannot be more than ${COMMENT_TEXT_MAX_LENGTH} characters.`));
+      return Err(ForumPostValidationError("Comment text is too long."));
     }
     if (!input.isAdmin && this.containsBannedPhrase(input.text)) {
       return Err(ForumPostValidationError(PROFANITY_VALIDATION_MESSAGE));
@@ -602,6 +609,11 @@ class OnDraftService implements IOnDraftService {
   private containsBannedPhrase(text: string): boolean {
     const normalizedText = text.toLowerCase().replace(/\s+/g, " ").trim();
     return BANNED_PHRASE_PATTERNS.some((pattern) => pattern.test(normalizedText));
+  }
+
+  private wordCount(text: string): number {
+    const words = text.trim().match(/\S+/g);
+    return words ? words.length : 0;
   }
 
   private validateYoutubeVideoInput(input: CreateYoutubeVideoInput): Result<void, ArticleError> {

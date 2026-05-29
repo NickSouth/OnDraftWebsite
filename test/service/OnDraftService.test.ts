@@ -191,6 +191,53 @@ describe("OnDraftService article validation", () => {
     }
   });
 
+  it("rejects article and hot take comments over 200 words", async () => {
+    const ondraftService = service();
+    const tooManyWords = Array.from({ length: 201 }, (_, index) => `word${index}`).join(" ");
+    const createdArticle = await ondraftService.createArticle({
+      title: "Long Comment Discussion",
+      author: "Alice OnDraft",
+      writeup: "A short discussion summary.",
+      publicationDate: new Date("2024-01-01"),
+      content: {
+        type: "plainText",
+        text: "A regular article body.",
+      },
+    });
+    const createdPost = await ondraftService.createForumPost({
+      userId: "reader-1",
+      userName: "Reader One",
+      content: "A normal hot take.",
+    });
+
+    expect(createdArticle.ok).toBe(true);
+    expect(createdPost.ok).toBe(true);
+    if (createdArticle.ok === false || createdPost.ok === false) {
+      return;
+    }
+
+    const articleComment = await ondraftService.commentByArticleId({
+      articleId: createdArticle.value.id,
+      userId: "reader-1",
+      userName: "Reader One",
+      text: tooManyWords,
+    });
+    const hotTakeComment = await ondraftService.commentByForumPostId(createdPost.value.id, {
+      userId: "reader-1",
+      userName: "Reader One",
+      text: tooManyWords,
+    });
+
+    expect(articleComment.ok).toBe(false);
+    expect(hotTakeComment.ok).toBe(false);
+    if (articleComment.ok === false) {
+      expect(articleComment.value.message).toBe("Comment text cannot be more than 200 words.");
+    }
+    if (hotTakeComment.ok === false) {
+      expect(hotTakeComment.value.message).toBe("Comment text cannot be more than 200 words.");
+    }
+  });
+
   it("allows admins to submit text that would otherwise match the banned phrase list", async () => {
     const ondraftService = service();
     const created = await ondraftService.createArticle({
