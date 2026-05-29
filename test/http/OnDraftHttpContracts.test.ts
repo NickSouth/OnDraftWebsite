@@ -1368,8 +1368,12 @@ describe("OnDraft HTTP contracts", () => {
     expect(bookmarks.status).toBe(200);
     expect(bookmarks.text).toContain("Bookmarkable Article");
     expect(bookmarks.text).toContain(`/articles/${articleId}`);
+    expect(bookmarks.text).toContain(`hx-post="/articles/${articleId}/bookmark"`);
+    expect(bookmarks.text).toContain(`hx-target="#article-bookmark-${articleId}"`);
     expect(bookmarks.text).toContain("Bookmark this hot take.");
     expect(bookmarks.text).toContain(`/hottakes#hot-take-${postId}`);
+    expect(bookmarks.text).toContain(`hx-post="/hottakes/${postId}/bookmark"`);
+    expect(bookmarks.text).toContain(`hx-target="#forum-post-bookmark-${postId}"`);
 
     const removeArticleBookmark = await agent
       .post(`/articles/${articleId}/bookmark`)

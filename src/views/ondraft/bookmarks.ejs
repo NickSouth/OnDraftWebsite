@@ -55,7 +55,10 @@
                 <% } %>
               </a>
               <div class="grid content-start gap-3 p-5">
-                <p class="m-0 text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Article</p>
+                <div class="flex items-start justify-between gap-3">
+                  <p class="m-0 text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Article</p>
+                  <%- include("partials/bookmarkButton", { bookmark: { type: "article", articleId: article.id }, bookmarked: true }) %>
+                </div>
                 <a class="font-display text-2xl font-black leading-tight text-slate-950 no-underline transition hover:text-draft-amber dark:text-white dark:hover:text-draft-gold" href="/articles/<%= article.id %>"><%= article.title %></a>
                 <p class="m-0 text-sm font-bold text-slate-600 dark:text-slate-300">by <%= article.author %></p>
                 <% if (article.writeup) { %>
@@ -83,7 +86,10 @@
             <li class="od-card grid gap-3 p-5 transition hover:-translate-y-0.5 hover:border-draft-gold hover:shadow-editorial">
               <div class="flex flex-wrap items-center justify-between gap-3">
                 <p class="m-0 text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Hot Take</p>
-                <span class="text-sm font-bold text-slate-600 dark:text-slate-300">by <%= post.userName %> · <%= formatRelative(post.createdAt) %></span>
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-bold text-slate-600 dark:text-slate-300">by <%= post.userName %> &middot; <%= formatRelative(post.createdAt) %></span>
+                  <%- include("partials/bookmarkButton", { bookmark: { type: "forumPost", forumPostId: post.id }, bookmarked: true }) %>
+                </div>
               </div>
               <a class="font-display text-2xl font-bold leading-snug text-slate-950 no-underline transition hover:text-draft-amber dark:text-white dark:hover:text-draft-gold" href="/hottakes#hot-take-<%= post.id %>"><%= post.content %></a>
             </li>
