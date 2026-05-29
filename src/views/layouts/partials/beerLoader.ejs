@@ -1,20 +1,5 @@
-<div id="site-loader" class="pointer-events-none fixed inset-0 z-[60] hidden bg-white/80 backdrop-blur-sm dark:bg-draft-ink/80" role="status" aria-live="polite" aria-label="Loading page">
-  <div class="grid min-h-full content-center gap-6 px-4 py-10">
-    <div class="mx-auto grid w-full max-w-4xl gap-4 rounded-lg border border-slate-200 bg-white/90 p-5 shadow-editorial dark:border-white/10 dark:bg-draft-slate/90">
-      <div class="flex items-center justify-between gap-4">
-        <div class="grid flex-1 gap-2">
-          <div class="od-loading-bar h-4 w-40"></div>
-          <div class="od-loading-bar h-8 w-full max-w-lg"></div>
-        </div>
-        <div class="od-loading-bar size-12 rounded-full"></div>
-      </div>
-      <div class="grid gap-3 sm:grid-cols-3">
-        <div class="od-loading-card"></div>
-        <div class="od-loading-card"></div>
-        <div class="od-loading-card"></div>
-      </div>
-    </div>
-    <div class="grid justify-items-center gap-4">
+<div id="site-loader" class="pointer-events-none fixed inset-0 z-[60] hidden place-items-center bg-white/65 p-6 backdrop-blur-sm dark:bg-draft-ink/70" role="status" aria-live="polite" aria-label="Loading page">
+  <div class="grid justify-items-center gap-4 rounded-lg border border-slate-200 bg-white/90 px-6 py-5 shadow-editorial dark:border-white/10 dark:bg-draft-slate/90">
     <div class="beer-loader" aria-hidden="true">
       <div class="beer-loader-mug">
         <div class="beer-loader-fill"></div>
@@ -23,6 +8,316 @@
       <div class="beer-loader-handle"></div>
     </div>
     <p class="m-0 text-sm font-bold uppercase tracking-[0.18em] text-slate-700 dark:text-slate-200">Pouring the page</p>
-    </div>
   </div>
+</div>
+
+<div id="loading-skeleton-templates" hidden>
+  <template data-page-skeleton="home">
+    <section class="od-page-skeleton grid gap-8">
+      <div class="od-card grid gap-8 overflow-hidden p-5 md:p-8 xl:grid-cols-[1.08fr_0.92fr]">
+        <div class="grid min-h-[360px] content-between gap-8">
+          <div class="grid max-w-2xl gap-4">
+            <div class="od-loading-bar h-20 w-24 rounded-md"></div>
+            <div class="od-loading-bar h-3 w-36"></div>
+            <div class="od-loading-bar h-12 w-full max-w-md"></div>
+            <div class="od-loading-bar h-4 w-full max-w-xl"></div>
+            <div class="od-loading-bar h-4 w-4/5 max-w-lg"></div>
+          </div>
+          <div class="grid gap-3 border-l-4 border-draft-gold pl-4">
+            <div class="od-loading-bar h-4 w-full max-w-lg"></div>
+            <div class="od-loading-bar h-11 w-56"></div>
+            <div class="od-loading-bar h-11 w-52"></div>
+            <div class="od-loading-bar h-11 w-60"></div>
+          </div>
+        </div>
+        <div class="od-card grid overflow-hidden">
+          <div class="border-b border-slate-200 px-4 py-3 dark:border-white/10">
+            <div class="od-loading-bar h-3 w-28"></div>
+          </div>
+          <div class="od-loading-card min-h-[360px] rounded-none"></div>
+          <div class="flex items-center justify-between border-t border-slate-200 p-4 dark:border-white/10">
+            <div class="od-loading-bar size-9 rounded-md"></div>
+            <div class="flex gap-2">
+              <div class="od-loading-bar size-2.5 rounded-full"></div>
+              <div class="od-loading-bar size-2.5 rounded-full"></div>
+              <div class="od-loading-bar size-2.5 rounded-full"></div>
+            </div>
+            <div class="od-loading-bar size-9 rounded-md"></div>
+          </div>
+        </div>
+      </div>
+      <div data-skeleton-include="popular-articles"></div>
+    </section>
+  </template>
+
+  <template data-page-skeleton="articles">
+    <section class="od-page-skeleton mx-auto grid w-full max-w-6xl gap-8">
+      <div class="grid gap-5 border-b border-slate-200 pb-6 dark:border-white/10 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+        <div class="grid max-w-3xl gap-3">
+          <div class="od-loading-bar h-3 w-36"></div>
+          <div class="od-loading-bar h-12 w-56"></div>
+          <div class="od-loading-bar h-5 w-full max-w-lg"></div>
+        </div>
+        <div class="od-loading-bar h-10 w-36 rounded-md"></div>
+      </div>
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div class="grid w-full gap-2 sm:w-auto sm:grid-cols-2">
+          <div class="od-loading-bar h-10 w-full sm:w-28"></div>
+          <div class="od-loading-bar h-10 w-full sm:w-36"></div>
+        </div>
+        <div class="flex justify-end gap-2">
+          <div class="od-loading-bar size-10 rounded-md"></div>
+          <div class="od-loading-bar size-10 rounded-md"></div>
+        </div>
+      </div>
+      <div data-skeleton-include="article-results"></div>
+    </section>
+  </template>
+
+  <template data-page-skeleton="videos">
+    <section class="od-page-skeleton mx-auto grid w-full max-w-6xl gap-8">
+      <div class="grid gap-5 border-b border-slate-200 pb-6 dark:border-white/10 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+        <div class="grid max-w-3xl gap-3">
+          <div class="od-loading-bar h-3 w-20"></div>
+          <div class="od-loading-bar h-12 w-72"></div>
+          <div class="od-loading-bar h-5 w-full max-w-xl"></div>
+        </div>
+        <div class="od-loading-bar h-10 w-28 rounded-md"></div>
+      </div>
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div class="grid w-full gap-2 sm:w-auto sm:grid-cols-2">
+          <div class="od-loading-bar h-10 w-full sm:w-28"></div>
+          <div class="od-loading-bar h-10 w-full sm:w-36"></div>
+        </div>
+        <div class="flex justify-end gap-2">
+          <div class="od-loading-bar size-10 rounded-md"></div>
+          <div class="od-loading-bar size-10 rounded-md"></div>
+        </div>
+      </div>
+      <div data-skeleton-include="video-results"></div>
+    </section>
+  </template>
+
+  <template data-page-skeleton="bigboard">
+    <section class="od-page-skeleton grid w-full gap-8">
+      <div class="grid gap-5 border-b border-slate-200 pb-6 dark:border-white/10 lg:grid-cols-[minmax(0,1fr)_27rem]">
+        <div class="grid gap-4">
+          <div class="od-loading-bar h-3 w-28"></div>
+          <div class="od-loading-bar h-12 w-72"></div>
+          <div class="grid max-w-xl gap-2 sm:grid-cols-3">
+            <div class="od-loading-bar h-10 rounded-md"></div>
+            <div class="od-loading-bar h-10 rounded-md"></div>
+            <div class="od-loading-bar h-10 rounded-md"></div>
+          </div>
+        </div>
+        <div class="od-card grid gap-3 p-4">
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div class="od-loading-bar h-16 rounded-md"></div>
+            <div class="od-loading-bar h-16 rounded-md"></div>
+          </div>
+        </div>
+      </div>
+      <div data-skeleton-include="big-board-results"></div>
+    </section>
+  </template>
+
+  <template data-page-skeleton="hottakes">
+    <section class="od-page-skeleton mx-auto grid w-full max-w-5xl gap-8">
+      <div class="flex flex-col gap-4 border-b border-slate-200 pb-6 dark:border-white/10 sm:flex-row sm:items-end sm:justify-between">
+        <div class="grid max-w-3xl gap-3">
+          <div class="od-loading-bar h-3 w-28"></div>
+          <div class="od-loading-bar h-12 w-60"></div>
+          <div class="od-loading-bar h-5 w-full max-w-xl"></div>
+        </div>
+        <div class="od-loading-bar h-10 w-full rounded-md sm:w-36"></div>
+      </div>
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div class="grid w-full gap-2 sm:w-auto sm:grid-cols-2">
+          <div class="od-loading-bar h-10 w-full sm:w-28"></div>
+          <div class="od-loading-bar h-10 w-full sm:w-36"></div>
+        </div>
+        <div class="od-loading-bar size-10 rounded-md justify-self-end"></div>
+      </div>
+      <div data-skeleton-include="hot-takes"></div>
+    </section>
+  </template>
+
+  <template data-page-skeleton="bookmarks">
+    <section class="od-page-skeleton mx-auto grid w-full max-w-6xl gap-8">
+      <div class="grid gap-3 border-b border-slate-200 pb-6 dark:border-white/10">
+        <div class="od-loading-bar h-3 w-32"></div>
+        <div class="od-loading-bar h-12 w-72"></div>
+        <div class="od-loading-bar h-5 w-full max-w-xl"></div>
+      </div>
+      <div data-skeleton-include="article-results"></div>
+    </section>
+  </template>
+
+  <template data-page-skeleton="article">
+    <article class="od-page-skeleton plain-page readable-page od-article-page">
+      <div class="article-page-actions">
+        <div class="od-loading-bar h-10 w-36 rounded-md"></div>
+      </div>
+      <header class="article-header">
+        <div class="od-loading-card article-cover-thumb"></div>
+        <div class="grid w-full gap-3">
+          <div class="od-loading-bar h-3 w-32"></div>
+          <div class="od-loading-bar h-12 w-full max-w-2xl"></div>
+          <div class="od-loading-bar h-4 w-64"></div>
+        </div>
+      </header>
+      <div class="grid gap-3">
+        <div class="od-loading-bar h-5 w-full"></div>
+        <div class="od-loading-bar h-5 w-11/12"></div>
+        <div class="od-loading-bar h-5 w-full"></div>
+        <div class="od-loading-bar h-5 w-4/5"></div>
+      </div>
+      <div data-skeleton-include="comments"></div>
+    </article>
+  </template>
+
+  <template data-page-skeleton="fallback">
+    <section class="od-page-skeleton grid min-h-[50vh] place-items-center">
+      <div class="grid justify-items-center gap-4">
+        <div class="beer-loader" aria-hidden="true">
+          <div class="beer-loader-mug">
+            <div class="beer-loader-fill"></div>
+            <div class="beer-loader-foam"></div>
+          </div>
+          <div class="beer-loader-handle"></div>
+        </div>
+        <p class="m-0 text-sm font-bold uppercase tracking-[0.18em] text-slate-700 dark:text-slate-200">Pouring the page</p>
+      </div>
+    </section>
+  </template>
+
+  <template data-result-skeleton="article-results">
+    <div class="od-result-skeleton article-grid grid gap-5 sm:grid-cols-2 lg:grid-cols-3" aria-live="polite" aria-label="Loading articles">
+      <% for (let index = 0; index < 6; index += 1) { %>
+        <article class="od-card grid gap-4 overflow-hidden p-4">
+          <div class="od-loading-card aspect-[16/10]"></div>
+          <div class="od-loading-bar h-3 w-24"></div>
+          <div class="od-loading-bar h-7 w-full"></div>
+          <div class="od-loading-bar h-4 w-11/12"></div>
+          <div class="od-loading-bar h-4 w-3/4"></div>
+          <div class="flex justify-between border-t border-slate-200 pt-3 dark:border-white/10">
+            <div class="od-loading-bar h-6 w-20 rounded"></div>
+            <div class="od-loading-bar h-6 w-16 rounded"></div>
+          </div>
+        </article>
+      <% } %>
+    </div>
+  </template>
+
+  <template data-result-skeleton="video-results">
+    <div class="od-result-skeleton video-grid grid gap-5" aria-live="polite" aria-label="Loading videos">
+      <% for (let index = 0; index < 3; index += 1) { %>
+        <article class="video-card od-card grid overflow-hidden lg:grid-cols-[24rem_minmax(0,1fr)]">
+          <div class="od-loading-card min-h-40 rounded-none sm:min-h-56"></div>
+          <div class="grid gap-4 p-4 sm:p-6">
+            <div class="od-loading-bar h-3 w-20"></div>
+            <div class="od-loading-bar h-8 w-full max-w-lg"></div>
+            <div class="od-loading-bar h-4 w-full"></div>
+            <div class="od-loading-bar h-4 w-4/5"></div>
+            <div class="flex flex-wrap gap-2">
+              <div class="od-loading-bar h-6 w-20 rounded"></div>
+              <div class="od-loading-bar h-6 w-16 rounded"></div>
+            </div>
+          </div>
+        </article>
+      <% } %>
+    </div>
+  </template>
+
+  <template data-result-skeleton="big-board-results">
+    <div class="od-result-skeleton big-board-results grid gap-4" aria-live="polite" aria-label="Loading draft board">
+      <div class="mb-1 flex justify-end">
+        <div class="od-loading-bar h-11 w-24 rounded-md"></div>
+      </div>
+      <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <% for (let index = 0; index < 9; index += 1) { %>
+          <article class="od-card grid gap-3 p-4">
+            <div class="flex items-start justify-between gap-3">
+              <div class="grid gap-2">
+                <div class="od-loading-bar h-4 w-20"></div>
+                <div class="od-loading-bar h-7 w-44"></div>
+              </div>
+              <div class="od-loading-bar size-12 rounded-md"></div>
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+              <div class="od-loading-bar h-10 rounded-md"></div>
+              <div class="od-loading-bar h-10 rounded-md"></div>
+              <div class="od-loading-bar h-10 rounded-md"></div>
+            </div>
+          </article>
+        <% } %>
+      </div>
+    </div>
+  </template>
+
+  <template data-result-skeleton="hot-takes">
+    <ul id="hot-take-list" class="od-result-skeleton comment-list hot-take-list" aria-live="polite" aria-label="Loading hot takes">
+      <% for (let index = 0; index < 4; index += 1) { %>
+        <li class="comment-item hot-take-item">
+          <div class="grid gap-3">
+            <div class="flex items-center gap-3">
+              <div class="od-loading-bar size-9 rounded-full"></div>
+              <div class="od-loading-bar h-4 w-40"></div>
+            </div>
+            <div class="od-loading-bar h-5 w-full"></div>
+            <div class="od-loading-bar h-5 w-5/6"></div>
+            <div class="flex gap-2">
+              <div class="od-loading-bar h-8 w-16 rounded-md"></div>
+              <div class="od-loading-bar h-8 w-16 rounded-md"></div>
+            </div>
+          </div>
+        </li>
+      <% } %>
+    </ul>
+  </template>
+
+  <template data-result-skeleton="popular-articles">
+    <div id="popular-articles-panel" class="od-result-skeleton grid gap-4" aria-live="polite" aria-label="Loading popular articles">
+      <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+        <div class="grid gap-2">
+          <div class="od-loading-bar h-3 w-28"></div>
+          <div class="od-loading-bar h-8 w-56"></div>
+        </div>
+        <div class="od-loading-bar h-10 w-full rounded-md sm:w-72"></div>
+      </div>
+      <div class="grid gap-3">
+        <% for (let index = 0; index < 5; index += 1) { %>
+          <div class="od-card grid grid-cols-[2.75rem_4.5rem_minmax(0,1fr)] items-center gap-3 p-3 sm:grid-cols-[3.5rem_6rem_minmax(0,1fr)_auto]">
+            <div class="od-loading-bar size-10 rounded-md sm:size-12"></div>
+            <div class="od-loading-card aspect-square"></div>
+            <div class="grid gap-2">
+              <div class="od-loading-bar h-5 w-full"></div>
+              <div class="od-loading-bar h-4 w-52"></div>
+            </div>
+            <div class="od-loading-bar col-span-3 h-7 w-16 rounded sm:col-span-1"></div>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </template>
+
+  <template data-result-skeleton="comments">
+    <div class="od-result-skeleton article-comments-section" aria-live="polite" aria-label="Loading comments">
+      <div class="section-heading">
+        <h2>Comments</h2>
+        <p class="muted-text">Loading</p>
+      </div>
+      <div class="grid gap-3">
+        <% for (let index = 0; index < 3; index += 1) { %>
+          <div class="comment-item">
+            <div class="grid gap-2">
+              <div class="od-loading-bar h-4 w-36"></div>
+              <div class="od-loading-bar h-4 w-full"></div>
+              <div class="od-loading-bar h-4 w-5/6"></div>
+            </div>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </template>
 </div>

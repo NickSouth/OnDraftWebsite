@@ -23,6 +23,8 @@
       hx-post="/articles/<%= article.id %>/comments?limit=<%= commentsLimit %>"
       hx-target="#article-comments-section"
       hx-swap="outerHTML"
+      data-loading-skeleton="comments"
+      data-loading-skeleton-target="#article-comments-section"
     >
       <label>
         Add a comment
@@ -63,6 +65,8 @@
                   hx-confirm="Delete this comment?"
                   hx-target="#article-comments-section"
                   hx-swap="outerHTML"
+                  data-loading-skeleton="comments"
+                  data-loading-skeleton-target="#article-comments-section"
                 >
                   Delete
                 </button>
@@ -96,6 +100,8 @@
                           hx-confirm="Delete this comment?"
                           hx-target="#article-comments-section"
                           hx-swap="outerHTML"
+                          data-loading-skeleton="comments"
+                          data-loading-skeleton-target="#article-comments-section"
                         >
                           Delete
                         </button>
@@ -118,6 +124,8 @@
               hx-post="/articles/<%= article.id %>/comments/<%= comment.id %>/replies?limit=<%= commentsLimit %>"
               hx-target="#article-comments-section"
               hx-swap="outerHTML"
+              data-loading-skeleton="comments"
+              data-loading-skeleton-target="#article-comments-section"
             >
               <label>
                 Reply
@@ -141,6 +149,8 @@
       hx-get="/articles/<%= article.id %>/comments?limit=<%= commentsLimit + 10 %>"
       hx-target="#article-comments-section"
       hx-swap="outerHTML"
+      data-loading-skeleton="comments"
+      data-loading-skeleton-target="#article-comments-section"
     >
       Show More
     </button>

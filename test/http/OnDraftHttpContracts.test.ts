@@ -109,6 +109,9 @@ describe("OnDraft HTTP contracts", () => {
     expect(response.text).toContain("/images/social/tiktok-icon.svg");
     expect(response.text).toContain("https://www.venmo.com/u/OnDraft-Football");
     expect(response.text).toContain('id="site-loader"');
+    expect(response.text).toContain('id="loading-skeleton-templates"');
+    expect(response.text).toContain('data-page-skeleton="articles"');
+    expect(response.text).toContain('data-result-skeleton="article-results"');
     expect(response.text).toContain("od-loading-card");
     expect(response.text).not.toContain("[PLACEHOLDER FOR SOCIAL MEDIA LINKS]");
   });
@@ -121,6 +124,9 @@ describe("OnDraft HTTP contracts", () => {
     expect(response.text).toContain('field.setAttribute("spellcheck", "true")');
     expect(response.text).toContain("MutationObserver");
     expect(response.text).toContain("htmx:afterSettle");
+    expect(response.text).toContain("showRouteSkeleton");
+    expect(response.text).toContain("showResultSkeleton");
+    expect(response.text).toContain("data-loading-skeleton");
   });
 
   it("blocks cross-origin state-changing requests when an origin is present", async () => {

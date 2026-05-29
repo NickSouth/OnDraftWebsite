@@ -11,6 +11,9 @@
         hx-get="/articles/popular?range=all"
         hx-target="#popular-articles-panel"
         hx-swap="outerHTML"
+        data-skip-global-loader
+        data-loading-skeleton="popular-articles"
+        data-loading-skeleton-target="#popular-articles-panel"
       >
         All time
       </button>
@@ -20,6 +23,9 @@
         hx-get="/articles/popular?range=month"
         hx-target="#popular-articles-panel"
         hx-swap="outerHTML"
+        data-skip-global-loader
+        data-loading-skeleton="popular-articles"
+        data-loading-skeleton-target="#popular-articles-panel"
       >
         Last month
       </button>
@@ -29,6 +35,9 @@
         hx-get="/articles/popular?range=year"
         hx-target="#popular-articles-panel"
         hx-swap="outerHTML"
+        data-skip-global-loader
+        data-loading-skeleton="popular-articles"
+        data-loading-skeleton-target="#popular-articles-panel"
       >
         Last year
       </button>

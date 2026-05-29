@@ -182,11 +182,28 @@
   }
 
   .od-loading-bar {
-    @apply animate-pulse rounded bg-slate-200 dark:bg-white/10;
+    @apply relative overflow-hidden rounded bg-slate-200 dark:bg-white/10;
   }
 
   .od-loading-card {
-    @apply h-28 animate-pulse rounded-md bg-slate-100 dark:bg-white/[0.06];
+    @apply relative h-28 overflow-hidden rounded-md bg-slate-100 dark:bg-white/[0.06];
+  }
+
+  .od-loading-bar::after,
+  .od-loading-card::after {
+    @apply absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/65 to-transparent content-[''] dark:via-white/10;
+    animation: od-skeleton-shimmer 1.35s ease-in-out infinite;
+  }
+
+  .od-page-skeleton,
+  .od-result-skeleton {
+    @apply opacity-0 transition-opacity duration-200;
+    animation: od-skeleton-enter 180ms ease-out forwards;
+  }
+
+  .od-page-skeleton.is-visible,
+  .od-result-skeleton-active {
+    @apply opacity-100;
   }
 
   .od-form-input {
@@ -1329,5 +1346,22 @@
   50% {
     transform: scale(1.18);
     opacity: 1;
+  }
+}
+
+@keyframes od-skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes od-skeleton-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

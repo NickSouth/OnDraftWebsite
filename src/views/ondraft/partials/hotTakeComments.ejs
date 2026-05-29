@@ -31,6 +31,8 @@
                   hx-confirm="Delete this comment?"
                   hx-target="#hot-take-comments-<%= post.id %>"
                   hx-swap="outerHTML"
+                  data-loading-skeleton="comments"
+                  data-loading-skeleton-target="#hot-take-comments-<%= post.id %>"
                 >
                   Delete
                 </button>
@@ -54,6 +56,8 @@
       hx-post="/hottakes/<%= post.id %>/comments"
       hx-target="#hot-take-comments-<%= post.id %>"
       hx-swap="outerHTML"
+      data-loading-skeleton="comments"
+      data-loading-skeleton-target="#hot-take-comments-<%= post.id %>"
     >
       <label>
         Comment
