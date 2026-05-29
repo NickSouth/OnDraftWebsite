@@ -27,10 +27,22 @@
       <textarea name="description" required><%= values.description || "" %></textarea>
     </label>
 
-    <label>
-      Tags
-      <input name="tags" value="<%= values.tags || "" %>" placeholder="draft,film-room" />
-    </label>
+    <div
+      class="tag-editor"
+      data-existing-tags="<%= JSON.stringify(existingTags || []).replace(/</g, "\\u003c") %>"
+    >
+      <label for="video-tag-entry">Tags</label>
+      <div class="tag-editor-box">
+        <div class="tag-chip-list" data-tag-list></div>
+        <input id="video-tag-entry" data-tag-input list="video-tag-suggestions" autocomplete="off" />
+      </div>
+      <input type="hidden" name="tags" value="<%= values.tags || "" %>" data-tag-value />
+      <datalist id="video-tag-suggestions">
+        <% (existingTags || []).forEach((tag) => { %>
+          <option value="<%= tag %>"></option>
+        <% }) %>
+      </datalist>
+    </div>
 
     <div class="form-actions od-admin-actions">
       <button type="submit"><%= typeof submitLabel === "string" ? submitLabel : "Add video" %></button>
@@ -38,3 +50,5 @@
     </div>
   </form>
 </section>
+
+<script src="/articleTags.js" defer></script>

@@ -660,8 +660,18 @@ class OnDraftController implements IOnDraftController {
   }
 
   private async getArticleTagSuggestions(): Promise<string[]> {
-    const result = await this.service.getArticleTags();
-    return result.ok === true ? result.value : [];
+    const tags = new Set<string>();
+    const articleTags = await this.service.getArticleTags();
+    if (articleTags.ok === true) {
+      articleTags.value.forEach((tag) => tags.add(tag));
+    }
+
+    const videos = await this.service.getYoutubeVideos();
+    if (videos.ok === true) {
+      videos.value.forEach((video) => video.tags.forEach((tag) => tags.add(tag)));
+    }
+
+    return [...tags].sort((first, second) => first.localeCompare(second));
   }
 
   private buildArticleContent(req: Request): ArticleContent {
@@ -1246,6 +1256,7 @@ class OnDraftController implements IOnDraftController {
       isAdmin: isAdminSession(session),
       errorMessage: null,
       values: {},
+      existingTags: await this.getArticleTagSuggestions(),
       heading: "Add YouTube Video",
       formAction: "/videos",
       submitLabel: "Add video",
@@ -1272,6 +1283,7 @@ class OnDraftController implements IOnDraftController {
       isAdmin: isAdminSession(session),
       errorMessage: null,
       values: this.videoFormValues(result.value),
+      existingTags: await this.getArticleTagSuggestions(),
       heading: "Edit YouTube Video",
       formAction: `/videos/${result.value.videoId}`,
       submitLabel: "Save video",
@@ -1377,6 +1389,7 @@ class OnDraftController implements IOnDraftController {
         isAdmin: isAdminSession(session),
         errorMessage: result.value.message,
         values: req.body,
+        existingTags: await this.getArticleTagSuggestions(),
         heading: "Add YouTube Video",
         formAction: "/videos",
         submitLabel: "Add video",
@@ -1397,6 +1410,7 @@ class OnDraftController implements IOnDraftController {
         isAdmin: isAdminSession(session),
         errorMessage: result.value.message,
         values: req.body,
+        existingTags: await this.getArticleTagSuggestions(),
         heading: "Edit YouTube Video",
         formAction: `/videos/${videoId}`,
         submitLabel: "Save video",

@@ -1394,6 +1394,10 @@ describe("OnDraft HTTP contracts", () => {
     const form = await agent.get("/videos/new");
     expect(form.status).toBe(200);
     expect(form.text).toContain("Add YouTube Video");
+    expect(form.text).toContain('class="tag-editor"');
+    expect(form.text).toContain('data-tag-input');
+    expect(form.text).toContain('data-tag-value');
+    expect(form.text).toContain('<script src="/articleTags.js" defer></script>');
 
     const invalid = await agent
       .post("/videos")
@@ -1406,6 +1410,8 @@ describe("OnDraft HTTP contracts", () => {
       });
     expect(invalid.status).toBe(400);
     expect(invalid.text).toContain("Enter a valid YouTube video URL");
+    expect(invalid.text).toContain('class="tag-editor"');
+    expect(invalid.text).toContain('value="draft" data-tag-value');
 
     const first = await agent
       .post("/videos")
@@ -1455,6 +1461,8 @@ describe("OnDraft HTTP contracts", () => {
     expect(editForm.status).toBe(200);
     expect(editForm.text).toContain("Edit YouTube Video");
     expect(editForm.text).toContain('value="Quarterback Film"');
+    expect(editForm.text).toContain('value="film-room,qb" data-tag-value');
+    expect(editForm.text).toContain('<option value="film-room"></option>');
 
     const update = await agent
       .post("/videos/dQw4w9WgXcQ")
