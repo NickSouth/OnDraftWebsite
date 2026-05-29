@@ -31,6 +31,9 @@ document.querySelectorAll("[data-tag-editor], .tag-editor").forEach((editor) => 
   const menu = editor.querySelector("[data-tag-menu]");
   const toggle = editor.querySelector("[data-tag-toggle]");
   const tagCount = editor.querySelector("[data-tag-count]");
+  const editorBox = editor.querySelector(".tag-editor-box");
+  const activeTagArea = editor.querySelector(".tag-active-box") || editorBox;
+  const addButton = editor.querySelector("[data-tag-add]");
   const checkboxes = [...editor.querySelectorAll("[data-tag-checkbox]")];
 
   if (!hiddenInput || !tagList) {
@@ -38,6 +41,23 @@ document.querySelectorAll("[data-tag-editor], .tag-editor").forEach((editor) => 
   }
 
   let tags = tagArray(hiddenInput.value);
+  let clearButton = editor.querySelector("[data-tag-clear]");
+
+  if (!clearButton && editorBox) {
+    clearButton = document.createElement("button");
+    clearButton.type = "button";
+    clearButton.className = "tag-editor-clear";
+    clearButton.setAttribute("data-tag-clear", "");
+    clearButton.setAttribute("aria-label", "Clear selected tags");
+    clearButton.setAttribute("title", "Clear selected tags");
+    clearButton.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+        <path d="M18 6 6 18"></path>
+        <path d="m6 6 12 12"></path>
+      </svg>
+    `;
+    editorBox.append(clearButton);
+  }
 
   function closeMenu() {
     if (!menu || !toggle) {
@@ -48,14 +68,28 @@ document.querySelectorAll("[data-tag-editor], .tag-editor").forEach((editor) => 
     toggle.setAttribute("aria-expanded", "false");
   }
 
+  function toggleMenu() {
+    if (!menu || !toggle) {
+      return;
+    }
+
+    const expanded = toggle.getAttribute("aria-expanded") === "true";
+    menu.hidden = expanded;
+    toggle.setAttribute("aria-expanded", String(!expanded));
+  }
+
   function syncTags() {
     hiddenInput.value = tags.join(",");
     tagList.replaceChildren(...tags.map((tag) => createTagChip(tag, removeTag)));
+    tagList.toggleAttribute("data-empty", tags.length === 0);
     checkboxes.forEach((checkbox) => {
       checkbox.checked = tags.includes(normalizeTag(checkbox.value));
     });
     if (tagCount) {
       tagCount.textContent = tags.length === 0 ? "Any tags" : `${tags.length} selected`;
+    }
+    if (clearButton) {
+      clearButton.hidden = tags.length === 0;
     }
   }
 
@@ -80,6 +114,25 @@ document.querySelectorAll("[data-tag-editor], .tag-editor").forEach((editor) => 
     tags = tags.filter((existingTag) => existingTag !== tag);
     syncTags();
   }
+
+  clearButton?.addEventListener("click", () => {
+    tags = [];
+    syncTags();
+    hiddenInput.dispatchEvent(new Event("change", { bubbles: true }));
+    input?.focus();
+  });
+
+  addButton?.addEventListener("click", () => {
+    addTag(input?.value || "");
+    input?.focus();
+  });
+
+  activeTagArea?.addEventListener("click", (event) => {
+    if (event.target.closest("button, input, label, a")) {
+      return;
+    }
+    toggleMenu();
+  });
 
   input?.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === ",") {
@@ -108,13 +161,7 @@ document.querySelectorAll("[data-tag-editor], .tag-editor").forEach((editor) => 
   });
 
   toggle?.addEventListener("click", () => {
-    if (!menu) {
-      return;
-    }
-
-    const expanded = toggle.getAttribute("aria-expanded") === "true";
-    menu.hidden = expanded;
-    toggle.setAttribute("aria-expanded", String(!expanded));
+    toggleMenu();
   });
 
   hiddenInput.addEventListener("change", () => {

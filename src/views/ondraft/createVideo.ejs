@@ -34,8 +34,6 @@
     <div class="tag-editor" data-tag-editor>
       <label for="video-tag-entry">Tags</label>
       <div class="tag-editor-box">
-        <div class="tag-chip-list" data-tag-list></div>
-        <input id="video-tag-entry" data-tag-input autocomplete="off" placeholder="Add a new tag" />
         <button
           type="button"
           class="tag-editor-toggle"
@@ -43,9 +41,21 @@
           aria-expanded="false"
           aria-controls="video-tag-options"
         >
-          Existing tags
+          <span class="tag-toggle-label">Existing tags</span>
           <span data-tag-count>Any tags</span>
         </button>
+        <div class="tag-input-box">
+          <input id="video-tag-entry" data-tag-input autocomplete="off" placeholder="Add a new tag" />
+          <button type="button" class="tag-add-button" data-tag-add aria-label="Add tag" title="Add tag">
+            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+              <path d="M12 5v14" />
+              <path d="M5 12h14" />
+            </svg>
+          </button>
+        </div>
+        <div class="tag-active-box">
+          <div class="tag-chip-list" data-tag-list></div>
+        </div>
       </div>
       <input type="hidden" name="tags" value="<%= values.tags || "" %>" data-tag-value />
       <div id="video-tag-options" class="tag-editor-menu" data-tag-menu hidden>

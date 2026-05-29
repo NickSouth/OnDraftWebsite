@@ -129,7 +129,7 @@
         const selectedVideoFilterTags = (values.tags || "").split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean);
         const videoFilterTagOptions = [...new Set([...(videoTags || []), ...selectedVideoFilterTags])].sort((first, second) => first.localeCompare(second));
       %>
-      <div class="od-article-filter-grid">
+      <div class="od-video-filter-grid">
         <div class="od-filter-field tag-editor" data-tag-editor>
           <span>
             <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -147,7 +147,7 @@
               aria-expanded="false"
               aria-controls="video-filter-tag-options"
             >
-              Select tags
+              <span class="tag-toggle-label">Select tags</span>
               <span data-tag-count>Any tags</span>
             </button>
           </div>
@@ -167,6 +167,7 @@
             <% } %>
           </div>
         </div>
+        <div class="od-video-filter-spacer" aria-hidden="true"></div>
         <label>
           <span>
             <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
