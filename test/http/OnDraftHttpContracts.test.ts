@@ -108,6 +108,8 @@ describe("OnDraft HTTP contracts", () => {
     expect(response.text).toContain("/images/social/x-icon.svg");
     expect(response.text).toContain("/images/social/tiktok-icon.svg");
     expect(response.text).toContain("https://www.venmo.com/u/OnDraft-Football");
+    expect(response.text).toContain('id="site-loader"');
+    expect(response.text).toContain("od-loading-card");
     expect(response.text).not.toContain("[PLACEHOLDER FOR SOCIAL MEDIA LINKS]");
   });
 
@@ -711,7 +713,12 @@ describe("OnDraft HTTP contracts", () => {
     const article = await reader.get(`/articles/${articleId}`);
     expect(article.status).toBe(200);
     expect(article.text).toContain("Banned User Comment Target");
-    expect(article.text).toContain("Cool down before posting again.");
+    expect(article.text).toContain(`hx-get="/articles/${articleId}/comments?limit=10"`);
+
+    const articleComments = await reader.get(`/articles/${articleId}/comments`);
+    expect(articleComments.status).toBe(200);
+    expect(articleComments.text).toContain("Cool down before posting again.");
+    expect(articleComments.text).not.toContain("Post Comment");
     expect(article.text).not.toContain("Post Comment");
 
     const comment = await reader
@@ -1555,6 +1562,12 @@ describe("OnDraft HTTP contracts", () => {
     const articlePath = create.headers.location;
     const articleId = articlePath.split("/").pop();
 
+    const article = await request(ondraft).get(articlePath);
+    expect(article.status).toBe(200);
+    expect(article.text).toContain(`hx-get="/articles/${articleId}/comments?limit=10"`);
+    expect(article.text).toContain('hx-trigger="revealed"');
+    expect(article.text).toContain("Loading comments");
+
     const anonymous = request.agent(ondraft);
     const like = await anonymous.post(`/articles/${articleId}/like`);
     expect(like.status).toBe(200);
@@ -1669,8 +1682,10 @@ describe("OnDraft HTTP contracts", () => {
         .send({ text: `Comment ${index}` });
     }
 
-    const firstPage = await request(ondraft).get(`/articles/${articleId}/comments`);
+    const firstPage = await admin.get(`/articles/${articleId}/comments`);
     expect(firstPage.status).toBe(200);
+    expect(firstPage.text).toContain('id="article-comments-section"');
+    expect(firstPage.text).toContain('hx-post="/articles/');
     expect(firstPage.text).toContain("Comment 10");
     expect(firstPage.text).not.toContain("Comment 11");
     expect(firstPage.text).toContain("Show More");

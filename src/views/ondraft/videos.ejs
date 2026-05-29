@@ -122,7 +122,7 @@
         <% const thumbnailUrl = video.thumbnailUrl || `https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`; %>
         <article class="video-card od-card grid overflow-hidden transition hover:-translate-y-0.5 hover:border-draft-gold hover:shadow-editorial lg:grid-cols-[24rem_minmax(0,1fr)]">
           <a class="group block overflow-hidden bg-draft-ink" href="<%= video.youtubeUrl %>" target="_blank" rel="noopener noreferrer">
-            <img class="video-thumb h-full min-h-40 sm:min-h-56" src="<%= thumbnailUrl %>" alt="" />
+            <img class="video-thumb h-full min-h-40 sm:min-h-56" src="<%= thumbnailUrl %>" alt="" loading="lazy" decoding="async" />
           </a>
           <div class="video-card-copy grid content-between gap-4 p-4 sm:gap-5 sm:p-6">
             <div class="grid gap-2">

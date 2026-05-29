@@ -35,5 +35,21 @@
     <div class="article-body"><%= article.content.text %></div>
   <% } %>
 
-  <%- include("partials/articleComments", { article, session, isAdmin, commentsLimit, likeActorId, userDirectoryById, userModerationById, activeUserBan, errorMessage: null }) %>
+  <section
+    id="article-comments-section"
+    class="article-comments-section"
+    hx-get="/articles/<%= article.id %>/comments?limit=<%= commentsLimit %>"
+    hx-trigger="revealed"
+    hx-swap="outerHTML"
+    hx-indicator="#article-comments-loading"
+  >
+    <div class="section-heading">
+      <h2>Comments</h2>
+      <p class="muted-text">Loading</p>
+    </div>
+    <div id="article-comments-loading" class="od-inline-loader htmx-indicator" role="status" aria-live="polite">
+      <span class="od-inline-loader-dot"></span>
+      Loading comments
+    </div>
+  </section>
 </article>

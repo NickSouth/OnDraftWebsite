@@ -179,6 +179,14 @@
     animation: od-loader-pulse 1s ease-in-out infinite;
   }
 
+  .od-loading-bar {
+    @apply animate-pulse rounded bg-slate-200 dark:bg-white/10;
+  }
+
+  .od-loading-card {
+    @apply h-28 animate-pulse rounded-md bg-slate-100 dark:bg-white/[0.06];
+  }
+
   .od-form-input {
     @apply od-focus-ring min-h-11 rounded-md border border-slate-300 bg-white px-3 text-base font-normal text-slate-950 placeholder:text-slate-400 dark:border-white/15 dark:bg-draft-ink dark:text-white;
   }
