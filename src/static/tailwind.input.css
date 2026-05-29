@@ -451,6 +451,18 @@
     @apply overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-draft-slate;
   }
 
+  .board-editor-sticky-scroll {
+    @apply sticky bottom-0 z-20 hidden h-5 overflow-x-auto rounded-b-lg border-x border-b border-slate-200 bg-white/95 shadow-sm dark:border-white/10 dark:bg-draft-slate/95;
+  }
+
+  .board-editor-sticky-scroll.is-active {
+    @apply block;
+  }
+
+  .board-editor-sticky-scroll [data-board-editor-sticky-scroll-spacer] {
+    @apply h-px;
+  }
+
   .board-editor-table {
     @apply w-full border-collapse bg-white text-sm dark:bg-draft-slate;
     min-width: 1620px;

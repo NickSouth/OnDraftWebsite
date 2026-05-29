@@ -232,6 +232,9 @@
         </tbody>
       </table>
     </div>
+    <div class="board-editor-sticky-scroll" data-board-editor-sticky-scroll aria-hidden="true">
+      <div data-board-editor-sticky-scroll-spacer></div>
+    </div>
     <div class="board-editor-bottom-actions">
       <button type="button" class="secondary-button" data-add-player>Add player</button>
       <div class="board-editor-bottom-save-actions">
@@ -362,11 +365,15 @@
     const template = document.querySelector("#board-editor-row-template");
     const entryIdInput = document.querySelector("#big-board-entry-id");
     const form = document.querySelector("#big-board-editor-form");
+    const tableWrap = document.querySelector(".board-editor-table-wrap");
+    const stickyScroll = document.querySelector("[data-board-editor-sticky-scroll]");
+    const stickyScrollSpacer = document.querySelector("[data-board-editor-sticky-scroll-spacer]");
     const deleteModal = document.querySelector("#board-editor-delete-entry-modal");
     const deleteEntryName = deleteModal?.querySelector("[data-delete-entry-name]");
     const cancelEntryDelete = deleteModal?.querySelector("[data-cancel-entry-delete]");
     const confirmEntryDelete = deleteModal?.querySelector("[data-confirm-entry-delete]");
     let pendingDeleteRow = null;
+    let syncingHorizontalScroll = false;
 
     function nextIndex() {
       return rows.querySelectorAll("tr").length;
@@ -389,6 +396,25 @@
 
     function markFormChanged() {
       form?.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    function syncStickyScrollSize() {
+      if (!tableWrap || !stickyScroll || !stickyScrollSpacer) {
+        return;
+      }
+      stickyScrollSpacer.style.width = `${tableWrap.scrollWidth}px`;
+      stickyScroll.classList.toggle("is-active", tableWrap.scrollWidth > tableWrap.clientWidth + 1);
+    }
+
+    function syncHorizontalScroll(source, target) {
+      if (!source || !target || syncingHorizontalScroll) {
+        return;
+      }
+      syncingHorizontalScroll = true;
+      target.scrollLeft = source.scrollLeft;
+      window.requestAnimationFrame(() => {
+        syncingHorizontalScroll = false;
+      });
     }
 
     function formatHeightDisplay(feet, inches, fraction) {
@@ -549,6 +575,7 @@
       const row = template.content.firstElementChild.cloneNode(true);
       wireRow(row, nextIndex(), id);
       rows.append(row);
+      syncStickyScrollSize();
       row.querySelector("input:not([type='hidden'])")?.focus();
     });
 
@@ -594,9 +621,15 @@
       pendingDeleteRow = null;
       row.remove();
       reindexRows();
+      syncStickyScrollSize();
       closeDeleteModal();
       markFormChanged();
     });
+
+    tableWrap?.addEventListener("scroll", () => syncHorizontalScroll(tableWrap, stickyScroll));
+    stickyScroll?.addEventListener("scroll", () => syncHorizontalScroll(stickyScroll, tableWrap));
+    window.addEventListener("resize", syncStickyScrollSize);
+    syncStickyScrollSize();
 
     function clearPublishState(event) {
       const field = event.target.closest("[data-publish-section]");

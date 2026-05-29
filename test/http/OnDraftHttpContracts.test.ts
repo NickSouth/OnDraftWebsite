@@ -1215,6 +1215,9 @@ describe("OnDraft HTTP contracts", () => {
     const editor = await agent.get("/bigboard/edit");
     expect(editor.status).toBe(200);
     expect(editor.text).toContain("Create draft class");
+    expect(editor.text).toContain('data-board-editor-sticky-scroll');
+    expect(editor.text).toContain('data-board-editor-sticky-scroll-spacer');
+    expect(editor.text).toContain("syncStickyScrollSize");
 
     const createYear = await agent
       .post("/bigboard/years")
