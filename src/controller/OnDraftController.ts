@@ -10,6 +10,7 @@ import { publicArticleUploadUrl } from "../uploads/articlePdfUpload";
 import { BIG_BOARD_CREATORS, POSITIONS, type Article, type ArticleContent, type ArticleFilter, type BigBoard, type BigBoardCreator, type ForumPost, type ForumPostFilter, type Video, type VideoQuery } from "../model/OnDraftContent";
 import type { Bookmark, IUserBanRecord } from "../auth/User";
 import { collegeTeam } from "../CollegeFootballColors";
+import { helmetColorKey } from "../service/HelmetAssetService";
 
 export interface DraftBoardFilterInput {
   school?: string;
@@ -1132,6 +1133,7 @@ class OnDraftController implements IOnDraftController {
       schools,
       filters: filter ?? {},
       collegeTeamColors: collegeTeam,
+      helmetColorKey,
     };
     if (req.get("HX-Request") === "true") {
       res.render("ondraft/partials/bigBoardPanel", { ...viewModel, layout: false });

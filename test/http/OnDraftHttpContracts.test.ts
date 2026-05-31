@@ -131,6 +131,27 @@ describe("OnDraft HTTP contracts", () => {
     expect(response.text).toContain("data-loading-skeleton");
   });
 
+  it("generates cacheable helmet assets for validated color pairs", async () => {
+    const generatedPath = path.join(process.cwd(), "public", "generated", "helmets", "v1", "690014-f1f2f3.png");
+    await fs.promises.rm(generatedPath, { force: true });
+
+    const response = await request(app()).get("/generated/helmets/v1/690014-f1f2f3.png");
+
+    expect(response.status).toBe(200);
+    expect(response.headers["content-type"]).toContain("image/png");
+    expect(response.headers["cache-control"]).toBe("public, max-age=31536000, immutable");
+    expect(response.body.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))).toBe(true);
+    expect(fs.existsSync(generatedPath)).toBe(true);
+
+    await fs.promises.rm(generatedPath, { force: true });
+  });
+
+  it("rejects generated helmet paths outside the color-key boundary", async () => {
+    const response = await request(app()).get("/generated/helmets/v1/not-a-key.png");
+
+    expect(response.status).toBe(404);
+  });
+
   it("blocks cross-origin state-changing requests when an origin is present", async () => {
     const response = await request(app())
       .post("/login")
@@ -843,8 +864,9 @@ describe("OnDraft HTTP contracts", () => {
     expect(visibleWithoutWriteup.text).toContain("Hidden Prospect");
     expect(visibleWithoutWriteup.text).toContain("Alabama football helmet");
     expect(visibleWithoutWriteup.text).toContain('src="/teamHelmetTemplate.png"');
-    expect(visibleWithoutWriteup.text).toContain('data-primary-color="#690014"');
-    expect(visibleWithoutWriteup.text).toContain('data-secondary-color="#F1F2F3"');
+    expect(visibleWithoutWriteup.text).toContain('loading="lazy"');
+    expect(visibleWithoutWriteup.text).toContain('decoding="async"');
+    expect(visibleWithoutWriteup.text).toContain('data-generated-helmet-src="/generated/helmets/v1/690014-f1f2f3.png"');
     expect(visibleWithoutWriteup.text).toContain("6&#39;2 3/8&#34;");
     expect(visibleWithoutWriteup.text).not.toContain("Starter traits.");
     expect(visibleWithoutWriteup.text).not.toContain("Private eval note.");

@@ -24,6 +24,7 @@ import {
   OnDraftSessionStore,
   STANDARD_SESSION_MAX_AGE_MS,
 } from "./session/OnDraftSession";
+import { CreateHelmetAssetService, InvalidHelmetKeyError, type IHelmetAssetService } from "./service/HelmetAssetService";
 import { ILoggingService } from "./service/LoggingService";
 import type { ITurnstileConfig } from "./config/AppConfig";
 
@@ -104,6 +105,7 @@ class ExpressApp implements IApp {
     private readonly sessionStore?: session.Store,
     private readonly turnstileConfig: ITurnstileConfig = { siteKey: null, secretKey: null, verificationDisabled: false },
     private readonly siteBaseUrl = "http://localhost:3000",
+    private readonly helmetAssets: IHelmetAssetService = CreateHelmetAssetService(),
   ) {
     this.app = express();
     this.turnstileVerifier = new TurnstileVerifier(this.turnstileConfig, this.logger);
@@ -117,6 +119,24 @@ class ExpressApp implements IApp {
     this.app.set("trust proxy", process.env.NODE_ENV === "production" ? 1 : false);
     this.app.use((req, res, next) => this.setSecurityHeaders(req, res, next));
     this.app.use((req, res, next) => this.blockCrossOriginStateChanges(req, res, next));
+    this.app.get(
+      "/generated/helmets/v1/:helmetKey.png",
+      asyncHandler(async (req, res) => {
+        const helmetKey = typeof req.params.helmetKey === "string" ? req.params.helmetKey : "";
+        try {
+          const helmetPath = await this.helmetAssets.generatedHelmetPath(helmetKey);
+          res.setHeader("Cache-Control", this.helmetAssets.cacheControlHeader());
+          res.type("png");
+          res.sendFile(helmetPath);
+        } catch (error) {
+          if (error instanceof InvalidHelmetKeyError) {
+            res.status(404).send("Helmet not found.");
+            return;
+          }
+          throw error;
+        }
+      }),
+    );
     this.app.use(express.static(path.join(process.cwd(), "src/static")));
     this.app.use("/vendor/htmx", express.static(path.join(process.cwd(), "node_modules", "htmx.org", "dist")));
     this.app.use("/vendor/alpinejs", express.static(path.join(process.cwd(), "node_modules", "alpinejs", "dist")));
