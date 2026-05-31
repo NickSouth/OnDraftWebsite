@@ -87,8 +87,8 @@
     </div>
     <label class="od-hook-field">
       Hook
-      <textarea name="writeup" maxlength="200" required data-hook-input><%= values.writeup || "" %></textarea>
-      <span class="od-hook-count" data-hook-count aria-live="polite">0 words</span>
+      <textarea name="writeup" required data-hook-input data-hook-max-words="300"><%= values.writeup || "" %></textarea>
+      <span class="od-hook-count" data-hook-count aria-live="polite">0/300 words</span>
     </label>
     <% if (values.imageUrl) { %>
       <input type="hidden" name="imageUrl" value="<%= values.imageUrl %>" />
@@ -145,8 +145,10 @@
         if (!hookInput || !hookCount) {
           return;
         }
+        const maxWords = Number(hookInput.dataset.hookMaxWords || 300);
         const count = wordCount(hookInput.value);
-        hookCount.textContent = `${count} ${count === 1 ? "word" : "words"}`;
+        hookCount.textContent = `${count}/${maxWords} words`;
+        hookCount.dataset.state = count > maxWords ? "over" : "ok";
       }
 
       hookInput?.addEventListener("input", syncHookCount);

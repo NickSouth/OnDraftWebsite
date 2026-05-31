@@ -74,12 +74,15 @@
 
   .od-page-sort-group label,
   .od-article-filter-grid > label,
-  .od-article-filter-grid > .od-filter-field {
+  .od-article-filter-grid > .od-filter-field,
+  .od-video-filter-grid > label,
+  .od-video-filter-grid > .od-filter-field {
     @apply grid gap-1.5 text-xs font-black uppercase tracking-[0.12em] text-slate-600 dark:text-slate-300;
   }
 
   .od-page-sort-group select,
-  .od-article-filter-grid > label > input {
+  .od-article-filter-grid > label > input,
+  .od-video-filter-grid > label > input {
     @apply od-focus-ring h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold normal-case tracking-normal text-slate-950 placeholder:text-slate-400 dark:border-white/15 dark:bg-draft-ink dark:text-white;
   }
 
@@ -104,12 +107,18 @@
   }
 
   .od-article-filter-grid > label > span,
-  .od-article-filter-grid > .od-filter-field > span {
+  .od-article-filter-grid > .od-filter-field > span,
+  .od-video-filter-grid > label > span,
+  .od-video-filter-grid > .od-filter-field > span {
     @apply inline-flex items-center gap-1.5;
   }
 
   .od-tool-panel-actions {
     @apply flex justify-end gap-2 border-t border-slate-200 pt-3 dark:border-white/10;
+  }
+
+  .od-filter-panel-actions {
+    @apply relative min-h-8 border-t border-slate-200 pt-3 dark:border-white/10;
   }
 
   .od-compact-tools-top {
@@ -130,6 +139,26 @@
 
   .od-search-submit {
     @apply bg-draft-gold text-draft-ink hover:bg-amber-400 hover:text-draft-ink;
+  }
+
+  .od-empty-state {
+    @apply od-card grid min-h-52 place-items-center p-8 text-center;
+  }
+
+  .od-empty-state-kicker {
+    @apply text-xs font-black uppercase tracking-[0.18em] text-draft-amber dark:text-draft-gold;
+  }
+
+  .od-empty-state-title {
+    @apply mt-2 font-display text-2xl font-bold leading-tight text-slate-950 dark:text-white;
+  }
+
+  .od-empty-state-copy {
+    @apply mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300;
+  }
+
+  .od-empty-state-actions {
+    @apply mt-5 flex flex-col justify-center gap-3 sm:flex-row;
   }
 
   .od-compact-sort-row {
@@ -289,6 +318,10 @@
 
   .od-hook-count {
     @apply text-xs font-bold text-slate-500 dark:text-slate-300;
+  }
+
+  .od-hook-count[data-state="over"] {
+    @apply text-red-700 dark:text-red-200;
   }
 
   .pdf-style-guide {

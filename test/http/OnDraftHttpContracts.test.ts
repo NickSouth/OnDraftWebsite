@@ -1906,7 +1906,7 @@ describe("OnDraft HTTP contracts", () => {
         writeup: "A short HTML summary.",
         publicationDate: "2024-01-01",
         contentType: "html",
-        content: '<h2>Film Room</h2><p onclick="alert(1)">Safe copy</p><script>alert(1)</script><iframe src="https://example.com"></iframe>',
+        content: '<h2>Film Room</h2><p onclick="alert(1)">Safe copy</p><img src="/generated/article-images/v1/1234567890abcdef-pocket-passer.png" alt="Pocket passer"><script>alert(1)</script><iframe src="https://example.com"></iframe>',
       });
 
     expect(create.status).toBe(302);
@@ -1914,7 +1914,7 @@ describe("OnDraft HTTP contracts", () => {
     const article = await agent.get(create.headers.location);
 
     expect(article.status).toBe(200);
-    expect(article.text).toContain('<div class="article-body article-html-body"><h2>Film Room</h2><p>Safe copy</p></div>');
+    expect(article.text).toContain('<div class="article-body article-html-body"><h2>Film Room</h2><p>Safe copy</p><img src="/generated/article-images/v1/1234567890abcdef-pocket-passer.png" alt="Pocket passer" /></div>');
     expect(article.text).not.toContain("<script>alert");
     expect(article.text).not.toContain("onclick");
     expect(article.text).not.toContain("<iframe");
@@ -1929,6 +1929,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(createForm.text).toContain('id="article-content-fields"');
     expect(createForm.text).toContain('type="date" name="publicationDate"');
     expect(createForm.text).toContain('data-hook-count');
+    expect(createForm.text).toContain('data-hook-max-words="300"');
     expect(createForm.text.indexOf('data-tag-editor')).toBeLessThan(createForm.text.indexOf('data-hook-input'));
 
     const pdfFields = await agent.get("/articles/new/content-fields?contentType=pdf");

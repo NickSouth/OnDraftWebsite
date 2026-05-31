@@ -292,7 +292,7 @@ describe("OnDraftService article validation", () => {
     }
   });
 
-  it("normalizes unique short tags and rejects long writeups", async () => {
+  it("normalizes unique short tags and rejects writeups over 300 words", async () => {
     const created = await service().createArticle({
       title: "Tagged Notes",
       author: "Alice OnDraft",
@@ -313,7 +313,7 @@ describe("OnDraftService article validation", () => {
     const rejected = await service().createArticle({
       title: "Long Writeup",
       author: "Alice OnDraft",
-      writeup: "x".repeat(201),
+      writeup: Array.from({ length: 301 }, (_, index) => `word${index}`).join(" "),
       publicationDate: new Date("2024-01-01"),
       content: {
         type: "plainText",
@@ -323,7 +323,7 @@ describe("OnDraftService article validation", () => {
 
     expect(rejected.ok).toBe(false);
     if (rejected.ok === false) {
-      expect(rejected.value.message).toContain("Writeup cannot be more than 200 characters");
+      expect(rejected.value.message).toContain("Writeup cannot be more than 300 words");
     }
   });
 

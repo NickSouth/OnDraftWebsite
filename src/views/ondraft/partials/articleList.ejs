@@ -1,21 +1,40 @@
 <% const currentViewMode = typeof viewMode !== "undefined" && viewMode === "list" ? "list" : "card"; %>
 <% if (articles.length === 0) { %>
-  <div class="od-card grid min-h-48 place-items-center p-8 text-center">
+  <% const anyArticlesExist = typeof hasAnyArticles !== "undefined" ? hasAnyArticles : articles.length > 0; %>
+  <% const currentHasFilters = typeof hasFilters !== "undefined" ? hasFilters : false; %>
+  <div class="od-empty-state">
     <div>
-      <p class="text-xs font-black uppercase tracking-[0.18em] text-draft-amber dark:text-draft-gold">Dry tap</p>
-      <p class="mt-2 font-display text-2xl font-bold text-slate-950 dark:text-white">No articles match those filters.</p>
-      <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">Try a wider search or clear the filters.</p>
-      <% if (isAdmin) { %>
-        <div class="mt-5 flex flex-col justify-center gap-3 sm:flex-row">
+      <% if (!anyArticlesExist) { %>
+        <p class="od-empty-state-kicker">No articles yet</p>
+        <p class="od-empty-state-title">No articles have been created yet.</p>
+        <p class="od-empty-state-copy">Create the first article when a story is ready for the board.</p>
+        <% if (isAdmin) { %>
+          <div class="od-empty-state-actions">
+            <a class="od-primary-link" href="/articles/new">Create article</a>
+          </div>
+        <% } %>
+      <% } else { %>
+        <p class="od-empty-state-kicker">Dry tap</p>
+        <p class="od-empty-state-title">No articles match those filters.</p>
+        <p class="od-empty-state-copy">Try a wider search or clear the filters.</p>
+        <% if (currentHasFilters) { %>
+          <div class="od-empty-state-actions">
+            <% if (isAdmin) { %>
+              <a class="od-primary-link" href="/articles/new">Create article</a>
+            <% } %>
+            <button
+              type="button"
+              class="od-secondary-link"
+              onclick="const form = document.getElementById('article-filter-form'); if (!form) return; const status = document.getElementById('article-status-field')?.value || 'published'; form.reset(); const statusField = document.getElementById('article-status-field'); if (statusField) statusField.value = status; htmx.trigger(form, 'submit');"
+            >
+              Clear filters
+            </button>
+          </div>
+        <% } else if (isAdmin) { %>
+          <div class="od-empty-state-actions">
           <a class="od-primary-link" href="/articles/new">Create article</a>
-          <button
-            type="button"
-            class="od-secondary-link"
-            onclick="const form = document.getElementById('article-filter-form'); if (!form) return; const status = document.getElementById('article-status-field')?.value || 'published'; form.reset(); const statusField = document.getElementById('article-status-field'); if (statusField) statusField.value = status; htmx.trigger(form, 'submit');"
-          >
-            Clear filters
-          </button>
-        </div>
+          </div>
+        <% } %>
       <% } %>
     </div>
   </div>

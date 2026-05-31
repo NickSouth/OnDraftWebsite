@@ -53,75 +53,49 @@
       filtersOpen: false,
       keyword: $el.dataset.keyword || '',
       searchedKeyword: ($el.dataset.keyword || '').trim(),
+      appliedFilterSignature: '<%= [values.author || "", values.tags || "", values.dateFrom || "", values.dateTo || ""].join("|") %>',
+      filterSignature: '<%= [values.author || "", values.tags || "", values.dateFrom || "", values.dateTo || ""].join("|") %>',
       get hasKeyword() { return this.keyword.trim().length > 0 },
       get searchDirty() { return this.keyword.trim() !== this.searchedKeyword },
+      currentFilterSignature() {
+        return [
+          this.$refs.articleAuthor?.value || '',
+          this.$refs.articleTags?.value || '',
+          this.$refs.articleDateFrom?.value || '',
+          this.$refs.articleDateTo?.value || ''
+        ].map((value) => value.trim()).join('|');
+      },
+      syncFilters() {
+        this.filterSignature = this.currentFilterSignature();
+      },
+      get hasFilterContent() { return this.filterSignature.split('|').some((value) => value.length > 0) },
+      get filtersDirty() { return this.filterSignature !== this.appliedFilterSignature },
       clearSearch() {
         this.keyword = '';
         this.searchedKeyword = '';
         this.$nextTick(() => htmx.trigger(this.$refs.articleFilterForm, 'submit'));
+      },
+      clearFilters() {
+        const status = document.getElementById('article-status-field')?.value || 'published';
+        this.$refs.articleAuthor.value = '';
+        this.$refs.articleTags.value = '';
+        this.$refs.articleTags.dispatchEvent(new Event('change', { bubbles: true }));
+        this.$refs.articleDateFrom.value = '';
+        this.$refs.articleDateTo.value = '';
+        const statusField = document.getElementById('article-status-field');
+        if (statusField) statusField.value = status;
+        this.syncFilters();
+        this.appliedFilterSignature = this.filterSignature;
+        this.$nextTick(() => htmx.trigger(this.$refs.articleFilterForm, 'submit'));
       }
     }"
     x-ref="articleFilterForm"
-    @submit="searchedKeyword = keyword.trim()"
+    @submit="searchedKeyword = keyword.trim(); syncFilters(); appliedFilterSignature = filterSignature"
   >
     <input type="hidden" name="view" x-model="articleView" />
     <% if (isAdmin) { %>
       <input id="article-status-field" type="hidden" name="status" value="<%= showingPublished ? "published" : "draft" %>" />
     <% } %>
-
-    <div class="od-page-tools-bar">
-      <div class="od-page-sort-group">
-        <label>
-          <span>Sort</span>
-          <select id="article-sort-by" name="sortBy" onchange="htmx.trigger(this.form, 'submit');">
-            <option value="date" <%= sortBy === "date" ? "selected" : "" %>>Date</option>
-            <option value="likes" <%= sortBy === "likes" ? "selected" : "" %>>Likes</option>
-            <option value="comments" <%= sortBy === "comments" ? "selected" : "" %>>Comments</option>
-          </select>
-        </label>
-        <label>
-          <span>Direction</span>
-          <select id="article-sort-direction" name="sortDirection" onchange="htmx.trigger(this.form, 'submit');">
-            <option value="desc" <%= sortDirection === "desc" ? "selected" : "" %>>Descending</option>
-            <option value="asc" <%= sortDirection === "asc" ? "selected" : "" %>>Ascending</option>
-          </select>
-        </label>
-      </div>
-
-      <div class="od-page-tool-actions">
-        <button
-          type="button"
-          class="od-icon-button"
-          :class="filtersOpen ? 'is-active' : ''"
-          :aria-expanded="String(filtersOpen)"
-          aria-controls="article-filter-panel"
-          aria-label="Filters"
-          title="Filters"
-          @click="filtersOpen = !filtersOpen"
-        >
-          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-            <path d="M4 7h16" />
-            <path d="M7 12h10" />
-            <path d="M10 17h4" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          class="od-icon-button"
-          :class="searchOpen ? 'is-active' : ''"
-          :aria-expanded="String(searchOpen)"
-          aria-controls="article-search-panel"
-          aria-label="Search articles"
-          title="Search articles"
-          @click="searchOpen = !searchOpen; $nextTick(() => searchOpen && $refs.articleSearch?.focus())"
-        >
-          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <circle cx="11" cy="11" r="7" />
-            <path d="m20 20-3.5-3.5" />
-          </svg>
-        </button>
-      </div>
-    </div>
 
     <div id="article-search-panel" class="od-tool-panel" x-show="searchOpen" x-collapse x-cloak>
       <label class="od-search-field">
@@ -163,7 +137,7 @@
         const selectedArticleFilterTags = (values.tags || "").split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean);
         const articleFilterTagOptions = [...new Set([...(articleTags || []), ...selectedArticleFilterTags])].sort((first, second) => first.localeCompare(second));
       %>
-      <div class="od-article-filter-grid">
+      <div class="od-article-filter-grid" @input="syncFilters()" @change="syncFilters()">
         <label>
           <span>
             <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -172,7 +146,7 @@
             </svg>
             Author
           </span>
-          <input name="author" value="<%= values.author || "" %>" />
+          <input x-ref="articleAuthor" name="author" value="<%= values.author || "" %>" />
         </label>
         <div class="od-filter-field tag-editor" data-tag-editor>
           <span>
@@ -195,7 +169,7 @@
               <span data-tag-count>Any tags</span>
             </button>
           </div>
-          <input type="hidden" name="tags" value="<%= values.tags || "" %>" data-tag-value />
+          <input x-ref="articleTags" type="hidden" name="tags" value="<%= values.tags || "" %>" data-tag-value />
           <div id="article-filter-tag-options" class="tag-editor-menu" data-tag-menu hidden>
             <% if (articleFilterTagOptions.length > 0) { %>
               <div class="tag-option-list">
@@ -221,7 +195,7 @@
             </svg>
             To
           </span>
-          <input type="date" name="dateTo" value="<%= values.dateTo || "" %>" />
+          <input x-ref="articleDateTo" type="date" name="dateTo" value="<%= values.dateTo || "" %>" />
         </label>
         <label>
           <span>
@@ -233,26 +207,83 @@
             </svg>
             From
           </span>
-          <input type="date" name="dateFrom" value="<%= values.dateFrom || "" %>" />
+          <input x-ref="articleDateFrom" type="date" name="dateFrom" value="<%= values.dateFrom || "" %>" />
         </label>
       </div>
-      <div class="od-tool-panel-actions">
-        <button class="od-icon-button" type="submit" aria-label="Apply filters" title="Apply filters">
-          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <div class="od-filter-panel-actions">
+        <button
+          type="button"
+          class="od-search-icon-button"
+          :class="filtersDirty ? 'right-10' : 'right-1'"
+          x-cloak
+          x-show="hasFilterContent"
+          @click="clearFilters()"
+          aria-label="Clear filters"
+          title="Clear filters"
+        >
+          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+            <path d="M18 6 6 18" />
+            <path d="m6 6 12 12" />
+          </svg>
+        </button>
+        <button class="od-search-icon-button od-search-submit right-1" type="submit" x-cloak x-show="filtersDirty" aria-label="Apply filters" title="Apply filters">
+          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M5 12h14" />
             <path d="m13 6 6 6-6 6" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="od-page-tools-bar">
+      <div class="od-page-sort-group">
+        <label>
+          <span>Sort</span>
+          <select id="article-sort-by" name="sortBy" onchange="htmx.trigger(this.form, 'submit');">
+            <option value="date" <%= sortBy === "date" ? "selected" : "" %>>Date</option>
+            <option value="likes" <%= sortBy === "likes" ? "selected" : "" %>>Likes</option>
+            <option value="comments" <%= sortBy === "comments" ? "selected" : "" %>>Comments</option>
+          </select>
+        </label>
+        <label>
+          <span>Direction</span>
+          <select id="article-sort-direction" name="sortDirection" onchange="htmx.trigger(this.form, 'submit');">
+            <option value="desc" <%= sortDirection === "desc" ? "selected" : "" %>>Descending</option>
+            <option value="asc" <%= sortDirection === "asc" ? "selected" : "" %>>Ascending</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="od-page-tool-actions">
+        <button
+          type="button"
+          class="od-icon-button"
+          :class="filtersOpen ? 'is-active' : ''"
+          :aria-expanded="String(filtersOpen)"
+          aria-controls="article-filter-panel"
+          aria-label="Filters"
+          title="Filters"
+          @click="filtersOpen = !filtersOpen"
+        >
+          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+            <path d="M4 7h16" />
+            <path d="M7 12h10" />
+            <path d="M10 17h4" />
           </svg>
         </button>
         <button
           type="button"
           class="od-icon-button"
-          onclick="const status = document.getElementById('article-status-field')?.value || 'published'; this.form.reset(); this.form.querySelectorAll('[data-tag-value]').forEach((input) => { input.value = ''; input.dispatchEvent(new Event('change', { bubbles: true })); }); const statusField = document.getElementById('article-status-field'); if (statusField) statusField.value = status; htmx.trigger(this.form, 'submit');"
-          aria-label="Clear filters"
-          title="Clear filters"
+          :class="searchOpen ? 'is-active' : ''"
+          :aria-expanded="String(searchOpen)"
+          aria-controls="article-search-panel"
+          aria-label="Search articles"
+          title="Search articles"
+          @click="searchOpen = !searchOpen; $nextTick(() => searchOpen && $refs.articleSearch?.focus())"
         >
-          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
-            <path d="M18 6 6 18" />
-            <path d="m6 6 12 12" />
+          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
           </svg>
         </button>
       </div>
@@ -302,7 +333,7 @@
   </form>
 
   <div id="articles-results">
-    <%- include("partials/articleList", { articles, isAdmin, showingPublished, session, viewMode, bookmarkedArticleIds }) %>
+    <%- include("partials/articleList", { articles, isAdmin, showingPublished, session, viewMode, bookmarkedArticleIds, hasAnyArticles, hasFilters }) %>
   </div>
   <script src="/articleTags.js" defer></script>
 </section>

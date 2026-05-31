@@ -46,7 +46,7 @@
 
   <form
     id="hot-take-filter-form"
-    class="article-filter-form od-page-tools -mb-4"
+    class="article-filter-form od-page-tools"
     hx-get="/hottakes/filter"
     hx-target="#hot-take-list"
     hx-swap="outerHTML"
@@ -69,6 +69,41 @@
     x-ref="hotTakeFilterForm"
     @submit="searchedKeyword = keyword.trim()"
   >
+    <div id="hot-take-search-panel" class="od-tool-panel" x-show="searchOpen" x-collapse x-cloak>
+      <label class="od-search-field">
+        <span class="sr-only">Search hot takes</span>
+        <input class="od-search-input" x-ref="hotTakeSearch" x-model="keyword" name="keyword" type="search" placeholder="Search hot takes" />
+        <button
+          type="button"
+          class="od-search-icon-button"
+          :class="hasKeyword && searchDirty ? 'right-10' : 'right-1'"
+          x-cloak
+          x-show="hasKeyword"
+          @click="clearSearch()"
+          aria-label="Clear search"
+          title="Clear search"
+        >
+          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+            <path d="M18 6 6 18" />
+            <path d="m6 6 12 12" />
+          </svg>
+        </button>
+        <button
+          type="submit"
+          class="od-search-icon-button od-search-submit right-1"
+          x-cloak
+          x-show="hasKeyword && searchDirty"
+          aria-label="Search"
+          title="Search"
+        >
+          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M5 12h14" />
+            <path d="m13 6 6 6-6 6" />
+          </svg>
+        </button>
+      </label>
+    </div>
+
     <div class="od-page-tools-bar">
       <div class="od-page-sort-group">
         <label>
@@ -106,46 +141,11 @@
       </div>
     </div>
 
-    <div id="hot-take-search-panel" class="od-tool-panel" x-show="searchOpen" x-collapse x-cloak>
-      <label class="od-search-field">
-        <span class="sr-only">Search hot takes</span>
-        <input class="od-search-input" x-ref="hotTakeSearch" x-model="keyword" name="keyword" type="search" placeholder="Search hot takes" />
-        <button
-          type="button"
-          class="od-search-icon-button"
-          :class="hasKeyword && searchDirty ? 'right-10' : 'right-1'"
-          x-cloak
-          x-show="hasKeyword"
-          @click="clearSearch()"
-          aria-label="Clear search"
-          title="Clear search"
-        >
-          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
-            <path d="M18 6 6 18" />
-            <path d="m6 6 12 12" />
-          </svg>
-        </button>
-        <button
-          type="submit"
-          class="od-search-icon-button od-search-submit right-1"
-          x-cloak
-          x-show="hasKeyword && searchDirty"
-          aria-label="Search"
-          title="Search"
-        >
-          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M5 12h14" />
-            <path d="m13 6 6 6-6 6" />
-          </svg>
-        </button>
-      </label>
-    </div>
-
     <div id="hot-take-results-loading" class="od-inline-loader htmx-indicator" role="status" aria-live="polite">
       <span class="od-inline-loader-dot" aria-hidden="true"></span>
       Updating hot takes
     </div>
   </form>
 
-  <%- include("partials/hotTakeList", { posts, session, isAdmin, likeActorId, bookmarkedForumPostIds, userModerationById, activeUserBan, errorMessage: null }) %>
+  <%- include("partials/hotTakeList", { posts, session, isAdmin, likeActorId, bookmarkedForumPostIds, userModerationById, activeUserBan, canCreateHotTake, hasAnyHotTakes, hasFilters, errorMessage: null }) %>
 </section>

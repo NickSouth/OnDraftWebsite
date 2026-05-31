@@ -2,13 +2,50 @@
   <% const usersById = typeof userDirectoryById !== "undefined" ? userDirectoryById : new Map(); %>
   <% const moderationById = typeof userModerationById !== "undefined" ? userModerationById : new Map(); %>
   <% const currentActiveBan = typeof activeUserBan !== "undefined" ? activeUserBan : null; %>
+  <% const anyHotTakesExist = typeof hasAnyHotTakes !== "undefined" ? hasAnyHotTakes : posts.length > 0; %>
+  <% const currentHasFilters = typeof hasFilters !== "undefined" ? hasFilters : false; %>
+  <% const currentCanCreateHotTake = typeof canCreateHotTake !== "undefined" ? canCreateHotTake : Boolean(session.authenticatedUser?.emailVerifiedAt && !currentActiveBan); %>
   <% const formatRelative = typeof relativeTime === "function" ? relativeTime : (value) => new Date(value).toLocaleString(); %>
   <% if (errorMessage) { %>
     <p class="error-message"><%= errorMessage %></p>
   <% } %>
 
   <% if (posts.length === 0) { %>
-    <p class="muted-text">No hot takes yet.</p>
+    <div class="od-empty-state">
+      <div>
+        <% if (!anyHotTakesExist) { %>
+          <p class="od-empty-state-kicker">The Taproom is quiet</p>
+          <p class="od-empty-state-title">Be the first to share a hot take.</p>
+          <p class="od-empty-state-copy">Start the conversation with a thought on the latest NFL or NFL Draft news.</p>
+          <% if (currentCanCreateHotTake) { %>
+            <div class="od-empty-state-actions">
+              <button
+                type="button"
+                class="od-primary-link"
+                @click="composerOpen = true; $nextTick(() => $refs.hotTakeContent?.focus())"
+              >
+                Create hot take
+              </button>
+            </div>
+          <% } %>
+        <% } else { %>
+          <p class="od-empty-state-kicker">No hot takes found</p>
+          <p class="od-empty-state-title">No hot takes match that search.</p>
+          <p class="od-empty-state-copy">Try a wider search or clear the search field.</p>
+          <% if (currentHasFilters) { %>
+            <div class="od-empty-state-actions">
+              <button
+                type="button"
+                class="od-secondary-link"
+                onclick="const form = document.getElementById('hot-take-filter-form'); if (!form) return; const input = form.querySelector('[name=keyword]'); if (input) { input.value = ''; input.dispatchEvent(new Event('input', { bubbles: true })); } htmx.trigger(form, 'submit');"
+              >
+                Clear search
+              </button>
+            </div>
+          <% } %>
+        <% } %>
+      </div>
+    </div>
   <% } else { %>
     <ol class="comment-list">
       <% posts.forEach((post) => { %>

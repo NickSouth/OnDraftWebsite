@@ -18,7 +18,7 @@ const DEFAULT_ARTICLE_IMAGE_URLS = [
   "/images/article-defaults/helmet.png",
   "/images/article-defaults/uprights.png",
 ];
-const ARTICLE_WRITEUP_MAX_LENGTH = 200;
+const ARTICLE_WRITEUP_MAX_WORDS = 300;
 const ARTICLE_TAG_MAX_LENGTH = 24;
 const ARTICLE_TAG_MAX_COUNT = 12;
 const ARTICLE_TAG_PATTERN = /^[a-z0-9-]+$/;
@@ -287,6 +287,7 @@ class OnDraftService implements IOnDraftService {
         "h3",
         "h4",
         "hr",
+        "img",
         "li",
         "ol",
         "p",
@@ -297,6 +298,7 @@ class OnDraftService implements IOnDraftService {
       ],
       allowedAttributes: {
         a: ["href", "title", "target", "rel"],
+        img: ["src", "alt", "title", "loading", "decoding"],
       },
       allowedSchemes: ["http", "https", "mailto"],
       transformTags: {
@@ -381,8 +383,8 @@ class OnDraftService implements IOnDraftService {
     if (input.title.trim() === "" || input.author.trim() === "" || input.writeup.trim() === "") {
       return Err(ArticleValidationError("Title, author, and writeup cannot be empty."));
     }
-    if (input.writeup.length > ARTICLE_WRITEUP_MAX_LENGTH) {
-      return Err(ArticleValidationError(`Writeup cannot be more than ${ARTICLE_WRITEUP_MAX_LENGTH} characters.`));
+    if (this.wordCount(input.writeup) > ARTICLE_WRITEUP_MAX_WORDS) {
+      return Err(ArticleValidationError(`Writeup cannot be more than ${ARTICLE_WRITEUP_MAX_WORDS} words.`));
     }
     if (isNaN(input.publicationDate.getTime())) {
       return Err(ArticleValidationError("Invalid publication date."));

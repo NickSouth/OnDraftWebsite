@@ -327,6 +327,33 @@ class OnDraftController implements IOnDraftController {
     return this.queryString(req, "view") === "list" ? "list" : "card";
   }
 
+  private hasArticleFilters(req: Request): boolean {
+    return Boolean(
+      this.queryString(req, "keyword") ||
+      this.queryString(req, "author") ||
+      this.queryString(req, "tags") ||
+      this.queryString(req, "dateFrom") ||
+      this.queryString(req, "dateTo")
+    );
+  }
+
+  private hasVideoFilters(req: Request): boolean {
+    return Boolean(
+      this.queryString(req, "keyword") ||
+      this.queryString(req, "tags") ||
+      this.queryString(req, "dateFrom") ||
+      this.queryString(req, "dateTo")
+    );
+  }
+
+  private hasForumPostFilters(req: Request): boolean {
+    return Boolean(
+      this.queryString(req, "keyword") ||
+      this.queryString(req, "dateFrom") ||
+      this.queryString(req, "dateTo")
+    );
+  }
+
   private favoritesRange(req: Request): "all" | "month" | "year" {
     const range = this.queryString(req, "range");
     return range === "month" || range === "year" ? range : "all";
@@ -677,6 +704,10 @@ class OnDraftController implements IOnDraftController {
     return [];
   }
 
+  private canCreateHotTake(session: IOnDraftBrowserSession, activeBan: IUserBanRecord | null): boolean {
+    return Boolean(session.authenticatedUser?.emailVerifiedAt && !activeBan);
+  }
+
   private async getVideoTagSuggestions(): Promise<string[]> {
     const videoTags = await this.service.getVideoTags();
     if (videoTags.ok === true) {
@@ -833,6 +864,11 @@ class OnDraftController implements IOnDraftController {
       res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
       return;
     }
+    const hasFilters = this.hasArticleFilters(req);
+    const unfilteredResult = hasFilters
+      ? await this.service.getFilteredArticles({ published: showingPublished, sortBy: "date", sortDirection: "desc" })
+      : result;
+    const hasAnyArticles = unfilteredResult.ok === true ? unfilteredResult.value.length > 0 : result.value.length > 0;
     res.render("ondraft/articles", {
       session,
       isAdmin: isAdminSession(session),
@@ -850,6 +886,8 @@ class OnDraftController implements IOnDraftController {
         dateTo: this.queryString(req, "dateTo") ?? "",
       },
       bookmarkedArticleIds: await this.bookmarkedArticleIds(session),
+      hasAnyArticles,
+      hasFilters,
     });
   }
 
@@ -863,6 +901,11 @@ class OnDraftController implements IOnDraftController {
       return;
     }
 
+    const hasFilters = this.hasVideoFilters(req);
+    const unfilteredResult = hasFilters
+      ? await this.service.filterYoutubeVideos({ sortBy: "date", sortDirection: "desc" })
+      : result;
+    const hasAnyVideos = unfilteredResult.ok === true ? unfilteredResult.value.length > 0 : result.value.length > 0;
     res.render("ondraft/videos", {
       session,
       isAdmin: isAdminSession(session),
@@ -876,6 +919,8 @@ class OnDraftController implements IOnDraftController {
         sortBy: this.videoSortBy(req),
         sortDirection: this.videoSortDirection(req),
       },
+      hasAnyVideos,
+      hasFilters,
     });
   }
 
@@ -939,6 +984,10 @@ class OnDraftController implements IOnDraftController {
       return;
     }
 
+    const hasFilters = this.hasArticleFilters(req);
+    const unfilteredResult = hasFilters
+      ? await this.service.getFilteredArticles({ published: showingPublished, sortBy: "date", sortDirection: "desc" })
+      : result;
     res.render("ondraft/partials/articleList", {
       layout: false,
       articles: result.value,
@@ -947,6 +996,8 @@ class OnDraftController implements IOnDraftController {
       session,
       viewMode: this.articleViewMode(req),
       bookmarkedArticleIds: await this.bookmarkedArticleIds(session),
+      hasAnyArticles: unfilteredResult.ok === true ? unfilteredResult.value.length > 0 : result.value.length > 0,
+      hasFilters,
     });
   }
 
@@ -996,6 +1047,7 @@ class OnDraftController implements IOnDraftController {
   }
 
   private async renderHotTakeList(res: Response, posts: ForumPost[], session: IOnDraftBrowserSession, errorMessage: string | null = null): Promise<void> {
+    const activeBan = await this.activeUserBan(session);
     res.render("ondraft/partials/hotTakeList", {
       layout: false,
       posts,
@@ -1005,7 +1057,8 @@ class OnDraftController implements IOnDraftController {
       bookmarkedForumPostIds: await this.bookmarkedForumPostIds(session),
       userDirectoryById: await this.userDirectoryById(),
       userModerationById: await this.userModerationById(session),
-      activeUserBan: await this.activeUserBan(session),
+      activeUserBan: activeBan,
+      canCreateHotTake: this.canCreateHotTake(session, activeBan),
       errorMessage,
     });
   }
@@ -1019,6 +1072,11 @@ class OnDraftController implements IOnDraftController {
       return;
     }
 
+    const activeBan = await this.activeUserBan(session);
+    const hasFilters = this.hasForumPostFilters(req);
+    const unfilteredResult = hasFilters
+      ? await this.service.getFilteredForumPosts({ sortBy: "date", sortDirection: "desc" })
+      : result;
     res.render("ondraft/hotTakes", {
       session,
       isAdmin: isAdminSession(session),
@@ -1029,7 +1087,10 @@ class OnDraftController implements IOnDraftController {
       bookmarkedForumPostIds: await this.bookmarkedForumPostIds(session),
       userDirectoryById: await this.userDirectoryById(),
       userModerationById: await this.userModerationById(session),
-      activeUserBan: await this.activeUserBan(session),
+      activeUserBan: activeBan,
+      canCreateHotTake: this.canCreateHotTake(session, activeBan),
+      hasAnyHotTakes: unfilteredResult.ok === true ? unfilteredResult.value.length > 0 : result.value.length > 0,
+      hasFilters,
       errorMessage: null,
       values: {},
     });
@@ -1043,7 +1104,26 @@ class OnDraftController implements IOnDraftController {
       return;
     }
 
-    await this.renderHotTakeList(res, result.value, session);
+    const hasFilters = this.hasForumPostFilters(req);
+    const unfilteredResult = hasFilters
+      ? await this.service.getFilteredForumPosts({ sortBy: "date", sortDirection: "desc" })
+      : result;
+    const activeBan = await this.activeUserBan(session);
+    res.render("ondraft/partials/hotTakeList", {
+      layout: false,
+      posts: result.value,
+      session,
+      isAdmin: isAdminSession(session),
+      likeActorId: this.likeActorId(session),
+      bookmarkedForumPostIds: await this.bookmarkedForumPostIds(session),
+      userDirectoryById: await this.userDirectoryById(),
+      userModerationById: await this.userModerationById(session),
+      activeUserBan: activeBan,
+      canCreateHotTake: this.canCreateHotTake(session, activeBan),
+      hasAnyHotTakes: unfilteredResult.ok === true ? unfilteredResult.value.length > 0 : result.value.length > 0,
+      hasFilters,
+      errorMessage: null,
+    });
   }
 
   async getSavedSchools(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {

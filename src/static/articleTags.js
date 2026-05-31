@@ -93,6 +93,10 @@ document.querySelectorAll("[data-tag-editor], .tag-editor").forEach((editor) => 
     }
   }
 
+  function notifyTagsChanged() {
+    hiddenInput.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
   function addTag(value) {
     const tag = normalizeTag(value);
     if (!tag || tags.includes(tag)) {
@@ -108,17 +112,19 @@ document.querySelectorAll("[data-tag-editor], .tag-editor").forEach((editor) => 
       input.value = "";
     }
     syncTags();
+    notifyTagsChanged();
   }
 
   function removeTag(tag) {
     tags = tags.filter((existingTag) => existingTag !== tag);
     syncTags();
+    notifyTagsChanged();
   }
 
   clearButton?.addEventListener("click", () => {
     tags = [];
     syncTags();
-    hiddenInput.dispatchEvent(new Event("change", { bubbles: true }));
+    notifyTagsChanged();
     input?.focus();
   });
 
