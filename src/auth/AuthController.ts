@@ -83,6 +83,11 @@ export interface IAuthController {
     store: OnDraftSessionStore,
     subscribe: boolean,
   ): Promise<void>;
+  deleteAccountFromSettings(
+    req: Request,
+    res: Response,
+    store: OnDraftSessionStore,
+  ): Promise<void>;
   changePasswordFromSettings(
     res: Response,
     store: OnDraftSessionStore,
@@ -468,6 +473,35 @@ class AuthController implements IAuthController {
         : "You are subscribed to the OnDraft mailing list."
       : "You are unsubscribed from the OnDraft mailing list.";
     this.renderSettingsModal(res, session, result.value, message, null);
+  }
+
+  async deleteAccountFromSettings(
+    req: Request,
+    res: Response,
+    store: OnDraftSessionStore,
+  ): Promise<void> {
+    const session = touchOnDraftSession(store);
+    const userId = session.authenticatedUser?.userId;
+
+    if (!userId) {
+      await this.showSettingsModal(res, store, null, "Log in to manage account settings.");
+      return;
+    }
+
+    const result = await this.service.deleteAccount({ userId });
+    if (result.ok === false) {
+      await this.showSettingsModal(res, store, null, result.value.message);
+      return;
+    }
+
+    signOutAuthenticatedUser(store);
+    await this.destroySession(req);
+    res.clearCookie("ondraft.sid", {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    });
+    res.redirect("/");
   }
 
   async changePasswordFromSettings(

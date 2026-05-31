@@ -76,7 +76,10 @@
             </div>
           </div>
           <p class="hot-take-content"><%= post.content %></p>
-          <%- include("hotTakeActions", { post, session, likeActorId, postBookmarked: bookmarkedForumPostIds.includes(post.id) }) %>
+          <div class="comment-actions">
+            <%- include("hotTakeActions", { post, session, likeActorId, postBookmarked: bookmarkedForumPostIds.includes(post.id) }) %>
+            <%- include("reportLink", { type: "hot take", id: `hot-take-${post.id}`, path: "/hottakes" }) %>
+          </div>
           <div id="hot-take-comment-panel-<%= post.id %>" x-show="commentsOpen" x-collapse x-cloak>
             <%- include("hotTakeComments", { post, session, isAdmin, userDirectoryById: usersById, userModerationById: moderationById, activeUserBan: currentActiveBan, errorMessage: null }) %>
           </div>

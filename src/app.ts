@@ -195,6 +195,23 @@ class ExpressApp implements IApp {
   }
 
   private setSecurityHeaders(_req: Request, res: Response, next: NextFunction): void {
+    res.setHeader(
+      "Content-Security-Policy",
+      [
+        "default-src 'self'",
+        "base-uri 'self'",
+        "object-src 'none'",
+        "frame-ancestors 'none'",
+        "form-action 'self'",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: https://img.youtube.com",
+        "font-src 'self' data:",
+        "connect-src 'self' https://challenges.cloudflare.com https://www.googleapis.com",
+        "frame-src https://challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com",
+        "upgrade-insecure-requests",
+      ].join("; "),
+    );
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("X-Frame-Options", "DENY");
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
@@ -216,6 +233,14 @@ class ExpressApp implements IApp {
 
     const source = req.get("origin") ?? req.get("referer");
     if (!source) {
+      if (process.env.NODE_ENV === "production") {
+        this.logger.warn("Blocked state-changing request without origin or referrer");
+        res.status(403).render("ondraft/partials/error", {
+          message: "Request blocked.",
+          layout: false,
+        });
+        return;
+      }
       next();
       return;
     }
@@ -340,10 +365,35 @@ class ExpressApp implements IApp {
     next();
   }
 
-  private renderInfoModal(res: Response, modal: "about" | "privacy" | "contact"): void {
+  private renderInfoModal(res: Response, modal: "about" | "privacy" | "contact" | "terms"): void {
     res.render("ondraft/partials/infoModal", {
       layout: false,
       modal,
+    });
+  }
+
+  private renderInfoPage(req: Request, res: Response, modal: "privacy" | "contact" | "terms"): void {
+    if (req.get("HX-Request") === "true") {
+      this.renderInfoModal(res, modal);
+      return;
+    }
+
+    const browserSession = recordPageView(sessionStore(req));
+    const title = modal === "privacy"
+      ? "Privacy Policy"
+      : modal === "terms"
+        ? "Terms and Community Guidelines"
+        : "Contact";
+    const description = modal === "privacy"
+      ? "How OnDraft Football collects, uses, and protects user information."
+      : modal === "terms"
+        ? "The terms and community expectations for using OnDraft Football."
+        : "Contact OnDraft Football for support, feedback, and business inquiries.";
+    res.render("ondraft/infoPage", {
+      session: browserSession,
+      modal,
+      metaTitle: `${title} | OnDraft Football`,
+      metaDescription: description,
     });
   }
 
@@ -364,8 +414,9 @@ class ExpressApp implements IApp {
         res.render("ondraft/about", { session: browserSession });
       }),
     );
-    this.app.get("/privacy", (_req, res) => this.renderInfoModal(res, "privacy"));
-    this.app.get("/contact", (_req, res) => this.renderInfoModal(res, "contact"));
+    this.app.get("/privacy", (req, res) => this.renderInfoPage(req, res, "privacy"));
+    this.app.get("/contact", (req, res) => this.renderInfoPage(req, res, "contact"));
+    this.app.get("/terms", (req, res) => this.renderInfoPage(req, res, "terms"));
 
     this.app.get(
       "/settings",
@@ -861,6 +912,39 @@ class ExpressApp implements IApp {
         });
       }),
     );
+
+    this.app.post(
+      "/settings/delete-account",
+      asyncHandler(async (req, res) => {
+        await this.authController.deleteAccountFromSettings(req, res, sessionStore(req));
+      }),
+    );
+
+    this.app.get("/robots.txt", (_req, res) => {
+      res.type("text/plain");
+      res.send([
+        "User-agent: *",
+        "Allow: /",
+        "Sitemap: " + new URL("/sitemap.xml", this.siteBaseUrl).toString(),
+        "",
+      ].join("\n"));
+    });
+
+    this.app.get("/sitemap.xml", (_req, res) => {
+      const urls = ["/", "/articles", "/videos", "/bigboard", "/hottakes", "/about", "/privacy", "/terms", "/contact"];
+      res.type("application/xml");
+      res.send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls
+        .map((url) => `  <url><loc>${new URL(url, this.siteBaseUrl).toString()}</loc></url>`)
+        .join("\n")}\n</urlset>\n`);
+    });
+
+    this.app.get("/feed.xml", asyncHandler(async (_req, res) => {
+      const items = await this.controller.publicFeedItems();
+      res.type("application/rss+xml");
+      res.send(`<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0"><channel><title>OnDraft Football</title><link>${this.siteBaseUrl}</link><description>NFL and NFL Draft analysis from OnDraft Football.</description>${items
+        .map((item) => `<item><title><![CDATA[${item.title}]]></title><link>${new URL(item.href, this.siteBaseUrl).toString()}</link><description><![CDATA[${item.description}]]></description><pubDate>${item.date.toUTCString()}</pubDate></item>`)
+        .join("")}</channel></rss>`);
+    }));
 
     this.app.post(
       "/articles/html-images",

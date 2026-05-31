@@ -102,6 +102,8 @@ describe("OnDraft HTTP contracts", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers["x-powered-by"]).toBeUndefined();
+    expect(response.headers["content-security-policy"]).toContain("default-src 'self'");
+    expect(response.headers["content-security-policy"]).toContain("frame-ancestors 'none'");
     expect(response.headers["x-content-type-options"]).toBe("nosniff");
     expect(response.headers["x-frame-options"]).toBe("DENY");
     expect(response.headers["referrer-policy"]).toBe("strict-origin-when-cross-origin");
@@ -199,6 +201,34 @@ describe("OnDraft HTTP contracts", () => {
 
     expect(response.status).toBe(403);
     expect(response.text).toContain("Request blocked.");
+  });
+
+  it("blocks production state-changing requests when origin and referrer are missing", async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalSessionSecret = process.env.SESSION_SECRET;
+    process.env.NODE_ENV = "production";
+    process.env.SESSION_SECRET = "test-production-session-secret";
+
+    try {
+      const response = await request(app())
+        .post("/login")
+        .type("form")
+        .send({ email: "ryan@ondraftfootball.com", password: "password123" });
+
+      expect(response.status).toBe(403);
+      expect(response.text).toContain("Request blocked.");
+    } finally {
+      if (originalNodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = originalNodeEnv;
+      }
+      if (originalSessionSecret === undefined) {
+        delete process.env.SESSION_SECRET;
+      } else {
+        process.env.SESSION_SECRET = originalSessionSecret;
+      }
+    }
   });
 
   it("rate limits repeated login attempts", async () => {
@@ -306,10 +336,12 @@ describe("OnDraft HTTP contracts", () => {
     }
   });
 
-  it("renders about as a full page and footer legal pages as modal content", async () => {
+  it("renders about and legal routes as full pages, with HTMX modal partials available", async () => {
     const about = await request(app()).get("/about");
     const privacy = await request(app()).get("/privacy");
     const contact = await request(app()).get("/contact");
+    const terms = await request(app()).get("/terms");
+    const privacyModal = await request(app()).get("/privacy").set("HX-Request", "true");
 
     expect(about.status).toBe(200);
     expect(about.text).toContain("<h1");
@@ -337,12 +369,43 @@ describe("OnDraft HTTP contracts", () => {
     expect(about.text).not.toContain('role="dialog"');
 
     expect(privacy.status).toBe(200);
+    expect(privacy.text).toContain("<!doctype html>");
+    expect(privacy.text).toContain("<h1");
     expect(privacy.text).toContain("OnDraft Football");
     expect(privacy.text).toContain("ondraftfootball.com");
     expect(privacy.text).toContain("support@ondraftfootball.com");
+    expect(privacy.text).toContain("1. Information We Collect");
+    expect(privacy.text).toContain("8. Social Media Affiliation and Icon Use");
+    expect(privacy.text).toContain("15. Contact Us");
 
     expect(contact.status).toBe(200);
+    expect(contact.text).toContain("<!doctype html>");
     expect(contact.text).toContain("For all business inquiries or suggestions");
+
+    expect(terms.status).toBe(200);
+    expect(terms.text).toContain("<!doctype html>");
+    expect(terms.text).toContain("Terms and Community Guidelines");
+    expect(terms.text).toContain("Community Guidelines");
+
+    expect(privacyModal.status).toBe(200);
+    expect(privacyModal.text).toContain('role="dialog"');
+    expect(privacyModal.text).not.toContain("<!doctype html>");
+  });
+
+  it("serves crawler and feed discovery endpoints", async () => {
+    const ondraft = app();
+    const robots = await request(ondraft).get("/robots.txt");
+    const sitemap = await request(ondraft).get("/sitemap.xml");
+    const feed = await request(ondraft).get("/feed.xml");
+
+    expect(robots.status).toBe(200);
+    expect(robots.text).toContain("Sitemap:");
+    expect(sitemap.status).toBe(200);
+    expect(sitemap.text).toContain("<urlset");
+    expect(sitemap.text).toContain("<loc>http://localhost:3000/terms</loc>");
+    expect(feed.status).toBe(200);
+    expect(feed.text).toContain("<rss");
+    expect(feed.text).toContain("<channel>");
   });
 
   it("logs in a demo user and renders the home page", async () => {
@@ -363,6 +426,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(ondraft.text).toContain("Ryan McWalter");
     expect(ondraft.text).toContain('hx-get="/settings"');
     expect(ondraft.text).toContain("Open account settings");
+    expect(ondraft.text).not.toContain('href="/feed.xml"');
   });
 
   it("renders and updates account settings through modal routes", async () => {
@@ -383,6 +447,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(modal.text).toContain("Send reset link");
     expect(modal.text).toContain("Delete account");
     expect(modal.text).toContain("This cannot be undone.");
+    expect(modal.text).toContain('action="/settings/delete-account"');
 
     const passwordReset = await agent.post("/settings/change-password");
     expect(passwordReset.status).toBe(200);
@@ -431,6 +496,45 @@ describe("OnDraft HTTP contracts", () => {
     expect(resent.text).toContain("we sent a new verification link");
   });
 
+  it("lets non-admin users delete their own account from settings", async () => {
+    const ondraft = app();
+    const agent = request.agent(ondraft);
+
+    await agent
+      .post("/register")
+      .type("form")
+      .send({
+        displayName: "Delete Me",
+        email: "delete-me@ondraft.test",
+        password: "password123",
+        confirmPassword: "password123",
+      });
+
+    const deleted = await agent.post("/settings/delete-account");
+    expect(deleted.status).toBe(302);
+    expect(deleted.headers.location).toBe("/");
+
+    const home = await agent.get("/");
+    expect(home.status).toBe(200);
+    expect(home.text).toContain("Log in");
+    expect(home.text).not.toContain("Delete Me");
+
+    const login = await request(ondraft)
+      .post("/login")
+      .type("form")
+      .send({ email: "delete-me@ondraft.test", password: "password123" });
+    expect(login.status).toBe(401);
+  });
+
+  it("does not allow admin self-deletion from settings", async () => {
+    const agent = await adminAgent();
+
+    const deleted = await agent.post("/settings/delete-account");
+
+    expect(deleted.status).toBe(200);
+    expect(deleted.text).toContain("Admin accounts cannot be deleted from account settings.");
+  });
+
   it("registers a new user and signs them in", async () => {
     const agent = request.agent(app());
 
@@ -452,6 +556,34 @@ describe("OnDraft HTTP contracts", () => {
     expect(ondraft.status).toBe(200);
     expect(ondraft.text).toContain("New Analyst");
     expect(ondraft.text).not.toContain("Resend verification email");
+  });
+
+  it("requires verified email before posting hot takes", async () => {
+    const ondraft = app();
+    const reader = request.agent(ondraft);
+    await reader
+      .post("/register")
+      .type("form")
+      .send({
+        displayName: "Unverified Hot Take",
+        email: "unverified-hot-take@ondraft.test",
+        password: "password123",
+        confirmPassword: "password123",
+      });
+
+    const page = await reader.get("/hottakes");
+    expect(page.status).toBe(200);
+    expect(page.text).toContain("Verify your email before posting a hot take.");
+    expect(page.text).not.toContain("Post Hot Take");
+
+    const create = await reader
+      .post("/hottakes")
+      .type("form")
+      .set("HX-Request", "true")
+      .send({ content: "This should be blocked." });
+
+    expect(create.status).toBe(403);
+    expect(create.text).toContain("Verify your email before posting a hot take.");
   });
 
   it("verifies an email token through the routed verification page", async () => {
@@ -1169,6 +1301,9 @@ describe("OnDraft HTTP contracts", () => {
     expect(fullBoard.text).toMatch(/>\s*Ryan\s*<\/button>/);
     expect(fullBoard.text).toMatch(/>\s*Aleks\s*<\/button>/);
     expect(fullBoard.text).toMatch(/>\s*Consensus\s*<\/button>/);
+    expect(fullBoard.text).toContain("Player analysis and opinions by");
+    expect(fullBoard.text).toContain('href="/about#ryan-mcwalter"');
+    expect(fullBoard.text).toContain("Ryan McWalter");
 
     const filteredBoard = await request(ondraft)
       .get("/bigboard?year=2026&creator=Ryan&position=QB&school=OnDraft%20State")
@@ -1184,6 +1319,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(filteredBoard.text).toContain('hx-get="/bigboard?year=2026&creator=Ryan"');
     expect(filteredBoard.text).toContain('id="draft-board-info-popover"');
     expect(filteredBoard.text).toContain("x-bind:hidden=\"!infoOpen\"");
+    expect(filteredBoard.text).toContain('href="/about#ryan-mcwalter"');
 
     const resetBoard = await request(ondraft)
       .get("/bigboard?year=2026&creator=Ryan")
@@ -1277,6 +1413,8 @@ describe("OnDraft HTTP contracts", () => {
     expect(consensus.text).toContain('value="Consensus"');
     expect(consensus.text).toMatch(/aria-pressed="true"[\s\S]*Consensus/);
     expect(consensus.text).not.toContain("/bigboard/edit?year=2026&amp;creator=Consensus");
+    expect(consensus.text).toContain('href="/about#ryan-mcwalter"');
+    expect(consensus.text).toContain('href="/about#aleks-ryabinkin"');
     expect(consensus.text).toMatch(/1\. Edge Prospect[\s\S]*EDGE1/);
     expect(consensus.text).toMatch(/2\. Quarterback Prospect[\s\S]*QB1/);
     expect(consensus.text).toContain("Ryan State");
@@ -1353,6 +1491,8 @@ describe("OnDraft HTTP contracts", () => {
     expect(create.text).toContain("hx-swap-oob");
     expect(create.text).toContain("verified-admin-badge");
     expect(create.text).toContain("Verified OnDraft admin");
+    expect(create.text).toContain("Report");
+    expect(create.text).toContain("mailto:support@ondraftfootball.com");
 
     const postId = create.text.match(/id="hot-take-([A-Za-z0-9]{5})"/)?.[1];
     expect(postId).toBeTruthy();
@@ -1376,6 +1516,8 @@ describe("OnDraft HTTP contracts", () => {
     expect(comment.text).toContain("Counterpoint: special teams matter.");
     expect(comment.text).toContain("verified-admin-badge");
     expect(comment.text).toContain(`hx-delete="/hottakes/${postId}/comments/`);
+    expect(comment.text).toContain("Report");
+    expect(comment.text).toContain("hot%20take%20comment");
 
     const commentId = comment.text.match(/id="hot-take-comment-([A-Za-z0-9]{8})"/)?.[1];
     expect(commentId).toBeTruthy();
@@ -1737,6 +1879,8 @@ describe("OnDraft HTTP contracts", () => {
     expect(comment.text).toContain("Ryan McWalter");
     expect(comment.text).toContain("verified-admin-badge");
     expect(comment.text).toContain("Verified OnDraft admin");
+    expect(comment.text).toContain("Report");
+    expect(comment.text).toContain("article%20comment");
 
     const commentId = comment.text.match(/id="comment-([A-Za-z0-9]{8})"/)?.[1];
     expect(commentId).toBeDefined();
@@ -1750,6 +1894,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(reply.text).toContain("Agree with this.");
     expect(reply.text).toContain("reply-list");
     expect(reply.text).toContain("verified-admin-badge");
+    expect(reply.text).toContain("article%20reply");
 
     const likedComment = await anonymous.post(`/comments/${commentId}/like`);
     expect(likedComment.status).toBe(200);

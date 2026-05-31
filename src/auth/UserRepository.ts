@@ -46,6 +46,7 @@ export interface BanUserInput extends IUserBanRecord {
 
 export interface IUserRepository {
   add(user: IUserRecord): Promise<Result<IUserRecord, AuthError>>;
+  deleteUser(userId: string): Promise<Result<void, AuthError>>;
   listUsers(): Promise<Result<IUserRecord[], AuthError>>;
   findById(userId: string): Promise<Result<IUserRecord | null, AuthError>>;
   findByEmail(email: string): Promise<Result<IUserRecord | null, AuthError>>;

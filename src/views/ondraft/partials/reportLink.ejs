@@ -1,0 +1,14 @@
+<%
+  const reportLabel = typeof label === "string" ? label : "Report";
+  const reportType = typeof type === "string" ? type : "content";
+  const reportId = typeof id === "string" ? id : "";
+  const reportPath = typeof path === "string" ? path : "/";
+  const subject = encodeURIComponent(`Report ${reportType}`);
+  const body = encodeURIComponent(`Please review this ${reportType}:\n\n${reportPath}${reportId ? `#${reportId}` : ""}\n\nReason: `);
+%>
+<a
+  class="muted-text text-xs font-bold uppercase tracking-[0.12em] transition hover:text-draft-amber"
+  href="mailto:support@ondraftfootball.com?subject=<%= subject %>&body=<%= body %>"
+>
+  <%= reportLabel %>
+</a>

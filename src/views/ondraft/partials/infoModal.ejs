@@ -3,13 +3,16 @@
     ? "About Us"
     : modal === "privacy"
       ? "Privacy Policy"
-      : "Contact";
+      : modal === "terms"
+        ? "Terms and Community Guidelines"
+        : "Contact";
 %>
 
 <div
   class="fixed inset-0 z-[70] grid place-items-center bg-slate-950/60 p-4 backdrop-blur-sm"
   role="presentation"
-  onclick="if (event.target === this) this.remove();"
+  x-data
+  @click.self="$el.remove()"
 >
   <section
     class="od-card max-h-[min(82vh,52rem)] w-full max-w-3xl overflow-hidden text-slate-950 shadow-editorial dark:text-slate-100"
@@ -17,7 +20,8 @@
     aria-modal="true"
     aria-labelledby="site-modal-title"
     tabindex="-1"
-    onkeydown="if (event.key === 'Escape') this.closest('[role=presentation]')?.remove();"
+    x-trap.noscroll="$el.isConnected"
+    @keydown.escape="$el.closest('[role=presentation]')?.remove()"
   >
     <div class="flex items-start justify-between gap-4 border-b border-slate-200 p-5 dark:border-white/10">
       <div>
@@ -28,7 +32,7 @@
         type="button"
         class="od-focus-ring inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white text-2xl leading-none text-slate-700 transition hover:bg-slate-50 dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
         aria-label="Close"
-        onclick="this.closest('[role=presentation]')?.remove();"
+        @click="$el.closest('[role=presentation]')?.remove()"
         autofocus
       >
         &times;
@@ -41,6 +45,22 @@
       <% } else if (modal === "contact") { %>
         <p>For all business inquiries or suggestions, contact <a class="od-focus-ring rounded font-bold text-draft-amber hover:text-draft-gold dark:text-draft-gold" href="mailto:ondraft@ondraftfootball.com">ondraft@ondraftfootball.com</a>.</p>
         <p>For support, questions, or feedback, contact <a class="od-focus-ring rounded font-bold text-draft-amber hover:text-draft-gold dark:text-draft-gold" href="mailto:support@ondraftfootball.com">support@ondraftfootball.com</a>.</p>
+      <% } else if (modal === "terms") { %>
+        <div class="grid gap-5">
+          <p>Use OnDraft Football for football discussion, draft analysis, and community conversation in good faith.</p>
+          <section class="grid gap-2">
+            <h3 class="font-display text-2xl font-black text-slate-950 dark:text-white">Community Guidelines</h3>
+            <ul class="list-disc space-y-1 pl-5">
+              <li>Do not post harassment, threats, spam, impersonation, or illegal content.</li>
+              <li>Keep comments and hot takes focused on football, scouting, media, and the OnDraft community.</li>
+              <li>Admins may remove content, restrict accounts, or ban users to protect the site and community.</li>
+            </ul>
+          </section>
+          <section class="grid gap-2">
+            <h3 class="font-display text-2xl font-black text-slate-950 dark:text-white">Account and Content Terms</h3>
+            <p>You are responsible for content you submit. By posting, you give OnDraft permission to display that content on the website. You may request account deletion from settings or by contacting support.</p>
+          </section>
+        </div>
       <% } else { %>
         <div class="grid gap-6">
           <p class="text-sm font-bold text-slate-600 dark:text-slate-300">Last updated: May 24, 2026</p>

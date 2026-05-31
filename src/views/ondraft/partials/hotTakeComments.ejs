@@ -40,6 +40,9 @@
             </div>
           </div>
           <p class="comment-text"><%= comment.text %></p>
+          <div class="comment-actions">
+            <%- include("reportLink", { type: "hot take comment", id: `hot-take-comment-${comment.id}`, path: "/hottakes" }) %>
+          </div>
         </li>
       <% }) %>
     </ol>

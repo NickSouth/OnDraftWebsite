@@ -45,6 +45,7 @@ type HomeFeedItem =
 const collegeTeamNames = Object.keys(collegeTeam).sort((first, second) => first.localeCompare(second));
 
 export interface IOnDraftController {
+  publicFeedItems(): Promise<Array<{ title: string; description: string; href: string; date: Date }>>;
   showHome(res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showPopularArticles(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showArticles(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
@@ -702,6 +703,19 @@ class OnDraftController implements IOnDraftController {
     }
 
     return [];
+  }
+
+  async publicFeedItems(): Promise<Array<{ title: string; description: string; href: string; date: Date }>> {
+    const articlesResult = await this.service.getArticles(true);
+    const videosResult = await this.service.getYoutubeVideos();
+    const articles = articlesResult.ok === true ? articlesResult.value : [];
+    const videos = videosResult.ok === true ? videosResult.value : [];
+    return this.homeFeedItems(articles, videos).slice(0, 20).map((item) => ({
+      title: item.title,
+      description: item.description,
+      href: item.href,
+      date: item.date,
+    }));
   }
 
   private canCreateHotTake(session: IOnDraftBrowserSession, activeBan: IUserBanRecord | null): boolean {
@@ -1760,6 +1774,17 @@ class OnDraftController implements IOnDraftController {
         errorMessage: null,
         values: req.body,
         activeUserBan: activeBan,
+      });
+      return;
+    }
+    if (!isVerifiedUserSession(session)) {
+      res.set("HX-Retarget", "#hot-take-composer");
+      res.status(403).render("ondraft/partials/hotTakeComposer", {
+        layout: false,
+        session,
+        errorMessage: "Verify your email before posting a hot take.",
+        values: req.body,
+        activeUserBan: null,
       });
       return;
     }

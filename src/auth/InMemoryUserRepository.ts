@@ -95,6 +95,24 @@ class InMemoryUserRepository implements IUserRepository {
     }
   }
 
+  async deleteUser(userId: string): Promise<Result<void, AuthError>> {
+    try {
+      const index = this.users.findIndex((user) => user.id === userId);
+      if (index === -1) {
+        return Err(UnexpectedDependencyError("User not found."));
+      }
+      this.users.splice(index, 1);
+      for (let index = this.mailingListSubscriptions.length - 1; index >= 0; index -= 1) {
+        if (this.mailingListSubscriptions[index].userId === userId) {
+          this.mailingListSubscriptions.splice(index, 1);
+        }
+      }
+      return Ok(undefined);
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to delete the user."));
+    }
+  }
+
   async listUsers(): Promise<Result<IUserRecord[], AuthError>> {
     try {
       return Ok(this.users.map((user) => this.cloneUser(user)));

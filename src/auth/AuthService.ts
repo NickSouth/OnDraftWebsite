@@ -64,6 +64,10 @@ export interface AccountSettingsInput {
   userId: string;
 }
 
+export interface DeleteAccountInput {
+  userId: string;
+}
+
 export interface UpdateMailingListPreferenceInput {
   userId: string;
   subscribe: boolean;
@@ -118,6 +122,7 @@ export interface IAuthService {
   updateMailingListPreference(
     input: UpdateMailingListPreferenceInput,
   ): Promise<Result<AccountSettings, AuthError>>;
+  deleteAccount(input: DeleteAccountInput): Promise<Result<void, AuthError>>;
   changePassword(input: ChangePasswordInput): Promise<Result<void, AuthError>>;
   createMailingListUnsubscribeUrl(input: CreateMailingListUnsubscribeUrlInput): Promise<Result<string | null, AuthError>>;
   unsubscribeMailingList(input: UnsubscribeMailingListInput): Promise<Result<void, AuthError>>;
@@ -588,6 +593,31 @@ class AuthService implements IAuthService {
     return Ok({
       mailingListStatus: updated.value.status,
     });
+  }
+
+  async deleteAccount(input: DeleteAccountInput): Promise<Result<void, AuthError>> {
+    const userId = input.userId.trim();
+    if (!userId) {
+      return Err(ValidationError("User id is required."));
+    }
+
+    const userResult = await this.users.findById(userId);
+    if (userResult.ok === false) {
+      return Err(UnexpectedDependencyError(userResult.value.message));
+    }
+    if (!userResult.value) {
+      return Err(ValidationError("User not found."));
+    }
+    if (userResult.value.role === "admin") {
+      return Err(ValidationError("Admin accounts cannot be deleted from account settings."));
+    }
+
+    const deleted = await this.users.deleteUser(userId);
+    if (deleted.ok === false) {
+      return Err(UnexpectedDependencyError(deleted.value.message));
+    }
+
+    return Ok(undefined);
   }
 
   async changePassword(input: ChangePasswordInput): Promise<Result<void, AuthError>> {

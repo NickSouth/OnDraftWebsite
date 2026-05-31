@@ -205,6 +205,22 @@ class PrismaUserRepository implements IUserRepository {
     }
   }
 
+  async deleteUser(userId: string): Promise<Result<void, AuthError>> {
+    try {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (!user) {
+        return Err(UnexpectedDependencyError("User not found."));
+      }
+      await this.prisma.$transaction([
+        this.prisma.mailingListSubscription.deleteMany({ where: { userId } }),
+        this.prisma.user.delete({ where: { id: userId } }),
+      ]);
+      return Ok(undefined);
+    } catch {
+      return Err(UnexpectedDependencyError("Unable to delete the user."));
+    }
+  }
+
   async listUsers(): Promise<Result<IUserRecord[], AuthError>> {
     try {
       const users = await this.prisma.user.findMany({

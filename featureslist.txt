@@ -9,8 +9,5 @@
         - Select articles/videos to push
         - Add updates to the site
         - Save draft/send buttons
-- Add images for HTML articles
 - rethink draft board editor entirely
 - Make fields sticky for context as you scroll down on draft board
-- Look at the article/video creation UI
-- Revisit recolored helmet caching, doesn't seem much faster currently once it should be cached

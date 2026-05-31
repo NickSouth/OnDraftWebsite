@@ -2,6 +2,11 @@
   <% const currentActiveBan = typeof activeUserBan !== "undefined" ? activeUserBan : null; %>
   <% if (session.authenticatedUser && currentActiveBan) { %>
     <%- include("bannedUserNotice", { ban: currentActiveBan }) %>
+  <% } else if (session.authenticatedUser && !session.authenticatedUser.emailVerifiedAt) { %>
+    <% if (errorMessage) { %>
+      <p class="error-message"><%= errorMessage %></p>
+    <% } %>
+    <p class="muted-text">Verify your email before posting a hot take.</p>
   <% } else if (session.authenticatedUser) { %>
     <% if (errorMessage) { %>
       <p class="error-message"><%= errorMessage %></p>

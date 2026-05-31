@@ -48,6 +48,13 @@
     };
     const formatHeightLabel = (height) => height ? `${height.feet}'${formatHeightInches(height.inches)}"` : "Height TBD";
     const hasText = (value) => typeof value === "string" && value.trim().length > 0;
+    const selectedBoard = typeof board !== "undefined" ? board : null;
+    const creatorAuthors = {
+      Ryan: ["Ryan McWalter"],
+      Aleks: ["Aleks Ryabinkin"],
+      Consensus: ["Ryan McWalter", "Aleks Ryabinkin"],
+    };
+    const bylineAuthors = selectedBoard ? creatorAuthors[selectedBoard.creator] ?? [] : [];
   %>
   <% if (bigBoard.length === 0) { %>
     <div class="od-card grid min-h-48 place-items-center p-8 text-center">
@@ -58,7 +65,17 @@
       </div>
     </div>
   <% } else { %>
-    <div class="mb-3 flex justify-end">
+    <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <% if (bylineAuthors.length > 0) { %>
+        <p class="m-0 text-sm font-bold text-slate-700 dark:text-slate-200">
+          Player analysis and opinions by
+          <% bylineAuthors.forEach((author, index) => { %>
+            <%- include("profileAuthorLink", { name: author, showBadge: false, className: "text-draft-amber no-underline transition hover:text-draft-gold dark:text-draft-gold" }) %><%= index < bylineAuthors.length - 1 ? "/" : "" %>
+          <% }) %>
+        </p>
+      <% } else { %>
+        <span aria-hidden="true"></span>
+      <% } %>
       <div class="inline-flex rounded-md border border-slate-200 bg-white p-1 shadow-sm dark:border-white/10 dark:bg-draft-slate" aria-label="Draft board view">
         <button
           type="button"
