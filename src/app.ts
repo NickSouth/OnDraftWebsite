@@ -14,7 +14,7 @@ import {
   RateLimiter,
 } from "./security/RateLimiter";
 import { TurnstileVerifier } from "./security/Turnstile";
-import { ARTICLE_PDF_MAX_BYTES, articleUpload } from "./uploads/articlePdfUpload";
+import { ARTICLE_HTML_IMAGE_MAX_BYTES, ARTICLE_PDF_MAX_BYTES, articleHtmlImageUpload, articleUpload } from "./uploads/articlePdfUpload";
 import { formatRelativeTime } from "./view/formatRelativeTime";
 import {
   getAuthenticatedUser,
@@ -25,6 +25,11 @@ import {
   STANDARD_SESSION_MAX_AGE_MS,
 } from "./session/OnDraftSession";
 import { CreateHelmetAssetService, InvalidHelmetKeyError, type IHelmetAssetService } from "./service/HelmetAssetService";
+import {
+  CreateArticleHtmlImageAssetService,
+  InvalidArticleHtmlImageKeyError,
+  type IArticleHtmlImageAssetService,
+} from "./service/ArticleHtmlImageAssetService";
 import { ILoggingService } from "./service/LoggingService";
 import type { ITurnstileConfig } from "./config/AppConfig";
 
@@ -106,6 +111,7 @@ class ExpressApp implements IApp {
     private readonly turnstileConfig: ITurnstileConfig = { siteKey: null, secretKey: null, verificationDisabled: false },
     private readonly siteBaseUrl = "http://localhost:3000",
     private readonly helmetAssets: IHelmetAssetService = CreateHelmetAssetService(),
+    private readonly articleHtmlImages: IArticleHtmlImageAssetService = CreateArticleHtmlImageAssetService(),
   ) {
     this.app = express();
     this.turnstileVerifier = new TurnstileVerifier(this.turnstileConfig, this.logger);
@@ -131,6 +137,23 @@ class ExpressApp implements IApp {
         } catch (error) {
           if (error instanceof InvalidHelmetKeyError) {
             res.status(404).send("Helmet not found.");
+            return;
+          }
+          throw error;
+        }
+      }),
+    );
+    this.app.get(
+      "/generated/article-images/v1/:imageKey",
+      asyncHandler(async (req, res) => {
+        const imageKey = typeof req.params.imageKey === "string" ? req.params.imageKey : "";
+        try {
+          const imagePath = await this.articleHtmlImages.generatedImagePath(imageKey);
+          res.setHeader("Cache-Control", this.articleHtmlImages.cacheControlHeader());
+          res.sendFile(imagePath);
+        } catch (error) {
+          if (error instanceof InvalidArticleHtmlImageKeyError || (error as NodeJS.ErrnoException).code === "ENOENT") {
+            res.status(404).send("Article image not found.");
             return;
           }
           throw error;
@@ -268,6 +291,23 @@ class ExpressApp implements IApp {
         formAction: "/articles/preview",
         saveAction: "/articles",
       });
+    });
+  }
+
+  private handleArticleHtmlImageUpload(req: Request, res: Response, next: NextFunction): void {
+    articleHtmlImageUpload.single("htmlImage")(req, res, (err: unknown) => {
+      if (!err) {
+        next();
+        return;
+      }
+
+      const message = err instanceof Error && err.name === "MulterError" && err.message === "File too large"
+        ? `HTML article images must be ${Math.floor(ARTICLE_HTML_IMAGE_MAX_BYTES / 1024 / 1024)} MB or smaller.`
+        : err instanceof Error
+          ? err.message
+          : "Unable to upload the HTML article image.";
+
+      res.status(400).json({ error: message });
     });
   }
 
@@ -819,6 +859,26 @@ class ExpressApp implements IApp {
           layout: false,
           values: { contentType },
         });
+      }),
+    );
+
+    this.app.post(
+      "/articles/html-images",
+      (req, res, next) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        this.handleArticleHtmlImageUpload(req, res, next);
+      },
+      asyncHandler(async (req, res) => {
+        if (!req.file) {
+          res.status(400).json({ error: "Choose an image before uploading." });
+          return;
+        }
+
+        const storedImage = await this.articleHtmlImages.storeUploadedImage(req.file);
+        res.json(storedImage);
       }),
     );
 

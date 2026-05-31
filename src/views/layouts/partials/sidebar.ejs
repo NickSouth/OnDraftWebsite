@@ -19,7 +19,7 @@
 <aside
   id="site-sidebar"
   class="fixed right-0 top-14 z-50 flex h-[calc(100vh-3.5rem)] w-80 max-w-[calc(100vw-1rem)] flex-col border-l border-slate-200 bg-white shadow-editorial transition-transform duration-200 dark:border-white/10 dark:bg-draft-slate <%= forceOverlaySidebar ? "" : "lg:top-0 lg:h-screen lg:translate-x-0" %>"
-  :class="sidebarOpen ? 'translate-x-0' : 'translate-x-full <%= forceOverlaySidebar ? "" : "lg:translate-x-0" %>'"
+  :class="sidebarOpen ? 'translate-x-0' : 'translate-x-[calc(100%+1rem)] <%= forceOverlaySidebar ? "" : "lg:translate-x-0" %>'"
   x-trap.noscroll="sidebarOpen <%= forceOverlaySidebar ? "" : "&& window.innerWidth < 1024" %>"
   @keydown.escape.window="sidebarOpen = false"
 >

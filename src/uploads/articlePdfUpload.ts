@@ -5,6 +5,7 @@ import multer from "multer";
 
 export const ARTICLE_PDF_MAX_BYTES = 5 * 1024 * 1024;
 export const ARTICLE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+export const ARTICLE_HTML_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 export const ARTICLE_UPLOAD_PUBLIC_PATH = "/uploads/articles";
 export const ARTICLE_UPLOAD_DIRECTORY = path.join(process.cwd(), "public", "uploads", "articles");
 
@@ -71,6 +72,28 @@ export const articleUpload = multer({
     cb(new Error("Unexpected article upload field."));
   },
 });
+
+export const articleHtmlImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: ARTICLE_HTML_IMAGE_MAX_BYTES,
+    files: 1,
+    fields: 2,
+    parts: 4,
+  },
+  fileFilter: (_req, file, cb) => {
+    if (!allowedImageMimeTypes.has(file.mimetype)) {
+      cb(new Error("Only JPG, PNG, GIF, or WebP files can be uploaded for HTML article images."));
+      return;
+    }
+
+    cb(null, true);
+  },
+});
+
+export function articleImageExtensionForMimeType(mimeType: string): string | undefined {
+  return allowedImageMimeTypes.get(mimeType);
+}
 
 export function publicArticleUploadUrl(filename: string): string {
   return `${ARTICLE_UPLOAD_PUBLIC_PATH}/${encodeURIComponent(filename)}`;

@@ -252,8 +252,7 @@
   }
 
   .od-admin-form label,
-  .od-admin-form .tag-editor > label,
-  .od-admin-form .publication-date-selectors > span {
+  .od-admin-form .tag-editor > label {
     @apply grid gap-2 text-sm font-bold text-slate-800 dark:text-slate-100;
   }
 
@@ -270,6 +269,26 @@
 
   .od-admin-form input[type="file"] {
     @apply py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-draft-gold file:px-3 file:py-1.5 file:text-sm file:font-black file:text-draft-ink hover:file:bg-amber-400;
+  }
+
+  .od-admin-compact-row {
+    @apply grid gap-3 sm:grid-cols-2;
+  }
+
+  .od-admin-meta-row {
+    @apply sm:grid-cols-[minmax(0,0.72fr)_minmax(12rem,0.42fr)];
+  }
+
+  .od-admin-asset-row {
+    @apply sm:grid-cols-[minmax(0,0.78fr)_minmax(12rem,0.44fr)];
+  }
+
+  .od-hook-field {
+    @apply gap-1;
+  }
+
+  .od-hook-count {
+    @apply text-xs font-bold text-slate-500 dark:text-slate-300;
   }
 
   .pdf-style-guide {
@@ -312,14 +331,6 @@
   .od-admin-form .tag-editor,
   .tag-editor {
     @apply relative grid gap-2;
-  }
-
-  .od-admin-form .publication-date-selectors {
-    @apply grid gap-2;
-  }
-
-  .od-admin-form .publication-date-grid {
-    @apply grid gap-3 sm:grid-cols-[minmax(0,1fr)_7rem_8rem];
   }
 
   .od-admin-form .tag-editor-box,
@@ -448,6 +459,30 @@
 
   .tag-empty {
     @apply m-0 rounded bg-slate-50 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-500 dark:bg-white/5 dark:text-slate-300;
+  }
+
+  .html-image-uploader {
+    @apply grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/[0.04] sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end;
+  }
+
+  .html-image-uploader .secondary-button {
+    @apply od-secondary-link w-full sm:w-auto;
+  }
+
+  .html-image-uploader .secondary-button:disabled {
+    @apply cursor-wait opacity-60;
+  }
+
+  .html-image-uploader-status {
+    @apply m-0 rounded bg-white px-3 py-2 text-xs font-bold text-slate-600 dark:bg-draft-ink dark:text-slate-300 sm:col-span-2;
+  }
+
+  .html-image-uploader-status[data-state="success"] {
+    @apply text-emerald-700 dark:text-emerald-200;
+  }
+
+  .html-image-uploader-status[data-state="error"] {
+    @apply text-red-700 dark:text-red-200;
   }
 
   .od-admin-actions {

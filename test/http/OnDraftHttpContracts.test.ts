@@ -87,6 +87,15 @@ function removeUploadedAssetsFromHtml(html: string) {
   }
 }
 
+function removeGeneratedArticleImagesFromHtml(html: string) {
+  const matches = html.matchAll(/\/generated\/article-images\/v1\/([^"#]+?\.(?:jpg|png|gif|webp))/g);
+  for (const match of matches) {
+    fs.rmSync(path.join(process.cwd(), "public", "generated", "article-images", "v1", decodeURIComponent(match[1])), {
+      force: true,
+    });
+  }
+}
+
 describe("OnDraft HTTP contracts", () => {
   it("renders the home page for anonymous visitors", async () => {
     const response = await request(app()).get("/");
@@ -150,6 +159,35 @@ describe("OnDraft HTTP contracts", () => {
     const response = await request(app()).get("/generated/helmets/v1/not-a-key.png");
 
     expect(response.status).toBe(404);
+  });
+
+  it("stores HTML article images under predictable cacheable generated URLs", async () => {
+    const agent = await adminAgent();
+    const png = Buffer.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+      0x00, 0x00, 0x00, 0x0d,
+    ]);
+
+    const upload = await agent
+      .post("/articles/html-images")
+      .attach("htmlImage", png, { filename: "Pocket Passer.png", contentType: "image/png" });
+
+    expect(upload.status).toBe(200);
+    expect(upload.body.url).toMatch(/^\/generated\/article-images\/v1\/[0-9a-f]{16}-pocket-passer\.png$/);
+
+    const secondUpload = await agent
+      .post("/articles/html-images")
+      .attach("htmlImage", png, { filename: "Pocket Passer.png", contentType: "image/png" });
+
+    expect(secondUpload.status).toBe(200);
+    expect(secondUpload.body.url).toBe(upload.body.url);
+
+    const image = await request(app()).get(upload.body.url);
+    expect(image.status).toBe(200);
+    expect(image.headers["cache-control"]).toBe("public, max-age=31536000, immutable");
+    expect(image.headers["content-type"]).toContain("image/png");
+
+    removeGeneratedArticleImagesFromHtml(upload.body.url);
   });
 
   it("blocks cross-origin state-changing requests when an origin is present", async () => {
@@ -1889,6 +1927,9 @@ describe("OnDraft HTTP contracts", () => {
     expect(createForm.status).toBe(200);
     expect(createForm.text).toContain('hx-get="/articles/new/content-fields"');
     expect(createForm.text).toContain('id="article-content-fields"');
+    expect(createForm.text).toContain('type="date" name="publicationDate"');
+    expect(createForm.text).toContain('data-hook-count');
+    expect(createForm.text.indexOf('data-tag-editor')).toBeLessThan(createForm.text.indexOf('data-hook-input'));
 
     const pdfFields = await agent.get("/articles/new/content-fields?contentType=pdf");
     expect(pdfFields.status).toBe(200);
@@ -1899,6 +1940,8 @@ describe("OnDraft HTTP contracts", () => {
     expect(htmlFields.status).toBe(200);
     expect(htmlFields.text).toContain("HTML content");
     expect(htmlFields.text).toContain("<textarea");
+    expect(htmlFields.text).toContain('data-html-image-uploader');
+    expect(htmlFields.text).toContain('name="htmlImage"');
 
     const plainTextFields = await agent.get("/articles/new/content-fields?contentType=plainText");
     expect(plainTextFields.status).toBe(200);

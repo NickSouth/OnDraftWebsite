@@ -2,18 +2,7 @@
   <% const pageHeading = typeof heading !== "undefined" ? heading : "Create Article"; %>
   <% const previewAction = typeof formAction !== "undefined" ? formAction : "/articles/preview"; %>
   <% const draftSaveAction = typeof saveAction !== "undefined" ? saveAction : "/articles"; %>
-  <%
-    const selectedPublicationDate = values.publicationDate || new Date().toLocaleDateString("en-CA");
-    const selectedDateParts = selectedPublicationDate.split("-").map((part) => Number(part));
-    const selectedYear = selectedDateParts[0] || new Date().getFullYear();
-    const selectedMonth = selectedDateParts[1] || new Date().getMonth() + 1;
-    const selectedDay = selectedDateParts[2] || new Date().getDate();
-    const currentYear = new Date().getFullYear();
-    const publicationYears = [];
-    for (let year = currentYear; year >= Math.min(2018, selectedYear); year -= 1) {
-      publicationYears.push(year);
-    }
-  %>
+  <% const selectedPublicationDate = values.publicationDate || new Date().toLocaleDateString("en-CA"); %>
   <div class="od-admin-heading">
     <div>
       <a class="od-admin-back-link" href="/articles">Back to articles</a>
@@ -37,57 +26,16 @@
       Title
       <input name="title" value="<%= values.title || "" %>" required />
     </label>
-    <label>
-      Author
-      <input name="author" value="<%= values.author || session.authenticatedUser?.displayName || "" %>" required />
-    </label>
-    <div class="publication-date-selectors">
-      <span>Publication date</span>
-      <input type="hidden" name="publicationDate" value="<%= selectedPublicationDate %>" data-publication-date-value />
-      <div class="publication-date-grid">
-        <label>
-          Month
-          <select data-publication-month required>
-            <% [
-              "January",
-              "February",
-              "March",
-              "April",
-              "May",
-              "June",
-              "July",
-              "August",
-              "September",
-              "October",
-              "November",
-              "December",
-            ].forEach((monthName, index) => { %>
-              <option value="<%= index + 1 %>" <%= selectedMonth === index + 1 ? "selected" : "" %>><%= monthName %></option>
-            <% }) %>
-          </select>
-        </label>
-        <label>
-          Day
-          <select data-publication-day required>
-            <% for (let day = 1; day <= 31; day += 1) { %>
-              <option value="<%= day %>" <%= selectedDay === day ? "selected" : "" %>><%= day %></option>
-            <% } %>
-          </select>
-        </label>
-        <label>
-          Year
-          <select data-publication-year required>
-            <% publicationYears.forEach((year) => { %>
-              <option value="<%= year %>" <%= selectedYear === year ? "selected" : "" %>><%= year %></option>
-            <% }) %>
-          </select>
-        </label>
-      </div>
+    <div class="od-admin-compact-row od-admin-meta-row">
+      <label>
+        Author
+        <input name="author" value="<%= values.author || session.authenticatedUser?.displayName || "" %>" required />
+      </label>
+      <label>
+        Publication date
+        <input type="date" name="publicationDate" value="<%= selectedPublicationDate %>" required />
+      </label>
     </div>
-    <label>
-      Hook
-      <textarea name="writeup" maxlength="200" required><%= values.writeup || "" %></textarea>
-    </label>
     <%
       const selectedArticleTags = (values.tags || "").split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean);
       const articleTagOptions = [...new Set([...(existingTags || []), ...selectedArticleTags])].sort((first, second) => first.localeCompare(second));
@@ -137,27 +85,34 @@
         <% } %>
       </div>
     </div>
-    <label>
-      Thumbnail - leave blank for generic thumbnail
-      <input type="file" name="image" accept="image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp" />
+    <label class="od-hook-field">
+      Hook
+      <textarea name="writeup" maxlength="200" required data-hook-input><%= values.writeup || "" %></textarea>
+      <span class="od-hook-count" data-hook-count aria-live="polite">0 words</span>
     </label>
     <% if (values.imageUrl) { %>
       <input type="hidden" name="imageUrl" value="<%= values.imageUrl %>" />
     <% } %>
-    <label>
-      Content type
-      <select
-        name="contentType"
-        hx-get="/articles/new/content-fields"
-        hx-trigger="change"
-        hx-target="#article-content-fields"
-        hx-swap="innerHTML"
-      >
-        <option value="plainText" <%= values.contentType === "pdf" || values.contentType === "html" ? "" : "selected" %>>Plain text</option>
-        <option value="html" <%= values.contentType === "html" ? "selected" : "" %>>HTML</option>
-        <option value="pdf" <%= values.contentType === "pdf" ? "selected" : "" %>>PDF</option>
-      </select>
-    </label>
+    <div class="od-admin-compact-row od-admin-asset-row">
+      <label>
+        Thumbnail
+        <input type="file" name="image" accept="image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp" />
+      </label>
+      <label>
+        Content type
+        <select
+          name="contentType"
+          hx-get="/articles/new/content-fields"
+          hx-trigger="change"
+          hx-target="#article-content-fields"
+          hx-swap="innerHTML"
+        >
+          <option value="plainText" <%= values.contentType === "pdf" || values.contentType === "html" ? "" : "selected" %>>Plain text</option>
+          <option value="html" <%= values.contentType === "html" ? "selected" : "" %>>HTML</option>
+          <option value="pdf" <%= values.contentType === "pdf" ? "selected" : "" %>>PDF</option>
+        </select>
+      </label>
+    </div>
     <div id="article-content-fields">
       <%- include("partials/articleContentFields", { values }) %>
     </div>
@@ -172,51 +127,30 @@
     </div>
   </form>
   <script src="/articleTags.js" defer></script>
+  <script src="/articleHtmlImages.js" defer></script>
   <% if (draftSaveAction === "/articles") { %>
     <script src="/articleEditorGuard.js" defer></script>
   <% } %>
   <script>
     (() => {
       const root = document.currentScript.closest("section");
-      const dateValue = root?.querySelector("[data-publication-date-value]");
-      const monthSelect = root?.querySelector("[data-publication-month]");
-      const daySelect = root?.querySelector("[data-publication-day]");
-      const yearSelect = root?.querySelector("[data-publication-year]");
+      const hookInput = root?.querySelector("[data-hook-input]");
+      const hookCount = root?.querySelector("[data-hook-count]");
 
-      function pad(value) {
-        return String(value).padStart(2, "0");
+      function wordCount(value) {
+        return (value.trim().match(/\S+/g) || []).length;
       }
 
-      function updateDays() {
-        if (!monthSelect || !daySelect || !yearSelect) {
+      function syncHookCount() {
+        if (!hookInput || !hookCount) {
           return;
         }
-        const selectedDay = Number(daySelect.value);
-        const month = Number(monthSelect.value);
-        const year = Number(yearSelect.value);
-        const daysInMonth = new Date(year, month, 0).getDate();
-        daySelect.innerHTML = "";
-        for (let day = 1; day <= daysInMonth; day += 1) {
-          const option = document.createElement("option");
-          option.value = String(day);
-          option.textContent = String(day);
-          option.selected = day === Math.min(selectedDay, daysInMonth);
-          daySelect.append(option);
-        }
+        const count = wordCount(hookInput.value);
+        hookCount.textContent = `${count} ${count === 1 ? "word" : "words"}`;
       }
 
-      function syncPublicationDate() {
-        if (!dateValue || !monthSelect || !daySelect || !yearSelect) {
-          return;
-        }
-        updateDays();
-        dateValue.value = `${yearSelect.value}-${pad(monthSelect.value)}-${pad(daySelect.value)}`;
-      }
-
-      [monthSelect, daySelect, yearSelect].forEach((select) => {
-        select?.addEventListener("change", syncPublicationDate);
-      });
-      syncPublicationDate();
+      hookInput?.addEventListener("input", syncHookCount);
+      syncHookCount();
     })();
   </script>
 </section>
