@@ -39,7 +39,7 @@
 
   <form
     id="article-filter-form"
-    class="article-filter-form od-page-tools"
+    class="article-filter-form od-page-tools od-list-controls"
     data-keyword="<%= values.keyword || "" %>"
     hx-get="/articles/filter"
     hx-target="#articles-results"
@@ -97,237 +97,243 @@
       <input id="article-status-field" type="hidden" name="status" value="<%= showingPublished ? "published" : "draft" %>" />
     <% } %>
 
-    <div id="article-search-panel" class="od-tool-panel" x-show="searchOpen" x-collapse x-cloak>
-      <label class="od-search-field">
-        <span class="sr-only">Search articles</span>
-        <input class="od-search-input" x-ref="articleSearch" x-model="keyword" name="keyword" type="search" placeholder="Search articles" />
-        <button
-          type="button"
-          class="od-search-icon-button"
-          :class="hasKeyword && searchDirty ? 'right-10' : 'right-1'"
-          x-cloak
-          x-show="hasKeyword"
-          @click="clearSearch()"
-          aria-label="Clear search"
-          title="Clear search"
-        >
-          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
-            <path d="M18 6 6 18" />
-            <path d="m6 6 12 12" />
-          </svg>
-        </button>
-        <button
-          type="submit"
-          class="od-search-icon-button od-search-submit right-1"
-          x-cloak
-          x-show="hasKeyword && searchDirty"
-          aria-label="Search"
-          title="Search"
-        >
-          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M5 12h14" />
-            <path d="m13 6 6 6-6 6" />
-          </svg>
-        </button>
-      </label>
-    </div>
+    <div class="od-control-workspace">
+      <div class="od-control-primary" :class="searchOpen || filtersOpen ? '' : 'is-compact'">
+        <div class="od-panel-toggle-row">
+          <button
+            type="button"
+            class="od-icon-button"
+            :class="filtersOpen ? 'is-active' : ''"
+            :aria-expanded="String(filtersOpen)"
+            aria-controls="article-filter-panel"
+            aria-label="Filters"
+            title="Filters"
+            @click="filtersOpen = !filtersOpen"
+          >
+            <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+              <path d="M4 7h16" />
+              <path d="M7 12h10" />
+              <path d="M10 17h4" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            class="od-icon-button"
+            :class="searchOpen ? 'is-active' : ''"
+            :aria-expanded="String(searchOpen)"
+            aria-controls="article-search-panel"
+            aria-label="Search articles"
+            title="Search articles"
+            @click="searchOpen = !searchOpen; $nextTick(() => searchOpen && $refs.articleSearch?.focus())"
+          >
+            <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
+          </button>
+        </div>
 
-    <div id="article-filter-panel" class="od-tool-panel" x-show="filtersOpen" x-collapse x-cloak>
-      <%
-        const selectedArticleFilterTags = (values.tags || "").split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean);
-        const articleFilterTagOptions = [...new Set([...(articleTags || []), ...selectedArticleFilterTags])].sort((first, second) => first.localeCompare(second));
-      %>
-      <div class="od-article-filter-grid" @input="syncFilters()" @change="syncFilters()">
-        <label>
-          <span>
-            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path d="M20 21a8 8 0 0 0-16 0" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
-            Author
-          </span>
-          <input x-ref="articleAuthor" name="author" value="<%= values.author || "" %>" />
-        </label>
-        <div class="od-filter-field tag-editor" data-tag-editor>
-          <span>
-            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path d="M20.6 13.5 13.5 20.6a2 2 0 0 1-2.8 0L3 12.9V3h9.9l7.7 7.7a2 2 0 0 1 0 2.8Z" />
-              <path d="M7.5 7.5h.01" />
-            </svg>
-            Tags
-          </span>
-          <div class="tag-editor-box">
-            <div class="tag-chip-list" data-tag-list></div>
+        <div id="article-search-panel" class="od-tool-panel od-search-panel" x-show="searchOpen" x-collapse x-cloak>
+          <label class="od-search-field">
+            <span class="sr-only">Search articles</span>
+            <input class="od-search-input" x-ref="articleSearch" x-model="keyword" name="keyword" type="search" placeholder="Search articles" />
             <button
               type="button"
-              class="tag-editor-toggle"
-              data-tag-toggle
-              aria-expanded="false"
-              aria-controls="article-filter-tag-options"
+              class="od-search-icon-button"
+              :class="hasKeyword && searchDirty ? 'right-10' : 'right-1'"
+              x-cloak
+              x-show="hasKeyword"
+              @click="clearSearch()"
+              aria-label="Clear search"
+              title="Clear search"
             >
-              <span class="tag-toggle-label">Select tags</span>
-              <span data-tag-count>Any tags</span>
+              <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </svg>
+            </button>
+            <button
+              type="submit"
+              class="od-search-icon-button od-search-submit right-1"
+              x-cloak
+              x-show="hasKeyword && searchDirty"
+              aria-label="Search"
+              title="Search"
+            >
+              <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12h14" />
+                <path d="m13 6 6 6-6 6" />
+              </svg>
+            </button>
+          </label>
+        </div>
+
+        <div id="article-filter-panel" class="od-tool-panel" x-show="filtersOpen" x-collapse x-cloak>
+          <%
+            const selectedArticleFilterTags = (values.tags || "").split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean);
+            const articleFilterTagOptions = [...new Set([...(articleTags || []), ...selectedArticleFilterTags])].sort((first, second) => first.localeCompare(second));
+          %>
+          <div class="od-article-filter-grid" @input="syncFilters()" @change="syncFilters()">
+            <label>
+              <span>
+                <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M20 21a8 8 0 0 0-16 0" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+                Author
+              </span>
+              <input x-ref="articleAuthor" name="author" value="<%= values.author || "" %>" />
+            </label>
+            <div class="od-filter-field tag-editor" data-tag-editor>
+              <span>
+                <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M20.6 13.5 13.5 20.6a2 2 0 0 1-2.8 0L3 12.9V3h9.9l7.7 7.7a2 2 0 0 1 0 2.8Z" />
+                  <path d="M7.5 7.5h.01" />
+                </svg>
+                Tags
+              </span>
+              <div class="tag-editor-box">
+                <div class="tag-chip-list" data-tag-list></div>
+                <button
+                  type="button"
+                  class="tag-editor-toggle"
+                  data-tag-toggle
+                  aria-expanded="false"
+                  aria-controls="article-filter-tag-options"
+                >
+                  <span class="tag-toggle-label">Select tags</span>
+                  <span data-tag-count>Any tags</span>
+                </button>
+              </div>
+              <input x-ref="articleTags" type="hidden" name="tags" value="<%= values.tags || "" %>" data-tag-value />
+              <div id="article-filter-tag-options" class="tag-editor-menu" data-tag-menu hidden>
+                <% if (articleFilterTagOptions.length > 0) { %>
+                  <div class="tag-option-list">
+                    <% articleFilterTagOptions.forEach((tag) => { %>
+                      <label class="tag-option">
+                        <input type="checkbox" value="<%= tag %>" data-tag-checkbox <%= selectedArticleFilterTags.includes(tag) ? "checked" : "" %> />
+                        <span><%= tag %></span>
+                      </label>
+                    <% }) %>
+                  </div>
+                <% } else { %>
+                  <p class="tag-empty">No article tags yet.</p>
+                <% } %>
+              </div>
+            </div>
+            <label>
+              <span>
+                <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M8 2v4" />
+                  <path d="M16 2v4" />
+                  <rect x="3" y="4" width="18" height="18" rx="2" />
+                  <path d="M3 10h18" />
+                </svg>
+                To
+              </span>
+              <input x-ref="articleDateTo" type="date" name="dateTo" value="<%= values.dateTo || "" %>" />
+            </label>
+            <label>
+              <span>
+                <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M8 2v4" />
+                  <path d="M16 2v4" />
+                  <rect x="3" y="4" width="18" height="18" rx="2" />
+                  <path d="M3 10h18" />
+                </svg>
+                From
+              </span>
+              <input x-ref="articleDateFrom" type="date" name="dateFrom" value="<%= values.dateFrom || "" %>" />
+            </label>
+          </div>
+          <div class="od-filter-panel-actions">
+            <button
+              type="button"
+              class="od-search-icon-button"
+              :class="filtersDirty ? 'right-10' : 'right-1'"
+              x-cloak
+              x-show="hasFilterContent"
+              @click="clearFilters()"
+              aria-label="Clear filters"
+              title="Clear filters"
+            >
+              <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </svg>
+            </button>
+            <button class="od-search-icon-button od-search-submit right-1" type="submit" x-cloak x-show="filtersDirty" aria-label="Apply filters" title="Apply filters">
+              <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12h14" />
+                <path d="m13 6 6 6-6 6" />
+              </svg>
             </button>
           </div>
-          <input x-ref="articleTags" type="hidden" name="tags" value="<%= values.tags || "" %>" data-tag-value />
-          <div id="article-filter-tag-options" class="tag-editor-menu" data-tag-menu hidden>
-            <% if (articleFilterTagOptions.length > 0) { %>
-              <div class="tag-option-list">
-                <% articleFilterTagOptions.forEach((tag) => { %>
-                  <label class="tag-option">
-                    <input type="checkbox" value="<%= tag %>" data-tag-checkbox <%= selectedArticleFilterTags.includes(tag) ? "checked" : "" %> />
-                    <span><%= tag %></span>
-                  </label>
-                <% }) %>
-              </div>
-            <% } else { %>
-              <p class="tag-empty">No article tags yet.</p>
-            <% } %>
+        </div>
+      </div>
+
+      <div class="od-control-secondary">
+        <div class="od-page-sort-row">
+          <div class="od-page-sort-group">
+            <label>
+              <span>Sort</span>
+              <select id="article-sort-by" name="sortBy" onchange="htmx.trigger(this.form, 'submit');">
+                <option value="date" <%= sortBy === "date" ? "selected" : "" %>>Date</option>
+                <option value="likes" <%= sortBy === "likes" ? "selected" : "" %>>Likes</option>
+                <option value="comments" <%= sortBy === "comments" ? "selected" : "" %>>Comments</option>
+              </select>
+            </label>
+            <label>
+              <span>Direction</span>
+              <select id="article-sort-direction" name="sortDirection" onchange="htmx.trigger(this.form, 'submit');">
+                <option value="desc" <%= sortDirection === "desc" ? "selected" : "" %>>Descending</option>
+                <option value="asc" <%= sortDirection === "asc" ? "selected" : "" %>>Ascending</option>
+              </select>
+            </label>
           </div>
         </div>
-        <label>
-          <span>
-            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path d="M8 2v4" />
-              <path d="M16 2v4" />
-              <rect x="3" y="4" width="18" height="18" rx="2" />
-              <path d="M3 10h18" />
-            </svg>
-            To
-          </span>
-          <input x-ref="articleDateTo" type="date" name="dateTo" value="<%= values.dateTo || "" %>" />
-        </label>
-        <label>
-          <span>
-            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path d="M8 2v4" />
-              <path d="M16 2v4" />
-              <rect x="3" y="4" width="18" height="18" rx="2" />
-              <path d="M3 10h18" />
-            </svg>
-            From
-          </span>
-          <input x-ref="articleDateFrom" type="date" name="dateFrom" value="<%= values.dateFrom || "" %>" />
-        </label>
-      </div>
-      <div class="od-filter-panel-actions">
-        <button
-          type="button"
-          class="od-search-icon-button"
-          :class="filtersDirty ? 'right-10' : 'right-1'"
-          x-cloak
-          x-show="hasFilterContent"
-          @click="clearFilters()"
-          aria-label="Clear filters"
-          title="Clear filters"
-        >
-          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
-            <path d="M18 6 6 18" />
-            <path d="m6 6 12 12" />
-          </svg>
-        </button>
-        <button class="od-search-icon-button od-search-submit right-1" type="submit" x-cloak x-show="filtersDirty" aria-label="Apply filters" title="Apply filters">
-          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M5 12h14" />
-            <path d="m13 6 6 6-6 6" />
-          </svg>
-        </button>
-      </div>
-    </div>
 
-    <div class="od-page-tools-bar">
-      <div class="od-page-sort-group">
-        <label>
-          <span>Sort</span>
-          <select id="article-sort-by" name="sortBy" onchange="htmx.trigger(this.form, 'submit');">
-            <option value="date" <%= sortBy === "date" ? "selected" : "" %>>Date</option>
-            <option value="likes" <%= sortBy === "likes" ? "selected" : "" %>>Likes</option>
-            <option value="comments" <%= sortBy === "comments" ? "selected" : "" %>>Comments</option>
-          </select>
-        </label>
-        <label>
-          <span>Direction</span>
-          <select id="article-sort-direction" name="sortDirection" onchange="htmx.trigger(this.form, 'submit');">
-            <option value="desc" <%= sortDirection === "desc" ? "selected" : "" %>>Descending</option>
-            <option value="asc" <%= sortDirection === "asc" ? "selected" : "" %>>Ascending</option>
-          </select>
-        </label>
-      </div>
-
-      <div class="od-page-tool-actions">
-        <button
-          type="button"
-          class="od-icon-button"
-          :class="filtersOpen ? 'is-active' : ''"
-          :aria-expanded="String(filtersOpen)"
-          aria-controls="article-filter-panel"
-          aria-label="Filters"
-          title="Filters"
-          @click="filtersOpen = !filtersOpen"
-        >
-          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
-            <path d="M4 7h16" />
-            <path d="M7 12h10" />
-            <path d="M10 17h4" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          class="od-icon-button"
-          :class="searchOpen ? 'is-active' : ''"
-          :aria-expanded="String(searchOpen)"
-          aria-controls="article-search-panel"
-          aria-label="Search articles"
-          title="Search articles"
-          @click="searchOpen = !searchOpen; $nextTick(() => searchOpen && $refs.articleSearch?.focus())"
-        >
-          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <circle cx="11" cy="11" r="7" />
-            <path d="m20 20-3.5-3.5" />
-          </svg>
-        </button>
-      </div>
-    </div>
-
-    <div class="od-page-tools-footer">
-      <div class="od-view-toggle-group" aria-label="Article layout">
-        <button
-          type="button"
-          class="od-view-toggle"
-          :class="articleView === 'card' ? 'is-active' : ''"
-          :aria-pressed="String(articleView === 'card')"
-          aria-label="Card view"
-          title="Card view"
-          @click="articleView = 'card'; $nextTick(() => htmx.trigger($el.form, 'submit'))"
-        >
-          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <rect x="4" y="5" width="16" height="4" rx="1" />
-            <rect x="4" y="10" width="16" height="4" rx="1" />
-            <rect x="4" y="15" width="16" height="4" rx="1" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          class="od-view-toggle"
-          :class="articleView === 'list' ? 'is-active' : ''"
-          :aria-pressed="String(articleView === 'list')"
-          aria-label="List view"
-          title="List view"
-          @click="articleView = 'list'; $nextTick(() => htmx.trigger($el.form, 'submit'))"
-        >
-          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path d="M7 6h14" />
-            <path d="M7 12h14" />
-            <path d="M7 18h14" />
-            <path d="M4 6h.01" />
-            <path d="M4 12h.01" />
-            <path d="M4 18h.01" />
-          </svg>
-        </button>
-      </div>
-      <div id="article-results-loading" class="od-inline-loader htmx-indicator" role="status" aria-live="polite">
-        <span class="od-inline-loader-dot" aria-hidden="true"></span>
-        Updating articles
+        <div class="od-page-tools-footer">
+          <div class="od-view-toggle-group" aria-label="Article layout">
+            <button
+              type="button"
+              class="od-view-toggle"
+              :class="articleView === 'card' ? 'is-active' : ''"
+              :aria-pressed="String(articleView === 'card')"
+              aria-label="Card view"
+              title="Card view"
+              @click="articleView = 'card'; $nextTick(() => htmx.trigger($el.form, 'submit'))"
+            >
+              <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <rect x="4" y="5" width="16" height="4" rx="1" />
+                <rect x="4" y="10" width="16" height="4" rx="1" />
+                <rect x="4" y="15" width="16" height="4" rx="1" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="od-view-toggle"
+              :class="articleView === 'list' ? 'is-active' : ''"
+              :aria-pressed="String(articleView === 'list')"
+              aria-label="List view"
+              title="List view"
+              @click="articleView = 'list'; $nextTick(() => htmx.trigger($el.form, 'submit'))"
+            >
+              <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M7 6h14" />
+                <path d="M7 12h14" />
+                <path d="M7 18h14" />
+                <path d="M4 6h.01" />
+                <path d="M4 12h.01" />
+                <path d="M4 18h.01" />
+              </svg>
+            </button>
+          </div>
+          <div id="article-results-loading" class="od-inline-loader htmx-indicator" role="status" aria-live="polite">
+            <span class="od-inline-loader-dot" aria-hidden="true"></span>
+            Updating articles
+          </div>
+        </div>
       </div>
     </div>
   </form>

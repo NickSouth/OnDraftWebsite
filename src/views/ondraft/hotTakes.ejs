@@ -46,7 +46,7 @@
 
   <form
     id="hot-take-filter-form"
-    class="article-filter-form od-page-tools"
+    class="article-filter-form od-page-tools od-list-controls"
     hx-get="/hottakes/filter"
     hx-target="#hot-take-list"
     hx-swap="outerHTML"
@@ -69,6 +69,26 @@
     x-ref="hotTakeFilterForm"
     @submit="searchedKeyword = keyword.trim()"
   >
+    <div class="od-page-tools-bar od-page-toggle-bar">
+      <div class="od-page-tool-actions">
+        <button
+          type="button"
+          class="od-icon-button"
+          :class="searchOpen ? 'is-active' : ''"
+          :aria-expanded="String(searchOpen)"
+          aria-controls="hot-take-search-panel"
+          aria-label="Search hot takes"
+          title="Search hot takes"
+          @click="searchOpen = !searchOpen; $nextTick(() => searchOpen && $refs.hotTakeSearch?.focus())"
+        >
+          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
     <div id="hot-take-search-panel" class="od-tool-panel" x-show="searchOpen" x-collapse x-cloak>
       <label class="od-search-field">
         <span class="sr-only">Search hot takes</span>
@@ -104,7 +124,7 @@
       </label>
     </div>
 
-    <div class="od-page-tools-bar">
+    <div class="od-page-sort-row">
       <div class="od-page-sort-group">
         <label>
           <span>Sort</span>
@@ -121,23 +141,6 @@
             <option value="asc" <%= sortDirection === "asc" ? "selected" : "" %>>Ascending</option>
           </select>
         </label>
-      </div>
-      <div class="od-page-tool-actions">
-        <button
-          type="button"
-          class="od-icon-button"
-          :class="searchOpen ? 'is-active' : ''"
-          :aria-expanded="String(searchOpen)"
-          aria-controls="hot-take-search-panel"
-          aria-label="Search hot takes"
-          title="Search hot takes"
-          @click="searchOpen = !searchOpen; $nextTick(() => searchOpen && $refs.hotTakeSearch?.focus())"
-        >
-          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <circle cx="11" cy="11" r="7" />
-            <path d="m20 20-3.5-3.5" />
-          </svg>
-        </button>
       </div>
     </div>
 
