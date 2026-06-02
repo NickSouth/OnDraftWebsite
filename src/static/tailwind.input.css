@@ -25,7 +25,7 @@
   }
 
   .od-shell-link {
-    @apply od-focus-ring rounded-md px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 dark:text-slate-200 dark:hover:bg-white/10 dark:hover:text-white;
+    @apply od-focus-ring rounded-md px-3 py-2 text-sm font-semibold text-slate-700 transition duration-200 hover:-translate-y-0.5 hover:bg-slate-100 hover:text-slate-950 active:translate-y-0 active:scale-[0.98] dark:text-slate-200 dark:hover:bg-white/10 dark:hover:text-white;
   }
 
   .od-shell-link.is-active {
@@ -33,7 +33,7 @@
   }
 
   .od-icon-button {
-    @apply od-focus-ring inline-grid size-10 shrink-0 place-items-center rounded-md border border-slate-300 bg-white text-slate-700 shadow-sm transition hover:border-draft-gold hover:bg-draft-foam hover:text-draft-amber dark:border-white/15 dark:bg-white/10 dark:text-slate-100 dark:hover:bg-white/15 dark:hover:text-draft-gold;
+    @apply od-focus-ring inline-grid size-10 shrink-0 place-items-center rounded-md border border-slate-300 bg-white text-slate-700 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-draft-gold hover:bg-draft-foam hover:text-draft-amber active:translate-y-0 active:scale-95 dark:border-white/15 dark:bg-white/10 dark:text-slate-100 dark:hover:bg-white/15 dark:hover:text-draft-gold;
   }
 
   .od-icon-button.is-active {
@@ -41,11 +41,11 @@
   }
 
   .od-primary-link {
-    @apply od-focus-ring inline-flex min-h-10 items-center justify-center rounded-md bg-draft-gold px-4 py-2 text-sm font-bold text-draft-ink transition hover:bg-amber-400;
+    @apply od-focus-ring inline-flex min-h-10 items-center justify-center rounded-md bg-draft-gold px-4 py-2 text-sm font-bold text-draft-ink shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-amber-400 hover:shadow-editorial active:translate-y-0 active:scale-[0.98];
   }
 
   .od-secondary-link {
-    @apply od-focus-ring inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-900 transition hover:bg-slate-50 dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/15;
+    @apply od-focus-ring inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-900 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-draft-gold hover:bg-slate-50 active:translate-y-0 active:scale-[0.98] dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/15;
   }
 
   .od-card {
@@ -123,7 +123,8 @@
   }
 
   .od-tool-panel {
-    @apply ml-auto grid w-full max-w-xl gap-3 rounded-lg border border-slate-200 bg-white/80 p-3 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/[0.04];
+    @apply ml-auto grid w-full max-w-xl gap-3 rounded-lg border border-slate-200 bg-white/80 p-3 shadow-sm backdrop-blur transition duration-200 dark:border-white/10 dark:bg-white/[0.04];
+    animation: od-menu-enter 180ms ease-out both;
   }
 
   .od-search-panel {
@@ -170,7 +171,7 @@
   }
 
   .od-search-icon-button {
-    @apply od-focus-ring absolute top-1/2 inline-grid size-8 -translate-y-1/2 place-items-center rounded-md text-slate-500 transition hover:bg-draft-foam hover:text-draft-amber dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-draft-gold;
+    @apply od-focus-ring absolute top-1/2 inline-grid size-8 -translate-y-1/2 place-items-center rounded-md text-slate-500 transition duration-200 hover:bg-draft-foam hover:text-draft-amber active:scale-95 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-draft-gold;
   }
 
   .od-search-submit {
@@ -221,23 +222,64 @@
   }
 
   .od-view-toggle-group {
-    @apply inline-flex w-fit rounded-md border border-slate-200 bg-slate-50 p-1 dark:border-white/10 dark:bg-draft-ink;
+    @apply relative inline-flex w-fit overflow-hidden rounded-md border border-slate-200 bg-slate-50 p-1 dark:border-white/10 dark:bg-draft-ink;
+  }
+
+  .od-view-toggle-group::before {
+    content: "";
+    @apply absolute bottom-1 left-1 top-1 rounded-md bg-draft-gold shadow-sm transition-transform duration-200;
+    width: calc((100% - 0.5rem) / 2);
+  }
+
+  .od-view-toggle-group:has(.od-view-toggle:nth-child(2).is-active)::before {
+    transform: translateX(100%);
   }
 
   .od-view-toggle {
-    @apply od-focus-ring inline-grid size-9 place-items-center rounded-md text-slate-700 transition hover:bg-white dark:text-slate-200 dark:hover:bg-white/10;
+    @apply od-focus-ring relative z-10 inline-grid size-9 place-items-center rounded-md text-slate-700 transition duration-200 hover:bg-white/70 active:scale-95 dark:text-slate-200 dark:hover:bg-white/10;
   }
 
   .od-view-toggle.is-active {
-    @apply bg-draft-gold text-draft-ink shadow-sm hover:bg-draft-gold;
+    @apply bg-transparent text-draft-ink shadow-none hover:bg-transparent;
   }
 
   .od-range-toggle {
-    @apply od-focus-ring rounded px-2 py-1.5 text-center text-xs font-black text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white sm:px-3 sm:text-sm;
+    @apply od-focus-ring relative z-10 rounded px-2 py-1.5 text-center text-xs font-black text-slate-600 transition duration-200 hover:bg-slate-100/80 hover:text-slate-950 active:scale-[0.98] dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white sm:px-3 sm:text-sm;
   }
 
   .od-range-toggle.is-active {
-    @apply bg-draft-gold text-draft-ink hover:bg-draft-gold hover:text-draft-ink;
+    @apply bg-transparent text-draft-ink hover:bg-transparent hover:text-draft-ink;
+  }
+
+  .od-range-toggle-group {
+    @apply relative overflow-hidden;
+  }
+
+  .od-range-toggle-group::before {
+    content: "";
+    @apply absolute bottom-1 left-1 top-1 rounded bg-draft-gold shadow-sm transition-transform duration-200;
+    width: calc((100% - 0.5rem) / 3);
+  }
+
+  .od-range-toggle-group:has(.od-range-toggle:nth-child(2).is-active)::before {
+    transform: translateX(100%);
+  }
+
+  .od-range-toggle-group:has(.od-range-toggle:nth-child(3).is-active)::before {
+    transform: translateX(200%);
+  }
+
+  .od-home-carousel-slide {
+    opacity: 0;
+    transform: translateX(var(--od-slide-x, 0)) scale(1.01);
+    transition:
+      opacity 520ms ease,
+      transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .od-home-carousel-slide.is-active {
+    opacity: 1;
+    transform: translateX(0) scale(1);
   }
 
   .od-inline-loader {
@@ -503,10 +545,15 @@
 
   .tag-editor-menu {
     @apply absolute left-0 top-[calc(100%+0.5rem)] z-50 grid w-max min-w-44 max-w-[min(18rem,calc(100vw-3rem))] gap-1 overflow-visible rounded-md border border-slate-200 bg-white p-1.5 text-slate-950 shadow-editorial dark:border-white/10 dark:bg-draft-ink dark:text-white;
+    animation: od-menu-enter 160ms ease-out both;
   }
 
   .tag-editor-menu[hidden] {
     @apply hidden;
+  }
+
+  .tag-editor-menu[data-closing="true"] {
+    animation: od-menu-exit 140ms ease-in both;
   }
 
   .tag-editor-menu::before {
@@ -630,7 +677,7 @@
   }
 
   .creator-toggle button {
-    @apply od-focus-ring min-h-10 rounded px-4 py-2 text-sm font-black text-slate-200 transition hover:bg-white/10;
+    @apply od-focus-ring min-h-10 rounded px-4 py-2 text-sm font-black text-slate-200 transition duration-200 hover:-translate-y-0.5 hover:bg-white/10 active:translate-y-0 active:scale-[0.98];
   }
 
   .creator-toggle button.is-active {
@@ -678,7 +725,7 @@
   }
 
   .board-editor-save-board-button {
-    @apply od-focus-ring inline-flex min-h-9 items-center justify-center rounded-md bg-draft-gold px-3 py-1.5 text-sm font-black text-draft-ink transition hover:bg-amber-400;
+    @apply od-primary-link min-h-9 px-3 py-1.5 text-sm font-black;
   }
 
   .board-editor-list-shell {
@@ -791,7 +838,7 @@
   }
 
   .board-editor-edit-button {
-    @apply od-focus-ring inline-grid size-8 shrink-0 place-items-center rounded-md text-slate-400 transition hover:bg-draft-foam hover:text-draft-amber dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-draft-gold;
+    @apply od-focus-ring inline-grid size-8 shrink-0 place-items-center rounded-md text-slate-400 transition duration-200 hover:bg-draft-foam hover:text-draft-amber active:scale-95 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-draft-gold;
   }
 
   .board-editor-inline-input {
@@ -907,7 +954,7 @@
   }
 
   .board-editor-expand-button {
-    @apply od-focus-ring inline-flex min-h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border border-draft-gold/50 bg-white px-3 text-xs font-black uppercase text-draft-amber transition hover:border-draft-gold hover:bg-draft-foam hover:text-draft-amber dark:border-draft-gold/50 dark:bg-white/10 dark:text-draft-gold dark:hover:bg-white/15;
+    @apply od-focus-ring inline-flex min-h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border border-draft-gold/50 bg-white px-3 text-xs font-black uppercase text-draft-amber transition duration-200 hover:-translate-y-0.5 hover:border-draft-gold hover:bg-draft-foam hover:text-draft-amber active:translate-y-0 active:scale-[0.98] dark:border-draft-gold/50 dark:bg-white/10 dark:text-draft-gold dark:hover:bg-white/15;
   }
 
   .board-editor-writeup-toggle-row {
@@ -948,6 +995,7 @@
 
   .board-editor-profile-panel {
     @apply border-t border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-draft-ink/40 sm:p-4;
+    overflow: hidden;
   }
 
   .board-editor-profile-grid {
@@ -1273,7 +1321,7 @@
   }
 
   .draft-board-info-button {
-    @apply od-focus-ring inline-grid size-6 place-items-center rounded-full border border-draft-gold/70 text-draft-amber transition hover:bg-draft-foam hover:text-draft-gold dark:text-draft-gold dark:hover:bg-white/10;
+    @apply od-focus-ring inline-grid size-6 place-items-center rounded-full border border-draft-gold/70 text-draft-amber transition duration-200 hover:-translate-y-0.5 hover:bg-draft-foam hover:text-draft-gold active:translate-y-0 active:scale-95 dark:text-draft-gold dark:hover:bg-white/10;
   }
 
   .draft-board-info-button svg {
@@ -1282,6 +1330,7 @@
 
   .draft-board-info-popover {
     @apply absolute left-0 top-[calc(100%+0.65rem)] z-[65] w-[min(20rem,calc(100vw-2rem))] rounded-lg border border-slate-200 bg-white p-4 pr-11 text-left text-sm font-semibold leading-6 text-slate-700 shadow-editorial dark:border-white/15 dark:bg-draft-slate dark:text-slate-200;
+    animation: od-menu-enter 160ms ease-out both;
   }
 
   .draft-board-info-popover::before {
@@ -1868,5 +1917,47 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes od-menu-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-0.35rem) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes od-menu-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-0.25rem) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+  }
+
+  .od-home-carousel-slide,
+  .od-home-carousel-slide.is-active {
+    transform: none;
   }
 }

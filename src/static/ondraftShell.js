@@ -23,6 +23,66 @@
     });
   };
 
+  const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const animateDetailsPanel = (details, opening) => {
+    const summary = details.querySelector("summary");
+    const panel = summary?.nextElementSibling;
+    if (!summary || !panel || reducedMotion()) {
+      details.open = opening;
+      return;
+    }
+
+    if (opening) {
+      details.open = true;
+      panel.style.overflow = "hidden";
+      panel.style.height = "0px";
+      panel.style.opacity = "0";
+      panel.offsetHeight;
+      panel.style.transition = "height 240ms ease, opacity 190ms ease";
+      panel.style.height = `${panel.scrollHeight}px`;
+      panel.style.opacity = "1";
+      window.setTimeout(() => {
+        panel.style.height = "";
+        panel.style.opacity = "";
+        panel.style.overflow = "";
+        panel.style.transition = "";
+      }, 250);
+      return;
+    }
+
+    panel.style.overflow = "hidden";
+    panel.style.height = `${panel.scrollHeight}px`;
+    panel.style.opacity = "1";
+    panel.offsetHeight;
+    panel.style.transition = "height 220ms ease, opacity 170ms ease";
+    panel.style.height = "0px";
+    panel.style.opacity = "0";
+    window.setTimeout(() => {
+      details.open = false;
+      panel.style.height = "";
+      panel.style.opacity = "";
+      panel.style.overflow = "";
+      panel.style.transition = "";
+    }, 230);
+  };
+
+  const enhanceAnimatedDetails = (root = document) => {
+    if (!(root instanceof Document || root instanceof Element || root instanceof DocumentFragment)) {
+      return;
+    }
+    root.querySelectorAll?.(".big-board-results details").forEach((details) => {
+      if (details.dataset.animatedDetails === "true") {
+        return;
+      }
+      details.dataset.animatedDetails = "true";
+      details.querySelector("summary")?.addEventListener("click", (event) => {
+        event.preventDefault();
+        animateDetailsPanel(details, !details.open);
+      });
+    });
+  };
+
   const isLocalNavigation = (link, event) => {
     if (!link || event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
       return false;
@@ -204,12 +264,14 @@
   document.addEventListener("htmx:afterSettle", (event) => {
     hideLoader();
     enableSpellcheck(event.detail?.target || document);
+    enhanceAnimatedDetails(event.detail?.target || document);
   });
   document.addEventListener("htmx:responseError", hideLoader);
   document.addEventListener("htmx:sendError", hideLoader);
   window.addEventListener("load", () => {
     hideLoader();
     enableSpellcheck();
+    enhanceAnimatedDetails();
   });
   window.addEventListener("pageshow", hideLoader);
   document.addEventListener("visibilitychange", () => {
@@ -222,8 +284,10 @@
     mutations.forEach((mutation) => {
       mutation.addedNodes.forEach((node) => {
         enableSpellcheck(node);
+        enhanceAnimatedDetails(node);
       });
     });
   }).observe(document.documentElement, { childList: true, subtree: true });
   enableSpellcheck();
+  enhanceAnimatedDetails();
 })();

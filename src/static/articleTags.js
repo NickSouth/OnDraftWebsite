@@ -42,6 +42,7 @@ document.querySelectorAll("[data-tag-editor], .tag-editor").forEach((editor) => 
 
   let tags = tagArray(hiddenInput.value);
   let clearButton = editor.querySelector("[data-tag-clear]");
+  let closeMenuTimer = null;
 
   if (!clearButton && editorBox) {
     clearButton = document.createElement("button");
@@ -64,8 +65,24 @@ document.querySelectorAll("[data-tag-editor], .tag-editor").forEach((editor) => 
       return;
     }
 
-    menu.hidden = true;
+    window.clearTimeout(closeMenuTimer);
+    menu.dataset.closing = "true";
+    closeMenuTimer = window.setTimeout(() => {
+      menu.hidden = true;
+      menu.dataset.closing = "false";
+    }, 140);
     toggle.setAttribute("aria-expanded", "false");
+  }
+
+  function openMenu() {
+    if (!menu || !toggle) {
+      return;
+    }
+
+    window.clearTimeout(closeMenuTimer);
+    menu.dataset.closing = "false";
+    menu.hidden = false;
+    toggle.setAttribute("aria-expanded", "true");
   }
 
   function toggleMenu() {
@@ -74,8 +91,11 @@ document.querySelectorAll("[data-tag-editor], .tag-editor").forEach((editor) => 
     }
 
     const expanded = toggle.getAttribute("aria-expanded") === "true";
-    menu.hidden = expanded;
-    toggle.setAttribute("aria-expanded", String(!expanded));
+    if (expanded) {
+      closeMenu();
+    } else {
+      openMenu();
+    }
   }
 
   function syncTags() {
