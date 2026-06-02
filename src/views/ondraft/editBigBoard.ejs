@@ -230,7 +230,7 @@
     const unsavedChangesMessage = "You have unsaved changes, are you sure you want to exit?";
     let pendingDeleteForm = null;
     let nativeSubmissionInProgress = false;
-    let boardStructureDirty = false;
+    let boardStructureDirty = document.querySelector("[data-big-board-editor-fragment]")?.dataset.boardStructureDirty === "true";
 
     function entryId() {
       if (window.crypto && window.crypto.randomUUID) {
@@ -421,11 +421,33 @@
       return boardStructureDirty || hasDirtyEntries();
     }
 
+    function markBoardStructureDirty() {
+      boardStructureDirty = true;
+      const editorFragment = document.querySelector("[data-big-board-editor-fragment]");
+      if (editorFragment) {
+        editorFragment.dataset.boardStructureDirty = "true";
+      }
+      updateBoardDirtyState();
+    }
+
     function updateBoardDirtyState() {
       if (!dirtyActions) {
         return;
       }
       dirtyActions.hidden = !hasUnsavedBoardChanges();
+    }
+
+    function scrollToFirstValidationError() {
+      const erroredForm = document.querySelector("[data-board-entry-form][data-has-validation-error='true']");
+      const erroredEntry = erroredForm?.closest("[data-board-entry-item]");
+      if (!erroredEntry) {
+        return;
+      }
+      window.requestAnimationFrame(() => {
+        window.setTimeout(() => {
+          erroredEntry.scrollIntoView({ block: "center", behavior: "smooth" });
+        }, 0);
+      });
     }
 
     function hideGlobalLoader() {
@@ -654,7 +676,7 @@
         updateBoardDirtyState();
         return;
       }
-      boardStructureDirty = true;
+      markBoardStructureDirty();
       form.action = "/bigboard/edit/delete-entry";
       const deleteSubmit = form.querySelector("[data-delete-submit]");
       closeDeleteModal();
@@ -666,10 +688,14 @@
       form.submit();
     });
 
-    document.body.addEventListener("htmx:afterSwap", () => {
+    document.body.addEventListener("htmx:afterSwap", (event) => {
       initializeFormsIn(document);
       updateEmptyState();
       updateBoardDirtyState();
+      const target = event.detail?.target;
+      if (target instanceof Element && target.matches("#big-board-editor-fragment")) {
+        scrollToFirstValidationError();
+      }
     }, editorListenerOptions);
 
     document.body.addEventListener("htmx:afterRequest", () => {
@@ -678,6 +704,10 @@
 
     document.body.addEventListener("htmx:beforeRequest", (event) => {
       const source = event.detail?.elt || event.target;
+      if (source instanceof Element && source.closest("[data-delete-submit]")) {
+        markBoardStructureDirty();
+        return;
+      }
       if (!(source instanceof Element) || !source.closest("[data-board-class-form]") || !hasUnsavedBoardChanges()) {
         return;
       }
@@ -689,6 +719,7 @@
     }, editorListenerOptions);
 
     saveFullBoardButton?.addEventListener("click", submitFullBoard);
+    scrollToFirstValidationError();
 
     document.addEventListener("click", (event) => {
       if (!hasUnsavedBoardChanges() || event.defaultPrevented) {

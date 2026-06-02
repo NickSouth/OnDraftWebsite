@@ -2378,8 +2378,7 @@ class OnDraftController implements IOnDraftController {
       const validationIssues = validationIssuesFor(updatedBoard.value, saved.value.id, published.value.message);
       if (req.get("HX-Request") === "true") {
         res.set("HX-Retarget", "#big-board-editor-fragment");
-        res.set("HX-Reswap", "outerHTML");
-        res.set("HX-Scroll", "top");
+        res.set("HX-Reswap", "outerHTML show:none");
         await this.renderBigBoardEditor(res, session, updatedBoard.value, published.value.message, null, 200, true, validationIssues);
         return;
       }

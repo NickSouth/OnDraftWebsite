@@ -24,3 +24,6 @@ Big Features:
 Bug Fixes:
 - Errors on draft board editor scroll to the bottom
 - Sometimes player deletion is not triggering dirty state.
+
+UI:
+- More animations, full pass with better skills

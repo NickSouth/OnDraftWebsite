@@ -983,6 +983,8 @@ describe("OnDraft HTTP contracts", () => {
     expect(editor.text).toContain("add player writeup");
     expect(editor.text).toContain("Save full board");
     expect(editor.text).toContain("data-board-dirty-actions");
+    expect(editor.text).toContain("markBoardStructureDirty");
+    expect(editor.text).toContain("scrollToFirstValidationError");
     expect(editor.text).toContain("You have unsaved changes, are you sure you want to exit?");
     expect(editor.text).toContain("/bigboard/edit/delete-entry");
     expect(editor.text).toContain("Are you sure?");
@@ -1340,6 +1342,7 @@ describe("OnDraft HTTP contracts", () => {
 
     expect(invalidWriteupPublish.status).toBe(200);
     expect(invalidWriteupPublish.headers["hx-retarget"]).toBe("#big-board-editor-fragment");
+    expect(invalidWriteupPublish.headers["hx-reswap"]).toBe("outerHTML show:none");
     expect(invalidWriteupPublish.text).toContain("Strengths are required before publishing a player writeup.");
     expect(invalidWriteupPublish.text).toContain("board-editor-profile-box is-validation-error");
     expect(invalidWriteupPublish.text).toContain('data-expanded="true"');
@@ -1369,6 +1372,7 @@ describe("OnDraft HTTP contracts", () => {
 
     expect(duplicatePositionRankPublish.status).toBe(200);
     expect(duplicatePositionRankPublish.headers["hx-retarget"]).toBe("#big-board-editor-fragment");
+    expect(duplicatePositionRankPublish.headers["hx-reswap"]).toBe("outerHTML show:none");
     expect(duplicatePositionRankPublish.text).toContain("QB1 is already used by Published QB.");
     expect((duplicatePositionRankPublish.text.match(/board-editor-pos-rank-field is-validation-error/g) ?? []).length).toBe(2);
     expect((duplicatePositionRankPublish.text.match(/QB1 is already used by Published QB\./g) ?? []).length).toBe(1);
