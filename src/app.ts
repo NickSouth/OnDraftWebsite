@@ -1184,6 +1184,18 @@ class ExpressApp implements IApp {
     );
 
     this.app.post(
+      "/bigboard/edit/player",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.saveBigBoardEntry(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
       "/bigboard/edit/autosave",
       asyncHandler(async (req, res) => {
         if (!this.requireAdmin(req, res)) {
@@ -1216,6 +1228,18 @@ class ExpressApp implements IApp {
 
         const browserSession = recordPageView(sessionStore(req));
         await this.controller.publishBigBoardWriteup(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/bigboard/edit/delete-entry",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.deleteBigBoardEntryFromEditor(req, res, browserSession);
       }),
     );
 

@@ -167,8 +167,14 @@
     document.getElementById("site-loader")?.classList.remove("grid");
   };
 
+  window.addEventListener("ondraft:hide-global-loader", hideLoader);
+
   document.addEventListener("htmx:beforeRequest", (event) => {
     const target = event.target;
+    if (target instanceof HTMLElement && target.closest("[data-use-global-loader]")) {
+      showLoader(0);
+      return;
+    }
     if (target instanceof HTMLElement && target.closest("[data-skip-global-loader]")) {
       showResultSkeleton(target);
       return;

@@ -124,6 +124,12 @@ export interface SaveBigBoardEntriesInput {
   entries: BigBoardEditableEntryInput[];
 }
 
+export interface SaveBigBoardEntryInput {
+  year?: number;
+  creator?: BigBoardCreator;
+  entry: BigBoardEditableEntryInput;
+}
+
 export interface CreateCommentInput {
   articleId?: string;
   parentCommentId?: string;
@@ -154,6 +160,7 @@ export interface IOnDraftService {
   updateArticle(id: string, input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
   createBigBoardEntry(input: BigBoardEntryInput): Promise<Result<BigBoardEntry, BigBoardError>>;
   saveBigBoardEntries(input: SaveBigBoardEntriesInput): Promise<Result<BigBoard, BigBoardError>>;
+  saveBigBoardEntry(input: SaveBigBoardEntryInput): Promise<Result<BigBoardEntry, BigBoardError>>;
   publishBigBoardEntryPlayerInfo(year: number | undefined, creator: BigBoardCreator | undefined, entryId: string): Promise<Result<BigBoardEntry, BigBoardError>>;
   publishBigBoardEntryWriteup(year: number | undefined, creator: BigBoardCreator | undefined, entryId: string): Promise<Result<BigBoardEntry, BigBoardError>>;
   deleteArticle(id: string): Promise<Result<void, ArticleError>>;
@@ -875,6 +882,37 @@ class OnDraftService implements IOnDraftService {
     }
 
     return await this.repository.replaceBigBoardEntries(key.value.year, key.value.creator, entries);
+  }
+
+  async saveBigBoardEntry(input: SaveBigBoardEntryInput): Promise<Result<BigBoardEntry, BigBoardError>> {
+    const key = await this.normalizeBigBoardKey(input.year, input.creator);
+    if (key.ok === false) {
+      return Err(key.value);
+    }
+
+    const existingBoard = await this.getBigBoard(key.value.year, key.value.creator);
+    if (existingBoard.ok === false) {
+      return Err(existingBoard.value);
+    }
+
+    const existing = input.entry.id
+      ? existingBoard.value.entries.find((entry) => entry.id === input.entry.id)
+      : undefined;
+    const next = this.normalizeBigBoardEntry(input.entry, existing);
+    next.playerInfoPublished = input.entry.playerInfoPublished ?? false;
+    next.writeupPublished = input.entry.writeupPublished ?? false;
+
+    const entries = existing
+      ? existingBoard.value.entries.map((entry) => entry.id === existing.id ? next : entry)
+      : [...existingBoard.value.entries, next];
+    const validation = this.validatePublishedBigBoardEntries(entries);
+    if (validation.ok === false) {
+      return Err(validation.value);
+    }
+
+    return existing
+      ? await this.repository.updateBigBoardEntry(key.value.year, key.value.creator, next)
+      : await this.repository.createBigBoardEntry(key.value.year, key.value.creator, next);
   }
 
   async publishBigBoardEntryPlayerInfo(year: number | undefined, creator: BigBoardCreator | undefined, entryId: string): Promise<Result<BigBoardEntry, BigBoardError>> {

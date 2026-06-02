@@ -1,13 +1,26 @@
+Pending Components:
 - Add actual logo
     - Add to about us page
 - Draft Board grading system
 - Aleks Bio/Headshot
 - Actual social media links
+
+
+Big Features:
 - Newsletter functionality
     - Send via resent from no-reply
     - Template that fills with date, this week/month from OnDraft
         - Select articles/videos to push
         - Add updates to the site
         - Save draft/send buttons
-- rethink draft board editor entirely
-- Make fields sticky for context as you scroll down on draft board
+
+- replace "manage users" with an admin dashboard
+    - create content in one place
+    - manage users
+    - create/send Newsletter
+    - analytics
+
+
+Bug Fixes:
+- Errors on draft board editor scroll to the bottom
+- Sometimes player deletion is not triggering dirty state.

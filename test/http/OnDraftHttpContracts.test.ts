@@ -966,9 +966,25 @@ describe("OnDraft HTTP contracts", () => {
     const editor = await agent.get("/bigboard/edit?year=2026&creator=Ryan");
     expect(editor.status).toBe(200);
     expect(editor.text).toContain("Edit Big Board");
-    expect(editor.text).toContain("Add player");
+    expect(editor.text).toContain("Add Player");
     expect(editor.text).toContain("Publish");
     expect(editor.text).toContain("data-delete-board-entry");
+    expect(editor.text).toContain("data-board-editor-card-list");
+    expect(editor.text).toContain("data-expand-entry");
+    expect(editor.text).toContain('id="big-board-editor-fragment"');
+    expect(editor.text).toContain('hx-get="/bigboard/edit"');
+    expect(editor.text).toContain('hx-target="#big-board-editor-fragment"');
+    expect(editor.text).toContain("data-use-global-loader");
+    expect(editor.text).toContain('action="/bigboard/edit/player"');
+    expect(editor.text).toContain('hx-post="/bigboard/edit/player"');
+    expect(editor.text).toContain('hx-post="/bigboard/edit/publish-player-info"');
+    expect(editor.text).toContain('hx-post="/bigboard/edit/publish-writeup"');
+    expect(editor.text).toContain('hx-post="/bigboard/edit/delete-entry"');
+    expect(editor.text).toContain("add player writeup");
+    expect(editor.text).toContain("Save full board");
+    expect(editor.text).toContain("data-board-dirty-actions");
+    expect(editor.text).toContain("You have unsaved changes, are you sure you want to exit?");
+    expect(editor.text).toContain("/bigboard/edit/delete-entry");
     expect(editor.text).toContain("Are you sure?");
     expect(editor.text).toContain("This cannot be undone.");
     expect(editor.text).toContain('list="college-team-options"');
@@ -1071,6 +1087,295 @@ describe("OnDraft HTTP contracts", () => {
     expect(visibleWithWriteup.text).toContain("Starter traits.");
     expect(visibleWithWriteup.text).toContain("Pocket movement");
     expect(visibleWithWriteup.text).not.toContain("Private eval note.");
+  });
+
+  it("saves one draft board editor card without replacing neighboring entries", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+
+    const saveTwoEntries = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": "single-save-entry-1",
+        "entries[0][playerName]": "Single Save One",
+        "entries[0][school]": "Alabama",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2",
+        "entries[0][weight]": "220",
+        "entries[1][id]": "single-save-entry-2",
+        "entries[1][playerName]": "Single Save Two",
+        "entries[1][school]": "OnDraft State",
+        "entries[1][position]": "WR",
+        "entries[1][rank]": "2",
+        "entries[1][posRank]": "1",
+        "entries[1][heightLabel]": "6-0",
+        "entries[1][weight]": "195",
+      });
+    expect(saveTwoEntries.status).toBe(200);
+
+    const saveOne = await agent
+      .post("/bigboard/edit/player")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        entryId: "single-save-entry-1",
+        "entries[0][id]": "single-save-entry-1",
+        "entries[0][playerName]": "Single Save One Updated",
+        "entries[0][school]": "Alabama",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2",
+        "entries[0][weight]": "221",
+        "entries[0][playerInfoPublished]": "false",
+        "entries[0][writeupPublished]": "false",
+      });
+
+    expect(saveOne.status).toBe(200);
+    expect(saveOne.text).toContain("Saved Single Save One Updated.");
+    expect(saveOne.text).toContain("Single Save One Updated");
+    expect(saveOne.text).toContain("Single Save Two");
+
+    const htmxSaveOne = await agent
+      .post("/bigboard/edit/player")
+      .set("HX-Request", "true")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        entryId: "single-save-entry-1",
+        "entries[0][id]": "single-save-entry-1",
+        "entries[0][playerName]": "Single Save One HTMX",
+        "entries[0][school]": "Alabama",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2",
+        "entries[0][weight]": "222",
+        "entries[0][playerInfoPublished]": "false",
+        "entries[0][writeupPublished]": "false",
+      });
+
+    expect(htmxSaveOne.status).toBe(200);
+    expect(htmxSaveOne.text).toContain("data-board-entry-item");
+    expect(htmxSaveOne.text).toContain("Single Save One HTMX");
+    expect(htmxSaveOne.text).not.toContain("Edit Big Board");
+    expect(htmxSaveOne.text).not.toContain("Single Save Two");
+
+    const htmxPublishInfo = await agent
+      .post("/bigboard/edit/publish-player-info")
+      .set("HX-Request", "true")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        entryId: "single-save-entry-1",
+        "entries[0][id]": "single-save-entry-1",
+        "entries[0][playerName]": "Single Save One HTMX",
+        "entries[0][school]": "Alabama",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2",
+        "entries[0][weight]": "222",
+        "entries[0][playerInfoPublished]": "false",
+        "entries[0][writeupPublished]": "false",
+      });
+
+    expect(htmxPublishInfo.status).toBe(200);
+    expect(htmxPublishInfo.text).toContain("data-board-entry-item");
+    expect(htmxPublishInfo.text).toContain('name="entries[0][playerInfoPublished]" value="true"');
+    expect(htmxPublishInfo.text).not.toContain("Edit Big Board");
+
+    const htmxPublishWriteup = await agent
+      .post("/bigboard/edit/publish-writeup")
+      .set("HX-Request", "true")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        entryId: "single-save-entry-1",
+        "entries[0][id]": "single-save-entry-1",
+        "entries[0][playerName]": "Single Save One HTMX",
+        "entries[0][school]": "Alabama",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2",
+        "entries[0][weight]": "222",
+        "entries[0][strengths]": "HTMX profile strength",
+        "entries[0][weaknesses]": "HTMX profile weakness",
+        "entries[0][rundown]": "HTMX profile rundown.",
+        "entries[0][playerInfoPublished]": "true",
+        "entries[0][writeupPublished]": "false",
+      });
+
+    expect(htmxPublishWriteup.status).toBe(200);
+    expect(htmxPublishWriteup.text).toContain("data-board-entry-item");
+    expect(htmxPublishWriteup.text).toContain('name="entries[0][writeupPublished]" value="true"');
+    expect(htmxPublishWriteup.text).toContain("data-publish-writeup");
+    expect(htmxPublishWriteup.text).toContain("hidden");
+    expect(htmxPublishWriteup.text).not.toContain("Edit Big Board");
+
+    const boardAfterWriteupPublish = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
+    expect(boardAfterWriteupPublish.status).toBe(200);
+    expect(boardAfterWriteupPublish.text).toContain("HTMX profile rundown.");
+
+    const htmxDelete = await agent
+      .post("/bigboard/edit/delete-entry")
+      .set("HX-Request", "true")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        entryId: "single-save-entry-1",
+        "entries[0][id]": "single-save-entry-1",
+        "entries[0][playerName]": "Single Save One HTMX",
+      });
+
+    expect(htmxDelete.status).toBe(200);
+    expect(htmxDelete.text).toBe("");
+
+    const boardAfterHtmxDelete = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
+    expect(boardAfterHtmxDelete.status).toBe(200);
+    expect(boardAfterHtmxDelete.text).toContain("Single Save One HTMX");
+
+    const editorAfterHtmxDelete = await agent.get("/bigboard/edit?year=2026&creator=Ryan");
+    expect(editorAfterHtmxDelete.status).toBe(200);
+    expect(editorAfterHtmxDelete.text).toContain("Single Save One HTMX");
+    expect(editorAfterHtmxDelete.text).toContain("Single Save Two");
+
+    const saveFullBoardAfterDelete = await agent
+      .post("/bigboard/edit")
+      .set("HX-Request", "true")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": "single-save-entry-2",
+        "entries[0][playerName]": "Single Save Two",
+        "entries[0][school]": "OnDraft State",
+        "entries[0][position]": "WR",
+        "entries[0][rank]": "2",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-0",
+        "entries[0][weight]": "195",
+        "entries[0][playerInfoPublished]": "false",
+        "entries[0][writeupPublished]": "false",
+      });
+
+    expect(saveFullBoardAfterDelete.status).toBe(200);
+    expect(saveFullBoardAfterDelete.text).toContain("Saved.");
+    expect(saveFullBoardAfterDelete.text).toContain('id="big-board-editor-fragment"');
+    expect(saveFullBoardAfterDelete.text).not.toContain("<!DOCTYPE html>");
+
+    const boardAfterFullSave = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
+    expect(boardAfterFullSave.status).toBe(200);
+    expect(boardAfterFullSave.text).not.toContain("Single Save One HTMX");
+
+    const editorAfterFullSave = await agent.get("/bigboard/edit?year=2026&creator=Ryan");
+    expect(editorAfterFullSave.status).toBe(200);
+    expect(editorAfterFullSave.text).not.toContain("Single Save One HTMX");
+    expect(editorAfterFullSave.text).toContain("Single Save Two");
+  });
+
+  it("shows field-level validation errors when publishing invalid draft board cards", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+
+    const saveCards = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": "validation-published-qb",
+        "entries[0][playerName]": "Published QB",
+        "entries[0][school]": "Alabama",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2",
+        "entries[0][weight]": "220",
+        "entries[0][playerInfoPublished]": "true",
+        "entries[1][id]": "validation-unpublished-qb",
+        "entries[1][playerName]": "Unpublished QB",
+        "entries[1][school]": "OnDraft State",
+        "entries[1][position]": "QB",
+        "entries[1][rank]": "2",
+        "entries[1][posRank]": "1",
+        "entries[1][heightLabel]": "6-0",
+        "entries[1][weight]": "195",
+      });
+    expect(saveCards.status).toBe(200);
+
+    const invalidWriteupPublish = await agent
+      .post("/bigboard/edit/publish-writeup")
+      .set("HX-Request", "true")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        entryId: "validation-unpublished-qb",
+        "entries[0][id]": "validation-unpublished-qb",
+        "entries[0][playerName]": "Unpublished QB",
+        "entries[0][school]": "OnDraft State",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "2",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-0",
+        "entries[0][weight]": "195",
+        "entries[0][strengths]": "",
+        "entries[0][weaknesses]": "Needs cleaner counters.",
+        "entries[0][rundown]": "Has enough to test partial validation.",
+        "entries[0][playerInfoPublished]": "false",
+        "entries[0][writeupPublished]": "false",
+      });
+
+    expect(invalidWriteupPublish.status).toBe(200);
+    expect(invalidWriteupPublish.headers["hx-retarget"]).toBe("#big-board-editor-fragment");
+    expect(invalidWriteupPublish.text).toContain("Strengths are required before publishing a player writeup.");
+    expect(invalidWriteupPublish.text).toContain("board-editor-profile-box is-validation-error");
+    expect(invalidWriteupPublish.text).toContain('data-expanded="true"');
+
+    const duplicatePositionRankPublish = await agent
+      .post("/bigboard/edit/publish-player-info")
+      .set("HX-Request", "true")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        entryId: "validation-unpublished-qb",
+        "entries[0][id]": "validation-unpublished-qb",
+        "entries[0][playerName]": "Unpublished QB",
+        "entries[0][school]": "OnDraft State",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "2",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-0",
+        "entries[0][weight]": "195",
+        "entries[0][strengths]": "Enough burst.",
+        "entries[0][weaknesses]": "Needs cleaner counters.",
+        "entries[0][rundown]": "Has enough to test duplicate ranking.",
+        "entries[0][playerInfoPublished]": "false",
+        "entries[0][writeupPublished]": "false",
+      });
+
+    expect(duplicatePositionRankPublish.status).toBe(200);
+    expect(duplicatePositionRankPublish.headers["hx-retarget"]).toBe("#big-board-editor-fragment");
+    expect(duplicatePositionRankPublish.text).toContain("QB1 is already used by Published QB.");
+    expect((duplicatePositionRankPublish.text.match(/board-editor-pos-rank-field is-validation-error/g) ?? []).length).toBe(2);
+    expect((duplicatePositionRankPublish.text.match(/QB1 is already used by Published QB\./g) ?? []).length).toBe(1);
+
+    const publicBoard = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
+    expect(publicBoard.status).toBe(200);
+    expect(publicBoard.text).not.toContain("Unpublished QB");
   });
 
   it("removes omitted draft board ranking entries when admins save the editor", async () => {
@@ -1431,9 +1736,9 @@ describe("OnDraft HTTP contracts", () => {
     const editor = await agent.get("/bigboard/edit");
     expect(editor.status).toBe(200);
     expect(editor.text).toContain("Create draft class");
-    expect(editor.text).toContain('data-board-editor-sticky-scroll');
-    expect(editor.text).toContain('data-board-editor-sticky-scroll-spacer');
-    expect(editor.text).toContain("syncStickyScrollSize");
+    expect(editor.text).toContain('data-board-editor-card-list');
+    expect(editor.text).toContain('data-add-player');
+    expect(editor.text).toContain("initializeForm");
 
     const createYear = await agent
       .post("/bigboard/years")

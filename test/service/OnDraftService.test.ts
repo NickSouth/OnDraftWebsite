@@ -768,6 +768,64 @@ describe("OnDraftService big board editing", () => {
       expect(changedWriteup.value.entries[0].writeupPublished).toBe(false);
     }
   });
+
+  it("saves one big board entry without replacing the rest of the board", async () => {
+    const ondraftService = service();
+
+    const saved = await ondraftService.saveBigBoardEntries({
+      year: 2026,
+      creator: "Ryan",
+      entries: [
+        {
+          id: "targeted-entry-one",
+          playerName: "Targeted One",
+          school: "OnDraft State",
+          position: "QB",
+          rank: 1,
+          posRank: 1,
+          height: { feet: 6, inches: 2 },
+          weight: 220,
+        },
+        {
+          id: "targeted-entry-two",
+          playerName: "Targeted Two",
+          school: "Mock Tech",
+          position: "WR",
+          rank: 2,
+          posRank: 1,
+          height: { feet: 6, inches: 0 },
+          weight: 195,
+        },
+      ],
+    });
+    expect(saved.ok).toBe(true);
+
+    const updated = await ondraftService.saveBigBoardEntry({
+      year: 2026,
+      creator: "Ryan",
+      entry: {
+        id: "targeted-entry-one",
+        playerName: "Targeted One Updated",
+        school: "OnDraft State",
+        position: "QB",
+        rank: 1,
+        posRank: 1,
+        height: { feet: 6, inches: 2 },
+        weight: 221,
+      },
+    });
+    expect(updated.ok).toBe(true);
+
+    const board = await ondraftService.getBigBoard(2026, "Ryan");
+    expect(board.ok).toBe(true);
+    if (board.ok === true) {
+      expect(board.value.entries.map((entry) => entry.playerName)).toEqual([
+        "Targeted One Updated",
+        "Targeted Two",
+      ]);
+      expect(board.value.entries[0].weight).toBe(221);
+    }
+  });
 });
 
 describe("UserPreferenceService bookmarks", () => {

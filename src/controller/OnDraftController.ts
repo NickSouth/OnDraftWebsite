@@ -7,7 +7,7 @@ import type { IUserPreferenceService, UserPreferenceError } from "../service/Use
 import type { ILoggingService } from "../service/LoggingService";
 import { ArticleError, BigBoardError, ForumPostError } from "../repository/OnDraftRepository";
 import { publicArticleUploadUrl } from "../uploads/articlePdfUpload";
-import { BIG_BOARD_CREATORS, POSITIONS, type Article, type ArticleContent, type ArticleFilter, type BigBoard, type BigBoardCreator, type ForumPost, type ForumPostFilter, type Video, type VideoQuery } from "../model/OnDraftContent";
+import { BIG_BOARD_CREATORS, POSITIONS, type Article, type ArticleContent, type ArticleFilter, type BigBoard, type BigBoardCreator, type BigBoardEntry, type ForumPost, type ForumPostFilter, type Video, type VideoQuery } from "../model/OnDraftContent";
 import type { Bookmark, IUserBanRecord } from "../auth/User";
 import { collegeTeam } from "../CollegeFootballColors";
 import { helmetColorKey } from "../service/HelmetAssetService";
@@ -43,6 +43,24 @@ type HomeFeedItem =
     };
 
 const collegeTeamNames = Object.keys(collegeTeam).sort((first, second) => first.localeCompare(second));
+
+type BigBoardEditorField =
+  | "playerName"
+  | "school"
+  | "position"
+  | "rank"
+  | "posRank"
+  | "height"
+  | "weight"
+  | "strengths"
+  | "weaknesses"
+  | "rundown";
+
+type BigBoardEditorValidationIssue = {
+  entryId: string;
+  field: BigBoardEditorField;
+  message?: string;
+};
 
 export interface IOnDraftController {
   publicFeedItems(): Promise<Array<{ title: string; description: string; href: string; date: Date }>>;
@@ -87,9 +105,11 @@ export interface IOnDraftController {
   createBigBoardYear(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   deleteBigBoardYear(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   saveBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  saveBigBoardEntry(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   autosaveBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   publishBigBoardPlayerInfo(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   publishBigBoardWriteup(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  deleteBigBoardEntryFromEditor(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   deleteArticle(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   deleteBigBoardEntry(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   getSavedSchools(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
@@ -1243,6 +1263,8 @@ class OnDraftController implements IOnDraftController {
     errorMessage: string | null = null,
     statusMessage: string | null = null,
     statusCode = 200,
+    fragment = false,
+    validationIssues: BigBoardEditorValidationIssue[] = [],
   ): Promise<void> {
     const yearsResult = await this.service.getBigBoardYears();
     if (yearsResult.ok === false) {
@@ -1264,9 +1286,13 @@ class OnDraftController implements IOnDraftController {
       creators: BIG_BOARD_CREATORS.filter((creator) => creator !== "Consensus"),
       positions: POSITIONS,
       collegeTeamNames,
+      collegeTeamColors: collegeTeam,
+      helmetColorKey,
       errorMessage,
       statusMessage,
+      validationIssues,
       forceOverlaySidebar: true,
+      layout: fragment ? false : undefined,
     });
   }
 
@@ -1276,6 +1302,137 @@ class OnDraftController implements IOnDraftController {
       message,
       isError,
     });
+  }
+
+  private bigBoardEditorEntryCardLocals(board: BigBoard, entry: BigBoardEntry, isTemplate = false) {
+    const heightFractionOptions = [
+      { value: 0, label: "0" },
+      { value: 0.125, label: " 1/8" },
+      { value: 0.25, label: " 1/4" },
+      { value: 0.375, label: " 3/8" },
+      { value: 0.5, label: " 1/2" },
+      { value: 0.625, label: " 5/8" },
+      { value: 0.75, label: " 3/4" },
+      { value: 0.875, label: " 7/8" },
+    ];
+    const heightFeetOptions = [5, 6, 7];
+    const heightInchOptions = Array.from({ length: 12 }, (_, index) => index);
+    const heightValue = (feet: number, inches: number) => `${feet}-${Number(inches.toFixed(3))}`;
+    const selectedHeightValue = (height: BigBoardEntry["height"]) => height ? heightValue(height.feet, height.inches) : "";
+    const selectedHeightFeet = (height: BigBoardEntry["height"]) => height ? height.feet : "";
+    const selectedHeightInches = (height: BigBoardEntry["height"]) => height ? Math.floor(height.inches) : "";
+    const selectedHeightFraction = (height: BigBoardEntry["height"]) => height ? Number((height.inches - Math.floor(height.inches)).toFixed(3)) : 0;
+
+    return {
+      layout: false,
+      board,
+      entry,
+      index: 0,
+      positions: POSITIONS,
+      heightFeetOptions,
+      heightInchOptions,
+      heightFractionOptions,
+      selectedHeightValue,
+      selectedHeightFeet,
+      selectedHeightInches,
+      selectedHeightFraction,
+      collegeTeamColors: collegeTeam,
+      helmetColorKey,
+      validationIssues: [],
+      isTemplate,
+    };
+  }
+
+  private renderBigBoardEditorEntryCard(res: Response, board: BigBoard, entry: BigBoardEntry, statusCode = 200): void {
+    res.status(statusCode).render("ondraft/partials/bigBoardEditorEntryCard", this.bigBoardEditorEntryCardLocals(board, entry));
+  }
+
+  private addPublishValidationIssue(
+    issues: BigBoardEditorValidationIssue[],
+    entryId: string,
+    field: BigBoardEditorField,
+    message?: string,
+  ): void {
+    issues.push({ entryId, field, message });
+  }
+
+  private playerInfoPublishValidationIssues(board: BigBoard, attemptedEntryId: string, fallbackMessage: string): BigBoardEditorValidationIssue[] {
+    const issues: BigBoardEditorValidationIssue[] = [];
+    const attempted = board.entries.find((entry) => entry.id === attemptedEntryId);
+    if (!attempted) {
+      return issues;
+    }
+
+    if (!attempted.playerName) {
+      this.addPublishValidationIssue(issues, attempted.id, "playerName", "Player name is required before publishing player info.");
+    }
+    if (!attempted.school) {
+      this.addPublishValidationIssue(issues, attempted.id, "school", "School is required before publishing player info.");
+    }
+    if (!attempted.position || !POSITIONS.includes(attempted.position as typeof POSITIONS[number])) {
+      this.addPublishValidationIssue(issues, attempted.id, "position", "Choose a valid position before publishing player info.");
+    }
+    if (!attempted.height) {
+      this.addPublishValidationIssue(issues, attempted.id, "height", "Height is required before publishing player info.");
+    }
+    if (attempted.weight === null || attempted.weight <= 0) {
+      this.addPublishValidationIssue(issues, attempted.id, "weight", "Weight must be a positive number before publishing player info.");
+    }
+    if (attempted.rank === null || attempted.rank <= 0) {
+      this.addPublishValidationIssue(issues, attempted.id, "rank", "Overall rank must be a positive number before publishing player info.");
+    }
+    if (attempted.posRank === null || attempted.posRank <= 0) {
+      this.addPublishValidationIssue(issues, attempted.id, "posRank", "Position rank must be a positive number before publishing player info.");
+    }
+
+    if (attempted.rank !== null && attempted.rank > 0) {
+      const rankConflict = board.entries.find((entry) => entry.id !== attempted.id && entry.playerInfoPublished && entry.rank === attempted.rank);
+      if (rankConflict) {
+        this.addPublishValidationIssue(issues, attempted.id, "rank", `Overall rank ${attempted.rank} is already used by ${rankConflict.playerName || "another player"}.`);
+        this.addPublishValidationIssue(issues, rankConflict.id, "rank");
+      }
+    }
+
+    if (attempted.position && attempted.posRank !== null && attempted.posRank > 0) {
+      const posRankConflict = board.entries.find((entry) =>
+        entry.id !== attempted.id &&
+        entry.playerInfoPublished &&
+        entry.position === attempted.position &&
+        entry.posRank === attempted.posRank
+      );
+      if (posRankConflict) {
+        this.addPublishValidationIssue(issues, attempted.id, "posRank", `${attempted.position}${attempted.posRank} is already used by ${posRankConflict.playerName || "another player"}.`);
+        this.addPublishValidationIssue(issues, posRankConflict.id, "posRank");
+      }
+    }
+
+    if (issues.length === 0) {
+      this.addPublishValidationIssue(issues, attempted.id, "rank", fallbackMessage);
+    }
+    return issues;
+  }
+
+  private writeupPublishValidationIssues(board: BigBoard, attemptedEntryId: string, fallbackMessage: string): BigBoardEditorValidationIssue[] {
+    const issues: BigBoardEditorValidationIssue[] = [];
+    const attempted = board.entries.find((entry) => entry.id === attemptedEntryId);
+    if (!attempted) {
+      return issues;
+    }
+
+    if (!attempted.writeup.strengths) {
+      this.addPublishValidationIssue(issues, attempted.id, "strengths", "Strengths are required before publishing a player writeup.");
+    }
+    if (!attempted.writeup.weaknesses) {
+      this.addPublishValidationIssue(issues, attempted.id, "weaknesses", "Weaknesses are required before publishing a player writeup.");
+    }
+    if (!attempted.writeup.rundown) {
+      this.addPublishValidationIssue(issues, attempted.id, "rundown", "Rundown is required before publishing a player writeup.");
+    }
+
+    if (issues.length === 0) {
+      this.addPublishValidationIssue(issues, attempted.id, "rundown", fallbackMessage);
+    }
+    return issues;
   }
 
   async showEditBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
@@ -1288,7 +1445,7 @@ class OnDraftController implements IOnDraftController {
       return;
     }
 
-    await this.renderBigBoardEditor(res, session, result.value);
+    await this.renderBigBoardEditor(res, session, result.value, null, null, 200, req.get("HX-Request") === "true");
   }
 
   async showOneArticle(res: Response, session: IOnDraftBrowserSession, id: string): Promise<void> {
@@ -2090,7 +2247,15 @@ class OnDraftController implements IOnDraftController {
     if (result.ok === false) {
       const board = await this.service.getBigBoard(input.year, input.creator);
       if (board.ok === true) {
-        await this.renderBigBoardEditor(res, session, board.value, result.value.message, null, this.mapBigBoardErrorToStatusCode(result.value));
+        await this.renderBigBoardEditor(
+          res,
+          session,
+          board.value,
+          result.value.message,
+          null,
+          this.mapBigBoardErrorToStatusCode(result.value),
+          req.get("HX-Request") === "true",
+        );
         return;
       }
       res.status(this.mapBigBoardErrorToStatusCode(result.value)).send(result.value.message);
@@ -2102,7 +2267,51 @@ class OnDraftController implements IOnDraftController {
       return;
     }
 
-    await this.renderBigBoardEditor(res, session, result.value, null, "Saved.");
+    await this.renderBigBoardEditor(res, session, result.value, null, "Saved.", 200, req.get("HX-Request") === "true");
+  }
+
+  async saveBigBoardEntry(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Saving big board entry edits");
+    const input = this.buildBigBoardEntriesInput(req);
+    const entry = input.entries[0];
+    if (!entry) {
+      const board = await this.service.getBigBoard(input.year, input.creator);
+      if (board.ok === true) {
+        await this.renderBigBoardEditor(res, session, board.value, "Add at least one player detail before saving this card.", null, 400);
+        return;
+      }
+      res.status(400).send("Add at least one player detail before saving this card.");
+      return;
+    }
+
+    const result = await this.service.saveBigBoardEntry({
+      year: input.year,
+      creator: input.creator,
+      entry,
+    });
+    const board = await this.service.getBigBoard(input.year, input.creator);
+    if (board.ok === false) {
+      res.status(this.mapBigBoardErrorToStatusCode(board.value)).send(board.value.message);
+      return;
+    }
+    if (result.ok === false) {
+      if (req.get("HX-Request") === "true") {
+        const fallbackEntry = board.value.entries.find((candidate) => candidate.id === entry.id) ?? board.value.entries[0];
+        if (fallbackEntry) {
+          this.renderBigBoardEditorEntryCard(res, board.value, fallbackEntry, 200);
+          return;
+        }
+      }
+      await this.renderBigBoardEditor(res, session, board.value, result.value.message, null, this.mapBigBoardErrorToStatusCode(result.value));
+      return;
+    }
+
+    const playerName = result.value.playerName || "draft board entry";
+    if (req.get("HX-Request") === "true") {
+      this.renderBigBoardEditorEntryCard(res, board.value, result.value);
+      return;
+    }
+    await this.renderBigBoardEditor(res, session, board.value, null, `Saved ${playerName}.`);
   }
 
   async autosaveBigBoard(req: Request, res: Response, _session: IOnDraftBrowserSession): Promise<void> {
@@ -2120,15 +2329,38 @@ class OnDraftController implements IOnDraftController {
     req: Request,
     res: Response,
     session: IOnDraftBrowserSession,
-    publish: (year: number | undefined, creator: BigBoardCreator | undefined, entryId: string) => Promise<{ ok: true; value: unknown } | { ok: false; value: BigBoardError }>,
+    publish: (year: number | undefined, creator: BigBoardCreator | undefined, entryId: string) => Promise<{ ok: true; value: BigBoardEntry } | { ok: false; value: BigBoardError }>,
+    validationIssuesFor: (board: BigBoard, attemptedEntryId: string, message: string) => BigBoardEditorValidationIssue[],
     successMessage: string,
   ): Promise<void> {
     const input = this.buildBigBoardEntriesInput(req);
-    const saved = await this.service.saveBigBoardEntries(input);
     const entryId = this.formString(req.body.entryId);
+    const entry = input.entries.find((candidate) => candidate.id === entryId) ?? input.entries[0];
+    if (!entry) {
+      const board = await this.service.getBigBoard(input.year, input.creator);
+      if (board.ok === true) {
+        await this.renderBigBoardEditor(res, session, board.value, "Save the player card before publishing it.", null, 400);
+        return;
+      }
+      res.status(400).send("Save the player card before publishing it.");
+      return;
+    }
+
+    const saved = await this.service.saveBigBoardEntry({
+      year: input.year,
+      creator: input.creator,
+      entry,
+    });
     if (saved.ok === false) {
       const board = await this.service.getBigBoard(input.year, input.creator);
       if (board.ok === true) {
+        if (req.get("HX-Request") === "true") {
+          const fallbackEntry = board.value.entries.find((candidate) => candidate.id === entry.id) ?? board.value.entries[0];
+          if (fallbackEntry) {
+            this.renderBigBoardEditorEntryCard(res, board.value, fallbackEntry, 200);
+            return;
+          }
+        }
         await this.renderBigBoardEditor(res, session, board.value, saved.value.message, null, this.mapBigBoardErrorToStatusCode(saved.value));
         return;
       }
@@ -2136,17 +2368,30 @@ class OnDraftController implements IOnDraftController {
       return;
     }
 
-    const published = await publish(input.year, input.creator, entryId);
+    const published = await publish(input.year, input.creator, saved.value.id);
     const updatedBoard = await this.service.getBigBoard(input.year, input.creator);
     if (updatedBoard.ok === false) {
       res.status(this.mapBigBoardErrorToStatusCode(updatedBoard.value)).send(updatedBoard.value.message);
       return;
     }
     if (published.ok === false) {
-      await this.renderBigBoardEditor(res, session, updatedBoard.value, published.value.message, null, this.mapBigBoardErrorToStatusCode(published.value));
+      const validationIssues = validationIssuesFor(updatedBoard.value, saved.value.id, published.value.message);
+      if (req.get("HX-Request") === "true") {
+        res.set("HX-Retarget", "#big-board-editor-fragment");
+        res.set("HX-Reswap", "outerHTML");
+        res.set("HX-Scroll", "top");
+        await this.renderBigBoardEditor(res, session, updatedBoard.value, published.value.message, null, 200, true, validationIssues);
+        return;
+      }
+      await this.renderBigBoardEditor(res, session, updatedBoard.value, published.value.message, null, this.mapBigBoardErrorToStatusCode(published.value), false, validationIssues);
       return;
     }
 
+    if (req.get("HX-Request") === "true") {
+      const publishedEntry = updatedBoard.value.entries.find((candidate) => candidate.id === published.value.id) ?? published.value;
+      this.renderBigBoardEditorEntryCard(res, updatedBoard.value, publishedEntry);
+      return;
+    }
     await this.renderBigBoardEditor(res, session, updatedBoard.value, null, successMessage);
   }
 
@@ -2157,6 +2402,7 @@ class OnDraftController implements IOnDraftController {
       res,
       session,
       (year, creator, entryId) => this.service.publishBigBoardEntryPlayerInfo(year, creator, entryId),
+      (board, entryId, message) => this.playerInfoPublishValidationIssues(board, entryId, message),
       "Player info published.",
     );
   }
@@ -2168,8 +2414,56 @@ class OnDraftController implements IOnDraftController {
       res,
       session,
       (year, creator, entryId) => this.service.publishBigBoardEntryWriteup(year, creator, entryId),
+      (board, entryId, message) => this.writeupPublishValidationIssues(board, entryId, message),
       "Writeup published.",
     );
+  }
+
+  async deleteBigBoardEntryFromEditor(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Deleting big board entry from editor");
+    const year = this.parseBigBoardYear(req.body.year);
+    const creator = this.parseBigBoardCreator(req.body.creator);
+    const entryId = this.formString(req.body.entryId);
+    const input = this.buildBigBoardEntriesInput(req);
+    const postedEntry = input.entries[0];
+    const postedPlayerName = this.formString(postedEntry?.playerName);
+    const board = await this.service.getBigBoard(year, creator);
+    if (board.ok === false) {
+      res.status(this.mapBigBoardErrorToStatusCode(board.value)).send(board.value.message);
+      return;
+    }
+
+    const entry = board.value.entries.find((candidate) => candidate.id === entryId)
+      ?? board.value.entries.find((candidate) => postedPlayerName !== "" && candidate.playerName === postedPlayerName);
+    if (!entry) {
+      if (req.get("HX-Request") === "true") {
+        res.status(200).send("");
+        return;
+      }
+      await this.renderBigBoardEditor(res, session, board.value, `Big board entry with id "${entryId}" was not found.`, null, 404);
+      return;
+    }
+
+    if (req.get("HX-Request") === "true") {
+      res.status(200).send("");
+      return;
+    }
+
+    const result = await this.service.deleteBigBoardEntry(year, creator, entry.playerName);
+    const updatedBoard = await this.service.getBigBoard(year, creator);
+    if (updatedBoard.ok === false) {
+      res.status(this.mapBigBoardErrorToStatusCode(updatedBoard.value)).send(updatedBoard.value.message);
+      return;
+    }
+    if (result.ok === false) {
+      if (req.get("HX-Request") === "true") {
+        res.status(200).send("");
+        return;
+      }
+      await this.renderBigBoardEditor(res, session, updatedBoard.value, result.value.message, null, this.mapBigBoardErrorToStatusCode(result.value));
+      return;
+    }
+    await this.renderBigBoardEditor(res, session, updatedBoard.value, null, `Deleted ${entry.playerName || "draft board entry"}.`);
   }
 
   async deleteArticle(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void> {
