@@ -1,7 +1,5 @@
 <section
   class="mx-auto grid w-full max-w-6xl gap-8"
-  data-keyword="<%= values.keyword || "" %>"
-  x-data="{ articleView: '<%= viewMode === "list" ? "list" : "card" %>' }"
 >
   <div class="grid gap-5 border-b border-slate-200 pb-6 dark:border-white/10 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
     <div class="max-w-3xl">
@@ -15,25 +13,7 @@
     </div>
 
     <% if (isAdmin) { %>
-      <div class="grid gap-3 sm:justify-items-end">
-        <a class="od-primary-link w-full sm:w-auto" href="/articles/new">Create article</a>
-        <div class="inline-flex w-full rounded-lg border border-slate-200 bg-white p-1 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:w-fit" aria-label="Article status">
-          <button
-            type="button"
-            class="od-focus-ring flex-1 rounded-md px-4 py-2 text-sm font-black transition sm:flex-none <%= showingPublished ? "bg-draft-gold text-draft-ink" : "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10" %>"
-            onclick="document.getElementById('article-status-field').value = 'published'; this.parentElement.querySelectorAll('button').forEach((button) => { button.classList.remove('bg-draft-gold', 'text-draft-ink'); button.classList.add('text-slate-700', 'dark:text-slate-200'); }); this.classList.add('bg-draft-gold', 'text-draft-ink'); this.classList.remove('text-slate-700', 'dark:text-slate-200'); htmx.trigger(document.querySelector('.article-filter-form'), 'submit');"
-          >
-            Published
-          </button>
-          <button
-            type="button"
-            class="od-focus-ring flex-1 rounded-md px-4 py-2 text-sm font-black transition sm:flex-none <%= showingPublished ? "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10" : "bg-draft-gold text-draft-ink" %>"
-            onclick="document.getElementById('article-status-field').value = 'draft'; this.parentElement.querySelectorAll('button').forEach((button) => { button.classList.remove('bg-draft-gold', 'text-draft-ink'); button.classList.add('text-slate-700', 'dark:text-slate-200'); }); this.classList.add('bg-draft-gold', 'text-draft-ink'); this.classList.remove('text-slate-700', 'dark:text-slate-200'); htmx.trigger(document.querySelector('.article-filter-form'), 'submit');"
-          >
-            Unpublished
-          </button>
-        </div>
-      </div>
+      <a class="od-primary-link w-full sm:w-auto" href="/articles/new">Create article</a>
     <% } %>
   </div>
 
@@ -49,14 +29,47 @@
     data-loading-skeleton="article-results"
     data-loading-skeleton-target="#articles-results"
     x-data="{
+      articleView: '<%= viewMode === "list" ? "list" : "card" %>',
       searchOpen: false,
       filtersOpen: false,
       keyword: $el.dataset.keyword || '',
       searchedKeyword: ($el.dataset.keyword || '').trim(),
-      appliedFilterSignature: '<%= [values.author || "", values.tags || "", values.dateFrom || "", values.dateTo || ""].join("|") %>',
       filterSignature: '<%= [values.author || "", values.tags || "", values.dateFrom || "", values.dateTo || ""].join("|") %>',
+      searchTimer: null,
+      filterTimer: null,
       get hasKeyword() { return this.keyword.trim().length > 0 },
-      get searchDirty() { return this.keyword.trim() !== this.searchedKeyword },
+      openSearch() {
+        this.searchOpen = true;
+        this.$nextTick(() => this.$refs.articleSearch?.focus());
+      },
+      closeSearch() {
+        this.searchOpen = false;
+        this.$nextTick(() => this.$refs.articleSearchTrigger?.focus());
+      },
+      toggleFilters() {
+        this.filtersOpen = !this.filtersOpen;
+      },
+      requestSubmit() {
+        htmx.trigger(this.$refs.articleFilterForm, 'submit');
+      },
+      queueSearchSubmit() {
+        window.clearTimeout(this.searchTimer);
+        this.searchTimer = window.setTimeout(() => {
+          if (this.keyword.trim() === this.searchedKeyword) return;
+          this.submitSearch();
+        }, 240);
+      },
+      submitSearch() {
+        this.searchedKeyword = this.keyword.trim();
+        this.requestSubmit();
+      },
+      queueFilterSubmit() {
+        this.filterSignature = this.currentFilterSignature();
+        window.clearTimeout(this.filterTimer);
+        this.filterTimer = window.setTimeout(() => {
+          this.requestSubmit();
+        }, 240);
+      },
       currentFilterSignature() {
         return [
           this.$refs.articleAuthor?.value || '',
@@ -65,15 +78,11 @@
           this.$refs.articleDateTo?.value || ''
         ].map((value) => value.trim()).join('|');
       },
-      syncFilters() {
-        this.filterSignature = this.currentFilterSignature();
-      },
       get hasFilterContent() { return this.filterSignature.split('|').some((value) => value.length > 0) },
-      get filtersDirty() { return this.filterSignature !== this.appliedFilterSignature },
       clearSearch() {
         this.keyword = '';
-        this.searchedKeyword = '';
-        this.$nextTick(() => htmx.trigger(this.$refs.articleFilterForm, 'submit'));
+        this.submitSearch();
+        this.$nextTick(() => this.$refs.articleSearch?.focus());
       },
       clearFilters() {
         const status = document.getElementById('article-status-field')?.value || 'published';
@@ -84,96 +93,149 @@
         this.$refs.articleDateTo.value = '';
         const statusField = document.getElementById('article-status-field');
         if (statusField) statusField.value = status;
-        this.syncFilters();
-        this.appliedFilterSignature = this.filterSignature;
-        this.$nextTick(() => htmx.trigger(this.$refs.articleFilterForm, 'submit'));
+        this.filterSignature = '';
+        this.$nextTick(() => this.requestSubmit());
+      },
+      clearAllFilters() {
+        const status = document.getElementById('article-status-field')?.value || 'published';
+        this.keyword = '';
+        this.searchedKeyword = '';
+        this.$refs.articleAuthor.value = '';
+        this.$refs.articleTags.value = '';
+        this.$refs.articleTags.dispatchEvent(new Event('change', { bubbles: true }));
+        this.$refs.articleDateFrom.value = '';
+        this.$refs.articleDateTo.value = '';
+        const statusField = document.getElementById('article-status-field');
+        if (statusField) statusField.value = status;
+        this.filterSignature = '';
+        this.$nextTick(() => this.requestSubmit());
       }
     }"
     x-ref="articleFilterForm"
-    @submit="searchedKeyword = keyword.trim(); syncFilters(); appliedFilterSignature = filterSignature"
+    @submit="searchedKeyword = keyword.trim()"
+    @ondraft:clear-filters.window="if ($event.detail?.formId === 'article-filter-form') clearAllFilters()"
+    @keydown.escape.window="if (filtersOpen) { filtersOpen = false } else if (searchOpen) { closeSearch() }"
   >
     <input type="hidden" name="view" x-model="articleView" />
     <% if (isAdmin) { %>
       <input id="article-status-field" type="hidden" name="status" value="<%= showingPublished ? "published" : "draft" %>" />
     <% } %>
 
-    <div class="od-control-workspace">
-      <div class="od-control-primary" :class="searchOpen || filtersOpen ? '' : 'is-compact'">
-        <div class="od-panel-toggle-row">
-          <button
-            type="button"
-            class="od-icon-button"
-            :class="filtersOpen ? 'is-active' : ''"
-            :aria-expanded="String(filtersOpen)"
-            aria-controls="article-filter-panel"
-            aria-label="Filters"
-            title="Filters"
-            @click="filtersOpen = !filtersOpen"
-          >
-            <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
-              <path d="M4 7h16" />
-              <path d="M7 12h10" />
-              <path d="M10 17h4" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            class="od-icon-button"
-            :class="searchOpen ? 'is-active' : ''"
-            :aria-expanded="String(searchOpen)"
-            aria-controls="article-search-panel"
-            aria-label="Search articles"
-            title="Search articles"
-            @click="searchOpen = !searchOpen; $nextTick(() => searchOpen && $refs.articleSearch?.focus())"
-          >
-            <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <circle cx="11" cy="11" r="7" />
-              <path d="m20 20-3.5-3.5" />
-            </svg>
-          </button>
-        </div>
-
-        <div id="article-search-panel" class="od-tool-panel od-search-panel" x-show="searchOpen" x-collapse x-cloak>
-          <label class="od-search-field">
-            <span class="sr-only">Search articles</span>
-            <input class="od-search-input" x-ref="articleSearch" x-model="keyword" name="keyword" type="search" placeholder="Search articles" />
+    <div class="od-toolbar-stack">
+      <div class="od-toolbar-topline">
+        <div></div>
+        <div class="od-toolbar-actions">
+          <div class="od-search-dock" :class="searchOpen ? 'is-open' : ''">
             <button
               type="button"
-              class="od-search-icon-button"
-              :class="hasKeyword && searchDirty ? 'right-10' : 'right-1'"
-              x-cloak
-              x-show="hasKeyword"
-              @click="clearSearch()"
-              aria-label="Clear search"
-              title="Clear search"
+              class="od-search-dock-trigger"
+              x-ref="articleSearchTrigger"
+              x-show="!searchOpen"
+              x-transition.opacity.duration.150ms
+              :aria-expanded="String(searchOpen)"
+              aria-controls="article-search-panel"
+              aria-label="Search articles"
+              title="Search articles"
+              @click="openSearch()"
             >
-              <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
-                <path d="M18 6 6 18" />
-                <path d="m6 6 12 12" />
+              <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" />
               </svg>
             </button>
-            <button
-              type="submit"
-              class="od-search-icon-button od-search-submit right-1"
+            <div
+              id="article-search-panel"
+              class="od-search-dock-field"
               x-cloak
-              x-show="hasKeyword && searchDirty"
-              aria-label="Search"
-              title="Search"
+              x-show="searchOpen"
+              x-transition.opacity.duration.180ms
             >
-              <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M5 12h14" />
-                <path d="m13 6 6 6-6 6" />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" />
               </svg>
-            </button>
-          </label>
-        </div>
+              <label class="sr-only" for="article-search-input">Search articles</label>
+              <input
+                id="article-search-input"
+                class="od-search-dock-input"
+                x-ref="articleSearch"
+                x-model="keyword"
+                name="keyword"
+                type="search"
+                placeholder="Search articles"
+                @input="queueSearchSubmit()"
+                @keydown.enter.prevent="submitSearch()"
+              />
+              <div class="od-search-dock-actions">
+                <button
+                  type="button"
+                  class="od-search-dock-action"
+                  x-cloak
+                  x-show="hasKeyword"
+                  x-transition.opacity.duration.150ms
+                  @click="clearSearch()"
+                >
+                  Clear
+                </button>
+              </div>
+              <button
+                type="button"
+                class="od-search-dock-close"
+                @click="closeSearch()"
+                aria-label="Close search"
+                title="Close search"
+              >
+                <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
 
-        <div id="article-filter-panel" class="od-tool-panel" x-show="filtersOpen" x-collapse x-cloak>
+          <div class="od-filter-popover-shell">
+            <button
+              type="button"
+              class="od-icon-button"
+              :class="filtersOpen || hasFilterContent ? 'is-active' : ''"
+              :aria-expanded="String(filtersOpen)"
+              aria-controls="article-filter-panel"
+              :aria-label="filtersOpen ? 'Close filters' : 'Filters'"
+              :title="filtersOpen ? 'Close filters' : 'Filters'"
+              @click="toggleFilters()"
+            >
+              <template x-if="!filtersOpen">
+                <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+                  <path d="M4 7h16" />
+                  <path d="M7 12h10" />
+                  <path d="M10 17h4" />
+                </svg>
+              </template>
+              <template x-if="filtersOpen">
+                <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </template>
+            </button>
+
+            <div
+              id="article-filter-panel"
+              class="od-filter-popover"
+              x-cloak
+              x-show="filtersOpen"
+              x-transition:enter="transition ease-out duration-180"
+              x-transition:enter-start="opacity-0 -translate-y-2 scale-[0.98]"
+              x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+              x-transition:leave="transition ease-in duration-140"
+              x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+              x-transition:leave-end="opacity-0 -translate-y-1 scale-[0.98]"
+            >
           <%
             const selectedArticleFilterTags = (values.tags || "").split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean);
             const articleFilterTagOptions = [...new Set([...(articleTags || []), ...selectedArticleFilterTags])].sort((first, second) => first.localeCompare(second));
           %>
-          <div class="od-article-filter-grid" @input="syncFilters()" @change="syncFilters()">
+              <div class="od-article-filter-grid od-filter-popover-grid" @input="queueFilterSubmit()" @change="queueFilterSubmit()">
             <label>
               <span>
                 <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -246,99 +308,112 @@
               <input x-ref="articleDateFrom" type="date" name="dateFrom" value="<%= values.dateFrom || "" %>" />
             </label>
           </div>
-          <div class="od-filter-panel-actions">
-            <button
-              type="button"
-              class="od-search-icon-button"
-              :class="filtersDirty ? 'right-10' : 'right-1'"
-              x-cloak
-              x-show="hasFilterContent"
-              @click="clearFilters()"
-              aria-label="Clear filters"
-              title="Clear filters"
-            >
-              <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
-                <path d="M18 6 6 18" />
-                <path d="m6 6 12 12" />
-              </svg>
-            </button>
-            <button class="od-search-icon-button od-search-submit right-1" type="submit" x-cloak x-show="filtersDirty" aria-label="Apply filters" title="Apply filters">
-              <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M5 12h14" />
-                <path d="m13 6 6 6-6 6" />
-              </svg>
-            </button>
+              <div class="od-tool-panel-actions">
+                <button
+                  type="button"
+                  class="od-search-dock-action"
+                  x-cloak
+                  x-show="hasFilterContent"
+                  x-transition.opacity.duration.150ms
+                  @click="clearFilters()"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="od-control-secondary">
-        <div class="od-page-sort-row">
-          <div class="od-page-sort-group">
-            <label>
-              <span>Sort</span>
-              <select id="article-sort-by" name="sortBy" onchange="htmx.trigger(this.form, 'submit');">
-                <option value="date" <%= sortBy === "date" ? "selected" : "" %>>Date</option>
-                <option value="likes" <%= sortBy === "likes" ? "selected" : "" %>>Likes</option>
-                <option value="comments" <%= sortBy === "comments" ? "selected" : "" %>>Comments</option>
-              </select>
-            </label>
-            <label>
-              <span>Direction</span>
-              <select id="article-sort-direction" name="sortDirection" onchange="htmx.trigger(this.form, 'submit');">
-                <option value="desc" <%= sortDirection === "desc" ? "selected" : "" %>>Descending</option>
-                <option value="asc" <%= sortDirection === "asc" ? "selected" : "" %>>Ascending</option>
-              </select>
-            </label>
+      <div class="od-toolbar-bottomline">
+        <div class="od-toolbar-bottomline-main">
+          <div class="od-toolbar-status">
+            <% if (isAdmin) { %>
+              <div class="od-text-toggle-group w-full sm:w-fit" style="--od-toggle-count: 2;" aria-label="Article status">
+                <button
+                  type="button"
+                  class="od-text-toggle flex-1 sm:flex-none <%= showingPublished ? "is-active" : "" %>"
+                  onclick="document.getElementById('article-status-field').value = 'published'; this.parentElement.querySelectorAll('button').forEach((button) => button.classList.remove('is-active')); this.classList.add('is-active'); htmx.trigger(document.querySelector('.article-filter-form'), 'submit');"
+                >
+                  Published
+                </button>
+                <button
+                  type="button"
+                  class="od-text-toggle flex-1 sm:flex-none <%= showingPublished ? "" : "is-active" %>"
+                  onclick="document.getElementById('article-status-field').value = 'draft'; this.parentElement.querySelectorAll('button').forEach((button) => button.classList.remove('is-active')); this.classList.add('is-active'); htmx.trigger(document.querySelector('.article-filter-form'), 'submit');"
+                >
+                  Unpublished
+                </button>
+              </div>
+            <% } %>
+          </div>
+
+          <div class="od-toolbar-sortline">
+            <div class="od-page-sort-group">
+              <label>
+                <span>Sort</span>
+                <select id="article-sort-by" name="sortBy" onchange="htmx.trigger(this.form, 'submit');">
+                  <option value="date" <%= sortBy === "date" ? "selected" : "" %>>Date</option>
+                  <option value="likes" <%= sortBy === "likes" ? "selected" : "" %>>Likes</option>
+                  <option value="comments" <%= sortBy === "comments" ? "selected" : "" %>>Comments</option>
+                </select>
+              </label>
+              <label>
+                <span>Direction</span>
+                <select id="article-sort-direction" name="sortDirection" onchange="htmx.trigger(this.form, 'submit');">
+                  <option value="desc" <%= sortDirection === "desc" ? "selected" : "" %>>Descending</option>
+                  <option value="asc" <%= sortDirection === "asc" ? "selected" : "" %>>Ascending</option>
+                </select>
+              </label>
+            </div>
+            <div class="od-toolbar-inline-meta">
+              <div class="od-view-toggle-group" aria-label="Article layout">
+                <button
+                  type="button"
+                  class="od-view-toggle"
+                  :class="articleView === 'card' ? 'is-active' : ''"
+                  :aria-pressed="String(articleView === 'card')"
+                  aria-label="Card view"
+                  title="Card view"
+                  @click="articleView = 'card'; $nextTick(() => htmx.trigger($el.form, 'submit'))"
+                >
+                  <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <rect x="4" y="5" width="16" height="4" rx="1" />
+                    <rect x="4" y="10" width="16" height="4" rx="1" />
+                    <rect x="4" y="15" width="16" height="4" rx="1" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="od-view-toggle"
+                  :class="articleView === 'list' ? 'is-active' : ''"
+                  :aria-pressed="String(articleView === 'list')"
+                  aria-label="List view"
+                  title="List view"
+                  @click="articleView = 'list'; $nextTick(() => htmx.trigger($el.form, 'submit'))"
+                >
+                  <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path d="M7 6h14" />
+                    <path d="M7 12h14" />
+                    <path d="M7 18h14" />
+                    <path d="M4 6h.01" />
+                    <path d="M4 12h.01" />
+                    <path d="M4 18h.01" />
+                  </svg>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-
-        <div class="od-page-tools-footer">
-          <div class="od-view-toggle-group" aria-label="Article layout">
-            <button
-              type="button"
-              class="od-view-toggle"
-              :class="articleView === 'card' ? 'is-active' : ''"
-              :aria-pressed="String(articleView === 'card')"
-              aria-label="Card view"
-              title="Card view"
-              @click="articleView = 'card'; $nextTick(() => htmx.trigger($el.form, 'submit'))"
-            >
-              <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <rect x="4" y="5" width="16" height="4" rx="1" />
-                <rect x="4" y="10" width="16" height="4" rx="1" />
-                <rect x="4" y="15" width="16" height="4" rx="1" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              class="od-view-toggle"
-              :class="articleView === 'list' ? 'is-active' : ''"
-              :aria-pressed="String(articleView === 'list')"
-              aria-label="List view"
-              title="List view"
-              @click="articleView = 'list'; $nextTick(() => htmx.trigger($el.form, 'submit'))"
-            >
-              <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path d="M7 6h14" />
-                <path d="M7 12h14" />
-                <path d="M7 18h14" />
-                <path d="M4 6h.01" />
-                <path d="M4 12h.01" />
-                <path d="M4 18h.01" />
-              </svg>
-            </button>
-          </div>
-          <div id="article-results-loading" class="od-inline-loader htmx-indicator" role="status" aria-live="polite">
-            <span class="od-inline-loader-dot" aria-hidden="true"></span>
-            Updating articles
-          </div>
+        <div id="article-results-loading" class="od-inline-loader htmx-indicator" role="status" aria-live="polite">
+          <span class="od-inline-loader-dot" aria-hidden="true"></span>
+          Updating articles
         </div>
       </div>
     </div>
   </form>
 
-  <div id="articles-results">
+  <div id="articles-results" class="od-swap-surface od-swap-active">
     <%- include("partials/articleList", { articles, isAdmin, showingPublished, session, viewMode, bookmarkedArticleIds, hasAnyArticles, hasFilters }) %>
   </div>
   <script src="/articleTags.js" defer></script>

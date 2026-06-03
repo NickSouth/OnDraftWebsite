@@ -34,7 +34,7 @@
           <div class="border-b border-slate-200 px-4 py-3 dark:border-white/10">
             <div class="od-loading-bar h-3 w-28"></div>
           </div>
-          <div class="od-loading-card min-h-[360px] rounded-none"></div>
+          <div class="od-loading-card od-loading-card-carousel min-h-[430px] rounded-none md:min-h-[520px]"></div>
           <div class="flex items-center justify-between border-t border-slate-200 p-4 dark:border-white/10">
             <div class="od-loading-bar size-9 rounded-md"></div>
             <div class="flex gap-2">
@@ -293,7 +293,7 @@
   </template>
 
   <template data-result-skeleton="big-board-results-card">
-    <div id="big-board-results" class="od-result-skeleton big-board-results" aria-live="polite" aria-label="Loading draft board">
+    <div id="big-board-results" class="od-result-skeleton big-board-results od-swap-surface" aria-live="polite" aria-label="Loading draft board">
       <div class="mb-4 flex justify-end">
         <div class="inline-flex rounded-md border border-slate-200 bg-white p-1 dark:border-white/10 dark:bg-draft-slate">
           <div class="od-loading-bar size-10 rounded"></div>
@@ -309,7 +309,7 @@
                 <div class="od-loading-bar h-12 w-12"></div>
               </span>
               <span class="relative z-10 flex justify-center">
-                <div class="od-loading-bar h-20 w-28 rounded-md"></div>
+                <div class="od-loading-bar od-loading-card-board h-20 w-28 rounded-md"></div>
               </span>
               <div class="relative z-10 grid gap-3">
                 <div class="grid gap-3 lg:grid-cols-[minmax(0,18rem)_minmax(12rem,1fr)] lg:items-start">
@@ -336,7 +336,7 @@
   </template>
 
   <template data-result-skeleton="big-board-results-list">
-    <div id="big-board-results" class="od-result-skeleton big-board-results" aria-live="polite" aria-label="Loading draft board">
+    <div id="big-board-results" class="od-result-skeleton big-board-results od-swap-surface" aria-live="polite" aria-label="Loading draft board">
       <div class="mb-4 flex justify-end">
         <div class="inline-flex rounded-md border border-slate-200 bg-white p-1 dark:border-white/10 dark:bg-draft-slate">
           <div class="od-loading-bar size-10 rounded"></div>
@@ -366,8 +366,8 @@
   </template>
 
   <template data-result-skeleton="hot-takes">
-    <div id="hot-take-list" class="od-result-skeleton hot-take-list" aria-live="polite" aria-label="Loading hot takes">
-      <ol class="comment-list">
+    <div id="hot-take-list" class="od-result-skeleton hot-take-list od-swap-surface" aria-live="polite" aria-label="Loading hot takes">
+      <ol class="comment-list od-stagger-list">
         <% for (let index = 0; index < 4; index += 1) { %>
           <li class="comment-item hot-take-item">
             <div class="comment-header">
@@ -394,15 +394,8 @@
   </template>
 
   <template data-result-skeleton="popular-articles">
-    <div id="popular-articles-panel" class="od-result-skeleton grid gap-4" aria-live="polite" aria-label="Loading popular articles">
-      <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-        <div class="grid gap-2">
-          <div class="od-loading-bar h-3 w-28"></div>
-          <div class="od-loading-bar h-8 w-56"></div>
-        </div>
-        <div class="od-loading-bar h-10 w-full rounded-md sm:w-72"></div>
-      </div>
-      <div class="grid max-h-[720px] gap-3 overflow-y-auto px-1 py-1">
+    <div id="popular-articles-results" class="od-result-skeleton od-swap-surface grid gap-4" aria-live="polite" aria-label="Loading popular articles">
+      <div class="od-stagger-list grid max-h-[720px] gap-3 overflow-y-auto px-1 py-1">
         <% for (let index = 0; index < 5; index += 1) { %>
           <div class="od-card grid grid-cols-[2.75rem_4.5rem_minmax(0,1fr)] items-center gap-3 overflow-hidden p-3 sm:grid-cols-[3.5rem_6rem_minmax(0,1fr)_auto] sm:p-0">
             <div class="od-loading-bar size-10 rounded-md sm:size-12"></div>

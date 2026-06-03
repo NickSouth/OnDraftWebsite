@@ -10,7 +10,7 @@
 
 <div
   x-cloak
-  class="fixed inset-0 z-50 bg-slate-950/50 <%= forceOverlaySidebar ? "" : "lg:hidden" %>"
+  class="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-[2px] transition-opacity duration-300 <%= forceOverlaySidebar ? "" : "lg:hidden" %>"
   x-show="sidebarOpen"
   x-transition.opacity
   @click="sidebarOpen = false"
@@ -18,7 +18,7 @@
 
 <aside
   id="site-sidebar"
-  class="fixed right-0 top-14 z-50 flex h-[calc(100vh-3.5rem)] w-80 max-w-[calc(100vw-1rem)] flex-col border-l border-slate-200 bg-white shadow-editorial transition-transform duration-200 dark:border-white/10 dark:bg-draft-slate <%= forceOverlaySidebar ? "" : "lg:top-0 lg:h-screen lg:translate-x-0" %>"
+  class="fixed right-0 top-14 z-50 flex h-[calc(100vh-3.5rem)] w-80 max-w-[calc(100vw-1rem)] flex-col border-l border-slate-200 bg-white shadow-editorial transition-transform duration-300 ease-out dark:border-white/10 dark:bg-draft-slate <%= forceOverlaySidebar ? "" : "lg:top-0 lg:h-screen lg:translate-x-0" %>"
   :class="sidebarOpen ? 'translate-x-0' : 'translate-x-[calc(100%+1rem)] <%= forceOverlaySidebar ? "" : "lg:translate-x-0" %>'"
   x-trap.noscroll="sidebarOpen <%= forceOverlaySidebar ? "" : "&& window.innerWidth < 1024" %>"
   @keydown.escape.window="sidebarOpen = false"
@@ -37,7 +37,7 @@
       <% if (currentSession?.authenticatedUser) { %>
         <button
           type="button"
-          class="od-focus-ring inline-flex size-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:hover:bg-white/15"
+          class="od-focus-ring inline-flex size-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 transition duration-200 hover:-translate-y-0.5 hover:bg-slate-50 active:scale-95 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:hover:bg-white/15"
           hx-get="/settings"
           hx-target="#site-modal-outlet"
           hx-swap="innerHTML"
@@ -52,7 +52,7 @@
       <% } %>
       <button
         type="button"
-        class="od-focus-ring inline-flex size-9 items-center justify-center rounded-md text-2xl leading-none text-slate-600 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 <%= forceOverlaySidebar ? "" : "lg:hidden" %>"
+        class="od-focus-ring inline-flex size-9 items-center justify-center rounded-md text-2xl leading-none text-slate-600 transition duration-200 hover:scale-[1.03] hover:bg-slate-100 active:scale-95 dark:text-slate-200 dark:hover:bg-white/10 <%= forceOverlaySidebar ? "" : "lg:hidden" %>"
         aria-label="Close navigation"
         @click="sidebarOpen = false"
       >

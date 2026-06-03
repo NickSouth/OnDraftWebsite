@@ -25,7 +25,7 @@
             <button
               type="button"
               class="od-secondary-link"
-              onclick="const form = document.getElementById('article-filter-form'); if (!form) return; const status = document.getElementById('article-status-field')?.value || 'published'; form.reset(); const statusField = document.getElementById('article-status-field'); if (statusField) statusField.value = status; htmx.trigger(form, 'submit');"
+              onclick="window.dispatchEvent(new CustomEvent('ondraft:clear-filters', { detail: { formId: 'article-filter-form' } }));"
             >
               Clear filters
             </button>
@@ -39,7 +39,7 @@
     </div>
   </div>
 <% } else if (currentViewMode === "list") { %>
-  <ul class="grid list-none gap-3 p-0">
+  <ul class="od-stagger-list grid list-none gap-3 p-0">
     <% articles.forEach((article) => { %>
       <% const articleHref = isAdmin && !article.published ? `/articles/${article.id}/preview` : `/articles/${article.id}`; %>
       <li id="article-list-item-<%= article.id %>" class="article-list-row od-card">
@@ -103,7 +103,7 @@
     <% }) %>
   </ul>
 <% } else { %>
-  <ul class="grid list-none gap-5 p-0">
+  <ul class="od-stagger-list grid list-none gap-5 p-0">
     <% articles.forEach((article) => { %>
       <% const articleHref = isAdmin && !article.published ? `/articles/${article.id}/preview` : `/articles/${article.id}`; %>
       <li id="article-list-item-<%= article.id %>" class="od-card grid overflow-hidden transition hover:-translate-y-0.5 hover:border-draft-gold hover:shadow-editorial lg:grid-cols-[18rem_minmax(0,1fr)_auto]">

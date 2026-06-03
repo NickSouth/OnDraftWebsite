@@ -1,6 +1,6 @@
 <div
   id="big-board-results"
-  class="big-board-results"
+  class="big-board-results od-swap-surface od-swap-active"
   x-data="{
     boardView: 'card',
     init() {
@@ -113,7 +113,7 @@
       </div>
     </div>
 
-    <ol class="ranking-list grid list-none p-0" x-show="boardView === 'card'" x-transition.opacity.duration.180ms>
+    <ol class="ranking-list od-stagger-list grid list-none p-0" x-show="boardView === 'card'" x-transition.opacity.duration.180ms>
       <% bigBoard.forEach((entry) => { %>
         <%
           const rankLabel = formatBoardNumber(entry.rank) || "NR";
@@ -235,7 +235,7 @@
       <% }) %>
     </ol>
 
-    <ol class="grid list-none divide-y divide-slate-200 rounded-md border border-slate-200 bg-white p-0 dark:divide-white/10 dark:border-white/10 dark:bg-draft-slate" x-show="boardView === 'list'" x-transition.opacity.duration.180ms x-cloak>
+    <ol class="od-stagger-list grid list-none divide-y divide-slate-200 rounded-md border border-slate-200 bg-white p-0 dark:divide-white/10 dark:border-white/10 dark:bg-draft-slate" x-show="boardView === 'list'" x-transition.opacity.duration.180ms x-cloak>
       <% bigBoard.forEach((entry) => { %>
         <%
           const rankLabel = formatBoardNumber(entry.rank) || "NR";

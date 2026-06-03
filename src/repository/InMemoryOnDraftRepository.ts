@@ -56,6 +56,11 @@ const MEMORY_LOAD_TEST_SCHOOLS = [
 ];
 const MEMORY_LOAD_TEST_POSITIONS = ["QB", "RB", "WR", "TE", "OT", "IOL", "EDGE", "IDL", "LB", "CB", "S"] as const;
 
+type InMemoryRepositoryOptions = {
+  seedContent?: boolean;
+  seedLoadTestBigBoards?: boolean;
+};
+
 class InMemoryOnDraftRepository implements IOnDraftRepository {
   private bigBoards: BigBoard[] = [];
   private articles: Article[] = [];
@@ -63,10 +68,17 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
   private videos: Video[] = [];
   private tagList: Set<string> = new Set();
 
-  constructor() {
-    this.createBigBoardYearSync(new Date().getFullYear());
-    if (process.env.ONDRAFT_MEMORY_LOAD_TEST === "true") {
-      this.seedMemoryLoadTestBigBoards(new Date().getFullYear());
+  constructor(options: InMemoryRepositoryOptions = {}) {
+    const currentYear = new Date().getFullYear();
+    this.createBigBoardYearSync(currentYear);
+
+    if (options.seedContent !== false) {
+      this.seedSampleContent();
+    }
+
+    const seedLoadTestBigBoards = options.seedLoadTestBigBoards ?? process.env.ONDRAFT_MEMORY_LOAD_TEST === "true";
+    if (seedLoadTestBigBoards) {
+      this.seedMemoryLoadTestBigBoards(currentYear);
     }
   }
 
@@ -107,6 +119,323 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
         notes: `Generated memory load-test entry for ${creator}.`,
       };
     });
+  }
+
+  private seedSampleContent(): void {
+    const now = new Date();
+    const atNoonDaysAgo = (daysAgo: number): Date => {
+      const value = new Date(now);
+      value.setDate(value.getDate() - daysAgo);
+      value.setHours(12, 0, 0, 0);
+      return value;
+    };
+    const createComment = (
+      id: string,
+      userId: string,
+      userName: string,
+      text: string,
+      daysAgo: number,
+      likedByUserIds: string[] = [],
+      replies: Comment[] = [],
+    ): Comment => ({
+      id,
+      userId,
+      userName,
+      text,
+      createdAt: atNoonDaysAgo(daysAgo),
+      likes: likedByUserIds.length,
+      likedByUserIds,
+      replies,
+    });
+
+    this.articles = [
+      {
+        id: "A1001",
+        published: true,
+        title: "The league is starving for pressure, and this EDGE class knows it",
+        author: "Ryan McWalter",
+        writeup: "Why the most explosive rushers in the next cycle are winning before the tackle can settle the set point.",
+        tags: ["EDGE", "Film Room", "Pass Rush"],
+        publicationDate: atNoonDaysAgo(3),
+        imageUrl: "/images/article-defaults/uprights.png",
+        content: {
+          type: "html",
+          body: `
+            <p>The first thing that jumps off this class is how often the top rushers win cleanly with urgency, not gimmicks.</p>
+            <p>That matters because NFL boards are built on traits that survive when the picture gets muddy. Burst, bend, and counters still travel.</p>
+            <p>Once the season gets moving, expect this group to force difficult conversations at the top of early big boards.</p>
+          `,
+        },
+        comments: [
+          createComment(
+            "c-a1001-1",
+            "sample-reader-1",
+            "Scout Sam",
+            "The hand usage note here feels right. This class has more finish than people are giving it credit for.",
+            2,
+            ["sample-reader-2", "sample-reader-3"],
+            [
+              createComment(
+                "c-a1001-1-r1",
+                "sample-reader-4",
+                "Nina Numbers",
+                "The finish is real, but I still want to see how many of these wins come against NFL-caliber tackles.",
+                1,
+                ["sample-reader-1"],
+              ),
+            ],
+          ),
+          createComment(
+            "c-a1001-2",
+            "sample-reader-5",
+            "Draft Dan",
+            "This is exactly why I keep circling back to the second tier of edge defenders.",
+            1,
+            ["sample-reader-1"],
+          ),
+        ],
+        likes: 5,
+        likedByUserIds: [
+          "sample-reader-1",
+          "sample-reader-2",
+          "sample-reader-3",
+          "sample-reader-4",
+          "sample-reader-5",
+        ],
+      },
+      {
+        id: "A1002",
+        published: true,
+        title: "Five quarterback traits that keep showing up on third-and-medium",
+        author: "Aleks Ryabinkin",
+        writeup: "A quarterback room built on calm feet, layered timing, and answers once the first read disappears.",
+        tags: ["QB", "Scouting", "Traits"],
+        publicationDate: atNoonDaysAgo(18),
+        imageUrl: "/images/article-defaults/football.png",
+        content: {
+          type: "plainText",
+          text: [
+            "Quarterback evaluation gets noisy when the game script is friendly.",
+            "Third-and-medium strips away some of that comfort and leaves you with timing, discipline, and processing speed.",
+            "The passers who keep drives alive in those moments usually carry cleaner translatable habits into Sundays.",
+          ].join("\n\n"),
+        },
+        comments: [
+          createComment(
+            "c-a1002-1",
+            "sample-reader-2",
+            "Pocket Pete",
+            "The footwork point is the one that usually decides whether I stay in or drop out on a guy.",
+            16,
+            ["sample-reader-1", "sample-reader-3"],
+          ),
+        ],
+        likes: 4,
+        likedByUserIds: ["sample-reader-1", "sample-reader-2", "sample-reader-3", "sample-reader-4"],
+      },
+      {
+        id: "A1003",
+        published: true,
+        title: "The slot separators keeping this receiver class honest",
+        author: "Ryan McWalter",
+        writeup: "These are the route runners who give an offense easier throws and force defenses to squeeze the middle of the field.",
+        tags: ["WR", "Big Board", "Route Running"],
+        publicationDate: atNoonDaysAgo(46),
+        imageUrl: "/images/article-defaults/helmet.png",
+        content: {
+          type: "plainText",
+          text: [
+            "Not every receiver has to win on the outside to matter at the top of a board.",
+            "The middle of the field still belongs to pass catchers who understand leverage and finish through contact.",
+            "This group has more of those players than last year did.",
+          ].join("\n\n"),
+        },
+        comments: [],
+        likes: 3,
+        likedByUserIds: ["sample-reader-1", "sample-reader-2", "sample-reader-3"],
+      },
+      {
+        id: "A1004",
+        published: true,
+        title: "Running backs who still create their own yards after the chalk breaks",
+        author: "Aleks Ryabinkin",
+        writeup: "A look at the runners whose contact balance and pacing keep the position valuable when blocking falls apart.",
+        tags: ["RB", "Scouting", "Offense"],
+        publicationDate: atNoonDaysAgo(190),
+        imageUrl: "/images/article-defaults/football.png",
+        content: {
+          type: "html",
+          body: `
+            <p>The easiest rushing yards are usually blocked. The meaningful ones rarely are.</p>
+            <p>This class still has a few backs who understand tempo, can absorb contact, and stay on schedule anyway.</p>
+          `,
+        },
+        comments: [
+          createComment(
+            "c-a1004-1",
+            "sample-reader-6",
+            "Tape Grinder",
+            "Love the pacing callout here. A lot of backs have speed but not enough pacing to unlock it.",
+            184,
+            ["sample-reader-2"],
+          ),
+        ],
+        likes: 4,
+        likedByUserIds: ["sample-reader-1", "sample-reader-2", "sample-reader-3", "sample-reader-4"],
+      },
+      {
+        id: "A1005",
+        published: true,
+        title: "What last year taught us about overreacting to spring draft boards",
+        author: "Ryan McWalter",
+        writeup: "A reset on patience, projection, and why the loudest March board is rarely the one that ages the best.",
+        tags: ["Draft History", "Process", "Board Building"],
+        publicationDate: atNoonDaysAgo(430),
+        imageUrl: "/images/article-defaults/uprights.png",
+        content: {
+          type: "plainText",
+          text: [
+            "Draft boards should move. They just should not panic.",
+            "The best spring work usually narrows the real questions instead of pretending everything is already solved.",
+            "That lesson holds up every single cycle.",
+          ].join("\n\n"),
+        },
+        comments: [],
+        likes: 6,
+        likedByUserIds: [
+          "sample-reader-1",
+          "sample-reader-2",
+          "sample-reader-3",
+          "sample-reader-4",
+          "sample-reader-5",
+          "sample-reader-6",
+        ],
+      },
+    ];
+
+    this.videos = [
+      {
+        youtubeUrl: "https://www.youtube.com/watch?v=BH3X-llq1M4&pp=ugUEEgJlbg%3D%3D",
+        title: "Quarterback room check-in: what still translates on Sundays",
+        description: "A sample Bar TV entry focused on pocket movement, timing windows, and how to separate traits from college comfort.",
+        videoId: "BH3X-llq1M4",
+        tags: ["QB", "Film Room", "Bar TV"],
+        createdAt: atNoonDaysAgo(2),
+        updatedAt: atNoonDaysAgo(2),
+        thumbnailUrl: "https://img.youtube.com/vi/BH3X-llq1M4/hqdefault.jpg",
+        viewCount: 12840,
+        youtubeStatsFetchedAt: atNoonDaysAgo(1),
+      },
+      {
+        youtubeUrl: "https://www.youtube.com/watch?v=uza2KtmxZ9g",
+        title: "Building pressure without panic: edge and interior notes",
+        description: "A sample video on pass-rush translation, coverage marriage, and why the best fronts create bad quarterback decisions early.",
+        videoId: "uza2KtmxZ9g",
+        tags: ["EDGE", "Defense", "Pressure"],
+        createdAt: atNoonDaysAgo(11),
+        updatedAt: atNoonDaysAgo(11),
+        thumbnailUrl: "https://img.youtube.com/vi/uza2KtmxZ9g/hqdefault.jpg",
+        viewCount: 9420,
+        youtubeStatsFetchedAt: atNoonDaysAgo(1),
+      },
+      {
+        youtubeUrl: "https://www.youtube.com/watch?v=5Lqtx40NloQ&pp=ugUEEgJlbg%3D%3D",
+        title: "Late-round bets worth making before the board catches up",
+        description: "A sample Bar TV entry highlighting developmental traits, role projection, and the kinds of depth bets smart teams keep making.",
+        videoId: "5Lqtx40NloQ",
+        tags: ["Sleepers", "Big Board", "Traits"],
+        createdAt: atNoonDaysAgo(54),
+        updatedAt: atNoonDaysAgo(54),
+        thumbnailUrl: "https://img.youtube.com/vi/5Lqtx40NloQ/hqdefault.jpg",
+        viewCount: 6840,
+        youtubeStatsFetchedAt: atNoonDaysAgo(1),
+      },
+    ];
+
+    this.forumPosts = [
+      {
+        id: "post-1",
+        userId: "sample-forum-1",
+        userName: "Scout Sam",
+        content: "Hot take: the safest offensive linemen in this class are the ones who already look boring on Saturdays. Quiet feet age well.",
+        createdAt: atNoonDaysAgo(1),
+        likes: 3,
+        likedByUserIds: ["sample-reader-1", "sample-reader-2", "sample-reader-3"],
+        comments: [
+          createComment(
+            "c-post-1-1",
+            "sample-forum-2",
+            "Nina Numbers",
+            "Boring is good when it means the quarterback never has to think about his blind side.",
+            1,
+            ["sample-reader-1"],
+          ),
+        ],
+      },
+      {
+        id: "post-2",
+        userId: "sample-forum-3",
+        userName: "Pocket Pete",
+        content: "I still think the deepest value pocket on this board is day-two receiver, not running back.",
+        createdAt: atNoonDaysAgo(4),
+        likes: 2,
+        likedByUserIds: ["sample-reader-2", "sample-reader-3"],
+        comments: [
+          createComment(
+            "c-post-2-1",
+            "sample-forum-4",
+            "Draft Dan",
+            "Depends on how many teams decide they need role players versus alpha traits.",
+            3,
+          ),
+          createComment(
+            "c-post-2-2",
+            "sample-forum-1",
+            "Scout Sam",
+            "The receiver pool is just easier to project into useful snaps right now.",
+            2,
+            ["sample-reader-4"],
+          ),
+        ],
+      },
+      {
+        id: "post-3",
+        userId: "sample-forum-5",
+        userName: "Tape Grinder",
+        content: "Quarterback rankings should start with pressure answers, not highlight throws. If the pocket gets loud, I need proof.",
+        createdAt: atNoonDaysAgo(9),
+        likes: 4,
+        likedByUserIds: ["sample-reader-1", "sample-reader-2", "sample-reader-3", "sample-reader-4"],
+        comments: [],
+      },
+      {
+        id: "post-4",
+        userId: "sample-forum-6",
+        userName: "Maya Matchups",
+        content: "The next big board riser is going to be a corner who already survives with route recognition instead of just raw speed.",
+        createdAt: atNoonDaysAgo(16),
+        likes: 1,
+        likedByUserIds: ["sample-reader-2"],
+        comments: [
+          createComment(
+            "c-post-4-1",
+            "sample-forum-3",
+            "Pocket Pete",
+            "That archetype always gets louder once teams start comparing third-down tape.",
+            14,
+          ),
+        ],
+      },
+    ];
+
+    this.syncTagList();
+  }
+
+  private syncTagList(): void {
+    this.tagList = new Set([
+      ...this.articles.flatMap((article) => article.tags ?? []),
+      ...this.videos.flatMap((video) => video.tags ?? []),
+    ]);
   }
 
   private findBigBoard(year: number, creator: BigBoardCreator): BigBoard | undefined {
@@ -791,6 +1120,6 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
   }
 }
 
-export function CreateInMemoryOnDraftRepository(): IOnDraftRepository {
-  return new InMemoryOnDraftRepository();
+export function CreateInMemoryOnDraftRepository(options?: InMemoryRepositoryOptions): IOnDraftRepository {
+  return new InMemoryOnDraftRepository(options);
 }

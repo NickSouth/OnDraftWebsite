@@ -83,6 +83,34 @@
     });
   };
 
+  const replayAnimationClass = (element, className) => {
+    element.classList.remove(className);
+    element.getBoundingClientRect();
+    element.classList.add(className);
+  };
+
+  const animateSwapSurfaces = (root = document) => {
+    if (!(root instanceof Document || root instanceof Element || root instanceof DocumentFragment)) {
+      return;
+    }
+
+    const surfaces = root.matches?.(".od-swap-surface")
+      ? [root]
+      : [...root.querySelectorAll?.(".od-swap-surface") ?? []];
+    surfaces.forEach((surface) => replayAnimationClass(surface, "od-swap-active"));
+  };
+
+  const activatePageStage = (root = document) => {
+    if (!(root instanceof Document || root instanceof Element || root instanceof DocumentFragment)) {
+      return;
+    }
+
+    const stages = root.matches?.(".od-page-stage")
+      ? [root]
+      : [...root.querySelectorAll?.(".od-page-stage") ?? []];
+    stages.forEach((stage) => window.requestAnimationFrame(() => stage.classList.add("is-ready")));
+  };
+
   const isLocalNavigation = (link, event) => {
     if (!link || event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
       return false;
@@ -265,6 +293,8 @@
     hideLoader();
     enableSpellcheck(event.detail?.target || document);
     enhanceAnimatedDetails(event.detail?.target || document);
+    animateSwapSurfaces(event.detail?.target || document);
+    activatePageStage(event.detail?.target || document);
   });
   document.addEventListener("htmx:responseError", hideLoader);
   document.addEventListener("htmx:sendError", hideLoader);
@@ -272,8 +302,13 @@
     hideLoader();
     enableSpellcheck();
     enhanceAnimatedDetails();
+    animateSwapSurfaces();
+    activatePageStage();
   });
-  window.addEventListener("pageshow", hideLoader);
+  window.addEventListener("pageshow", () => {
+    hideLoader();
+    activatePageStage();
+  });
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) {
       hideLoader();
@@ -285,9 +320,13 @@
       mutation.addedNodes.forEach((node) => {
         enableSpellcheck(node);
         enhanceAnimatedDetails(node);
+        animateSwapSurfaces(node);
+        activatePageStage(node);
       });
     });
   }).observe(document.documentElement, { childList: true, subtree: true });
   enableSpellcheck();
   enhanceAnimatedDetails();
+  animateSwapSurfaces();
+  activatePageStage();
 })();

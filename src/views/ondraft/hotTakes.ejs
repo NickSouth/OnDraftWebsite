@@ -47,6 +47,7 @@
   <form
     id="hot-take-filter-form"
     class="article-filter-form od-page-tools od-list-controls"
+    data-keyword="<%= values.keyword || "" %>"
     hx-get="/hottakes/filter"
     hx-target="#hot-take-list"
     hx-swap="outerHTML"
@@ -56,75 +57,120 @@
     data-loading-skeleton-target="#hot-take-list"
     x-data="{
       searchOpen: false,
-      keyword: '',
-      searchedKeyword: '',
+      keyword: $el.dataset.keyword || '',
+      searchedKeyword: ($el.dataset.keyword || '').trim(),
+      searchTimer: null,
       get hasKeyword() { return this.keyword.trim().length > 0 },
       get searchDirty() { return this.keyword.trim() !== this.searchedKeyword },
+      openSearch() {
+        this.searchOpen = true;
+        this.$nextTick(() => this.$refs.hotTakeSearch?.focus());
+      },
+      closeSearch() {
+        this.searchOpen = false;
+        this.$nextTick(() => this.$refs.hotTakeSearchTrigger?.focus());
+      },
+      requestSubmit() {
+        htmx.trigger(this.$refs.hotTakeFilterForm, 'submit');
+      },
+      queueSearchSubmit() {
+        window.clearTimeout(this.searchTimer);
+        this.searchTimer = window.setTimeout(() => {
+          if (this.keyword.trim() === this.searchedKeyword) return;
+          this.submitSearch();
+        }, 240);
+      },
+      submitSearch() {
+        this.searchedKeyword = this.keyword.trim();
+        this.requestSubmit();
+      },
       clearSearch() {
         this.keyword = '';
-        this.searchedKeyword = '';
-        this.$nextTick(() => htmx.trigger(this.$refs.hotTakeFilterForm, 'submit'));
+        this.submitSearch();
+        this.$nextTick(() => this.$refs.hotTakeSearch?.focus());
       }
     }"
     x-ref="hotTakeFilterForm"
     @submit="searchedKeyword = keyword.trim()"
+    @keydown.escape.window="if (searchOpen) { closeSearch() }"
   >
-    <div class="od-page-tools-bar od-page-toggle-bar">
-      <div class="od-page-tool-actions">
-        <button
-          type="button"
-          class="od-icon-button"
-          :class="searchOpen ? 'is-active' : ''"
-          :aria-expanded="String(searchOpen)"
-          aria-controls="hot-take-search-panel"
-          aria-label="Search hot takes"
-          title="Search hot takes"
-          @click="searchOpen = !searchOpen; $nextTick(() => searchOpen && $refs.hotTakeSearch?.focus())"
-        >
-          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <circle cx="11" cy="11" r="7" />
-            <path d="m20 20-3.5-3.5" />
-          </svg>
-        </button>
+    <div class="od-toolbar-stack">
+      <div class="od-toolbar-topline">
+        <div></div>
+        <div class="od-toolbar-actions">
+          <div class="od-search-dock" :class="searchOpen ? 'is-open' : ''">
+            <button
+              type="button"
+              class="od-search-dock-trigger"
+              x-ref="hotTakeSearchTrigger"
+              x-show="!searchOpen"
+              x-transition.opacity.duration.150ms
+              :aria-expanded="String(searchOpen)"
+              aria-controls="hot-take-search-panel"
+              aria-label="Search hot takes"
+              title="Search hot takes"
+              @click="openSearch()"
+            >
+              <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" />
+              </svg>
+            </button>
+            <div
+              id="hot-take-search-panel"
+              class="od-search-dock-field"
+              x-cloak
+              x-show="searchOpen"
+              x-transition.opacity.duration.180ms
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" />
+              </svg>
+              <label class="sr-only" for="hot-take-search-input">Search hot takes</label>
+              <input
+                id="hot-take-search-input"
+                class="od-search-dock-input"
+                x-ref="hotTakeSearch"
+                x-model="keyword"
+                name="keyword"
+                type="search"
+                placeholder="Search hot takes"
+                @input="queueSearchSubmit()"
+                @keydown.enter.prevent="submitSearch()"
+              />
+              <div class="od-search-dock-actions">
+                <button
+                  type="button"
+                  class="od-search-dock-action"
+                  x-cloak
+                  x-show="hasKeyword"
+                  x-transition.opacity.duration.150ms
+                  @click="clearSearch()"
+                >
+                  Clear
+                </button>
+              </div>
+              <button
+                type="button"
+                class="od-search-dock-close"
+                @click="closeSearch()"
+                aria-label="Close search"
+                title="Close search"
+              >
+                <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
 
-    <div id="hot-take-search-panel" class="od-tool-panel" x-show="searchOpen" x-collapse x-cloak>
-      <label class="od-search-field">
-        <span class="sr-only">Search hot takes</span>
-        <input class="od-search-input" x-ref="hotTakeSearch" x-model="keyword" name="keyword" type="search" placeholder="Search hot takes" />
-        <button
-          type="button"
-          class="od-search-icon-button"
-          :class="hasKeyword && searchDirty ? 'right-10' : 'right-1'"
-          x-cloak
-          x-show="hasKeyword"
-          @click="clearSearch()"
-          aria-label="Clear search"
-          title="Clear search"
-        >
-          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
-            <path d="M18 6 6 18" />
-            <path d="m6 6 12 12" />
-          </svg>
-        </button>
-        <button
-          type="submit"
-          class="od-search-icon-button od-search-submit right-1"
-          x-cloak
-          x-show="hasKeyword && searchDirty"
-          aria-label="Search"
-          title="Search"
-        >
-          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M5 12h14" />
-            <path d="m13 6 6 6-6 6" />
-          </svg>
-        </button>
-      </label>
-    </div>
-
-    <div class="od-page-sort-row">
+      <div class="od-toolbar-bottomline">
+        <div></div>
+        <div class="od-page-sort-row">
       <div class="od-page-sort-group">
         <label>
           <span>Sort</span>
@@ -141,6 +187,8 @@
             <option value="asc" <%= sortDirection === "asc" ? "selected" : "" %>>Ascending</option>
           </select>
         </label>
+      </div>
+        </div>
       </div>
     </div>
 

@@ -6,22 +6,45 @@
     videoFiltersOpen: false,
     keyword: $el.dataset.keyword || '',
     searchedKeyword: ($el.dataset.keyword || '').trim(),
-    filterSignature: [
-      '<%= values.tags || "" %>',
-      '<%= values.dateFrom || "" %>',
-      '<%= values.dateTo || "" %>'
-    ].join('|'),
-    appliedFilterSignature: [
-      '<%= values.tags || "" %>',
-      '<%= values.dateFrom || "" %>',
-      '<%= values.dateTo || "" %>'
-    ].join('|'),
+    filterSignature: '<%= [values.tags || "", values.dateFrom || "", values.dateTo || ""].join("|") %>',
+    searchTimer: null,
+    filterTimer: null,
     get hasKeyword() { return this.keyword.trim().length > 0 },
-    get searchDirty() { return this.keyword.trim() !== this.searchedKeyword },
-    get hasFilterContent() {
-      return this.currentFilterSignature().split('|').some((value) => value.trim().length > 0);
+    openSearch() {
+      this.videoSearchOpen = true;
+      this.$nextTick(() => this.$refs.videoSearch?.focus());
     },
-    get filtersDirty() { return this.currentFilterSignature() !== this.appliedFilterSignature },
+    closeSearch() {
+      this.videoSearchOpen = false;
+      this.$nextTick(() => this.$refs.videoSearchTrigger?.focus());
+    },
+    toggleFilters() {
+      this.videoFiltersOpen = !this.videoFiltersOpen;
+    },
+    requestSubmit() {
+      this.$refs.videoFilterForm.requestSubmit();
+    },
+    queueSearchSubmit() {
+      window.clearTimeout(this.searchTimer);
+      this.searchTimer = window.setTimeout(() => {
+        if (this.keyword.trim() === this.searchedKeyword) return;
+        this.submitSearch();
+      }, 240);
+    },
+    submitSearch() {
+      this.searchedKeyword = this.keyword.trim();
+      this.requestSubmit();
+    },
+    queueFilterSubmit() {
+      this.filterSignature = this.currentFilterSignature();
+      window.clearTimeout(this.filterTimer);
+      this.filterTimer = window.setTimeout(() => {
+        this.requestSubmit();
+      }, 240);
+    },
+    get hasFilterContent() {
+      return this.filterSignature.split('|').some((value) => value.trim().length > 0);
+    },
     currentFilterSignature() {
       return [
         this.$refs.videoTags?.value || '',
@@ -29,22 +52,18 @@
         this.$refs.videoDateTo?.value || ''
       ].join('|');
     },
-    syncFilters() {
-      this.filterSignature = this.currentFilterSignature();
-    },
     clearSearch() {
       this.keyword = '';
-      this.searchedKeyword = '';
-      this.$nextTick(() => this.$refs.videoFilterForm.submit());
+      this.submitSearch();
+      this.$nextTick(() => this.$refs.videoSearch?.focus());
     },
     clearFilters() {
       this.$refs.videoTags.value = '';
       this.$refs.videoTags.dispatchEvent(new Event('change', { bubbles: true }));
       this.$refs.videoDateFrom.value = '';
       this.$refs.videoDateTo.value = '';
-      this.syncFilters();
-      this.appliedFilterSignature = this.filterSignature;
-      this.$nextTick(() => this.$refs.videoFilterForm.submit());
+      this.filterSignature = '';
+      this.$nextTick(() => this.requestSubmit());
     },
     clearAllFilters() {
       this.keyword = '';
@@ -53,11 +72,11 @@
       this.$refs.videoTags.dispatchEvent(new Event('change', { bubbles: true }));
       this.$refs.videoDateFrom.value = '';
       this.$refs.videoDateTo.value = '';
-      this.syncFilters();
-      this.appliedFilterSignature = this.filterSignature;
-      this.$nextTick(() => this.$refs.videoFilterForm.submit());
+      this.filterSignature = '';
+      this.$nextTick(() => this.submitSearch());
     }
   }"
+  @keydown.escape.window="if (videoFiltersOpen) { videoFiltersOpen = false } else if (videoSearchOpen) { closeSearch() }"
 >
   <div class="grid gap-5 border-b border-slate-200 pb-6 dark:border-white/10 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
     <div class="max-w-3xl">
@@ -79,85 +98,124 @@
     method="get"
     action="/videos"
     x-ref="videoFilterForm"
-    @submit="searchedKeyword = keyword.trim(); syncFilters(); appliedFilterSignature = filterSignature"
+    @submit="searchedKeyword = keyword.trim()"
   >
-    <div class="od-control-workspace">
-      <div class="od-control-primary" :class="videoSearchOpen || videoFiltersOpen ? '' : 'is-compact'">
-        <div class="od-panel-toggle-row">
-          <button
-            type="button"
-            class="od-icon-button"
-            :class="videoFiltersOpen ? 'is-active' : ''"
-            :aria-expanded="String(videoFiltersOpen)"
-            aria-controls="video-filter-panel"
-            aria-label="Filters"
-            title="Filters"
-            @click="videoFiltersOpen = !videoFiltersOpen"
-          >
-            <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-              <path d="M4 7h16" />
-              <path d="M7 12h10" />
-              <path d="M10 17h4" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            class="od-icon-button"
-            :class="videoSearchOpen ? 'is-active' : ''"
-            :aria-expanded="String(videoSearchOpen)"
-            aria-controls="video-search-panel"
-            aria-label="Search videos"
-            title="Search videos"
-            @click="videoSearchOpen = !videoSearchOpen; $nextTick(() => videoSearchOpen && $refs.videoSearch?.focus())"
-          >
-            <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <circle cx="11" cy="11" r="7" />
-              <path d="m20 20-3.5-3.5" />
-            </svg>
-          </button>
-        </div>
-
-        <div id="video-search-panel" class="od-tool-panel od-search-panel" x-show="videoSearchOpen" x-collapse x-cloak>
-          <label class="od-search-field">
-            <span class="sr-only">Search videos</span>
-            <input class="od-search-input" x-ref="videoSearch" x-model="keyword" name="keyword" type="search" placeholder="Search videos" value="<%= values.keyword %>" />
+    <div class="od-toolbar-stack">
+      <div class="od-toolbar-topline">
+        <div></div>
+        <div class="od-toolbar-actions">
+          <div class="od-search-dock" :class="videoSearchOpen ? 'is-open' : ''">
             <button
               type="button"
-              class="od-search-icon-button"
-              :class="hasKeyword && searchDirty ? 'right-10' : 'right-1'"
-              x-cloak
-              x-show="hasKeyword"
-              @click="clearSearch()"
-              aria-label="Clear search"
-              title="Clear search"
+              class="od-search-dock-trigger"
+              x-ref="videoSearchTrigger"
+              x-show="!videoSearchOpen"
+              x-transition.opacity.duration.150ms
+              :aria-expanded="String(videoSearchOpen)"
+              aria-controls="video-search-panel"
+              aria-label="Search videos"
+              title="Search videos"
+              @click="openSearch()"
             >
-              <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
-                <path d="M18 6 6 18" />
-                <path d="m6 6 12 12" />
+              <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" />
               </svg>
             </button>
-            <button
-              type="submit"
-              class="od-search-icon-button od-search-submit right-1"
+            <div
+              id="video-search-panel"
+              class="od-search-dock-field"
               x-cloak
-              x-show="hasKeyword && searchDirty"
-              aria-label="Search"
-              title="Search"
+              x-show="videoSearchOpen"
+              x-transition.opacity.duration.180ms
             >
-              <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M5 12h14" />
-                <path d="m13 6 6 6-6 6" />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" />
               </svg>
-            </button>
-          </label>
-        </div>
+              <label class="sr-only" for="video-search-input">Search videos</label>
+              <input
+                id="video-search-input"
+                class="od-search-dock-input"
+                x-ref="videoSearch"
+                x-model="keyword"
+                name="keyword"
+                type="search"
+                placeholder="Search videos"
+                value="<%= values.keyword %>"
+                @input="queueSearchSubmit()"
+                @keydown.enter.prevent="submitSearch()"
+              />
+              <div class="od-search-dock-actions">
+                <button
+                  type="button"
+                  class="od-search-dock-action"
+                  x-cloak
+                  x-show="hasKeyword"
+                  x-transition.opacity.duration.150ms
+                  @click="clearSearch()"
+                >
+                  Clear
+                </button>
+              </div>
+              <button
+                type="button"
+                class="od-search-dock-close"
+                @click="closeSearch()"
+                aria-label="Close search"
+                title="Close search"
+              >
+                <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
 
-        <div id="video-filter-panel" class="od-tool-panel" x-show="videoFiltersOpen" x-collapse x-cloak>
+          <div class="od-filter-popover-shell">
+            <button
+              type="button"
+              class="od-icon-button"
+              :class="videoFiltersOpen || hasFilterContent ? 'is-active' : ''"
+              :aria-expanded="String(videoFiltersOpen)"
+              aria-controls="video-filter-panel"
+              :aria-label="videoFiltersOpen ? 'Close filters' : 'Filters'"
+              :title="videoFiltersOpen ? 'Close filters' : 'Filters'"
+              @click="toggleFilters()"
+            >
+              <template x-if="!videoFiltersOpen">
+                <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                  <path d="M4 7h16" />
+                  <path d="M7 12h10" />
+                  <path d="M10 17h4" />
+                </svg>
+              </template>
+              <template x-if="videoFiltersOpen">
+                <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </template>
+            </button>
+
+            <div
+              id="video-filter-panel"
+              class="od-filter-popover"
+              x-cloak
+              x-show="videoFiltersOpen"
+              x-transition:enter="transition ease-out duration-180"
+              x-transition:enter-start="opacity-0 -translate-y-2 scale-[0.98]"
+              x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+              x-transition:leave="transition ease-in duration-140"
+              x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+              x-transition:leave-end="opacity-0 -translate-y-1 scale-[0.98]"
+            >
           <%
             const selectedVideoFilterTags = (values.tags || "").split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean);
             const videoFilterTagOptions = [...new Set([...(videoTags || []), ...selectedVideoFilterTags])].sort((first, second) => first.localeCompare(second));
           %>
-          <div class="od-video-filter-grid" @input="syncFilters()" @change="syncFilters()">
+              <div class="od-video-filter-grid od-filter-popover-grid" @input="queueFilterSubmit()" @change="queueFilterSubmit()">
             <div class="od-filter-field tag-editor" data-tag-editor>
               <span>
                 <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -221,56 +279,42 @@
               <input type="date" name="dateTo" value="<%= values.dateTo || "" %>" x-ref="videoDateTo" />
             </label>
           </div>
-          <div class="od-filter-panel-actions">
-            <button
-              type="button"
-              class="od-search-icon-button"
-              :class="filtersDirty ? 'right-10' : 'right-1'"
-              x-cloak
-              x-show="hasFilterContent"
-              @click="clearFilters()"
-              aria-label="Clear filters"
-              title="Clear filters"
-            >
-              <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
-                <path d="M18 6 6 18" />
-                <path d="m6 6 12 12" />
-              </svg>
-            </button>
-            <button
-              class="od-search-icon-button od-search-submit right-1"
-              type="submit"
-              x-cloak
-              x-show="filtersDirty"
-              aria-label="Apply filters"
-              title="Apply filters"
-            >
-              <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M5 12h14" />
-                <path d="m13 6 6 6-6 6" />
-              </svg>
-            </button>
+              <div class="od-tool-panel-actions">
+                <button
+                  type="button"
+                  class="od-search-dock-action"
+                  x-cloak
+                  x-show="hasFilterContent"
+                  x-transition.opacity.duration.150ms
+                  @click="clearFilters()"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="od-control-secondary">
-        <div class="od-page-sort-row">
-          <div class="od-page-sort-group">
-            <label>
-              <span>Sort</span>
-              <select name="sortBy" onchange="this.form.submit();">
-                <option value="date" <%= values.sortBy === "date" ? "selected" : "" %>>Date</option>
-                <option value="popularity" <%= values.sortBy === "popularity" ? "selected" : "" %>>Popularity</option>
-              </select>
-            </label>
-            <label>
-              <span>Direction</span>
-              <select name="sortDirection" onchange="this.form.submit();">
-                <option value="desc" <%= values.sortDirection === "desc" ? "selected" : "" %>>Descending</option>
-                <option value="asc" <%= values.sortDirection === "asc" ? "selected" : "" %>>Ascending</option>
-              </select>
-            </label>
+      <div class="od-toolbar-bottomline">
+        <div class="od-toolbar-bottomline-main">
+          <div class="od-toolbar-sortline">
+            <div class="od-page-sort-group">
+              <label>
+                <span>Sort</span>
+                <select name="sortBy" onchange="this.form.submit();">
+                  <option value="date" <%= values.sortBy === "date" ? "selected" : "" %>>Date</option>
+                  <option value="popularity" <%= values.sortBy === "popularity" ? "selected" : "" %>>Popularity</option>
+                </select>
+              </label>
+              <label>
+                <span>Direction</span>
+                <select name="sortDirection" onchange="this.form.submit();">
+                  <option value="desc" <%= values.sortDirection === "desc" ? "selected" : "" %>>Descending</option>
+                  <option value="asc" <%= values.sortDirection === "asc" ? "selected" : "" %>>Ascending</option>
+                </select>
+              </label>
+            </div>
           </div>
         </div>
       </div>
@@ -304,15 +348,27 @@
       </div>
     </div>
   <% } else { %>
-    <div class="video-grid grid gap-5">
+    <div class="video-grid od-swap-surface od-swap-active od-stagger-list grid gap-5">
       <% videos.forEach((video) => { %>
-        <% const thumbnailUrl = video.thumbnailUrl || `https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`; %>
+        <% const fallbackThumbnailUrl = `https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`; %>
+        <% const thumbnailUrl = video.thumbnailUrl || fallbackThumbnailUrl; %>
+        <% const thumbnailNeedsFallback = Boolean(video.thumbnailUrl && video.thumbnailUrl !== fallbackThumbnailUrl); %>
         <article class="video-card od-card grid overflow-hidden transition hover:-translate-y-0.5 hover:border-draft-gold hover:shadow-editorial lg:grid-cols-[24rem_minmax(0,1fr)]">
           <a class="group block overflow-hidden bg-draft-ink" href="<%= video.youtubeUrl %>" target="_blank" rel="noopener noreferrer">
-            <img class="video-thumb h-full min-h-40 sm:min-h-56" src="<%= thumbnailUrl %>" alt="" loading="lazy" decoding="async" />
+            <img
+              class="video-thumb h-full min-h-40 sm:min-h-56"
+              src="<%= thumbnailUrl %>"
+              alt=""
+              loading="lazy"
+              decoding="async"
+              <% if (thumbnailNeedsFallback) { %>
+                data-fallback-src="<%= fallbackThumbnailUrl %>"
+                onerror="if (this.dataset.fallbackApplied === 'true') return; this.dataset.fallbackApplied = 'true'; this.src = this.dataset.fallbackSrc;"
+              <% } %>
+            />
           </a>
           <div class="video-card-copy grid content-between gap-4 p-4 sm:gap-5 sm:p-6">
-            <div class="grid gap-2">
+            <div class="video-card-meta grid gap-2">
               <p class="m-0 text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Bar TV</p>
               <h2 class="m-0 font-display text-2xl font-black leading-tight text-slate-950 dark:text-white sm:text-3xl"><%= video.title %></h2>
               <p class="m-0 hidden text-base leading-7 text-slate-700 dark:text-slate-200 sm:block"><%= video.description %></p>
@@ -326,7 +382,7 @@
                 <p class="m-0 text-sm leading-6 text-slate-700 dark:text-slate-200"><%= video.description %></p>
               </details>
             </div>
-            <div class="flex flex-wrap gap-2">
+            <div class="video-card-tags flex flex-wrap gap-2">
               <% video.tags.forEach((tag) => { %>
                 <span class="rounded bg-draft-foam px-2.5 py-1 text-xs font-black text-draft-amber dark:bg-white/10 dark:text-draft-gold"><%= tag.toLowerCase() %></span>
               <% }) %>

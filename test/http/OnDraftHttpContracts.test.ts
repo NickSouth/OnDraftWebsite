@@ -104,6 +104,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(response.headers["x-powered-by"]).toBeUndefined();
     expect(response.headers["content-security-policy"]).toContain("default-src 'self'");
     expect(response.headers["content-security-policy"]).toContain("frame-ancestors 'none'");
+    expect(response.headers["content-security-policy"]).toContain("https://i.ytimg.com");
     expect(response.headers["x-content-type-options"]).toBe("nosniff");
     expect(response.headers["x-frame-options"]).toBe("DENY");
     expect(response.headers["referrer-policy"]).toBe("strict-origin-when-cross-origin");
@@ -2338,7 +2339,7 @@ describe("OnDraft HTTP contracts", () => {
 
     const allPopular = await request(ondraft).get("/articles/popular?range=all").set("HX-Request", "true");
     expect(allPopular.status).toBe(200);
-    expect(allPopular.text).toContain('id="popular-articles-panel"');
+    expect(allPopular.text).not.toContain('id="popular-articles-panel"');
     expect(allPopular.text).toContain("Older Sort Article");
     expect(allPopular.text).toContain("Current Favorite Article");
 

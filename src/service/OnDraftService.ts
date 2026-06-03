@@ -27,7 +27,7 @@ const COMMENT_TEXT_MAX_LENGTH = 2000;
 const DEFAULT_BIG_BOARD_CREATOR: BigBoardCreator = "Ryan";
 const HOT_TAKE_MAX_LENGTH = 300;
 const VIDEO_DESCRIPTION_MAX_LENGTH = 500;
-const YOUTUBE_STATS_TTL_MS = 6 * 60 * 60 * 1000;
+const YOUTUBE_STATS_TTL_MS = 24 * 60 * 60 * 1000;
 const PROFANITY_VALIDATION_MESSAGE = "The comment/post contains profanity. Please edit it and try again.";
 const BANNED_PHRASE_PATTERNS = [...new Set(BANNED_PHRASES.map((phrase) => phrase.trim().toLowerCase()).filter(Boolean))]
   .map((phrase) => {
@@ -153,6 +153,10 @@ export interface CreateYoutubeVideoInput {
   tags?: string[];
 }
 
+type YoutubeCatalogRefreshOptions = {
+  force?: boolean;
+};
+
 export interface IOnDraftService {
   previewArticle(input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
   createArticle(input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
@@ -195,11 +199,14 @@ export interface IOnDraftService {
   filterYoutubeVideos(query: VideoQuery): Promise<Result<Video[], ArticleError>>;
   updateYoutubeVideo(videoId: string, input: CreateYoutubeVideoInput): Promise<Result<Video, ArticleError>>;
   updateYoutubeVideoStats(videoId: string, stats: { thumbnailUrl?: string; viewCount?: number; youtubeStatsFetchedAt: Date }): Promise<Result<Video, ArticleError>>;
+  refreshYoutubeVideoCatalog(options?: YoutubeCatalogRefreshOptions): Promise<Result<number, ArticleError>>;
   deleteYoutubeVideo(videoId: string): Promise<Result<void, ArticleError>>;
   getTags(): Promise<Result<string[], ArticleError>>;
 }
 
 class OnDraftService implements IOnDraftService {
+  private youtubeCatalogRefreshPromise: Promise<Result<number, ArticleError>> | null = null;
+
   constructor(
     private readonly repository: IOnDraftRepository,
     private readonly youtubeStats?: IYoutubeVideoStatsService,
@@ -664,24 +671,27 @@ class OnDraftService implements IOnDraftService {
     return now.getTime() - new Date(video.youtubeStatsFetchedAt).getTime() > YOUTUBE_STATS_TTL_MS;
   }
 
-  private async refreshStaleYoutubeStats(videos: Video[]): Promise<boolean> {
+  private async refreshStaleYoutubeStats(videos: Video[], options: YoutubeCatalogRefreshOptions = {}): Promise<Result<number, ArticleError>> {
     if (!this.youtubeStats) {
-      return false;
+      return Ok(0);
     }
 
     const staleVideoIds = videos
-      .filter((video) => this.youtubeStatsAreStale(video))
+      .filter((video) => options.force === true || this.youtubeStatsAreStale(video))
       .map((video) => video.videoId);
     if (staleVideoIds.length === 0) {
-      return false;
+      return Ok(0);
     }
 
     const stats = await this.youtubeStats.fetchVideoStats(staleVideoIds);
-    if (stats.ok === false || stats.value.size === 0) {
-      return false;
+    if (stats.ok === false) {
+      return Err(stats.value);
+    }
+    if (stats.value.size === 0) {
+      return Ok(0);
     }
 
-    let updated = false;
+    let updated = 0;
     for (const [videoId, videoStats] of stats.value) {
       const result = await this.repository.updateYoutubeVideoStats(videoId, {
         thumbnailUrl: videoStats.thumbnailUrl,
@@ -689,10 +699,21 @@ class OnDraftService implements IOnDraftService {
         youtubeStatsFetchedAt: new Date(),
       });
       if (result.ok === true) {
-        updated = true;
+        updated += 1;
       }
     }
-    return updated;
+    return Ok(updated);
+  }
+
+  private queueYoutubeCatalogRefresh(options: YoutubeCatalogRefreshOptions = {}): void {
+    if (this.youtubeCatalogRefreshPromise) {
+      return;
+    }
+
+    this.youtubeCatalogRefreshPromise = this.refreshYoutubeVideoCatalog(options)
+      .finally(() => {
+        this.youtubeCatalogRefreshPromise = null;
+      });
   }
 
   private async fetchYoutubeStatsForVideo(videoId: string): Promise<Pick<Video, "thumbnailUrl" | "viewCount" | "youtubeStatsFetchedAt">> {
@@ -1239,8 +1260,10 @@ class OnDraftService implements IOnDraftService {
     if (result.ok === false) {
       return Err(result.value);
     }
-    const refreshed = await this.refreshStaleYoutubeStats(result.value);
-    return refreshed ? await this.repository.getYoutubeVideos() : result;
+    if (result.value.some((video) => this.youtubeStatsAreStale(video))) {
+      this.queueYoutubeCatalogRefresh();
+    }
+    return result;
   }
 
   async getVideoTags(): Promise<Result<string[], ArticleError>> {
@@ -1252,8 +1275,10 @@ class OnDraftService implements IOnDraftService {
     if (result.ok === false) {
       return Err(result.value);
     }
-    const refreshed = await this.refreshStaleYoutubeStats(result.value);
-    return refreshed ? await this.repository.filterYoutubeVideos(query) : result;
+    if (result.value.some((video) => this.youtubeStatsAreStale(video))) {
+      this.queueYoutubeCatalogRefresh();
+    }
+    return result;
   }
 
   async updateYoutubeVideo(videoId: string, input: CreateYoutubeVideoInput): Promise<Result<Video, ArticleError>> {
@@ -1291,6 +1316,15 @@ class OnDraftService implements IOnDraftService {
       return Err(ArticleValidationError("YouTube video id is required."));
     }
     return await this.repository.updateYoutubeVideoStats(videoId.trim(), stats);
+  }
+
+  async refreshYoutubeVideoCatalog(options: YoutubeCatalogRefreshOptions = {}): Promise<Result<number, ArticleError>> {
+    const videos = await this.repository.getYoutubeVideos();
+    if (videos.ok === false) {
+      return Err(videos.value);
+    }
+
+    return await this.refreshStaleYoutubeStats(videos.value, options);
   }
 
   async deleteYoutubeVideo(videoId: string): Promise<Result<void, ArticleError>> {

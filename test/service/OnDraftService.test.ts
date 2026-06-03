@@ -5,11 +5,11 @@ import { CreateUserPreferenceService } from "../../src/service/UserPreferenceSer
 import { IYoutubeVideoStatsService } from "../../src/service/YoutubeVideoStatsService";
 
 function service() {
-  return CreateOnDraftService(CreateInMemoryOnDraftRepository());
+  return CreateOnDraftService(CreateInMemoryOnDraftRepository({ seedContent: false }));
 }
 
 function serviceWithYoutubeStats(youtubeStats: IYoutubeVideoStatsService) {
-  return CreateOnDraftService(CreateInMemoryOnDraftRepository(), youtubeStats);
+  return CreateOnDraftService(CreateInMemoryOnDraftRepository({ seedContent: false }), youtubeStats);
 }
 
 function userPreferenceService() {
@@ -943,6 +943,131 @@ describe("OnDraftService YouTube videos", () => {
       expect(updated.value.title).toBe("Quarterback Film Updated");
       expect(updated.value.thumbnailUrl).toContain("maxresdefault");
       expect(updated.value.viewCount).toBe(99);
+    }
+  });
+
+  it("refreshes stale cached youtube stats across the whole catalog", async () => {
+    let currentViewCount = 25;
+    const statsService: IYoutubeVideoStatsService = {
+      async fetchVideoStats(videoIds) {
+        return {
+          ok: true,
+          value: new Map(videoIds.map((videoId) => [videoId, {
+            videoId,
+            thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+            viewCount: currentViewCount,
+          }])),
+        };
+      },
+    };
+    const ondraftService = serviceWithYoutubeStats(statsService);
+
+    const created = await ondraftService.createYoutubeVideo({
+      youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      title: "Quarterback Film",
+      description: "A look at QB processing.",
+      tags: ["Film Room", "QB"],
+    });
+
+    expect(created.ok).toBe(true);
+    if (created.ok === false) {
+      return;
+    }
+
+    currentViewCount = 99;
+    const staleWrite = await ondraftService.updateYoutubeVideoStats("dQw4w9WgXcQ", {
+      thumbnailUrl: created.value.thumbnailUrl,
+      viewCount: 25,
+      youtubeStatsFetchedAt: new Date(Date.now() - (25 * 60 * 60 * 1000)),
+    });
+    expect(staleWrite.ok).toBe(true);
+
+    const refreshed = await ondraftService.refreshYoutubeVideoCatalog();
+    expect(refreshed).toEqual({ ok: true, value: 1 });
+
+    const video = await ondraftService.getYoutubeVideo("dQw4w9WgXcQ");
+    expect(video.ok).toBe(true);
+    if (video.ok === true) {
+      expect(video.value.viewCount).toBe(99);
+    }
+  });
+
+  it("returns cached youtube stats immediately while refreshing stale data in the background", async () => {
+    let fetchCount = 0;
+    let releaseBackgroundRefresh: (() => void) | null = null;
+    let backgroundRefreshStartedResolve: (() => void) | null = null;
+    const backgroundRefreshStarted = new Promise<void>((resolve) => {
+      backgroundRefreshStartedResolve = resolve;
+    });
+
+    const statsService: IYoutubeVideoStatsService = {
+      async fetchVideoStats(videoIds) {
+        fetchCount += 1;
+        if (fetchCount === 1) {
+          return {
+            ok: true,
+            value: new Map(videoIds.map((videoId) => [videoId, {
+              videoId,
+              thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+              viewCount: 25,
+            }])),
+          };
+        }
+
+        backgroundRefreshStartedResolve?.();
+        return await new Promise((resolve) => {
+          releaseBackgroundRefresh = () => resolve({
+            ok: true,
+            value: new Map(videoIds.map((videoId) => [videoId, {
+              videoId,
+              thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+              viewCount: 99,
+            }])),
+          });
+        });
+      },
+    };
+    const ondraftService = serviceWithYoutubeStats(statsService);
+
+    const created = await ondraftService.createYoutubeVideo({
+      youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      title: "Quarterback Film",
+      description: "A look at QB processing.",
+      tags: ["Film Room", "QB"],
+    });
+    expect(created.ok).toBe(true);
+    if (created.ok === false) {
+      return;
+    }
+
+    const staleWrite = await ondraftService.updateYoutubeVideoStats("dQw4w9WgXcQ", {
+      thumbnailUrl: created.value.thumbnailUrl,
+      viewCount: 25,
+      youtubeStatsFetchedAt: new Date(Date.now() - (25 * 60 * 60 * 1000)),
+    });
+    expect(staleWrite.ok).toBe(true);
+
+    const listed = await ondraftService.getYoutubeVideos();
+    expect(listed.ok).toBe(true);
+    if (listed.ok === true) {
+      expect(listed.value[0].viewCount).toBe(25);
+    }
+
+    await backgroundRefreshStarted;
+
+    const stillCached = await ondraftService.getYoutubeVideo("dQw4w9WgXcQ");
+    expect(stillCached.ok).toBe(true);
+    if (stillCached.ok === true) {
+      expect(stillCached.value.viewCount).toBe(25);
+    }
+
+    releaseBackgroundRefresh?.();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const refreshed = await ondraftService.getYoutubeVideo("dQw4w9WgXcQ");
+    expect(refreshed.ok).toBe(true);
+    if (refreshed.ok === true) {
+      expect(refreshed.value.viewCount).toBe(99);
     }
   });
 });

@@ -13,6 +13,7 @@ import { CreatePrismaOnDraftRepository } from "./repository/PrismaOnDraftReposit
 import { CreateOnDraftService } from "./service/OnDraftService";
 import { CreateUserPreferenceService } from "./service/UserPreferenceService";
 import { CreateYoutubeVideoStatsService } from "./service/YoutubeVideoStatsService";
+import { CreateYoutubeVideoStatsRefreshScheduler } from "./service/YoutubeVideoStatsRefreshScheduler";
 import { CreateLoggingService } from "./service/LoggingService";
 import type { ILoggingService } from "./service/LoggingService";
 import { getPrismaClient } from "./prisma/client";
@@ -32,6 +33,9 @@ export function createComposedApp(
 
   const youtubeStats = CreateYoutubeVideoStatsService();
   const service = CreateOnDraftService(repository, youtubeStats);
+  if (process.env.NODE_ENV !== "test") {
+    CreateYoutubeVideoStatsRefreshScheduler(service, resolvedLogger).start();
+  }
   const authUsers = prisma ? CreatePrismaUserRepository(prisma) : CreateInMemoryUserRepository();
   const userPreferences = CreateUserPreferenceService(authUsers);
   const authService = CreateAuthService(authUsers, emailService, config.email);

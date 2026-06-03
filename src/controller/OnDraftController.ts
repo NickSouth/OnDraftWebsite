@@ -39,6 +39,7 @@ type HomeFeedItem =
       date: Date;
       tags: string[];
       imageUrl?: string;
+      fallbackImageUrl?: string;
       viewCount?: number;
     };
 
@@ -508,6 +509,7 @@ class OnDraftController implements IOnDraftController {
   }
 
   private videoHomeItem(video: Video): HomeFeedItem {
+    const fallbackImageUrl = `https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`;
     return {
       type: "video",
       id: video.videoId,
@@ -516,7 +518,8 @@ class OnDraftController implements IOnDraftController {
       href: video.youtubeUrl,
       date: video.createdAt,
       tags: video.tags,
-      imageUrl: video.thumbnailUrl || `https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`,
+      imageUrl: video.thumbnailUrl || fallbackImageUrl,
+      fallbackImageUrl: video.thumbnailUrl && video.thumbnailUrl !== fallbackImageUrl ? fallbackImageUrl : undefined,
       viewCount: video.viewCount,
     };
   }
@@ -882,10 +885,9 @@ class OnDraftController implements IOnDraftController {
 
   async showPopularArticles(req: Request, res: Response, _session: IOnDraftBrowserSession): Promise<void> {
     const popularRange = this.favoritesRange(req);
-    res.render("ondraft/partials/popularArticles", {
+    res.render("ondraft/partials/popularArticlesResultsBody", {
       layout: false,
       popularArticles: await this.popularArticles(popularRange),
-      popularRange,
     });
   }
 
@@ -1126,7 +1128,9 @@ class OnDraftController implements IOnDraftController {
       hasAnyHotTakes: unfilteredResult.ok === true ? unfilteredResult.value.length > 0 : result.value.length > 0,
       hasFilters,
       errorMessage: null,
-      values: {},
+      values: {
+        keyword: this.queryString(req, "keyword") ?? "",
+      },
     });
   }
 

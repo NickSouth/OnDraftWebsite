@@ -73,11 +73,11 @@
               </select>
             </label>
             <input type="hidden" name="creator" value="<%= board.creator %>" />
-            <div class="creator-toggle" aria-label="Board creator">
+            <div class="creator-toggle od-text-toggle-group" style="--od-toggle-count: <%= creators.length %>;" aria-label="Board creator">
               <% creators.forEach((creator) => { %>
                 <button
                   type="button"
-                  class="<%= board.creator === creator ? "is-active" : "" %>"
+                  class="od-text-toggle <%= board.creator === creator ? "is-active" : "" %>"
                   aria-pressed="<%= board.creator === creator ? "true" : "false" %>"
                   onclick="this.form.creator.value = '<%= creator %>'; this.form.requestSubmit();"
                 >

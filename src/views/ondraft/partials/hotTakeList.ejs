@@ -1,4 +1,4 @@
-<div id="hot-take-list" class="hot-take-list">
+<div id="hot-take-list" class="hot-take-list od-swap-surface od-swap-active">
   <% const usersById = typeof userDirectoryById !== "undefined" ? userDirectoryById : new Map(); %>
   <% const moderationById = typeof userModerationById !== "undefined" ? userModerationById : new Map(); %>
   <% const currentActiveBan = typeof activeUserBan !== "undefined" ? activeUserBan : null; %>
@@ -47,7 +47,7 @@
       </div>
     </div>
   <% } else { %>
-    <ol class="comment-list">
+    <ol class="comment-list od-stagger-list">
       <% posts.forEach((post) => { %>
         <% const postUser = usersById.get(post.userId); %>
         <li id="hot-take-<%= post.id %>" class="comment-item hot-take-item" x-data="{ commentsOpen: false }">

@@ -9,6 +9,16 @@
   data-skip-global-loader
   data-loading-skeleton="big-board-results"
   data-loading-skeleton-target="#big-board-results"
+  x-data="{
+    selectedCreator: '<%= board.creator %>',
+    selectCreator(creator) {
+      if (this.selectedCreator === creator) return;
+      this.selectedCreator = creator;
+      this.$refs.creatorInput.value = creator;
+      htmx.trigger(this.$refs.bigBoardControls, 'submit');
+    }
+  }"
+  x-ref="bigBoardControls"
 >
   <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_27rem] lg:items-start xl:grid-cols-[minmax(0,1fr)_30rem]">
     <div class="grid justify-items-start gap-4 text-left">
@@ -70,14 +80,20 @@
 
       <div class="w-full">
         <p class="mb-2 text-sm font-bold text-slate-800 dark:text-slate-100">Board</p>
-        <input type="hidden" name="creator" value="<%= board.creator %>" />
-        <div class="grid w-full max-w-xl gap-2 sm:grid-cols-3" aria-label="Board creator">
+        <input type="hidden" name="creator" value="<%= board.creator %>" x-ref="creatorInput" />
+        <div
+          class="od-range-toggle-group grid w-full max-w-xl grid-cols-3 rounded-md border border-slate-200 bg-white p-1 shadow-sm dark:border-white/10 dark:bg-draft-slate"
+          style="--od-toggle-count: <%= creators.length %>;"
+          aria-label="Board creator"
+        >
           <% creators.forEach((creator) => { %>
             <button
               type="button"
-              class="od-focus-ring rounded-md border px-4 py-2 text-sm font-black transition <%= board.creator === creator ? "border-draft-gold bg-draft-gold text-draft-ink" : "border-white/10 bg-draft-slate text-white hover:border-draft-gold hover:bg-draft-ink dark:border-white/20 dark:bg-draft-slate dark:text-white dark:hover:border-draft-gold" %>"
+              class="od-range-toggle <%= board.creator === creator ? "is-active" : "" %>"
               aria-pressed="<%= board.creator === creator ? "true" : "false" %>"
-              onclick="this.form.creator.value = '<%= creator %>'; htmx.trigger(this.form, 'submit');"
+              :class="{ 'is-active': selectedCreator === '<%= creator %>' }"
+              :aria-pressed="String(selectedCreator === '<%= creator %>')"
+              @click="selectCreator('<%= creator %>')"
             >
               <%= creator %>
             </button>
