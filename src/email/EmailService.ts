@@ -198,7 +198,7 @@ function redactVerificationToken(verificationUrl: string): string {
 }
 
 function buildBrandLogoUrl(actionUrl: string): string {
-  return new URL("/images/brand/ondraft-logo.png", actionUrl).toString();
+  return new URL("/images/brand/OnDraftLogo-cropped.png", actionUrl).toString();
 }
 
 function redactToken(verificationUrl: string): string {

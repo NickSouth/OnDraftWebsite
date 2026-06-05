@@ -96,7 +96,7 @@ describe("EmailService", () => {
     });
     expect(body.html).toContain("Verify your OnDraft email");
     expect(body.html).toContain("OnDraft Football");
-    expect(body.html).toContain("https://ondraftfootball.com/images/brand/ondraft-logo.png");
+    expect(body.html).toContain("https://ondraftfootball.com/images/brand/OnDraftLogo-cropped.png");
     expect(body.html).toContain("#d99822");
     expect(body.html).toContain("font-family:Segoe UI,Inter,Arial,sans-serif");
     expect(body.html).toContain("font-family:Georgia,Cambria,Times New Roman,serif");
@@ -134,7 +134,7 @@ describe("EmailService", () => {
     });
     expect(body.html).toContain("Reset your password");
     expect(body.html).toContain("OnDraft Football");
-    expect(body.html).toContain("https://ondraftfootball.com/images/brand/ondraft-logo.png");
+    expect(body.html).toContain("https://ondraftfootball.com/images/brand/OnDraftLogo-cropped.png");
     expect(body.html).toContain("#d99822");
     expect(body.html).toContain("https://ondraftfootball.com/reset-password?token=example");
     expect(body.text).toContain("https://ondraftfootball.com/reset-password?token=example");

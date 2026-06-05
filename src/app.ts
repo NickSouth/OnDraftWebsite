@@ -355,7 +355,7 @@ class ExpressApp implements IApp {
   private exposeSessionLocals(req: Request, res: Response, next: NextFunction): void {
     const browserSession = touchOnDraftSession(sessionStore(req));
     const currentAbsoluteUrl = new URL(req.originalUrl || req.path, this.siteBaseUrl).toString();
-    const defaultPreviewImageUrl = new URL("/images/brand/ondraft-logo.png", this.siteBaseUrl).toString();
+    const defaultPreviewImageUrl = new URL("/images/brand/OnDraftLogo-cropped.png", this.siteBaseUrl).toString();
     res.locals.isAdmin = isAdminSession(browserSession);
     res.locals.currentPath = req.path;
     res.locals.currentAbsoluteUrl = currentAbsoluteUrl;
@@ -1311,7 +1311,7 @@ class ExpressApp implements IApp {
           isAdmin: isAdminSession(browserSession),
           currentPath: req.path,
           currentAbsoluteUrl,
-          defaultPreviewImageUrl: new URL("/images/brand/ondraft-logo.png", this.siteBaseUrl).toString(),
+          defaultPreviewImageUrl: new URL("/images/brand/OnDraftLogo-cropped.png", this.siteBaseUrl).toString(),
           relativeTime: formatRelativeTime,
           turnstileSiteKey: this.turnstileConfig.verificationDisabled ? null : this.turnstileConfig.siteKey,
           metaTitle: "Save too large | OnDraft Football",

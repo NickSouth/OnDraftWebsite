@@ -1,9 +1,4 @@
-Pending Components:
-- Add actual logo
-    - Add to about us page
-- Draft Board grading system
-- Aleks Bio/Headshot
-- Actual social media links
+
 
 
 Big Features:
@@ -19,3 +14,8 @@ Big Features:
     - manage users
     - create/send Newsletter
     - analytics
+
+- Draft Board grading system
+    - 
+
+- Discrepencys

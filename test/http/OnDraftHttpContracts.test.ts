@@ -113,9 +113,9 @@ describe("OnDraft HTTP contracts", () => {
     expect(response.text).toContain('href="/about"');
     expect(response.text).not.toContain('hx-get="/about"');
     expect(response.text).toContain('hx-target="#site-modal-outlet"');
-    expect(response.text).toContain("/images/brand/ondraft-logo.png");
-    expect(response.text).toContain('<meta property="og:image" content="http://localhost:3000/images/brand/ondraft-logo.png"');
-    expect(response.text).toContain('<meta name="twitter:image" content="http://localhost:3000/images/brand/ondraft-logo.png"');
+    expect(response.text).toContain("/images/brand/OnDraftLogo-cropped.png");
+    expect(response.text).toContain('<meta property="og:image" content="http://localhost:3000/images/brand/OnDraftLogo-cropped.png"');
+    expect(response.text).toContain('<meta name="twitter:image" content="http://localhost:3000/images/brand/OnDraftLogo-cropped.png"');
     expect(response.text).toContain("/images/social/youtube-icon.svg");
     expect(response.text).toContain("/images/social/x-icon.svg");
     expect(response.text).toContain("/images/social/tiktok-icon.svg");

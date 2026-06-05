@@ -1491,7 +1491,7 @@ class OnDraftController implements IOnDraftController {
       activeUserBan: await this.activeUserBan(session),
       metaTitle: `${article.title} | OnDraft Football`,
       metaDescription: article.writeup || `Read ${article.title} on OnDraft Football.`,
-      metaImage: this.absoluteMetadataUrl(res, article.imageUrl ?? "/images/brand/ondraft-logo.png"),
+      metaImage: this.absoluteMetadataUrl(res, article.imageUrl ?? "/images/brand/OnDraftLogo-cropped.png"),
       metaUrl: this.absoluteMetadataUrl(res, `/articles/${article.id}`),
       metaType: "article",
     });
