@@ -7,7 +7,7 @@
     </div>
   </div>
 <% } else { %>
-  <div class="od-stagger-list grid max-h-[720px] gap-3 overflow-y-auto px-1 py-1">
+  <div class="od-stagger-list grid gap-3 px-1 py-1">
     <% popularArticles.forEach((article, index) => { %>
       <a href="/articles/<%= article.id %>" class="od-card od-focus-ring grid grid-cols-[2.75rem_4.5rem_minmax(0,1fr)] items-center gap-3 overflow-hidden p-3 text-slate-950 no-underline transition hover:-translate-y-0.5 hover:border-draft-gold dark:text-white sm:grid-cols-[3.5rem_6rem_minmax(0,1fr)_auto] sm:p-0">
         <span class="grid size-10 place-items-center rounded-md bg-slate-100 font-display text-lg font-black text-slate-700 dark:bg-white/10 dark:text-white sm:size-12 sm:text-xl"><%= index + 1 %></span>

@@ -395,7 +395,7 @@
 
   <template data-result-skeleton="popular-articles">
     <div id="popular-articles-results" class="od-result-skeleton od-swap-surface grid gap-4" aria-live="polite" aria-label="Loading popular articles">
-      <div class="od-stagger-list grid max-h-[720px] gap-3 overflow-y-auto px-1 py-1">
+      <div class="od-stagger-list grid gap-3 px-1 py-1">
         <% for (let index = 0; index < 5; index += 1) { %>
           <div class="od-card grid grid-cols-[2.75rem_4.5rem_minmax(0,1fr)] items-center gap-3 overflow-hidden p-3 sm:grid-cols-[3.5rem_6rem_minmax(0,1fr)_auto] sm:p-0">
             <div class="od-loading-bar size-10 rounded-md sm:size-12"></div>

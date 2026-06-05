@@ -115,6 +115,9 @@
     if (!link || event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
       return false;
     }
+    if (document.querySelector("[data-unsaved-new-article][data-unsaved-dirty='true']")) {
+      return false;
+    }
     if (link.target || link.hasAttribute("download") || link.hasAttribute("hx-get") || link.hasAttribute("hx-post") || link.closest("[data-skip-global-loader]")) {
       return false;
     }
