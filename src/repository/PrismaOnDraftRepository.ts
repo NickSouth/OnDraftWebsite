@@ -15,6 +15,7 @@ import {
   Video,
   VideoQuery,
 } from "../model/OnDraftContent";
+import { calculateDraftGrade, toDraftGrade } from "../model/DraftGrades";
 import { getPrismaClient, type OnDraftPrismaClient } from "../prisma/client";
 import {
   ArticleNotFound,
@@ -181,7 +182,9 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
     weaknesses: string;
     rundown: string;
     notes: string;
+    grade: unknown;
     playerInfoPublished: boolean;
+    gradePublished: boolean;
     writeupPublished: boolean;
   }): BigBoardEntry {
     return {
@@ -196,6 +199,8 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
         : { feet: record.heightFeet, inches: record.heightInches },
       weight: record.weight,
       playerInfoPublished: record.playerInfoPublished,
+      grade: toDraftGrade(record.grade, record.position as Position | ""),
+      gradePublished: record.gradePublished,
       writeup: {
         strengths: record.strengths,
         weaknesses: record.weaknesses,
@@ -264,6 +269,12 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
         ? Number.MAX_SAFE_INTEGER
         : rankedValues.reduce((sum, value) => sum + value, 0) / rankedValues.length;
     };
+    const nullableAverage = (values: Array<number | null | undefined>): number | null => {
+      const numericValues = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+      return numericValues.length === 0
+        ? null
+        : numericValues.reduce((sum, value) => sum + value, 0) / numericValues.length;
+    };
     type ConsensusEntryDraft = {
       entry: BigBoardEntry;
       averageRank: number;
@@ -281,12 +292,19 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
       const rankDiscrepency = typeof Ryan?.rank === "number" && typeof Aleks?.rank === "number"
         ? Math.abs(Ryan.rank - Aleks.rank)
         : 0;
+      const averageFinalGrade = nullableAverage([
+        Ryan?.gradePublished ? calculateDraftGrade(Ryan.grade)?.displayGrade : null,
+        Aleks?.gradePublished ? calculateDraftGrade(Aleks.grade)?.displayGrade : null,
+      ]);
       return {
         entry: {
           ...source,
           id: `consensus-${source.id}`,
           rank: null,
           posRank: null,
+          grade: null,
+          gradePublished: averageFinalGrade !== null,
+          gradeSummary: averageFinalGrade !== null ? { finalGrade: averageFinalGrade } : undefined,
           bigDiscrepency: rankDiscrepency > 10,
         },
         averageRank: average([Ryan?.rank, Aleks?.rank]),
@@ -487,11 +505,13 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
       heightFeet: entry.height?.feet ?? null,
       heightInches: entry.height?.inches ?? null,
       weight: entry.weight,
+      grade: entry.grade,
       strengths: entry.writeup.strengths,
       weaknesses: entry.writeup.weaknesses,
       rundown: entry.writeup.rundown,
       notes: entry.notes,
       playerInfoPublished: entry.playerInfoPublished,
+      gradePublished: entry.gradePublished,
       writeupPublished: entry.writeupPublished,
     };
   }

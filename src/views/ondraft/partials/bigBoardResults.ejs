@@ -127,9 +127,13 @@
           const helmetSecondaryColor = teamColors?.secondaryColor || "#F8FAFC";
           const helmetKey = typeof helmetColorKey !== "undefined" ? helmetColorKey(helmetPrimaryColor, helmetSecondaryColor) : null;
           const generatedHelmetSrc = helmetKey ? `/generated/helmets/v1/${helmetKey}.png` : "/teamHelmetTemplate.png";
+          const boardGradeValue = typeof publishedBoardGrade === "function" ? publishedBoardGrade(entry) : null;
+          const boardGradeLabel = typeof formatDraftBoardGrade === "function" ? formatDraftBoardGrade(boardGradeValue) : "-/8";
+          const hasPublishedGrade = boardGradeValue !== null;
+          const hasPublishedDetails = entry.writeupPublished || hasPublishedGrade;
         %>
         <li class="border-b border-slate-200 py-3 last:border-b-0 dark:border-white/10">
-          <% if (entry.writeupPublished) { %>
+          <% if (hasPublishedDetails) { %>
             <details class="group">
               <summary class="od-focus-ring relative grid cursor-pointer list-none gap-3 overflow-hidden rounded-md p-2 transition hover:bg-white/70 dark:hover:bg-white/[0.04] sm:min-h-32 sm:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)] sm:items-center sm:pb-11 [&::-webkit-details-marker]:hidden">
                 <span class="pointer-events-none absolute inset-y-0 right-0 left-[31rem] hidden bg-slate-200/55 [clip-path:polygon(3rem_0,100%_0,100%_100%,0_100%)] dark:bg-white/[0.06] lg:block" aria-hidden="true"></span>
@@ -159,6 +163,12 @@
                       </span>
                     </span>
                     <span class="flex flex-wrap gap-2 pt-1 text-slate-500 dark:text-slate-300 lg:justify-end">
+                      <% if (hasPublishedGrade) { %>
+                        <span class="grid min-h-16 min-w-32 place-content-center gap-1 rounded-md border border-draft-gold/50 bg-white px-4 py-3 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink">
+                          <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Grade</span>
+                          <span class="font-display text-xl font-black leading-none text-draft-amber dark:text-draft-gold"><%= boardGradeLabel %></span>
+                        </span>
+                      <% } %>
                       <span class="grid min-w-20 gap-0.5 rounded bg-draft-slate px-3 py-2 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink">
                         <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Height</span>
                         <span class="text-sm font-black leading-none text-slate-500 dark:text-slate-300"><%= heightLabel %></span>
@@ -184,7 +194,7 @@
                   </span>
                 </span>
               </summary>
-              <%- include("bigBoardWriteupPanel", { entry, hasText }) %>
+              <%- include("bigBoardWriteupPanel", { entry, hasText, publishedBoardGrade, formatDraftBoardGrade, gradeTraitCategoriesForGrade }) %>
             </details>
           <% } else { %>
             <div class="relative grid gap-3 overflow-hidden rounded-md p-2 sm:min-h-32 sm:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)] sm:items-center">
@@ -215,6 +225,12 @@
                     </span>
                   </div>
                   <div class="flex flex-wrap gap-2 pt-1 text-slate-500 dark:text-slate-300 lg:justify-end">
+                    <% if (hasPublishedGrade) { %>
+                      <span class="grid min-h-16 min-w-32 place-content-center gap-1 rounded-md border border-draft-gold/50 bg-white px-4 py-3 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink">
+                        <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Grade</span>
+                        <span class="font-display text-xl font-black leading-none text-draft-amber dark:text-draft-gold"><%= boardGradeLabel %></span>
+                      </span>
+                    <% } %>
                     <span class="grid min-w-20 gap-0.5 rounded bg-draft-slate px-3 py-2 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink">
                       <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Height</span>
                       <span class="text-sm font-black leading-none text-slate-500 dark:text-slate-300"><%= heightLabel %></span>
@@ -249,9 +265,13 @@
           const helmetSecondaryColor = teamColors?.secondaryColor || "#F8FAFC";
           const helmetKey = typeof helmetColorKey !== "undefined" ? helmetColorKey(helmetPrimaryColor, helmetSecondaryColor) : null;
           const generatedHelmetSrc = helmetKey ? `/generated/helmets/v1/${helmetKey}.png` : "/teamHelmetTemplate.png";
+          const boardGradeValue = typeof publishedBoardGrade === "function" ? publishedBoardGrade(entry) : null;
+          const boardGradeLabel = typeof formatDraftBoardGrade === "function" ? formatDraftBoardGrade(boardGradeValue) : "-/8";
+          const hasPublishedGrade = boardGradeValue !== null;
+          const hasPublishedDetails = entry.writeupPublished || hasPublishedGrade;
         %>
         <li>
-          <% if (entry.writeupPublished) { %>
+          <% if (hasPublishedDetails) { %>
             <details class="group">
               <summary class="od-focus-ring grid cursor-pointer list-none gap-3 px-3 py-3 transition hover:bg-slate-50 dark:hover:bg-white/[0.04] sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:items-center [&::-webkit-details-marker]:hidden">
                 <span class="sr-only"><%= accessibleSummary %></span>
@@ -282,6 +302,12 @@
                   </span>
                 </span>
                 <span class="flex flex-wrap gap-2 sm:justify-end">
+                  <% if (hasPublishedGrade) { %>
+                    <span class="grid min-h-16 min-w-32 place-content-center gap-1 rounded-md border border-draft-gold/50 bg-white px-4 py-3 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink">
+                      <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Grade</span>
+                      <span class="font-display text-xl font-black leading-none text-draft-amber dark:text-draft-gold"><%= boardGradeLabel %></span>
+                    </span>
+                  <% } %>
                   <span class="grid min-w-20 gap-0.5 rounded bg-draft-slate px-3 py-2 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink">
                     <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Height</span>
                     <span class="text-sm font-black leading-none text-slate-500 dark:text-slate-300"><%= heightLabel %></span>
@@ -292,7 +318,7 @@
                   </span>
                 </span>
               </summary>
-              <%- include("bigBoardWriteupPanel", { entry, hasText }) %>
+              <%- include("bigBoardWriteupPanel", { entry, hasText, publishedBoardGrade, formatDraftBoardGrade, gradeTraitCategoriesForGrade }) %>
             </details>
           <% } else { %>
             <div class="grid gap-3 px-3 py-3 sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:items-center">
@@ -316,6 +342,12 @@
                 </span>
               </span>
               <span class="flex flex-wrap gap-2 sm:justify-end">
+                <% if (hasPublishedGrade) { %>
+                  <span class="grid min-h-16 min-w-32 place-content-center gap-1 rounded-md border border-draft-gold/50 bg-white px-4 py-3 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink">
+                    <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Grade</span>
+                    <span class="font-display text-xl font-black leading-none text-draft-amber dark:text-draft-gold"><%= boardGradeLabel %></span>
+                  </span>
+                <% } %>
                 <span class="grid min-w-20 gap-0.5 rounded bg-draft-slate px-3 py-2 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink">
                   <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Height</span>
                   <span class="text-sm font-black leading-none text-slate-500 dark:text-slate-300"><%= heightLabel %></span>

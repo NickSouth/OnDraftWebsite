@@ -8,6 +8,18 @@ import type { ILoggingService } from "../service/LoggingService";
 import { ArticleError, BigBoardError, ForumPostError } from "../repository/OnDraftRepository";
 import { publicArticleUploadUrl } from "../uploads/articlePdfUpload";
 import { BIG_BOARD_CREATORS, POSITIONS, type Article, type ArticleContent, type ArticleFilter, type BigBoard, type BigBoardCreator, type BigBoardEntry, type ForumPost, type ForumPostFilter, type Video, type VideoQuery } from "../model/OnDraftContent";
+import {
+  calculateDraftGrade,
+  defaultDraftGrade,
+  draftGradeArchetypeNames,
+  draftGradePositionConfig,
+  formatDraftBoardGrade,
+  gradeTraitCategoriesForGrade,
+  normalizeDraftGradeTraitScore,
+  normalizePotential,
+  validateDraftGradeForPublication,
+  type DraftGrade,
+} from "../model/DraftGrades";
 import type { Bookmark, IUserBanRecord } from "../auth/User";
 import { collegeTeam } from "../CollegeFootballColors";
 import { helmetColorKey } from "../service/HelmetAssetService";
@@ -53,6 +65,7 @@ type BigBoardEditorField =
   | "posRank"
   | "height"
   | "weight"
+  | "grade"
   | "strengths"
   | "weaknesses"
   | "rundown";
@@ -109,6 +122,7 @@ export interface IOnDraftController {
   saveBigBoardEntry(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   autosaveBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   publishBigBoardPlayerInfo(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  publishBigBoardGrade(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   publishBigBoardWriteup(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   deleteBigBoardEntryFromEditor(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   deleteArticle(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void>;
@@ -218,6 +232,40 @@ class OnDraftController implements IOnDraftController {
     return value === "true" || value === "on";
   }
 
+  private formRecord(value: unknown): Record<string, unknown> {
+    return value && typeof value === "object" && !Array.isArray(value)
+      ? value as Record<string, unknown>
+      : {};
+  }
+
+  private formTraitScores(value: unknown): Record<string, DraftGrade["physicalTraits"][string]> {
+    return Object.fromEntries(
+      Object.entries(this.formRecord(value)).map(([trait, score]) => [trait, normalizeDraftGradeTraitScore(score)])
+    );
+  }
+
+  private buildDraftGradeInput(entry: Record<string, unknown>): DraftGrade | null {
+    const rawGrade = this.formRecord(entry.grade);
+    const position = this.formString(entry.position) || this.formString(rawGrade.position);
+    const archetype = this.formString(rawGrade.archetype);
+    const physicalTraits = this.formRecord(rawGrade.physicalTraits);
+    const filmTraits = this.formRecord(rawGrade.filmTraits);
+
+    if (!POSITIONS.includes(position as typeof POSITIONS[number])) {
+      return null;
+    }
+
+    return {
+      position: position as typeof POSITIONS[number],
+      archetype: draftGradeArchetypeNames(position as typeof POSITIONS[number]).includes(archetype)
+        ? archetype
+        : draftGradeArchetypeNames(position as typeof POSITIONS[number])[0] ?? "",
+      potential: normalizePotential(rawGrade.potential),
+      physicalTraits: this.formTraitScores(physicalTraits),
+      filmTraits: this.formTraitScores(filmTraits),
+    };
+  }
+
   private parseHeightLabel(value: unknown): { feet: number; inches: number } | null {
     if (typeof value !== "string" || value.trim() === "") {
       return null;
@@ -253,8 +301,9 @@ class OnDraftController implements IOnDraftController {
       const heightFeet = this.parseOptionalNumber(height.feet);
       const heightInches = this.parseOptionalNumber(height.inches);
       const heightLabel = this.parseHeightLabel(entry.heightLabel);
+      const hasField = (field: string) => Object.prototype.hasOwnProperty.call(entry, field);
 
-      return {
+      const input: BigBoardEditableEntryInput = {
         id: this.formString(entry.id),
         playerName: this.formString(entry.playerName),
         school: this.formString(entry.school),
@@ -263,13 +312,26 @@ class OnDraftController implements IOnDraftController {
         posRank: this.parseOptionalNumber(entry.posRank),
         height: heightLabel ?? (heightFeet === null && heightInches === null ? null : { feet: heightFeet ?? 0, inches: heightInches ?? 0 }),
         weight: this.parseOptionalNumber(entry.weight),
-        strengths: this.formString(entry.strengths),
-        weaknesses: this.formString(entry.weaknesses),
-        rundown: this.formString(entry.rundown),
-        notes: this.formString(entry.notes),
         playerInfoPublished: this.formBoolean(entry.playerInfoPublished),
+        gradePublished: this.formBoolean(entry.gradePublished),
         writeupPublished: this.formBoolean(entry.writeupPublished),
       };
+      if (hasField("grade")) {
+        input.grade = this.buildDraftGradeInput(entry);
+      }
+      if (hasField("strengths")) {
+        input.strengths = this.formString(entry.strengths);
+      }
+      if (hasField("weaknesses")) {
+        input.weaknesses = this.formString(entry.weaknesses);
+      }
+      if (hasField("rundown")) {
+        input.rundown = this.formString(entry.rundown);
+      }
+      if (hasField("notes")) {
+        input.notes = this.formString(entry.notes);
+      }
+      return input;
     }).filter((entry) => !this.isBlankBigBoardEntryInput(entry));
 
     return {
@@ -280,18 +342,20 @@ class OnDraftController implements IOnDraftController {
   }
 
   private isBlankBigBoardEntryInput(entry: BigBoardEditableEntryInput): boolean {
-    return entry.playerName.trim() === ""
-      && entry.school.trim() === ""
-      && entry.position.trim() === ""
+    return (entry.playerName ?? "").trim() === ""
+      && (entry.school ?? "").trim() === ""
+      && (entry.position ?? "").trim() === ""
       && entry.rank === null
       && entry.posRank === null
       && entry.height === null
       && entry.weight === null
-      && entry.strengths.trim() === ""
-      && entry.weaknesses.trim() === ""
-      && entry.rundown.trim() === ""
-      && entry.notes.trim() === ""
+      && (entry.grade === null || entry.grade === undefined)
+      && (entry.strengths ?? "").trim() === ""
+      && (entry.weaknesses ?? "").trim() === ""
+      && (entry.rundown ?? "").trim() === ""
+      && (entry.notes ?? "").trim() === ""
       && !entry.playerInfoPublished
+      && !entry.gradePublished
       && !entry.writeupPublished;
   }
 
@@ -1194,6 +1258,13 @@ class OnDraftController implements IOnDraftController {
     return filter;
   }
 
+  private publishedBoardGrade(entry: BigBoardEntry): number | null {
+    if (!entry.gradePublished) {
+      return null;
+    }
+    return entry.gradeSummary?.finalGrade ?? calculateDraftGrade(entry.grade)?.displayGrade ?? null;
+  }
+
   async showBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
     this.logger.info("Rendering big board page");
     const selectedYear = this.parseBigBoardYear(req.query.year);
@@ -1252,6 +1323,12 @@ class OnDraftController implements IOnDraftController {
       filters: filter ?? {},
       collegeTeamColors: collegeTeam,
       helmetColorKey,
+      calculateDraftGrade,
+      defaultDraftGrade,
+      draftGradePositionConfig,
+      formatDraftBoardGrade,
+      gradeTraitCategoriesForGrade,
+      publishedBoardGrade: (entry: BigBoardEntry) => this.publishedBoardGrade(entry),
     };
     if (req.get("HX-Request") === "true") {
       res.render("ondraft/partials/bigBoardPanel", { ...viewModel, layout: false });
@@ -1292,6 +1369,12 @@ class OnDraftController implements IOnDraftController {
       collegeTeamNames,
       collegeTeamColors: collegeTeam,
       helmetColorKey,
+      calculateDraftGrade,
+      defaultDraftGrade,
+      draftGradePositionConfig,
+      formatDraftBoardGrade,
+      gradeTraitCategoriesForGrade,
+      publishedBoardGrade: (entry: BigBoardEntry) => this.publishedBoardGrade(entry),
       errorMessage,
       statusMessage,
       validationIssues,
@@ -1308,7 +1391,12 @@ class OnDraftController implements IOnDraftController {
     });
   }
 
-  private bigBoardEditorEntryCardLocals(board: BigBoard, entry: BigBoardEntry, isTemplate = false) {
+  private bigBoardEditorEntryCardLocals(
+    board: BigBoard,
+    entry: BigBoardEntry,
+    isTemplate = false,
+    options: { forceExpandWriteup?: boolean; forceExpandGrade?: boolean } = {},
+  ) {
     const heightFractionOptions = [
       { value: 0, label: "0" },
       { value: 0.125, label: " 1/8" },
@@ -1336,6 +1424,12 @@ class OnDraftController implements IOnDraftController {
       heightFeetOptions,
       heightInchOptions,
       heightFractionOptions,
+      calculateDraftGrade,
+      defaultDraftGrade,
+      draftGradePositionConfig,
+      formatDraftBoardGrade,
+      gradeTraitCategoriesForGrade,
+      publishedBoardGrade: (candidate: BigBoardEntry) => this.publishedBoardGrade(candidate),
       selectedHeightValue,
       selectedHeightFeet,
       selectedHeightInches,
@@ -1344,11 +1438,19 @@ class OnDraftController implements IOnDraftController {
       helmetColorKey,
       validationIssues: [],
       isTemplate,
+      forceExpandWriteup: options.forceExpandWriteup ?? false,
+      forceExpandGrade: options.forceExpandGrade ?? false,
     };
   }
 
-  private renderBigBoardEditorEntryCard(res: Response, board: BigBoard, entry: BigBoardEntry, statusCode = 200): void {
-    res.status(statusCode).render("ondraft/partials/bigBoardEditorEntryCard", this.bigBoardEditorEntryCardLocals(board, entry));
+  private renderBigBoardEditorEntryCard(
+    res: Response,
+    board: BigBoard,
+    entry: BigBoardEntry,
+    statusCode = 200,
+    options: { forceExpandWriteup?: boolean; forceExpandGrade?: boolean } = {},
+  ): void {
+    res.status(statusCode).render("ondraft/partials/bigBoardEditorEntryCard", this.bigBoardEditorEntryCardLocals(board, entry, false, options));
   }
 
   private addPublishValidationIssue(
@@ -1435,6 +1537,22 @@ class OnDraftController implements IOnDraftController {
 
     if (issues.length === 0) {
       this.addPublishValidationIssue(issues, attempted.id, "rundown", fallbackMessage);
+    }
+    return issues;
+  }
+
+  private gradePublishValidationIssues(board: BigBoard, attemptedEntryId: string, fallbackMessage: string): BigBoardEditorValidationIssue[] {
+    const issues: BigBoardEditorValidationIssue[] = [];
+    const attempted = board.entries.find((entry) => entry.id === attemptedEntryId);
+    if (!attempted) {
+      return issues;
+    }
+
+    const messages = validateDraftGradeForPublication(attempted.position, attempted.grade);
+    messages.forEach((message) => this.addPublishValidationIssue(issues, attempted.id, "grade", message));
+
+    if (issues.length === 0) {
+      this.addPublishValidationIssue(issues, attempted.id, "grade", fallbackMessage);
     }
     return issues;
   }
@@ -2277,6 +2395,8 @@ class OnDraftController implements IOnDraftController {
   async saveBigBoardEntry(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
     this.logger.info("Saving big board entry edits");
     const input = this.buildBigBoardEntriesInput(req);
+    const forceExpandWriteup = this.formBoolean(req.body.expandWriteup);
+    const forceExpandGrade = this.formBoolean(req.body.expandGrade);
     const entry = input.entries[0];
     if (!entry) {
       const board = await this.service.getBigBoard(input.year, input.creator);
@@ -2300,11 +2420,10 @@ class OnDraftController implements IOnDraftController {
     }
     if (result.ok === false) {
       if (req.get("HX-Request") === "true") {
-        const fallbackEntry = board.value.entries.find((candidate) => candidate.id === entry.id) ?? board.value.entries[0];
-        if (fallbackEntry) {
-          this.renderBigBoardEditorEntryCard(res, board.value, fallbackEntry, 200);
-          return;
-        }
+        res.set("HX-Retarget", "#big-board-editor-fragment");
+        res.set("HX-Reswap", "outerHTML show:none");
+        await this.renderBigBoardEditor(res, session, board.value, result.value.message, null, 200, true);
+        return;
       }
       await this.renderBigBoardEditor(res, session, board.value, result.value.message, null, this.mapBigBoardErrorToStatusCode(result.value));
       return;
@@ -2312,7 +2431,7 @@ class OnDraftController implements IOnDraftController {
 
     const playerName = result.value.playerName || "draft board entry";
     if (req.get("HX-Request") === "true") {
-      this.renderBigBoardEditorEntryCard(res, board.value, result.value);
+      this.renderBigBoardEditorEntryCard(res, board.value, result.value, 200, { forceExpandWriteup, forceExpandGrade });
       return;
     }
     await this.renderBigBoardEditor(res, session, board.value, null, `Saved ${playerName}.`);
@@ -2338,6 +2457,8 @@ class OnDraftController implements IOnDraftController {
     successMessage: string,
   ): Promise<void> {
     const input = this.buildBigBoardEntriesInput(req);
+    const forceExpandWriteup = this.formBoolean(req.body.expandWriteup);
+    const forceExpandGrade = this.formBoolean(req.body.expandGrade);
     const entryId = this.formString(req.body.entryId);
     const entry = input.entries.find((candidate) => candidate.id === entryId) ?? input.entries[0];
     if (!entry) {
@@ -2359,11 +2480,10 @@ class OnDraftController implements IOnDraftController {
       const board = await this.service.getBigBoard(input.year, input.creator);
       if (board.ok === true) {
         if (req.get("HX-Request") === "true") {
-          const fallbackEntry = board.value.entries.find((candidate) => candidate.id === entry.id) ?? board.value.entries[0];
-          if (fallbackEntry) {
-            this.renderBigBoardEditorEntryCard(res, board.value, fallbackEntry, 200);
-            return;
-          }
+          res.set("HX-Retarget", "#big-board-editor-fragment");
+          res.set("HX-Reswap", "outerHTML show:none");
+          await this.renderBigBoardEditor(res, session, board.value, saved.value.message, null, 200, true);
+          return;
         }
         await this.renderBigBoardEditor(res, session, board.value, saved.value.message, null, this.mapBigBoardErrorToStatusCode(saved.value));
         return;
@@ -2392,7 +2512,7 @@ class OnDraftController implements IOnDraftController {
 
     if (req.get("HX-Request") === "true") {
       const publishedEntry = updatedBoard.value.entries.find((candidate) => candidate.id === published.value.id) ?? published.value;
-      this.renderBigBoardEditorEntryCard(res, updatedBoard.value, publishedEntry);
+      this.renderBigBoardEditorEntryCard(res, updatedBoard.value, publishedEntry, 200, { forceExpandWriteup, forceExpandGrade });
       return;
     }
     await this.renderBigBoardEditor(res, session, updatedBoard.value, null, successMessage);
@@ -2407,6 +2527,18 @@ class OnDraftController implements IOnDraftController {
       (year, creator, entryId) => this.service.publishBigBoardEntryPlayerInfo(year, creator, entryId),
       (board, entryId, message) => this.playerInfoPublishValidationIssues(board, entryId, message),
       "Player info published.",
+    );
+  }
+
+  async publishBigBoardGrade(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Publishing big board grade");
+    await this.saveThenPublishBigBoardEntry(
+      req,
+      res,
+      session,
+      (year, creator, entryId) => this.service.publishBigBoardEntryGrade(year, creator, entryId),
+      (board, entryId, message) => this.gradePublishValidationIssues(board, entryId, message),
+      "Grade published.",
     );
   }
 

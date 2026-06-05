@@ -1,3 +1,5 @@
+import type { DraftGrade, DraftGradeSummary } from "./DraftGrades";
+
 export interface IOnDraftContent {}
 export const BIG_BOARD_CREATORS = ["Ryan", "Aleks", "Consensus"] as const;
 export type BigBoardCreator = typeof BIG_BOARD_CREATORS[number];
@@ -32,6 +34,9 @@ export type BigBoardEntry = {
   height: Height | null;
   weight: number | null;
   playerInfoPublished: boolean;
+  grade: DraftGrade | null;
+  gradePublished: boolean;
+  gradeSummary?: DraftGradeSummary;
   writeup: BigBoardWriteup;
   writeupPublished: boolean;
   notes: string;

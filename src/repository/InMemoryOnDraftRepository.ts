@@ -1,5 +1,6 @@
 import { Err, Ok, Result } from "../lib/result";
 import { Article, ArticleFilter, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, Comment, ConsensusBigBoard, DraftBoardFilter, ForumPost, ForumPostFilter, Video, VideoQuery } from "../model/OnDraftContent";
+import { calculateDraftGrade } from "../model/DraftGrades";
 import { ArticleNotFound, BigBoardNotFound, CommentNotFound, DuplicateBigBoardYear, DuplicatePlayer, DuplicateArticle, DuplicateForumPost, ForumPostCommentNotFound, type ArticleError, type BigBoardError, type IOnDraftRepository, PlayerNotFound, ForumPostError, ForumPostNotFound } from "./OnDraftRepository";
 
 const MEMORY_LOAD_TEST_SCHOOLS = [
@@ -110,6 +111,8 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
         height: { feet: 6, inches },
         weight: 185 + index,
         playerInfoPublished: true,
+        grade: null,
+        gradePublished: false,
         writeup: {
           strengths: "",
           weaknesses: "",
@@ -542,6 +545,14 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
       return rankedValues.reduce((sum, value) => sum + value, 0) / rankedValues.length;
     };
 
+    const nullableAverage = (values: Array<number | null | undefined>): number | null => {
+      const numericValues = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+      if (numericValues.length === 0) {
+        return null;
+      }
+      return numericValues.reduce((sum, value) => sum + value, 0) / numericValues.length;
+    };
+
     const compareOverall = (first: ConsensusEntryDraft, second: ConsensusEntryDraft): number => (
       first.averageRank - second.averageRank ||
       first.ryanRank - second.ryanRank ||
@@ -568,6 +579,10 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
       const rankDiscrepency = typeof Ryan?.rank === "number" && typeof Aleks?.rank === "number"
         ? Math.abs(Ryan.rank - Aleks.rank)
         : 0;
+      const averageFinalGrade = nullableAverage([
+        Ryan?.gradePublished ? calculateDraftGrade(Ryan.grade)?.displayGrade : null,
+        Aleks?.gradePublished ? calculateDraftGrade(Aleks.grade)?.displayGrade : null,
+      ]);
 
       return {
         entry: {
@@ -575,6 +590,9 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
           id: `consensus-${sourceOfTruth.id}`,
           rank: null,
           posRank: null,
+          grade: null,
+          gradePublished: averageFinalGrade !== null,
+          gradeSummary: averageFinalGrade !== null ? { finalGrade: averageFinalGrade } : undefined,
           bigDiscrepency: rankDiscrepency > 10,
         },
         averageRank,

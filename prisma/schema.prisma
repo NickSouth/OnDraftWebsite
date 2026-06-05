@@ -327,7 +327,9 @@ model BigBoardEntry {
   weaknesses          String   @default("")
   rundown             String   @default("")
   notes               String   @default("")
+  grade               Json?
   playerInfoPublished Boolean  @default(false) @map("player_info_published")
+  gradePublished      Boolean  @default(false) @map("grade_published")
   writeupPublished    Boolean  @default(false) @map("writeup_published")
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
@@ -342,6 +344,7 @@ model BigBoardEntry {
   @@index([sortOrder])
   @@index([posRank])
   @@index([playerInfoPublished])
+  @@index([gradePublished])
   @@index([writeupPublished])
   @@map("big_board_entries")
 }

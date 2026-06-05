@@ -15,7 +15,6 @@ Big Features:
     - create/send Newsletter
     - analytics
 
-- Draft Board grading system
-    - 
-
 - Discrepencys
+
+- Google discoverability

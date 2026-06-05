@@ -3,6 +3,8 @@ import { CreateInMemoryUserRepository } from "../../src/auth/InMemoryUserReposit
 import { CreateOnDraftService, parseYoutubeVideoId } from "../../src/service/OnDraftService";
 import { CreateUserPreferenceService } from "../../src/service/UserPreferenceService";
 import { IYoutubeVideoStatsService } from "../../src/service/YoutubeVideoStatsService";
+import { calculateDraftGrade, defaultDraftGrade, formatDraftBoardGrade, gradeTraitCategoriesForGrade, type DraftGrade } from "../../src/model/DraftGrades";
+import type { Position } from "../../src/model/OnDraftContent";
 
 function service() {
   return CreateOnDraftService(CreateInMemoryOnDraftRepository({ seedContent: false }));
@@ -15,6 +17,77 @@ function serviceWithYoutubeStats(youtubeStats: IYoutubeVideoStatsService) {
 function userPreferenceService() {
   return CreateUserPreferenceService(CreateInMemoryUserRepository());
 }
+
+function filledGrade(position: Position, score = 6, potential = 6): DraftGrade {
+  const base = defaultDraftGrade(position);
+  if (!base) {
+    throw new Error(`Missing grade config for ${position}`);
+  }
+  const categories = gradeTraitCategoriesForGrade(base, position);
+  return {
+    ...base,
+    potential,
+    physicalTraits: Object.fromEntries(categories[0].traits.map((trait) => [trait, score])),
+    filmTraits: Object.fromEntries(categories[1].traits.map((trait) => [trait, score])),
+  };
+}
+
+describe("Draft grade calculations", () => {
+  it("matches Ryan's weighted WR final grade math to two decimals", () => {
+    const grade: DraftGrade = {
+      position: "WR",
+      archetype: "Balanced",
+      potential: 6,
+      physicalTraits: {
+        Speed: 6,
+        Acceleration: 6,
+        Agility: 7,
+        "Change of Direction": 7,
+        Strength: 5,
+        "Size / Frame": 5,
+      },
+      filmTraits: {
+        "Blocking / Toughness": 4,
+        "Route Tree": 7,
+        "Short Route Running": 7,
+        "Intermediate Route Running": 7,
+        "Deep Route Running": 6,
+        Release: 7,
+        Catching: 6,
+        "Catch In Traffic": 6,
+        "Contested Catching": 5,
+        "Body Control": 7,
+        "Run After Catch": 4,
+      },
+    };
+
+    const result = calculateDraftGrade(grade);
+
+    expect(result).not.toBeNull();
+    expect(result?.physicalGrade).toBeCloseTo(6.14, 4);
+    expect(result?.filmGrade).toBeCloseTo(6.08, 4);
+    expect(formatDraftBoardGrade(result?.displayGrade)).toBe("6.26/8");
+  });
+
+  it("maps OnDraft EDGE to Ryan's ED formula and supports NA in calculations", () => {
+    const edgeGrade = filledGrade("EDGE", 6, 6);
+    edgeGrade.physicalTraits.Speed = "NA";
+
+    const result = calculateDraftGrade(edgeGrade);
+
+    expect(result).not.toBeNull();
+    expect(formatDraftBoardGrade(result?.displayGrade)).toBe("6.15/8");
+  });
+
+  it("accepts decimal trait grades and keeps displayed grades within the eight point scale", () => {
+    const decimalGrade = filledGrade("WR", 6.5, 6);
+    const maxGrade = filledGrade("WR", 8, 8);
+
+    expect(formatDraftBoardGrade(calculateDraftGrade(decimalGrade)?.displayGrade)).toBe("6.65/8");
+    expect(calculateDraftGrade(maxGrade)?.finalGrade).toBeCloseTo(8.3, 4);
+    expect(formatDraftBoardGrade(calculateDraftGrade(maxGrade)?.displayGrade)).toBe("8.00/8");
+  });
+});
 
 describe("OnDraftService article validation", () => {
   it("generates a five character alphanumeric article id", async () => {
@@ -824,6 +897,151 @@ describe("OnDraftService big board editing", () => {
         "Targeted Two",
       ]);
       expect(board.value.entries[0].weight).toBe(221);
+    }
+  });
+
+  it("saves draft grades and only publishes fully numeric grade entries", async () => {
+    const ondraftService = service();
+    const invalidGrade = filledGrade("EDGE", 6, 6);
+    invalidGrade.physicalTraits.Speed = "NA";
+
+    const saved = await ondraftService.saveBigBoardEntries({
+      year: 2026,
+      creator: "Ryan",
+      entries: [
+        {
+          id: "edge-grade-draft",
+          playerName: "Graded Edge",
+          school: "OnDraft State",
+          position: "EDGE",
+          rank: 1,
+          posRank: 1,
+          height: { feet: 6, inches: 4 },
+          weight: 255,
+          grade: invalidGrade,
+        },
+      ],
+    });
+
+    expect(saved.ok).toBe(true);
+    if (saved.ok === false) {
+      return;
+    }
+    expect(saved.value.entries[0].gradePublished).toBe(false);
+
+    const rejected = await ondraftService.publishBigBoardEntryGrade(2026, "Ryan", "edge-grade-draft");
+    expect(rejected.ok).toBe(false);
+    if (rejected.ok === false) {
+      expect(rejected.value.message).toContain("Speed must be a number from 1 to 8");
+    }
+
+    const validGrade = filledGrade("EDGE", 6, 6);
+    const corrected = await ondraftService.saveBigBoardEntry({
+      year: 2026,
+      creator: "Ryan",
+      entry: {
+        ...saved.value.entries[0],
+        grade: validGrade,
+        gradePublished: false,
+      },
+    });
+    expect(corrected.ok).toBe(true);
+
+    const published = await ondraftService.publishBigBoardEntryGrade(2026, "Ryan", "edge-grade-draft");
+    expect(published.ok).toBe(true);
+    if (published.ok === true) {
+      expect(published.value.gradePublished).toBe(true);
+      expect(formatDraftBoardGrade(calculateDraftGrade(published.value.grade)?.displayGrade)).toBe("6.15/8");
+    }
+  });
+
+  it("preserves omitted writeup and grade data when saving a single draft board card", async () => {
+    const ondraftService = service();
+    const grade = filledGrade("WR", 6.5, 6);
+    const created = await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Ryan",
+      id: "partial-save-preserves-nested",
+      playerName: "Partial Save",
+      school: "OnDraft State",
+      position: "WR",
+      rank: 1,
+      posRank: 1,
+      height: { feet: 6, inches: 1 },
+      weight: 205,
+      grade,
+      gradePublished: true,
+      strengths: "Original strength.",
+      weaknesses: "Original weakness.",
+      rundown: "Original rundown.",
+      writeupPublished: true,
+    });
+    expect(created.ok).toBe(true);
+
+    const saved = await ondraftService.saveBigBoardEntry({
+      year: 2026,
+      creator: "Ryan",
+      entry: {
+        id: "partial-save-preserves-nested",
+        playerName: "Partial Save Updated",
+        school: "OnDraft State",
+        position: "WR",
+        rank: 1,
+        posRank: 1,
+        height: { feet: 6, inches: 1 },
+        weight: 206,
+      },
+    });
+
+    expect(saved.ok).toBe(true);
+    if (saved.ok === true) {
+      expect(saved.value.writeup).toEqual({
+        strengths: "Original strength.",
+        weaknesses: "Original weakness.",
+        rundown: "Original rundown.",
+      });
+      expect(saved.value.writeupPublished).toBe(true);
+      expect(saved.value.gradePublished).toBe(true);
+      expect(formatDraftBoardGrade(calculateDraftGrade(saved.value.grade)?.displayGrade)).toBe("6.65/8");
+    }
+  });
+
+  it("averages published board grades on the consensus board", async () => {
+    const ondraftService = service();
+
+    await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Ryan",
+      playerName: "Consensus Grade",
+      school: "OnDraft State",
+      position: "WR",
+      rank: 1,
+      posRank: 1,
+      height: { feet: 6, inches: 1 },
+      weight: 205,
+      grade: filledGrade("WR", 6, 6),
+      gradePublished: true,
+    });
+    await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Aleks",
+      playerName: "Consensus Grade",
+      school: "OnDraft State",
+      position: "WR",
+      rank: 3,
+      posRank: 1,
+      height: { feet: 6, inches: 1 },
+      weight: 205,
+      grade: filledGrade("WR", 8, 8),
+      gradePublished: true,
+    });
+
+    const consensus = await ondraftService.getBigBoard(2026, "Consensus");
+
+    expect(consensus.ok).toBe(true);
+    if (consensus.ok === true) {
+      expect(consensus.value.entries[0].gradePublished).toBe(true);
+      expect(formatDraftBoardGrade(consensus.value.entries[0].gradeSummary?.finalGrade)).toBe("7.08/8");
     }
   });
 });

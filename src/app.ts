@@ -1232,6 +1232,18 @@ class ExpressApp implements IApp {
     );
 
     this.app.post(
+      "/bigboard/edit/publish-grade",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.publishBigBoardGrade(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
       "/bigboard/edit/delete-entry",
       asyncHandler(async (req, res) => {
         if (!this.requireAdmin(req, res)) {
