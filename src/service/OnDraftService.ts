@@ -6,6 +6,7 @@ import { UnknownArticleError, UnknownForumPostError, ArticleError,  BigBoardErro
 import { DraftBoardFilterInput } from "../controller/OnDraftController";
 import { IYoutubeVideoStatsService } from "./YoutubeVideoStatsService";
 import { BANNED_PHRASES } from "./bannedPhrases";
+import { toDraftGrade, validateDraftGradeForPublication, type DraftGrade } from "../model/DraftGrades";
 
 const ARTICLE_PDF_MAX_BYTES = 5 * 1024 * 1024;
 const ARTICLE_ID_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -96,7 +97,9 @@ export interface BigBoardEntryInput {
     inches: number;
   };
   weight: number;
+  grade?: DraftGrade | null;
   playerInfoPublished?: boolean;
+  gradePublished?: boolean;
   writeupPublished?: boolean;
 }
 
@@ -109,12 +112,14 @@ export interface BigBoardEditableEntryInput {
   posRank?: number | string | null;
   height?: Height | null;
   weight?: number | string | null;
+  grade?: DraftGrade | null;
   writeup?: Partial<BigBoardWriteup> | string;
   strengths?: string;
   weaknesses?: string;
   rundown?: string;
   notes?: string;
   playerInfoPublished?: boolean;
+  gradePublished?: boolean;
   writeupPublished?: boolean;
 }
 
@@ -166,6 +171,7 @@ export interface IOnDraftService {
   saveBigBoardEntries(input: SaveBigBoardEntriesInput): Promise<Result<BigBoard, BigBoardError>>;
   saveBigBoardEntry(input: SaveBigBoardEntryInput): Promise<Result<BigBoardEntry, BigBoardError>>;
   publishBigBoardEntryPlayerInfo(year: number | undefined, creator: BigBoardCreator | undefined, entryId: string): Promise<Result<BigBoardEntry, BigBoardError>>;
+  publishBigBoardEntryGrade(year: number | undefined, creator: BigBoardCreator | undefined, entryId: string): Promise<Result<BigBoardEntry, BigBoardError>>;
   publishBigBoardEntryWriteup(year: number | undefined, creator: BigBoardCreator | undefined, entryId: string): Promise<Result<BigBoardEntry, BigBoardError>>;
   deleteArticle(id: string): Promise<Result<void, ArticleError>>;
   deleteBigBoardEntry(year: number | undefined, creator: BigBoardCreator | undefined, playerName: string): Promise<Result<void, BigBoardError>>;
@@ -448,19 +454,19 @@ class OnDraftService implements IOnDraftService {
     return { feet, inches };
   }
 
-  private normalizeBigBoardWriteup(input: BigBoardEntryInput | BigBoardEditableEntryInput): BigBoardWriteup {
+  private normalizeBigBoardWriteup(input: BigBoardEntryInput | BigBoardEditableEntryInput, existing?: BigBoardWriteup): BigBoardWriteup {
     if (typeof input.writeup === "object" && input.writeup !== null) {
       return {
-        strengths: input.writeup.strengths?.trim() ?? "",
-        weaknesses: input.writeup.weaknesses?.trim() ?? "",
-        rundown: input.writeup.rundown?.trim() ?? "",
+        strengths: input.writeup.strengths?.trim() ?? existing?.strengths ?? "",
+        weaknesses: input.writeup.weaknesses?.trim() ?? existing?.weaknesses ?? "",
+        rundown: input.writeup.rundown?.trim() ?? existing?.rundown ?? "",
       };
     }
 
     return {
-      strengths: input.strengths?.trim() ?? "",
-      weaknesses: input.weaknesses?.trim() ?? "",
-      rundown: input.rundown?.trim() ?? (typeof input.writeup === "string" ? input.writeup.trim() : ""),
+      strengths: input.strengths?.trim() ?? existing?.strengths ?? "",
+      weaknesses: input.weaknesses?.trim() ?? existing?.weaknesses ?? "",
+      rundown: input.rundown?.trim() ?? (typeof input.writeup === "string" ? input.writeup.trim() : existing?.rundown ?? ""),
     };
   }
 
@@ -475,7 +481,11 @@ class OnDraftService implements IOnDraftService {
       height: this.normalizeHeight(input.height),
       weight: this.normalizeNullableInteger(input.weight),
       playerInfoPublished: existing?.playerInfoPublished ?? false,
-      writeup: this.normalizeBigBoardWriteup(input),
+      grade: input.grade === undefined
+        ? existing?.grade ?? null
+        : toDraftGrade(input.grade, POSITIONS.includes(input.position as Position) ? input.position as Position : existing?.position ?? ""),
+      gradePublished: existing?.gradePublished ?? false,
+      writeup: this.normalizeBigBoardWriteup(input, existing?.writeup),
       writeupPublished: existing?.writeupPublished ?? false,
       notes: input.notes?.trim() ?? existing?.notes ?? "",
     };
@@ -503,6 +513,14 @@ class OnDraftService implements IOnDraftService {
   private validateWriteupForPublication(entry: BigBoardEntry): Result<void, BigBoardError> {
     if (!entry.writeup.strengths || !entry.writeup.weaknesses || !entry.writeup.rundown) {
       return Err(BigBoardValidationError("Strengths, weaknesses, and rundown are required before publishing a player writeup."));
+    }
+    return Ok(undefined);
+  }
+
+  private validateGradeForPublication(entry: BigBoardEntry): Result<void, BigBoardError> {
+    const issues = validateDraftGradeForPublication(entry.position, entry.grade);
+    if (issues.length > 0) {
+      return Err(BigBoardValidationError(issues[0]));
     }
     return Ok(undefined);
   }
@@ -549,6 +567,13 @@ class OnDraftService implements IOnDraftService {
       }
     }
 
+    for (const entry of entries.filter((entry) => entry.gradePublished)) {
+      const gradeValidation = this.validateGradeForPublication(entry);
+      if (gradeValidation.ok === false) {
+        return Err(gradeValidation.value);
+      }
+    }
+
     return Ok(undefined);
   }
 
@@ -567,6 +592,10 @@ class OnDraftService implements IOnDraftService {
     return existing.writeup.strengths !== next.writeup.strengths ||
       existing.writeup.weaknesses !== next.writeup.weaknesses ||
       existing.writeup.rundown !== next.writeup.rundown;
+  }
+
+  private gradeChanged(existing: BigBoardEntry, next: BigBoardEntry): boolean {
+    return JSON.stringify(existing.grade ?? null) !== JSON.stringify(next.grade ?? null);
   }
 
   private validateCommentInput(input: CreateCommentInput): Result<void, ArticleError> {
@@ -851,6 +880,7 @@ class OnDraftService implements IOnDraftService {
     }
     const entry = this.normalizeBigBoardEntry(input);
     entry.playerInfoPublished = input.playerInfoPublished ?? true;
+    entry.gradePublished = input.gradePublished ?? false;
     entry.writeupPublished = input.writeupPublished ?? false;
 
     let board = await this.repository.getBigBoard(key.value.year, key.value.creator);
@@ -892,8 +922,9 @@ class OnDraftService implements IOnDraftService {
     const entries = input.entries.map((entryInput) => {
       const existing = entryInput.id ? existingById.get(entryInput.id) : undefined;
       const next = this.normalizeBigBoardEntry(entryInput, existing);
-      next.playerInfoPublished = entryInput.playerInfoPublished ?? false;
-      next.writeupPublished = entryInput.writeupPublished ?? false;
+      next.playerInfoPublished = entryInput.playerInfoPublished ?? existing?.playerInfoPublished ?? false;
+      next.gradePublished = entryInput.gradePublished ?? existing?.gradePublished ?? false;
+      next.writeupPublished = entryInput.writeupPublished ?? existing?.writeupPublished ?? false;
       return next;
     });
 
@@ -920,8 +951,9 @@ class OnDraftService implements IOnDraftService {
       ? existingBoard.value.entries.find((entry) => entry.id === input.entry.id)
       : undefined;
     const next = this.normalizeBigBoardEntry(input.entry, existing);
-    next.playerInfoPublished = input.entry.playerInfoPublished ?? false;
-    next.writeupPublished = input.entry.writeupPublished ?? false;
+    next.playerInfoPublished = input.entry.playerInfoPublished ?? existing?.playerInfoPublished ?? false;
+    next.gradePublished = input.entry.gradePublished ?? existing?.gradePublished ?? false;
+    next.writeupPublished = input.entry.writeupPublished ?? existing?.writeupPublished ?? false;
 
     const entries = existing
       ? existingBoard.value.entries.map((entry) => entry.id === existing.id ? next : entry)
@@ -952,6 +984,28 @@ class OnDraftService implements IOnDraftService {
     }
     const next = { ...entry, playerInfoPublished: true };
     const validation = this.validatePublishedBigBoardEntries(board.value.entries.map((candidate) => candidate.id === entryId ? next : candidate));
+    if (validation.ok === false) {
+      return Err(validation.value);
+    }
+    return await this.repository.updateBigBoardEntry(key.value.year, key.value.creator, next);
+  }
+
+  async publishBigBoardEntryGrade(year: number | undefined, creator: BigBoardCreator | undefined, entryId: string): Promise<Result<BigBoardEntry, BigBoardError>> {
+    const key = await this.normalizeBigBoardKey(year, creator);
+    if (key.ok === false) {
+      return Err(key.value);
+    }
+
+    const board = await this.getBigBoard(key.value.year, key.value.creator);
+    if (board.ok === false) {
+      return Err(board.value);
+    }
+    const entry = board.value.entries.find((candidate) => candidate.id === entryId);
+    if (!entry) {
+      return Err(BigBoardValidationError(`Big board entry with id "${entryId}" was not found.`));
+    }
+    const next = { ...entry, gradePublished: true };
+    const validation = this.validateGradeForPublication(next);
     if (validation.ok === false) {
       return Err(validation.value);
     }

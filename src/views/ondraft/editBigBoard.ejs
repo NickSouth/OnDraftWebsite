@@ -26,6 +26,8 @@
     height: null,
     weight: null,
     playerInfoPublished: false,
+    grade: null,
+    gradePublished: false,
     writeup: {
       strengths: "",
       weaknesses: "",
@@ -258,6 +260,9 @@
     function serializeForm(form) {
       const pairs = [];
       new FormData(form).forEach((value, name) => {
+        if (name === "expandWriteup" || name === "expandGrade") {
+          return;
+        }
         pairs.push(`${encodeURIComponent(name)}=${encodeURIComponent(String(value))}`);
       });
       return pairs.sort().join("&");
@@ -363,16 +368,40 @@
       return ["strengths", "weaknesses", "rundown"].some((fieldName) => fieldValue(form, fieldName) !== "");
     }
 
+    function hasAnyGradeContent(form) {
+      const gradeFields = Array.from(form.querySelectorAll("[name^='entries[0][grade]']"));
+      return gradeFields.some((field) => {
+        if (!(field instanceof HTMLInputElement || field instanceof HTMLSelectElement)) {
+          return false;
+        }
+        if (field.name.endsWith("[position]") || field.name.endsWith("[archetype]")) {
+          return false;
+        }
+        return field.value.trim() !== "";
+      });
+    }
+
     function setButtonsHidden(form, selector, hidden) {
       form.querySelectorAll(selector).forEach((button) => {
         button.hidden = hidden;
       });
     }
 
+    function setPanelState(form, panelName, expanded) {
+      const stateField = panelName === "grade"
+        ? form.querySelector("[data-expand-grade-state]")
+        : form.querySelector("[data-expand-writeup-state]");
+      if (stateField) {
+        stateField.value = expanded ? "true" : "false";
+      }
+    }
+
     function syncPublishChips(form) {
       const playerPublished = form.querySelector("[data-player-publish]")?.value === "true";
+      const gradePublished = form.querySelector("[data-grade-publish]")?.value === "true";
       const writeupPublished = form.querySelector("[data-writeup-publish]")?.value === "true";
       const playerChip = form.querySelector("[data-player-publish-chip]");
+      const gradeChip = form.querySelector("[data-grade-publish-chip]");
       const writeupChip = form.querySelector("[data-writeup-publish-chip]");
       if (playerChip) {
         playerChip.dataset.state = playerPublished ? "published" : "draft";
@@ -381,6 +410,10 @@
       if (writeupChip) {
         writeupChip.dataset.state = writeupPublished ? "published" : "draft";
         writeupChip.textContent = writeupPublished ? "Profile published" : "Profile draft";
+      }
+      if (gradeChip) {
+        gradeChip.dataset.state = gradePublished ? "published" : "draft";
+        gradeChip.textContent = gradePublished ? "Grade published" : "Grade draft";
       }
     }
 
@@ -475,7 +508,7 @@
         seen.add(nextName);
         appendHiddenInput(targetForm, nextName, String(value));
       });
-      ["id", "playerInfoPublished", "writeupPublished", "playerName", "school", "position", "rank", "posRank", "heightLabel", "weight", "strengths", "weaknesses", "rundown", "notes"].forEach((fieldName) => {
+      ["id", "playerInfoPublished", "gradePublished", "writeupPublished", "playerName", "school", "position", "rank", "posRank", "heightLabel", "weight", "strengths", "weaknesses", "rundown", "notes"].forEach((fieldName) => {
         const nextName = `${nextPrefix}[${fieldName}]`;
         if (!seen.has(nextName)) {
           appendHiddenInput(targetForm, nextName, "");
@@ -521,12 +554,15 @@
       setButtonsHidden(form, "[data-save-entry]", !dirty);
 
       const playerPublished = form.querySelector("[data-player-publish]")?.value === "true";
+      const gradePublished = form.querySelector("[data-grade-publish]")?.value === "true";
       const writeupPublished = form.querySelector("[data-writeup-publish]")?.value === "true";
       const showPlayerPublish = !playerPublished && hasAnyPlayerContent(form);
+      const showGradePublish = !gradePublished && hasAnyGradeContent(form);
       const showWriteupPublish = !writeupPublished && hasAnyWriteupContent(form);
       setButtonsHidden(form, "[data-publish-player]", !showPlayerPublish);
+      setButtonsHidden(form, "[data-publish-grade]", !showGradePublish);
       setButtonsHidden(form, "[data-publish-writeup]", !showWriteupPublish);
-      form.dataset.actionsVisible = dirty || showPlayerPublish || showWriteupPublish ? "true" : "false";
+      form.dataset.actionsVisible = dirty || showPlayerPublish || showGradePublish || showWriteupPublish ? "true" : "false";
       updateBoardDirtyState();
     }
 
@@ -537,7 +573,9 @@
       }
       const publishState = field.dataset.publishSection === "player"
         ? form.querySelector("[data-player-publish]")
-        : form.querySelector("[data-writeup-publish]");
+        : field.dataset.publishSection === "grade"
+          ? form.querySelector("[data-grade-publish]")
+          : form.querySelector("[data-writeup-publish]");
       if (publishState) {
         publishState.value = "false";
       }
@@ -600,6 +638,50 @@
       }
       button.setAttribute("aria-expanded", String(opening));
       form.dataset.expanded = opening ? "true" : "false";
+      setPanelState(form, "writeup", opening);
+    }
+
+    function toggleGradePanel(form) {
+      const panel = form.querySelector("[data-grade-panel]");
+      const button = form.querySelector("[data-expand-grade]");
+      if (!panel || !button) {
+        return;
+      }
+      const opening = panel.hidden;
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (opening) {
+        panel.hidden = false;
+        if (!reduceMotion) {
+          panel.style.height = "0px";
+          panel.style.opacity = "0";
+          panel.offsetHeight;
+          panel.style.transition = "height 220ms ease, opacity 180ms ease";
+          panel.style.height = `${panel.scrollHeight}px`;
+          panel.style.opacity = "1";
+          window.setTimeout(() => {
+            panel.style.height = "";
+            panel.style.transition = "";
+          }, 230);
+        }
+      } else if (reduceMotion) {
+        panel.hidden = true;
+      } else {
+        panel.style.height = `${panel.scrollHeight}px`;
+        panel.style.opacity = "1";
+        panel.offsetHeight;
+        panel.style.transition = "height 200ms ease, opacity 160ms ease";
+        panel.style.height = "0px";
+        panel.style.opacity = "0";
+        window.setTimeout(() => {
+          panel.hidden = true;
+          panel.style.height = "";
+          panel.style.opacity = "";
+          panel.style.transition = "";
+        }, 210);
+      }
+      button.setAttribute("aria-expanded", String(opening));
+      form.dataset.gradeExpanded = opening ? "true" : "false";
+      setPanelState(form, "grade", opening);
     }
 
     function openDeleteModal(form) {
@@ -627,6 +709,7 @@
       form.querySelectorAll("[data-height-picker]").forEach(syncHeightPicker);
       form.querySelectorAll("[data-editable-field]").forEach((editable) => wireEditableField(editable, form));
       form.querySelector("[data-expand-entry]")?.addEventListener("click", () => toggleProfilePanel(form));
+      form.querySelector("[data-expand-grade]")?.addEventListener("click", () => toggleGradePanel(form));
       form.querySelector("[data-delete-board-entry]")?.addEventListener("click", () => openDeleteModal(form));
       form.addEventListener("input", (event) => {
         clearPublishState(event, form);
@@ -641,6 +724,8 @@
         nativeSubmissionInProgress = !(submitter instanceof HTMLElement && submitter.hasAttribute("hx-post"));
       });
       form.dataset.initialState = serializeForm(form);
+      setPanelState(form, "writeup", form.dataset.expanded === "true");
+      setPanelState(form, "grade", form.dataset.gradeExpanded === "true");
       updateFormState(form);
       if (form.dataset.newEntry !== "true") {
         form.dataset.initialState = serializeForm(form);

@@ -3,6 +3,8 @@
   class="big-board-results od-swap-surface od-swap-active"
   x-data="{
     boardView: 'card',
+    gradeGuideOpen: false,
+    gradeGuidePosition: '<%= typeof positions !== "undefined" && positions.length > 0 ? positions[0] : "QB" %>',
     init() {
       const savedView = window.localStorage.getItem('bigBoardView');
       if (savedView === 'card' || savedView === 'list') {
@@ -55,6 +57,9 @@
       Consensus: ["Ryan McWalter", "Aleks Ryabinkin"],
     };
     const bylineAuthors = selectedBoard ? creatorAuthors[selectedBoard.creator] ?? [] : [];
+    const gradeGuidePositions = (typeof positions !== "undefined" ? positions : [])
+      .map((position) => typeof draftGradePositionConfig === "function" ? draftGradePositionConfig(position) : null)
+      .filter(Boolean);
   %>
   <% if (bigBoard.length === 0) { %>
     <div class="od-card grid min-h-48 place-items-center p-8 text-center">
@@ -67,12 +72,21 @@
   <% } else { %>
     <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <% if (bylineAuthors.length > 0) { %>
-        <p class="m-0 text-sm font-bold text-slate-700 dark:text-slate-200">
-          Player analysis and opinions by
-          <% bylineAuthors.forEach((author, index) => { %>
-            <%- include("profileAuthorLink", { name: author, showBadge: false, className: "text-draft-amber no-underline transition hover:text-draft-gold dark:text-draft-gold" }) %><%= index < bylineAuthors.length - 1 ? "/" : "" %>
-          <% }) %>
-        </p>
+        <div class="grid gap-1">
+          <p class="m-0 text-sm font-bold text-slate-700 dark:text-slate-200">
+            Player analysis and opinions by
+            <% bylineAuthors.forEach((author, index) => { %>
+              <%- include("profileAuthorLink", { name: author, showBadge: false, className: "text-draft-amber no-underline transition hover:text-draft-gold dark:text-draft-gold" }) %><%= index < bylineAuthors.length - 1 ? "/" : "" %>
+            <% }) %>
+          </p>
+          <button
+            type="button"
+            class="w-fit text-left text-xs font-black uppercase tracking-[0.14em] text-draft-amber underline decoration-draft-gold/40 underline-offset-4 transition hover:text-draft-gold hover:decoration-draft-gold dark:text-draft-gold"
+            @click="gradeGuideOpen = true"
+          >
+            How we grade players
+          </button>
+        </div>
       <% } else { %>
         <span aria-hidden="true"></span>
       <% } %>
@@ -127,9 +141,13 @@
           const helmetSecondaryColor = teamColors?.secondaryColor || "#F8FAFC";
           const helmetKey = typeof helmetColorKey !== "undefined" ? helmetColorKey(helmetPrimaryColor, helmetSecondaryColor) : null;
           const generatedHelmetSrc = helmetKey ? `/generated/helmets/v1/${helmetKey}.png` : "/teamHelmetTemplate.png";
+          const boardGradeValue = typeof publishedBoardGrade === "function" ? publishedBoardGrade(entry) : null;
+          const boardGradeLabel = typeof formatDraftBoardGrade === "function" ? formatDraftBoardGrade(boardGradeValue) : "-/8";
+          const hasPublishedGrade = boardGradeValue !== null;
+          const hasPublishedDetails = entry.writeupPublished || hasPublishedGrade;
         %>
         <li class="border-b border-slate-200 py-3 last:border-b-0 dark:border-white/10">
-          <% if (entry.writeupPublished) { %>
+          <% if (hasPublishedDetails) { %>
             <details class="group">
               <summary class="od-focus-ring relative grid cursor-pointer list-none gap-3 overflow-hidden rounded-md p-2 transition hover:bg-white/70 dark:hover:bg-white/[0.04] sm:min-h-32 sm:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)] sm:items-center sm:pb-11 [&::-webkit-details-marker]:hidden">
                 <span class="pointer-events-none absolute inset-y-0 right-0 left-[31rem] hidden bg-slate-200/55 [clip-path:polygon(3rem_0,100%_0,100%_100%,0_100%)] dark:bg-white/[0.06] lg:block" aria-hidden="true"></span>
@@ -158,7 +176,13 @@
                         <span class="text-sm font-black leading-tight text-slate-500 dark:text-slate-300"><%= entry.school %></span>
                       </span>
                     </span>
-                    <span class="flex flex-wrap gap-2 pt-1 text-slate-500 dark:text-slate-300 lg:justify-end">
+                    <span class="flex flex-wrap items-start gap-2 pt-1 text-slate-500 dark:text-slate-300 lg:justify-end">
+                      <% if (hasPublishedGrade) { %>
+                        <span class="grid min-h-16 min-w-32 place-content-center gap-1 rounded-md border border-draft-gold/50 bg-white px-4 py-3 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink">
+                          <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Grade</span>
+                          <span class="font-display text-xl font-black leading-none text-draft-amber dark:text-draft-gold"><%= boardGradeLabel %></span>
+                        </span>
+                      <% } %>
                       <span class="grid min-w-20 gap-0.5 rounded bg-draft-slate px-3 py-2 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink">
                         <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Height</span>
                         <span class="text-sm font-black leading-none text-slate-500 dark:text-slate-300"><%= heightLabel %></span>
@@ -184,7 +208,7 @@
                   </span>
                 </span>
               </summary>
-              <%- include("bigBoardWriteupPanel", { entry, hasText }) %>
+              <%- include("bigBoardWriteupPanel", { entry, hasText, publishedBoardGrade, formatDraftBoardGrade, gradeTraitCategoriesForGrade, abbreviateDraftGradeTrait }) %>
             </details>
           <% } else { %>
             <div class="relative grid gap-3 overflow-hidden rounded-md p-2 sm:min-h-32 sm:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)] sm:items-center">
@@ -214,7 +238,13 @@
                       <span class="text-sm font-black leading-tight text-slate-500 dark:text-slate-300"><%= entry.school %></span>
                     </span>
                   </div>
-                  <div class="flex flex-wrap gap-2 pt-1 text-slate-500 dark:text-slate-300 lg:justify-end">
+                  <div class="flex flex-wrap items-start gap-2 pt-1 text-slate-500 dark:text-slate-300 lg:justify-end">
+                    <% if (hasPublishedGrade) { %>
+                      <span class="grid min-h-16 min-w-32 place-content-center gap-1 rounded-md border border-draft-gold/50 bg-white px-4 py-3 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink">
+                        <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Grade</span>
+                        <span class="font-display text-xl font-black leading-none text-draft-amber dark:text-draft-gold"><%= boardGradeLabel %></span>
+                      </span>
+                    <% } %>
                     <span class="grid min-w-20 gap-0.5 rounded bg-draft-slate px-3 py-2 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink">
                       <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Height</span>
                       <span class="text-sm font-black leading-none text-slate-500 dark:text-slate-300"><%= heightLabel %></span>
@@ -249,9 +279,13 @@
           const helmetSecondaryColor = teamColors?.secondaryColor || "#F8FAFC";
           const helmetKey = typeof helmetColorKey !== "undefined" ? helmetColorKey(helmetPrimaryColor, helmetSecondaryColor) : null;
           const generatedHelmetSrc = helmetKey ? `/generated/helmets/v1/${helmetKey}.png` : "/teamHelmetTemplate.png";
+          const boardGradeValue = typeof publishedBoardGrade === "function" ? publishedBoardGrade(entry) : null;
+          const boardGradeLabel = typeof formatDraftBoardGrade === "function" ? formatDraftBoardGrade(boardGradeValue) : "-/8";
+          const hasPublishedGrade = boardGradeValue !== null;
+          const hasPublishedDetails = entry.writeupPublished || hasPublishedGrade;
         %>
         <li>
-          <% if (entry.writeupPublished) { %>
+          <% if (hasPublishedDetails) { %>
             <details class="group">
               <summary class="od-focus-ring grid cursor-pointer list-none gap-3 px-3 py-3 transition hover:bg-slate-50 dark:hover:bg-white/[0.04] sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:items-center [&::-webkit-details-marker]:hidden">
                 <span class="sr-only"><%= accessibleSummary %></span>
@@ -281,7 +315,13 @@
                     </span>
                   </span>
                 </span>
-                <span class="flex flex-wrap gap-2 sm:justify-end">
+                <span class="flex flex-wrap items-start gap-2 sm:justify-end">
+                  <% if (hasPublishedGrade) { %>
+                    <span class="grid min-h-16 min-w-32 place-content-center gap-1 rounded-md border border-draft-gold/50 bg-white px-4 py-3 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink">
+                      <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Grade</span>
+                      <span class="font-display text-xl font-black leading-none text-draft-amber dark:text-draft-gold"><%= boardGradeLabel %></span>
+                    </span>
+                  <% } %>
                   <span class="grid min-w-20 gap-0.5 rounded bg-draft-slate px-3 py-2 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink">
                     <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Height</span>
                     <span class="text-sm font-black leading-none text-slate-500 dark:text-slate-300"><%= heightLabel %></span>
@@ -292,7 +332,7 @@
                   </span>
                 </span>
               </summary>
-              <%- include("bigBoardWriteupPanel", { entry, hasText }) %>
+              <%- include("bigBoardWriteupPanel", { entry, hasText, publishedBoardGrade, formatDraftBoardGrade, gradeTraitCategoriesForGrade, abbreviateDraftGradeTrait }) %>
             </details>
           <% } else { %>
             <div class="grid gap-3 px-3 py-3 sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:items-center">
@@ -315,7 +355,13 @@
                   </span>
                 </span>
               </span>
-              <span class="flex flex-wrap gap-2 sm:justify-end">
+              <span class="flex flex-wrap items-start gap-2 sm:justify-end">
+                <% if (hasPublishedGrade) { %>
+                  <span class="grid min-h-16 min-w-32 place-content-center gap-1 rounded-md border border-draft-gold/50 bg-white px-4 py-3 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink">
+                    <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Grade</span>
+                    <span class="font-display text-xl font-black leading-none text-draft-amber dark:text-draft-gold"><%= boardGradeLabel %></span>
+                  </span>
+                <% } %>
                 <span class="grid min-w-20 gap-0.5 rounded bg-draft-slate px-3 py-2 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink">
                   <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Height</span>
                   <span class="text-sm font-black leading-none text-slate-500 dark:text-slate-300"><%= heightLabel %></span>
@@ -330,5 +376,167 @@
         </li>
       <% }) %>
     </ol>
+    <template x-teleport="body">
+      <div
+        class="fixed inset-0 z-[70] grid place-items-center bg-slate-950/70 p-4 backdrop-blur-sm"
+        x-cloak
+        x-show="gradeGuideOpen"
+        x-transition.opacity.duration.150ms
+        @keydown.escape.window="gradeGuideOpen = false"
+        @click.self="gradeGuideOpen = false"
+        role="presentation"
+      >
+      <section
+        class="max-h-[88vh] w-full max-w-5xl overflow-y-auto rounded-lg border border-slate-200 bg-white text-slate-950 shadow-editorial dark:border-white/10 dark:bg-draft-slate dark:text-white"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="grade-guide-title"
+        tabindex="-1"
+        x-trap.noscroll="gradeGuideOpen"
+      >
+        <div class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white/95 p-4 backdrop-blur dark:border-white/10 dark:bg-draft-slate/95">
+          <div>
+            <p class="text-xs font-black uppercase tracking-[0.18em] text-draft-amber dark:text-draft-gold">Draft grades</p>
+            <h2 id="grade-guide-title" class="font-display text-2xl font-black leading-tight">How we grade players</h2>
+          </div>
+          <button
+            type="button"
+            class="od-focus-ring inline-grid size-9 shrink-0 place-items-center rounded-md border border-slate-300 text-slate-500 transition hover:bg-draft-foam hover:text-draft-amber dark:border-white/15 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-draft-gold"
+            @click="gradeGuideOpen = false"
+            aria-label="Close grading guide"
+          >
+            <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" aria-hidden="true">
+              <path d="M18 6 6 18" />
+              <path d="m6 6 12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="grid gap-5 p-4">
+          <section class="grid gap-2">
+            <h3 class="text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Final Grades</h3>
+            <div class="overflow-hidden rounded-md border border-slate-200 dark:border-white/10">
+              <div class="grid grid-cols-[minmax(6rem,0.75fr)_minmax(0,1.5fr)_minmax(6rem,0.75fr)] bg-slate-100 px-3 py-2 text-[0.68rem] font-black uppercase tracking-wide text-slate-500 dark:bg-white/10 dark:text-slate-300">
+                <span>Grade</span>
+                <span>Meaning</span>
+                <span>Projection</span>
+              </div>
+              <% [
+                ["7.70 - 8.00", "Generational Prospect", "#1 Overall Pick"],
+                ["7.10 - 7.70", "Blue Chip Talent", "Top 5"],
+                ["6.80 - 7.10", "Immediate Impact Starter / Elite Upside Project", "Top 10"],
+                ["6.50 - 6.80", "Year 1 Starter / High Upside Project", "Round 1"],
+                ["6.10 - 6.50", "Potential Year 1 Impact / Good Upside Project (Medium Floor)", "Rounds 1-2 / Top 50"],
+                ["5.70 - 6.10", "Potential Impact Starter within Rookie Contract", "Round 2 / Rounds 2-3"],
+                ["5.10 - 5.70", "High Level Backup / Role Player / Good Upside Project (Lower Floor)", "Round 3 / Rounds 3-4"],
+                ["4.40 - 5.10", "Good Role Player / Total Project", "Early Day 3"],
+                ["3.80 - 4.40", "Developmental: Backup / Role Player with Roster Potential", "Late Day 3"],
+                ["3.00 - 3.80", "Roster Longshot / Practice Squad Contributor", "PFA"],
+                ["< 3.0", "Training Camp Body", "UDFA"],
+              ].forEach((row) => { %>
+                <div class="grid grid-cols-[minmax(6rem,0.75fr)_minmax(0,1.5fr)_minmax(6rem,0.75fr)] gap-2 border-t border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 dark:border-white/10 dark:text-slate-200">
+                  <strong class="text-draft-amber dark:text-draft-gold"><%= row[0] %></strong>
+                  <span><%= row[1] %></span>
+                  <span><%= row[2] %></span>
+                </div>
+              <% }) %>
+            </div>
+          </section>
+
+          <div class="grid gap-4 lg:grid-cols-[minmax(13rem,0.62fr)_minmax(0,1.38fr)] lg:items-start">
+            <section class="grid content-start gap-2">
+              <h3 class="text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Our Scale</h3>
+              <div class="grid grid-cols-2 gap-1.5">
+                <% [
+                  ["1", "Liability"],
+                  ["2", "Poor"],
+                  ["3", "Below Average"],
+                  ["4", "Average"],
+                  ["5", "Above Average"],
+                  ["6", "Good"],
+                  ["7", "Outstanding"],
+                  ["8", "Rare"],
+                ].forEach((row) => { %>
+                  <span class="grid grid-cols-[1.35rem_minmax(0,1fr)] items-center gap-2 rounded bg-slate-100 px-2 py-1 text-[0.72rem] font-bold leading-tight dark:bg-white/10">
+                    <strong class="font-display text-base leading-none text-draft-amber dark:text-draft-gold"><%= row[0] %></strong>
+                    <span><%= row[1] %></span>
+                  </span>
+                <% }) %>
+              </div>
+            </section>
+
+            <section class="grid content-start gap-2">
+              <h3 class="text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Universal Physical Traits</h3>
+              <div class="grid gap-1.5 text-[0.72rem] font-bold leading-5 text-slate-700 dark:text-slate-200 sm:grid-cols-2">
+                <% [
+                  ["SPD", "Speed", "Raw top-end speed"],
+                  ["ACC", "Acceleration", "Ability to get from 0-60; essentially burst from standstill"],
+                  ["AGI", "Agility", "General foot quickness, lateral movement, and ability to stay feather footed"],
+                  ["COD", "Change of Direction", "Ability to turn and change directions without sacrificing momentum and speed; generally looks at hip fluidity"],
+                  ["STR", "Strength", "Raw play strength"],
+                  ["FRA", "Size / Frame", "Relative assessment of their size / frame for their position"],
+                ].forEach((row) => { %>
+                  <span class="rounded bg-slate-100 px-2 py-1.5 dark:bg-white/10">
+                    <strong class="text-draft-amber dark:text-draft-gold"><%= row[0] %></strong>
+                    <span><%= row[1] %>: <%= row[2] %></span>
+                  </span>
+                <% }) %>
+              </div>
+            </section>
+          </div>
+
+          <section class="grid gap-2 rounded-md bg-slate-100 p-3 text-sm font-bold text-slate-700 dark:bg-white/10 dark:text-slate-200">
+            <h3 class="text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Archetype Explanation</h3>
+            <p>Each position has anywhere from 2-4 archetypes. These archetypes are not necessarily role projections into the league; they are a reflection of current playstyle.</p>
+            <p>Archetypes are only used for the internal grading structure. True role projection and scheme fit are presented separately.</p>
+          </section>
+
+          <% if (gradeGuidePositions.length > 0) { %>
+            <section class="grid gap-3">
+              <div>
+                <h3 class="text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Position Trait Glossary</h3>
+                <div class="mt-2 flex flex-wrap gap-1.5">
+                  <% gradeGuidePositions.forEach((config) => { %>
+                    <button
+                      type="button"
+                      class="od-focus-ring rounded border border-slate-300 px-2.5 py-1 text-xs font-black uppercase tracking-wide text-slate-600 transition hover:border-draft-gold hover:text-draft-amber dark:border-white/15 dark:text-slate-300 dark:hover:text-draft-gold"
+                      :class="gradeGuidePosition === '<%= config.position %>' ? 'border-draft-gold bg-draft-gold text-draft-ink dark:text-draft-ink' : ''"
+                      @click="gradeGuidePosition = '<%= config.position %>'"
+                    >
+                      <%= config.position %>
+                    </button>
+                  <% }) %>
+                </div>
+              </div>
+
+              <% gradeGuidePositions.forEach((config) => { %>
+                <div class="grid gap-2" x-show="gradeGuidePosition === '<%= config.position %>'" x-cloak>
+                  <% config.archetypes.forEach((archetype, index) => { %>
+                    <% const filmTraitCategory = archetype.categories.find((category) => category.key === "filmTraits"); %>
+                    <details class="rounded-md border border-slate-200 bg-white dark:border-white/10 dark:bg-draft-ink" <%= index === 0 ? "open" : "" %>>
+                      <summary class="od-focus-ring cursor-pointer list-none px-3 py-2 text-sm font-black text-slate-800 transition hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-white/[0.04] [&::-webkit-details-marker]:hidden">
+                        <%= config.position %> - <%= archetype.name %>
+                      </summary>
+                      <div class="border-t border-slate-200 p-3 dark:border-white/10">
+                        <% if (filmTraitCategory) { %>
+                          <div class="flex flex-wrap gap-1.5">
+                            <% filmTraitCategory.traits.forEach((trait) => { %>
+                              <span class="rounded bg-slate-100 px-2 py-1 text-[0.72rem] font-semibold leading-tight text-slate-700 dark:bg-white/10 dark:text-slate-200">
+                                <%= trait %>
+                              </span>
+                            <% }) %>
+                          </div>
+                        <% } %>
+                      </div>
+                    </details>
+                  <% }) %>
+                </div>
+              <% }) %>
+            </section>
+          <% } %>
+        </div>
+      </section>
+      </div>
+    </template>
   <% } %>
 </div>

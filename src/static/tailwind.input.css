@@ -975,13 +975,14 @@
   }
 
   .board-editor-card-main {
-    @apply grid min-w-0 gap-3 p-3 sm:p-4 md:grid-cols-[2.5rem_9rem_4.5rem_minmax(0,1fr)] md:items-center xl:grid-cols-[2.5rem_9rem_4.5rem_minmax(0,1fr)_auto];
+    @apply grid min-w-0 gap-3 p-3 sm:p-4 md:grid-cols-[2.5rem_9rem_4.5rem_minmax(0,1fr)] md:items-center xl:grid-cols-[2.5rem_9rem_4.5rem_minmax(20rem,1fr)_minmax(16rem,22rem)_auto];
   }
 
   .board-editor-delete-cell,
   .board-editor-rank-cell,
   .board-editor-helmet-cell,
   .board-editor-player-cell,
+  .board-editor-grade-cell,
   .board-editor-measurement-cell {
     @apply min-w-0;
   }
@@ -1000,6 +1001,10 @@
 
   .board-editor-player-cell {
     @apply grid gap-1;
+  }
+
+  .board-editor-grade-cell {
+    @apply md:col-span-4 xl:col-span-1 xl:flex xl:items-center xl:justify-center;
   }
 
   .board-editor-editable-field {
@@ -1104,7 +1109,23 @@
   }
 
   .board-editor-measurement-cell {
-    @apply grid gap-2 sm:grid-cols-2 md:col-span-3 xl:col-span-1 xl:min-w-[18rem] xl:grid-cols-2 xl:justify-self-end;
+    @apply grid gap-2 sm:grid-cols-2 md:col-span-4 xl:col-span-1 xl:min-w-[18rem] xl:grid-cols-2 xl:justify-self-end;
+  }
+
+  .board-editor-grade-summary {
+    @apply grid min-h-24 w-full max-w-80 min-w-0 justify-items-center gap-2 rounded-md border border-draft-gold/35 bg-draft-slate px-4 py-3 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink;
+  }
+
+  .board-editor-grade-summary .board-editor-field-label {
+    @apply text-center;
+  }
+
+  .board-editor-grade-summary strong {
+    @apply font-display text-2xl font-black leading-none text-draft-amber dark:text-draft-gold;
+  }
+
+  .board-editor-grade-summary .board-editor-expand-button {
+    @apply w-full max-w-64;
   }
 
   .board-editor-height-picker,
@@ -1175,11 +1196,19 @@
     @apply hidden;
   }
 
-  .board-editor-entry-shell[data-expanded="true"] .board-editor-expand-button {
+  .board-editor-entry-shell[data-expanded="true"] [data-expand-entry] {
     @apply border-draft-gold bg-draft-gold text-draft-ink;
   }
 
-  .board-editor-entry-shell[data-expanded="true"] .board-editor-expand-button svg {
+  .board-editor-entry-shell[data-expanded="true"] [data-expand-entry] svg {
+    @apply rotate-180;
+  }
+
+  .board-editor-entry-shell[data-grade-expanded="true"] [data-expand-grade] {
+    @apply border-draft-gold bg-draft-gold text-draft-ink;
+  }
+
+  .board-editor-entry-shell[data-grade-expanded="true"] [data-expand-grade] svg {
     @apply rotate-180;
   }
 
@@ -1201,6 +1230,78 @@
 
   .board-editor-publish-button {
     @apply od-focus-ring inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-md border border-sky-400 bg-sky-600 px-4 py-2 text-sm font-black text-white transition hover:border-sky-300 hover:bg-sky-500 dark:border-sky-400 dark:bg-sky-500 dark:text-white dark:hover:bg-sky-400;
+  }
+
+  .board-editor-grade-panel {
+    @apply border-t border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-draft-ink/40 sm:p-4;
+    overflow: hidden;
+  }
+
+  .board-editor-grade-panel.is-validation-error {
+    @apply bg-red-500/10;
+  }
+
+  .board-editor-grade-head {
+    @apply grid gap-3 md:grid-cols-[minmax(10rem,14rem)_minmax(8rem,10rem)_auto] md:items-end;
+  }
+
+  .board-editor-grade-head label,
+  .board-editor-grade-current {
+    @apply grid gap-1 rounded-md border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-draft-ink;
+  }
+
+  .board-editor-grade-head label > span,
+  .board-editor-grade-current span,
+  .board-editor-grade-row-label {
+    @apply text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold;
+  }
+
+  .board-editor-grade-head select {
+    @apply od-focus-ring min-h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-black text-slate-950 dark:border-white/15 dark:bg-draft-slate dark:text-white;
+  }
+
+  .board-editor-grade-current strong {
+    @apply font-display text-2xl font-black text-slate-950 dark:text-white;
+  }
+
+  .board-editor-grade-rows {
+    @apply mt-3 grid gap-3;
+  }
+
+  .board-editor-grade-row {
+    @apply grid gap-2 rounded-md border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-draft-ink;
+  }
+
+  .board-editor-grade-trait-strip {
+    @apply grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6;
+  }
+
+  .board-editor-grade-trait {
+    @apply grid min-w-0 gap-1;
+  }
+
+  .board-editor-grade-trait span {
+    @apply truncate text-[0.68rem] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400;
+  }
+
+  .board-editor-grade-trait input {
+    @apply od-focus-ring min-h-10 rounded-md border border-slate-300 bg-white px-2 text-center text-sm font-black text-slate-950 dark:border-white/15 dark:bg-draft-slate dark:text-white;
+  }
+
+  .board-editor-grade-empty {
+    @apply rounded-md border border-slate-200 bg-white p-4 text-sm font-bold text-slate-600 dark:border-white/10 dark:bg-draft-ink dark:text-slate-300;
+  }
+
+  .board-editor-grade-empty.is-validation-error {
+    @apply border-red-400/70 bg-red-500/10 text-red-700 ring-1 ring-red-400/30 dark:text-red-200;
+  }
+
+  .draft-grade-trait-tile:hover .draft-grade-trait-full {
+    @apply block;
+  }
+
+  .draft-grade-trait-tile:hover .draft-grade-trait-abbr {
+    @apply opacity-0;
   }
 
   .board-editor-profile-panel {

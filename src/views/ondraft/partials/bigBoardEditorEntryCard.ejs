@@ -37,6 +37,22 @@
   const schoolLabel = hasText(entry.school) ? entry.school : "School TBD";
   const posRankLabel = formatBoardNumber(entry.posRank) || "Pos rank";
   const weightLabel = typeof entry.weight === "number" ? `${entry.weight} lbs` : "Weight TBD";
+  const gradeConfig = typeof draftGradePositionConfig === "function" ? draftGradePositionConfig(entry.position) : null;
+  const fallbackGrade = typeof defaultDraftGrade === "function" ? defaultDraftGrade(entry.position) : null;
+  const grade = entry.grade || fallbackGrade;
+  const gradeCalculation = typeof calculateDraftGrade === "function" ? calculateDraftGrade(entry.grade) : null;
+  const gradeDisplayValue = typeof publishedBoardGrade === "function" ? publishedBoardGrade(entry) : gradeCalculation?.displayGrade;
+  const gradeDisplayLabel = typeof formatDraftBoardGrade === "function" ? formatDraftBoardGrade(gradeDisplayValue) : "-/8";
+  const gradeArchetypeNames = gradeConfig ? gradeConfig.archetypes.map((archetype) => archetype.name) : [];
+  const gradeCategories = grade && typeof gradeTraitCategoriesForGrade === "function" ? gradeTraitCategoriesForGrade(grade, entry.position) : [];
+  const gradeTraitValue = (categoryKey, trait) => {
+    if (!entry.grade) {
+      return "";
+    }
+    const category = categoryKey === "physicalTraits" ? entry.grade.physicalTraits : entry.grade.filmTraits;
+    const value = category ? category[trait] : "";
+    return value === null || value === undefined ? "" : value;
+  };
   const teamColors = typeof collegeTeamColors !== "undefined" ? collegeTeamColors[entry.school] : undefined;
   const helmetPrimaryColor = teamColors?.primaryColor || "#111111";
   const helmetSecondaryColor = teamColors?.secondaryColor || "#F8FAFC";
@@ -50,7 +66,14 @@
     || entry.height
     || typeof entry.weight === "number";
   const hasWriteupContent = hasText(entry.writeup.strengths) || hasText(entry.writeup.weaknesses) || hasText(entry.writeup.rundown);
+  const hasStoredGradeScores = Boolean(entry.grade && (
+    entry.grade.potential !== null
+      || Object.values(entry.grade.physicalTraits ?? {}).some((value) => value !== null && value !== undefined)
+      || Object.values(entry.grade.filmTraits ?? {}).some((value) => value !== null && value !== undefined)
+  ));
+  const hasGradeContent = Boolean(hasStoredGradeScores);
   const showPlayerPublish = !entry.playerInfoPublished && hasPlayerContent;
+  const showGradePublish = !entry.gradePublished && hasGradeContent;
   const showWriteupPublish = !entry.writeupPublished && hasWriteupContent;
   const entryValidationIssues = (typeof validationIssues !== "undefined" && Array.isArray(validationIssues))
     ? validationIssues.filter((issue) => issue && issue.entryId === entry.id)
@@ -72,7 +95,9 @@
     return message ? `<span class="board-editor-field-error">${escapeHtml(message)}</span>` : "";
   };
   const hasWriteupValidationError = ["strengths", "weaknesses", "rundown"].some(fieldHasError);
-  const expandWriteup = hasWriteupValidationError;
+  const hasGradeValidationError = fieldHasError("grade");
+  const expandWriteup = hasWriteupValidationError || Boolean(typeof forceExpandWriteup !== "undefined" && forceExpandWriteup);
+  const expandGrade = hasGradeValidationError || Boolean(typeof forceExpandGrade !== "undefined" && forceExpandGrade);
 %>
 
 <li class="board-editor-entry-item" data-board-entry-item>
@@ -82,8 +107,9 @@
     action="/bigboard/edit/player"
     data-board-entry-form
     data-persisted-entry="<%= persistedEntry ? "true" : "false" %>"
-    data-actions-visible="<%= showPlayerPublish || showWriteupPublish ? "true" : "false" %>"
+    data-actions-visible="<%= showPlayerPublish || showGradePublish || showWriteupPublish ? "true" : "false" %>"
     data-expanded="<%= expandWriteup ? "true" : "false" %>"
+    data-grade-expanded="<%= expandGrade ? "true" : "false" %>"
     data-has-validation-error="<%= entryValidationIssues.length > 0 ? "true" : "false" %>"
   >
     <input type="hidden" name="year" value="<%= board.year %>" />
@@ -91,7 +117,10 @@
     <input type="hidden" name="entryId" value="<%= entry.id %>" data-entry-action-id />
     <input type="hidden" name="<%= fieldPrefix %>[id]" value="<%= entry.id %>" data-entry-id />
     <input type="hidden" name="<%= fieldPrefix %>[playerInfoPublished]" value="<%= entry.playerInfoPublished ? "true" : "false" %>" data-player-publish />
+    <input type="hidden" name="<%= fieldPrefix %>[gradePublished]" value="<%= entry.gradePublished ? "true" : "false" %>" data-grade-publish />
     <input type="hidden" name="<%= fieldPrefix %>[writeupPublished]" value="<%= entry.writeupPublished ? "true" : "false" %>" data-writeup-publish />
+    <input type="hidden" name="expandWriteup" value="<%= expandWriteup ? "true" : "false" %>" data-expand-writeup-state />
+    <input type="hidden" name="expandGrade" value="<%= expandGrade ? "true" : "false" %>" data-expand-grade-state />
 
     <article class="board-editor-entry-card">
       <div class="board-editor-card-main">
@@ -238,6 +267,19 @@
           </div>
         </div>
 
+        <div class="board-editor-grade-cell">
+          <div class="board-editor-grade-summary">
+            <span class="board-editor-field-label">Grade</span>
+            <strong data-grade-summary><%= entry.gradePublished || entry.grade ? gradeDisplayLabel : "-/8" %></strong>
+            <button type="button" class="board-editor-expand-button" data-expand-grade aria-expanded="<%= expandGrade ? "true" : "false" %>" aria-label="Edit grade" title="Edit grade">
+              <svg class="size-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" />
+              </svg>
+              <span>grade</span>
+            </button>
+          </div>
+        </div>
+
         <div class="board-editor-measurement-cell">
           <div class="board-editor-height-picker <%= fieldErrorClass("height") %>" data-height-picker>
             <input type="hidden" name="<%= fieldPrefix %>[heightLabel]" value="<%= selectedHeightValue(entry.height) %>" data-height-label />
@@ -346,6 +388,20 @@
           <button
             type="submit"
             class="board-editor-publish-button"
+            formaction="/bigboard/edit/publish-grade"
+            hx-post="/bigboard/edit/publish-grade"
+            hx-include="closest form"
+            hx-target="closest [data-board-entry-item]"
+            hx-swap="outerHTML"
+            data-publish-entry
+            data-publish-grade
+            <%= showGradePublish ? "" : "hidden" %>
+          >
+            Publish Grade
+          </button>
+          <button
+            type="submit"
+            class="board-editor-publish-button"
             formaction="/bigboard/edit/publish-writeup"
             hx-post="/bigboard/edit/publish-writeup"
             hx-include="closest form"
@@ -358,6 +414,65 @@
             Publish Writeup
           </button>
         </div>
+      </div>
+
+      <div class="board-editor-grade-panel <%= hasGradeValidationError ? "is-validation-error" : "" %>" data-grade-panel <%= expandGrade ? "" : "hidden" %>>
+        <% if (gradeConfig && grade) { %>
+          <input type="hidden" name="<%= fieldPrefix %>[grade][position]" value="<%= entry.position %>" data-grade-position />
+          <div class="board-editor-grade-head">
+            <label>
+              <span>Archetype</span>
+              <select name="<%= fieldPrefix %>[grade][archetype]" data-publish-section="grade" aria-label="Archetype">
+                <% gradeArchetypeNames.forEach((archetype) => { %>
+                  <option value="<%= archetype %>" <%= grade.archetype === archetype ? "selected" : "" %>><%= archetype %></option>
+                <% }) %>
+              </select>
+            </label>
+            <label>
+              <span>Potential</span>
+              <select name="<%= fieldPrefix %>[grade][potential]" data-publish-section="grade" aria-label="Potential">
+                <option value="">--</option>
+                <% [1, 2, 3, 4, 5, 6, 7, 8].forEach((value) => { %>
+                  <option value="<%= value %>" <%= grade.potential === value ? "selected" : "" %>><%= value %></option>
+                <% }) %>
+              </select>
+            </label>
+            <div class="board-editor-grade-current">
+              <span>Final Grade</span>
+              <strong data-grade-panel-summary><%= gradeCalculation ? formatDraftBoardGrade(gradeCalculation.displayGrade) : "-/8" %></strong>
+            </div>
+          </div>
+          <div class="board-editor-grade-rows">
+            <% gradeCategories.forEach((category) => { %>
+              <div class="board-editor-grade-row">
+                <span class="board-editor-grade-row-label"><%= category.label %></span>
+                <div class="board-editor-grade-trait-strip">
+                  <% category.traits.forEach((trait) => { %>
+                    <label class="board-editor-grade-trait">
+                      <span><%= trait %></span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="8"
+                        step="any"
+                        name="<%= fieldPrefix %>[grade][<%= category.key %>][<%= trait %>]"
+                        value="<%= gradeTraitValue(category.key, trait) %>"
+                        data-publish-section="grade"
+                        aria-label="<%= trait %>"
+                      />
+                    </label>
+                  <% }) %>
+                </div>
+              </div>
+            <% }) %>
+          </div>
+          <%- fieldErrorMarkup("grade") %>
+        <% } else { %>
+          <div class="board-editor-grade-empty <%= hasGradeValidationError ? "is-validation-error" : "" %>">
+            <p>Choose a position before adding a grade.</p>
+            <%- fieldErrorMarkup("grade") %>
+          </div>
+        <% } %>
       </div>
 
       <div class="board-editor-profile-panel" data-profile-panel <%= expandWriteup ? "" : "hidden" %>>

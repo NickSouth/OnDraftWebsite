@@ -78,6 +78,23 @@ async function loginAdminAgent(ondraft: ReturnType<typeof app>) {
   return agent;
 }
 
+function edgeGradePayload(prefix: string, score = "6", potential = "6") {
+  const physicalTraits = ["Speed", "Acceleration", "Agility", "Change of Direction", "Strength", "Size / Frame"];
+  const filmTraits = ["Get Off", "Bend", "Power", "Finesse", "Pass Rush Plan", "Block Shed", "Pad Level", "Anchor", "Discipline & Diagnostics", "Tackling", "Pursuit", "Coverage"];
+  const payload: Record<string, string> = {
+    [`${prefix}[grade][position]`]: "EDGE",
+    [`${prefix}[grade][archetype]`]: "Balanced",
+    [`${prefix}[grade][potential]`]: potential,
+  };
+  physicalTraits.forEach((trait) => {
+    payload[`${prefix}[grade][physicalTraits][${trait}]`] = score;
+  });
+  filmTraits.forEach((trait) => {
+    payload[`${prefix}[grade][filmTraits][${trait}]`] = score;
+  });
+  return payload;
+}
+
 function removeUploadedAssetsFromHtml(html: string) {
   const matches = html.matchAll(/\/uploads\/articles\/([^"#]+?\.(?:pdf|jpg|jpeg|png|gif|webp))/g);
   for (const match of matches) {
@@ -1163,11 +1180,17 @@ describe("OnDraft HTTP contracts", () => {
         "entries[0][weight]": "222",
         "entries[0][playerInfoPublished]": "false",
         "entries[0][writeupPublished]": "false",
+        expandWriteup: "true",
+        expandGrade: "true",
       });
 
     expect(htmxSaveOne.status).toBe(200);
     expect(htmxSaveOne.text).toContain("data-board-entry-item");
     expect(htmxSaveOne.text).toContain("Single Save One HTMX");
+    expect(htmxSaveOne.text).toContain('data-expanded="true"');
+    expect(htmxSaveOne.text).toContain('data-grade-expanded="true"');
+    expect(htmxSaveOne.text).toContain('name="expandWriteup" value="true"');
+    expect(htmxSaveOne.text).toContain('name="expandGrade" value="true"');
     expect(htmxSaveOne.text).not.toContain("Edit Big Board");
     expect(htmxSaveOne.text).not.toContain("Single Save Two");
 
@@ -1381,6 +1404,50 @@ describe("OnDraft HTTP contracts", () => {
     const publicBoard = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
     expect(publicBoard.status).toBe(200);
     expect(publicBoard.text).not.toContain("Unpublished QB");
+  });
+
+  it("publishes draft board grades and renders public grade details", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+
+    const publishGrade = await agent
+      .post("/bigboard/edit/publish-grade")
+      .set("HX-Request", "true")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        entryId: "published-grade-edge",
+        "entries[0][id]": "published-grade-edge",
+        "entries[0][playerName]": "Published Grade Edge",
+        "entries[0][school]": "Alabama",
+        "entries[0][position]": "EDGE",
+        "entries[0][rank]": "4",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-4",
+        "entries[0][weight]": "255",
+        "entries[0][playerInfoPublished]": "true",
+        "entries[0][gradePublished]": "false",
+        "entries[0][writeupPublished]": "false",
+        ...edgeGradePayload("entries[0]", "6", "6"),
+      });
+
+    expect(publishGrade.status).toBe(200);
+    expect(publishGrade.text).toContain("data-board-entry-item");
+    expect(publishGrade.text).toContain('name="entries[0][gradePublished]" value="true"');
+    expect(publishGrade.text).toContain("Publish Grade");
+    expect(publishGrade.text).toContain("Speed");
+    expect(publishGrade.text).not.toContain("Edit Big Board");
+
+    const publicBoard = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
+
+    expect(publicBoard.status).toBe(200);
+    expect(publicBoard.text).toContain("Published Grade Edge");
+    expect(publicBoard.text).toContain("6.15/8");
+    expect(publicBoard.text).toContain("How we grade players");
+    expect(publicBoard.text).toContain('title="Pass Rush Plan"');
+    expect(publicBoard.text).toContain("PRP");
+    expect(publicBoard.text).not.toContain("Balanced archetype");
   });
 
   it("removes omitted draft board ranking entries when admins save the editor", async () => {
