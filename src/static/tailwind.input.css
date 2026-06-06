@@ -1296,6 +1296,14 @@
     @apply border-red-400/70 bg-red-500/10 text-red-700 ring-1 ring-red-400/30 dark:text-red-200;
   }
 
+  .draft-grade-trait-tile:hover .draft-grade-trait-full {
+    @apply block;
+  }
+
+  .draft-grade-trait-tile:hover .draft-grade-trait-abbr {
+    @apply opacity-0;
+  }
+
   .board-editor-profile-panel {
     @apply border-t border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-draft-ink/40 sm:p-4;
     overflow: hidden;

@@ -1444,8 +1444,10 @@ describe("OnDraft HTTP contracts", () => {
     expect(publicBoard.status).toBe(200);
     expect(publicBoard.text).toContain("Published Grade Edge");
     expect(publicBoard.text).toContain("6.15/8");
-    expect(publicBoard.text).toContain("Balanced archetype");
-    expect(publicBoard.text).toContain("Pass Rush Plan");
+    expect(publicBoard.text).toContain("How we grade players");
+    expect(publicBoard.text).toContain('title="Pass Rush Plan"');
+    expect(publicBoard.text).toContain("PRP");
+    expect(publicBoard.text).not.toContain("Balanced archetype");
   });
 
   it("removes omitted draft board ranking entries when admins save the editor", async () => {

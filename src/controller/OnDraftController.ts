@@ -9,6 +9,7 @@ import { ArticleError, BigBoardError, ForumPostError } from "../repository/OnDra
 import { publicArticleUploadUrl } from "../uploads/articlePdfUpload";
 import { BIG_BOARD_CREATORS, POSITIONS, type Article, type ArticleContent, type ArticleFilter, type BigBoard, type BigBoardCreator, type BigBoardEntry, type ForumPost, type ForumPostFilter, type Video, type VideoQuery } from "../model/OnDraftContent";
 import {
+  abbreviateDraftGradeTrait,
   calculateDraftGrade,
   defaultDraftGrade,
   draftGradeArchetypeNames,
@@ -1323,6 +1324,7 @@ class OnDraftController implements IOnDraftController {
       filters: filter ?? {},
       collegeTeamColors: collegeTeam,
       helmetColorKey,
+      abbreviateDraftGradeTrait,
       calculateDraftGrade,
       defaultDraftGrade,
       draftGradePositionConfig,
@@ -1369,6 +1371,7 @@ class OnDraftController implements IOnDraftController {
       collegeTeamNames,
       collegeTeamColors: collegeTeam,
       helmetColorKey,
+      abbreviateDraftGradeTrait,
       calculateDraftGrade,
       defaultDraftGrade,
       draftGradePositionConfig,
@@ -1424,6 +1427,7 @@ class OnDraftController implements IOnDraftController {
       heightFeetOptions,
       heightInchOptions,
       heightFractionOptions,
+      abbreviateDraftGradeTrait,
       calculateDraftGrade,
       defaultDraftGrade,
       draftGradePositionConfig,

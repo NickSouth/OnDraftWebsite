@@ -4,6 +4,16 @@
   const publicGradeCategories = entry.gradePublished && entry.grade && typeof gradeTraitCategoriesForGrade === "function"
     ? gradeTraitCategoriesForGrade(entry.grade, entry.position)
     : [];
+  const publicPhysicalGradeCategory = publicGradeCategories.find((category) => category.key === "physicalTraits");
+  const publicFilmGradeCategory = publicGradeCategories.find((category) => category.key === "filmTraits");
+  const publicGradeLayoutCategories = [
+    publicPhysicalGradeCategory
+      ? { category: publicPhysicalGradeCategory, widthClass: "grid-cols-[repeat(2,4.15rem)]" }
+      : null,
+    publicFilmGradeCategory
+      ? { category: publicFilmGradeCategory, widthClass: "grid-cols-[repeat(2,4.15rem)] sm:grid-cols-[repeat(3,4.15rem)] lg:grid-cols-[repeat(5,4.15rem)]" }
+      : null,
+  ].filter(Boolean);
   const publicGradeTraitValue = (categoryKey, trait) => {
     if (!entry.grade) {
       return "";
@@ -20,9 +30,12 @@
     }
     return value === "NA" ? "NA" : "-/8";
   };
+  const publicGradeTraitAbbreviation = (trait) => typeof abbreviateDraftGradeTrait === "function"
+    ? abbreviateDraftGradeTrait(trait)
+    : trait;
 %>
 
-<div class="relative z-10 overflow-hidden rounded-md pb-2 pt-3 sm:ml-[7.5rem]">
+<div class="relative z-10 overflow-visible rounded-md pb-2 pt-3 sm:ml-[7.5rem]">
   <span class="pointer-events-none absolute inset-y-0 right-0 left-0 hidden bg-slate-200/45 [clip-path:polygon(10rem_0,100%_0,100%_100%,4rem_100%)] dark:bg-white/[0.05] lg:block" aria-hidden="true"></span>
   <div class="relative z-10 grid min-w-0 gap-3 px-3 lg:pl-20">
     <% if (entry.writeupPublished) { %>
@@ -44,26 +57,24 @@
       </div>
     <% } %>
     <% if (entry.gradePublished && publicBoardGradeValue !== null) { %>
-      <section class="min-w-0 rounded-lg border border-slate-200 bg-white p-3 text-left dark:border-white/10 dark:bg-draft-ink">
+      <section class="ml-auto min-w-0 rounded-lg border border-slate-200 bg-white p-3 text-left dark:border-white/10 dark:bg-draft-ink lg:w-fit lg:max-w-full">
         <div class="flex flex-wrap items-end justify-between gap-2">
           <div>
             <h3 class="text-xs font-black uppercase tracking-[0.18em] text-draft-amber dark:text-draft-gold">Grades</h3>
-            <% if (entry.grade) { %>
-              <p class="mt-0.5 text-xs font-bold text-slate-500 dark:text-slate-300"><%= entry.grade.archetype %></p>
-            <% } %>
           </div>
           <strong class="font-display text-2xl font-black leading-none text-slate-950 dark:text-white"><%= publicBoardGradeLabel %></strong>
         </div>
-        <% if (publicGradeCategories.length > 0) { %>
-          <div class="mt-3 grid gap-2.5">
-            <% publicGradeCategories.forEach((category) => { %>
-              <div class="grid gap-1.5">
+        <% if (publicGradeLayoutCategories.length > 0) { %>
+          <div class="mt-3 flex flex-col gap-2.5 overflow-visible lg:flex-row lg:items-start">
+            <% publicGradeLayoutCategories.forEach(({ category, widthClass }) => { %>
+              <div class="grid gap-1.5 overflow-visible">
                 <span class="text-[0.64rem] font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400"><%= category.label %></span>
-                <div class="grid grid-cols-[repeat(auto-fit,minmax(6.75rem,1fr))] gap-1.5">
+                <div class="grid <%= widthClass %> gap-1 overflow-visible">
                   <% category.traits.forEach((trait) => { %>
-                    <span class="grid min-h-14 min-w-0 place-items-center gap-1 rounded bg-slate-100 px-2 py-1.5 text-center dark:bg-white/10">
-                      <span class="text-[0.58rem] font-black uppercase leading-tight text-slate-600 [overflow-wrap:anywhere] dark:text-slate-300"><%= trait %></span>
-                      <strong class="font-display text-lg font-black leading-none text-draft-amber dark:text-draft-gold"><%= publicGradeTraitLabel(category.key, trait) %></strong>
+                    <span class="draft-grade-trait-tile relative z-0 grid h-[2.4rem] w-[4.15rem] place-items-center gap-0.5 overflow-visible rounded bg-slate-100 px-1 py-1 text-center transition duration-150 hover:z-20 hover:scale-[1.04] hover:bg-slate-200 hover:shadow-lg hover:ring-1 hover:ring-draft-gold/60 dark:bg-white/10 dark:hover:bg-white/20" title="<%= trait %>">
+                      <span class="draft-grade-trait-full pointer-events-none absolute left-1/2 top-1 z-30 hidden min-w-max -translate-x-1/2 rounded bg-slate-950 px-2 py-1 text-[0.58rem] font-black uppercase leading-none text-white shadow-xl ring-1 ring-draft-gold/50 dark:bg-white dark:text-draft-ink"><%= trait %></span>
+                      <span class="draft-grade-trait-abbr text-[0.58rem] font-black uppercase leading-none text-slate-600 transition dark:text-slate-300"><%= publicGradeTraitAbbreviation(trait) %></span>
+                      <strong class="font-display text-[0.9rem] font-black leading-none text-draft-amber dark:text-draft-gold"><%= publicGradeTraitLabel(category.key, trait) %></strong>
                     </span>
                   <% }) %>
                 </div>
