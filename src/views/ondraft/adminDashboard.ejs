@@ -1,4 +1,4 @@
-<section class="od-admin-page max-w-none">
+<section class="od-admin-page max-w-none overflow-hidden">
   <div class="od-admin-heading">
     <div>
       <p>Admin</p>
@@ -7,8 +7,8 @@
     </div>
   </div>
 
-  <div class="mb-5 overflow-x-auto" role="tablist" aria-label="Admin dashboard">
-    <div class="od-text-toggle-group min-w-[44rem]" style="--od-toggle-count: 4;">
+  <div class="mb-5 -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0" role="tablist" aria-label="Admin dashboard">
+    <div class="od-text-toggle-group min-w-max sm:min-w-[44rem]" style="--od-toggle-count: 4;">
       <% tabs.forEach((tab) => { %>
         <a
           href="/admin?tab=<%= tab.id %>"
@@ -32,7 +32,9 @@
         <%- include("partials/adminNewsletter", { articles: [], videos: [], newsletters: [], flashMessage: null, errorMessage: null, values: {} }) %>
       </div>
     <% } else if (activeTab === "analytics") { %>
-      <%- include("partials/adminAnalytics") %>
+      <div hx-get="/admin/tabs/analytics?period=<%= typeof analyticsPeriod !== "undefined" ? analyticsPeriod : "month" %>&category=<%= typeof analyticsCategory !== "undefined" ? analyticsCategory : "all" %>" hx-trigger="load" hx-swap="outerHTML">
+        <%- include("partials/adminAnalytics", { period: typeof analyticsPeriod !== "undefined" ? analyticsPeriod : "month", category: typeof analyticsCategory !== "undefined" ? analyticsCategory : "all", summary: null, diagnostics: null, errorMessage: null }) %>
+      </div>
     <% } else { %>
       <div hx-get="/admin/tabs/users" hx-trigger="load" hx-swap="outerHTML">
         <div class="od-card p-6 text-sm font-semibold text-slate-600 dark:text-slate-300">Loading users...</div>

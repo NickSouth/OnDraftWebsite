@@ -1,75 +1,210 @@
-<section class="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
+<section class="grid gap-5">
   <%
     const currentCategory = typeof category !== "undefined" ? category : "all";
+    const currentPeriod = typeof period !== "undefined" ? period : "month";
     const analyticsSummary = typeof summary !== "undefined" ? summary : null;
+    const analyticsDiagnostics = analyticsSummary || (typeof diagnostics !== "undefined" ? diagnostics : null);
     const metricValue = (value) => value === null || value === undefined ? "Pending" : value.toLocaleString();
+    const secondsLabel = (value) => value === null || value === undefined ? "Pending" : `${value}s`;
+    const percentLabel = (value) => value === null || value === undefined ? "Pending" : `${value}%`;
+    const periodTabs = [
+      { id: "week", label: "Last week" },
+      { id: "month", label: "Last month" },
+      { id: "all", label: "All time" },
+    ];
+    const categoryOptions = [
+      ["all", "All pages"],
+      ["articles", "Articles"],
+      ["videos", "Videos"],
+      ["home", "Home"],
+      ["draft-board", "Draft board"],
+      ["taproom", "Taproom"],
+    ];
+    const trendPoints = analyticsSummary?.pageviewSeries ?? [];
+    const trendMax = Math.max(1, ...trendPoints.map((point) => Math.max(point.pageviews, point.sessions)));
+    const topContentMax = Math.max(1, ...(analyticsSummary?.topContent ?? []).map((item) => item.visitors));
+    const deviceMax = Math.max(1, ...(analyticsSummary?.deviceBreakdown ?? []).map((item) => item.visitors));
+    const referrerMax = Math.max(1, ...(analyticsSummary?.referrerBreakdown ?? []).map((item) => item.visitors));
+    const cacheStatusLabel = analyticsSummary?.cacheStatus === "live"
+      ? "Live"
+      : analyticsSummary?.cacheStatus === "cached"
+        ? "Cached"
+        : analyticsSummary?.cacheStatus === "stale"
+          ? "Cached"
+          : "Setup";
+    const cacheStatusClass = analyticsSummary?.cacheStatus === "live"
+      ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-400/40 dark:bg-emerald-950/30 dark:text-emerald-100"
+      : "border-draft-gold/40 bg-draft-gold/10 text-draft-amber dark:text-draft-gold";
+    const dateLabel = (value) => {
+      const date = new Date(value);
+      return isNaN(date.getTime()) ? "" : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    };
   %>
-  <div class="od-card p-5">
-    <p class="text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Analytics</p>
-    <h2 class="mt-1 text-2xl font-black tracking-normal text-slate-950 dark:text-white">Umami</h2>
-    <p class="mt-3 text-sm font-semibold text-slate-600 dark:text-slate-300">Open-source, privacy-friendly analytics are tracked through the Umami Cloud script. Dashboard stats use the Umami API when an API key is configured.</p>
+
+  <div class="od-card p-4 sm:p-5">
+    <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+      <div>
+        <p class="text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Analytics</p>
+        <h2 class="mt-1 text-2xl font-black tracking-normal text-slate-950 dark:text-white">Traffic Dashboard</h2>
+        <div class="mt-3 flex flex-wrap items-center gap-2 text-xs font-black uppercase tracking-[0.12em]">
+          <span class="inline-flex min-h-8 items-center rounded-md border px-2.5 <%= cacheStatusClass %>"><%= cacheStatusLabel %></span>
+          <% if (analyticsSummary?.rangeLabel) { %>
+            <span class="inline-flex min-h-8 items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"><%= analyticsSummary.rangeLabel %></span>
+          <% } %>
+          <% if (analyticsSummary?.cachedAt) { %>
+            <span class="inline-flex min-h-8 items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">Updated <%= analyticsSummary.cachedAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) %></span>
+          <% } %>
+        </div>
+      </div>
+
+      <form
+        class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end lg:min-w-[28rem]"
+        hx-get="/admin/tabs/analytics"
+        hx-target="#admin-dashboard-panel"
+        hx-swap="innerHTML"
+      >
+        <input type="hidden" name="period" value="<%= currentPeriod %>" />
+        <label class="grid gap-1 text-sm font-black text-slate-700 dark:text-slate-200">
+          Category
+          <select class="od-focus-ring min-h-10 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-draft-ink" name="category" onchange="htmx.trigger(this.form, 'submit');">
+            <% categoryOptions.forEach(([value, label]) => { %>
+              <option value="<%= value %>" <%= currentCategory === value ? "selected" : "" %>><%= label %></option>
+            <% }) %>
+          </select>
+        </label>
+        <div class="-mx-1 overflow-x-auto px-1">
+          <div class="od-text-toggle-group min-w-max" style="--od-toggle-count: 3;">
+            <% periodTabs.forEach((tab) => { %>
+              <a
+                href="/admin?tab=analytics&period=<%= tab.id %>&category=<%= currentCategory %>"
+                class="od-text-toggle <%= currentPeriod === tab.id ? "is-active" : "" %>"
+                role="tab"
+                aria-selected="<%= currentPeriod === tab.id ? "true" : "false" %>"
+                hx-get="/admin/tabs/analytics?period=<%= tab.id %>&category=<%= currentCategory %>"
+                hx-target="#admin-dashboard-panel"
+                hx-swap="innerHTML"
+                onclick="const group = this.closest('.od-text-toggle-group'); group?.querySelectorAll('.od-text-toggle').forEach((toggle) => { toggle.classList.remove('is-active'); toggle.setAttribute('aria-selected', 'false'); }); this.classList.add('is-active'); this.setAttribute('aria-selected', 'true'); const periodInput = this.closest('form')?.querySelector('input[name=period]'); if (periodInput) periodInput.value = '<%= tab.id %>';"
+              ><%= tab.label %></a>
+            <% }) %>
+          </div>
+        </div>
+      </form>
+    </div>
+
     <% if (analyticsSummary?.message) { %>
       <p class="mt-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"><%= analyticsSummary.message %></p>
     <% } %>
     <% if (errorMessage) { %>
       <p class="od-admin-error mt-4" role="alert"><%= errorMessage %></p>
     <% } %>
+    <% if (analyticsDiagnostics && !analyticsSummary?.configured) { %>
+      <dl class="mt-4 grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-xs font-bold text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 sm:grid-cols-3">
+        <div>
+          <dt class="font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Website ID</dt>
+          <dd class="mt-1"><%= analyticsDiagnostics.websiteConfigured ? "Loaded" : "Missing" %></dd>
+        </div>
+        <div>
+          <dt class="font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">API Key</dt>
+          <dd class="mt-1"><%= analyticsDiagnostics.apiKeyConfigured ? "Loaded" : "Missing" %></dd>
+        </div>
+        <div>
+          <dt class="font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Endpoint</dt>
+          <dd class="mt-1 truncate"><%= analyticsDiagnostics.apiBaseUrl %></dd>
+        </div>
+      </dl>
+    <% } %>
   </div>
 
-  <div class="od-card p-5">
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <p class="text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">View</p>
-        <h2 class="mt-1 text-2xl font-black tracking-normal text-slate-950 dark:text-white">Traffic Overview</h2>
+  <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+    <% [
+      ["Visits", metricValue(analyticsSummary?.visits)],
+      ["Pageviews", metricValue(analyticsSummary?.pageviews)],
+      ["Visitors", metricValue(analyticsSummary?.visitors)],
+      ["Avg Visit", secondsLabel(analyticsSummary?.averageVisitLengthSeconds)],
+      ["Bounce", percentLabel(analyticsSummary?.bounceRate)],
+      ["Retention", analyticsSummary?.bounceRate === null || analyticsSummary?.bounceRate === undefined ? "Pending" : `${Math.max(0, 100 - analyticsSummary.bounceRate)}%`],
+    ].forEach((metric) => { %>
+      <div class="od-card p-4">
+        <p class="text-xs font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400"><%= metric[0] %></p>
+        <p class="mt-2 font-display text-2xl font-black tracking-normal text-slate-950 dark:text-white"><%= metric[1] %></p>
       </div>
-      <form
-        class="m-0"
-        hx-get="/admin/tabs/analytics"
-        hx-target="#admin-dashboard-panel"
-        hx-swap="innerHTML"
-      >
-        <label class="text-sm font-black text-slate-700 dark:text-slate-200">
-          Category
-          <select class="mt-1 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-draft-ink" name="category" onchange="htmx.trigger(this.form, 'submit');">
-            <option value="all" <%= currentCategory === "all" ? "selected" : "" %>>All pages</option>
-            <option value="articles" <%= currentCategory === "articles" ? "selected" : "" %>>Articles</option>
-            <option value="videos" <%= currentCategory === "videos" ? "selected" : "" %>>Videos</option>
-            <option value="home" <%= currentCategory === "home" ? "selected" : "" %>>Home</option>
-            <option value="draft-board" <%= currentCategory === "draft-board" ? "selected" : "" %>>Draft board</option>
-            <option value="taproom" <%= currentCategory === "taproom" ? "selected" : "" %>>Taproom</option>
-          </select>
-        </label>
-      </form>
-    </div>
+    <% }) %>
+  </div>
 
-    <div class="mt-5 grid gap-3 sm:grid-cols-2">
-      <% [
-        ["Visits", metricValue(analyticsSummary?.visits)],
-        ["Pageviews", metricValue(analyticsSummary?.pageviews)],
-        ["Visitors", metricValue(analyticsSummary?.visitors)],
-        ["Avg Visit Length", analyticsSummary?.averageVisitLengthSeconds === null || analyticsSummary?.averageVisitLengthSeconds === undefined ? "Pending" : `${analyticsSummary.averageVisitLengthSeconds}s`],
-        ["Bounce Rate", analyticsSummary?.bounceRate === null || analyticsSummary?.bounceRate === undefined ? "Pending" : `${analyticsSummary.bounceRate}%`],
-        ["Retention", analyticsSummary?.bounceRate === null || analyticsSummary?.bounceRate === undefined ? "Pending" : `${Math.max(0, 100 - analyticsSummary.bounceRate)}%`],
-      ].forEach((metric) => { %>
-        <div class="rounded-md border border-slate-200 p-4 dark:border-white/10">
-          <p class="text-xs font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400"><%= metric[0] %></p>
-          <p class="mt-2 text-lg font-black tracking-normal text-slate-950 dark:text-white"><%= metric[1] %></p>
+  <div class="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(18rem,0.75fr)]">
+    <section class="od-card p-4 sm:p-5">
+      <div class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p class="text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Trend</p>
+          <h3 class="mt-1 text-xl font-black tracking-normal text-slate-950 dark:text-white">Pageviews and Sessions</h3>
         </div>
-      <% }) %>
-    </div>
+        <div class="flex items-center gap-3 text-xs font-black uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+          <span class="inline-flex items-center gap-1.5"><span class="size-2 rounded-full bg-draft-gold"></span>Pageviews</span>
+          <span class="inline-flex items-center gap-1.5"><span class="size-2 rounded-full bg-sky-400"></span>Sessions</span>
+        </div>
+      </div>
 
-    <% if (analyticsSummary?.topContent?.length) { %>
-      <div class="mt-5 rounded-md border border-slate-200 p-4 dark:border-white/10">
-        <h3 class="text-sm font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Top content</h3>
-        <div class="mt-3 grid gap-2">
-          <% analyticsSummary.topContent.forEach((item) => { %>
-            <div class="flex items-center justify-between gap-3 text-sm">
-              <span class="truncate font-bold text-slate-800 dark:text-slate-100"><%= item.path %></span>
-              <span class="shrink-0 font-black text-draft-amber dark:text-draft-gold"><%= item.visitors.toLocaleString() %></span>
+      <% if (trendPoints.length > 0) { %>
+        <div class="mt-5 flex h-64 items-end gap-1 rounded-md border border-slate-200 bg-slate-50 px-3 pb-8 pt-4 dark:border-white/10 dark:bg-draft-ink/60">
+          <% trendPoints.slice(-24).forEach((point) => { %>
+            <div class="group relative flex min-w-4 flex-1 items-end justify-center gap-0.5">
+              <span class="w-2 rounded-t bg-draft-gold transition group-hover:bg-amber-300" style="height: <%= Math.max(4, Math.round((point.pageviews / trendMax) * 190)) %>px"></span>
+              <span class="w-2 rounded-t bg-sky-400 transition group-hover:bg-sky-300" style="height: <%= Math.max(4, Math.round((point.sessions / trendMax) * 190)) %>px"></span>
+              <span class="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-max -translate-x-1/2 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-slate-700 shadow-editorial group-hover:block dark:border-white/10 dark:bg-draft-slate dark:text-slate-100"><%= dateLabel(point.timestamp) %>: <%= point.pageviews.toLocaleString() %> / <%= point.sessions.toLocaleString() %></span>
             </div>
           <% }) %>
         </div>
+      <% } else { %>
+        <p class="mt-5 rounded-md border border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm font-bold text-slate-600 dark:border-white/10 dark:bg-draft-ink/60 dark:text-slate-300">No trend data yet.</p>
+      <% } %>
+    </section>
+
+    <section class="od-card p-4 sm:p-5">
+      <p class="text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Breakdown</p>
+      <h3 class="mt-1 text-xl font-black tracking-normal text-slate-950 dark:text-white">Devices</h3>
+      <div class="mt-4 grid gap-3">
+        <% (analyticsSummary?.deviceBreakdown ?? []).forEach((item) => { %>
+          <div>
+            <div class="flex items-center justify-between gap-3 text-sm">
+              <span class="truncate font-bold text-slate-800 dark:text-slate-100"><%= item.name %></span>
+              <span class="shrink-0 font-black text-draft-amber dark:text-draft-gold"><%= item.visitors.toLocaleString() %></span>
+            </div>
+            <div class="mt-1 h-2 overflow-hidden rounded bg-slate-100 dark:bg-white/10">
+              <span class="block h-full rounded bg-draft-gold" style="width: <%= Math.max(5, Math.round((item.visitors / deviceMax) * 100)) %>%"></span>
+            </div>
+          </div>
+        <% }) %>
+        <% if (!(analyticsSummary?.deviceBreakdown ?? []).length) { %>
+          <p class="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-600 dark:border-white/10 dark:bg-draft-ink/60 dark:text-slate-300">No device data yet.</p>
+        <% } %>
       </div>
-    <% } %>
+    </section>
+  </div>
+
+  <div class="grid gap-5 lg:grid-cols-2">
+    <% [
+      { title: "Top Content", items: analyticsSummary?.topContent ?? [], max: topContentMax, labelKey: "path" },
+      { title: "Referrers", items: analyticsSummary?.referrerBreakdown ?? [], max: referrerMax, labelKey: "name" },
+    ].forEach((panel) => { %>
+      <section class="od-card p-4 sm:p-5">
+        <h3 class="text-sm font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400"><%= panel.title %></h3>
+        <div class="mt-4 grid gap-3">
+          <% panel.items.forEach((item) => { %>
+            <div>
+              <div class="flex items-center justify-between gap-3 text-sm">
+                <span class="truncate font-bold text-slate-800 dark:text-slate-100"><%= item[panel.labelKey] %></span>
+                <span class="shrink-0 font-black text-draft-amber dark:text-draft-gold"><%= item.visitors.toLocaleString() %></span>
+              </div>
+              <div class="mt-1 h-2 overflow-hidden rounded bg-slate-100 dark:bg-white/10">
+                <span class="block h-full rounded bg-sky-400" style="width: <%= Math.max(5, Math.round((item.visitors / panel.max) * 100)) %>%"></span>
+              </div>
+            </div>
+          <% }) %>
+          <% if (!panel.items.length) { %>
+            <p class="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-600 dark:border-white/10 dark:bg-draft-ink/60 dark:text-slate-300">No <%= panel.title.toLowerCase() %> data yet.</p>
+          <% } %>
+        </div>
+      </section>
+    <% }) %>
   </div>
 </section>
