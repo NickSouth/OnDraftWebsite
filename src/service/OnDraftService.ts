@@ -1480,6 +1480,10 @@ class OnDraftService implements IOnDraftService {
     if (input.id) {
       const existing = await this.repository.getNewsletter(input.id);
       if (existing.ok === true) {
+        if (existing.value.status === "sent") {
+          return Err(NewsletterValidationError("Sent newsletters cannot be edited or re-sent."));
+        }
+
         return Ok({
           ...existing.value,
           date,

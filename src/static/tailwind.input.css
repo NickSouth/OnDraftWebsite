@@ -1232,6 +1232,119 @@
     @apply od-focus-ring inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-md border border-sky-400 bg-sky-600 px-4 py-2 text-sm font-black text-white transition hover:border-sky-300 hover:bg-sky-500 dark:border-sky-400 dark:bg-sky-500 dark:text-white dark:hover:bg-sky-400;
   }
 
+  .consensus-discrepancy {
+    @apply relative inline-flex min-w-0 flex-wrap items-center gap-2;
+  }
+
+  .consensus-source-ranks {
+    @apply grid min-h-14 w-fit min-w-44 content-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-left text-[0.52rem] font-black uppercase tracking-wide text-slate-500 shadow-sm dark:border-white/10 dark:bg-draft-ink dark:text-slate-300;
+  }
+
+  .consensus-source-ranks-line {
+    @apply grid gap-0.5 whitespace-nowrap;
+  }
+
+  .consensus-source-ranks-line > span {
+    @apply flex items-baseline gap-1 leading-none;
+  }
+
+  .consensus-source-ranks strong {
+    @apply font-display text-sm font-black leading-none text-draft-amber dark:text-draft-gold;
+  }
+
+  .consensus-discrepancy-flag {
+    @apply inline-flex w-fit rounded bg-red-50 px-2 py-0.5 text-[0.58rem] font-black uppercase leading-none tracking-wide text-red-700 dark:bg-red-500/10 dark:text-red-200;
+  }
+
+  .consensus-discrepancy-controls {
+    @apply inline-grid min-w-0;
+  }
+
+  .consensus-discrepancy-controls-list {
+    @apply min-w-20 justify-items-start;
+  }
+
+  .consensus-discrepancy-control-row {
+    @apply flex min-h-8 flex-wrap items-center gap-1.5;
+  }
+
+  .consensus-discrepancy-details,
+  .consensus-discrepancy-admin {
+    @apply relative inline-block min-w-0;
+  }
+
+  .consensus-discrepancy-summary,
+  .consensus-discrepancy-edit-trigger {
+    @apply od-focus-ring inline-flex min-h-8 cursor-pointer list-none items-center justify-center gap-1.5 rounded-full border border-draft-gold/50 bg-white/90 px-3 py-1.5 text-xs font-black uppercase tracking-[0.12em] text-draft-amber shadow-sm transition hover:bg-draft-gold hover:text-draft-ink dark:bg-draft-ink/95 dark:text-draft-gold dark:hover:bg-draft-gold dark:hover:text-draft-ink;
+  }
+
+  .consensus-discrepancy-summary::-webkit-details-marker,
+  .consensus-discrepancy-edit-trigger::-webkit-details-marker {
+    @apply hidden;
+  }
+
+  .consensus-discrepancy-edit-trigger {
+    @apply size-8 rounded-md border-red-200 px-0 py-0 text-red-700 hover:bg-red-50 hover:text-red-700 dark:border-red-400/30 dark:bg-white/10 dark:text-red-200 dark:hover:bg-red-500/10 dark:hover:text-red-200;
+  }
+
+  .consensus-discrepancy-panel {
+    @apply relative z-10 overflow-visible rounded-md pb-2 pt-3 text-left text-slate-950 dark:text-white sm:ml-[7.5rem];
+  }
+
+  .consensus-discrepancy-panel::before {
+    @apply pointer-events-none absolute inset-y-0 right-0 left-0 hidden bg-slate-200/45 content-[''] [clip-path:polygon(9rem_0,100%_0,100%_100%,3rem_100%)] dark:bg-white/[0.05] lg:block;
+  }
+
+  .consensus-discrepancy-read-panel,
+  .consensus-discrepancy-form {
+    @apply relative z-10 grid min-w-0 gap-3 px-3 lg:grid-cols-2 lg:items-start lg:pl-16;
+  }
+
+  .consensus-discrepancy-panel section {
+    @apply min-w-0 rounded-lg border border-slate-200 bg-white p-4 text-left dark:border-white/10 dark:bg-draft-ink;
+  }
+
+  .consensus-discrepancy-panel-actions {
+    @apply relative z-10 flex min-w-0 justify-end px-3 pb-2 lg:pl-16;
+  }
+
+  .consensus-discrepancy-read-actions {
+    @apply flex min-w-0 justify-end lg:col-span-2;
+  }
+
+  .consensus-discrepancy-panel h3,
+  .consensus-discrepancy-form label > span {
+    @apply text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold;
+  }
+
+  .consensus-discrepancy-panel p {
+    @apply mt-3 min-h-48 whitespace-pre-wrap break-words text-base font-semibold leading-7 text-slate-800 [overflow-wrap:anywhere] dark:text-slate-100;
+  }
+
+  .consensus-discrepancy-form-head {
+    @apply flex min-w-0 flex-wrap items-center gap-2 lg:col-span-2;
+  }
+
+  .consensus-discrepancy-form-grid {
+    @apply grid min-w-0 gap-3 lg:col-span-2 lg:grid-cols-2;
+  }
+
+  .consensus-discrepancy-form label {
+    @apply grid min-w-0 gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/10;
+  }
+
+  .consensus-discrepancy-form label.is-validation-error {
+    @apply border-red-400/70 bg-red-500/10 ring-1 ring-red-400/30;
+  }
+
+  .consensus-discrepancy-form textarea {
+    @apply od-focus-ring min-h-64 resize-y rounded-md border border-slate-300 bg-white p-3 text-base leading-7 text-slate-950 placeholder:text-slate-400 dark:border-white/15 dark:bg-draft-slate dark:text-white;
+  }
+
+  .consensus-discrepancy-actions {
+    @apply flex flex-wrap justify-end gap-2 lg:col-span-2;
+  }
+
   .board-editor-grade-panel {
     @apply border-t border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-draft-ink/40 sm:p-4;
     overflow: visible;

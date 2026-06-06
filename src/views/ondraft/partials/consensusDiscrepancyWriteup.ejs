@@ -1,0 +1,149 @@
+<%
+  const hasTextValue = (value) => typeof value === "string" && value.trim().length > 0;
+  const writeup = entry.discWriteup || { ryanWriteup: "", aleksWriteup: "", published: false };
+  const ryanRank = entry.consensusRankingContext?.Ryan?.rank;
+  const aleksRank = entry.consensusRankingContext?.Aleks?.rank;
+  const ryanHigher = typeof ryanRank === "number" && typeof aleksRank === "number" && ryanRank < aleksRank;
+  const aleksHigher = typeof ryanRank === "number" && typeof aleksRank === "number" && aleksRank < ryanRank;
+  const ryanLabel = ryanHigher
+    ? "Why Ryan is high on this player:"
+    : aleksHigher
+      ? "Why Ryan is low on this player:"
+      : "Ryan's view:";
+  const aleksLabel = aleksHigher
+    ? "Why Aleks is high on this player:"
+    : ryanHigher
+      ? "Why Aleks is low on this player:"
+      : "Aleks's view:";
+  const hasSavedExplanationText = hasTextValue(writeup.ryanWriteup) && hasTextValue(writeup.aleksWriteup);
+  const publishedExplanation = writeup.published && hasTextValue(writeup.ryanWriteup) && hasTextValue(writeup.aleksWriteup);
+  const validationSet = new Set(Array.isArray(validationFields) ? validationFields : []);
+  const hasRyanError = validationSet.has("ryanWriteup");
+  const hasAleksError = validationSet.has("aleksWriteup");
+  const safePlayerKey = String(entry.playerName).replace(/[^A-Za-z0-9_-]/g, "-");
+  const includeOobControlsForSwap = typeof includeOobControls !== "undefined" && includeOobControls;
+  const editorState = JSON.stringify({
+    editMode: Boolean(forceOpen || errorMessage || !publishedExplanation),
+    ryan: writeup.ryanWriteup,
+    aleks: writeup.aleksWriteup,
+    initialRyan: writeup.ryanWriteup,
+    initialAleks: writeup.aleksWriteup,
+    savedPublished: writeup.published,
+    playerName: entry.playerName,
+  }).replace(/'/g, "&#39;").replace(/</g, "\\u003c");
+%>
+
+<div
+  class="consensus-discrepancy-panel"
+  data-consensus-discrepancy
+  x-data='<%- editorState %>'
+  @consensus-edit.window="if ($event.detail.playerName === playerName) { editMode = true }"
+>
+  <% if (isAdmin && hasSavedExplanationText) { %>
+    <div class="consensus-discrepancy-panel-actions">
+      <button
+        type="button"
+        class="consensus-discrepancy-edit-trigger"
+        :aria-label="editMode ? 'Cancel editing discrepancy explanation' : 'Edit discrepancy explanation'"
+        :title="editMode ? 'Cancel editing discrepancy explanation' : 'Edit discrepancy explanation'"
+        @click.stop="
+          if (editMode) {
+            ryan = initialRyan;
+            aleks = initialAleks;
+            editMode = false;
+          } else {
+            editMode = true;
+          }
+        "
+      >
+        <svg x-show="!editMode" class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M17 3a2.85 2.85 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+          <path d="m15 5 4 4" />
+        </svg>
+        <svg x-show="editMode" x-cloak class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M18 6 6 18" />
+          <path d="m6 6 12 12" />
+        </svg>
+      </button>
+    </div>
+  <% } %>
+
+  <% if (isAdmin ? hasSavedExplanationText : publishedExplanation) { %>
+    <div class="consensus-discrepancy-read-panel" x-show="!editMode">
+      <section>
+        <h3><%= ryanLabel %></h3>
+        <p><%= writeup.ryanWriteup %></p>
+      </section>
+      <section>
+        <h3><%= aleksLabel %></h3>
+        <p><%= writeup.aleksWriteup %></p>
+      </section>
+    </div>
+  <% } %>
+
+  <% if (isAdmin) { %>
+      <form
+        class="consensus-discrepancy-form"
+        method="post"
+        action="/bigboard/consensus/discrepancy-writeup"
+        hx-post="/bigboard/consensus/discrepancy-writeup"
+        hx-target="closest [data-consensus-discrepancy]"
+        hx-swap="outerHTML"
+        x-show="editMode"
+      >
+        <input type="hidden" name="year" value="<%= board.year %>" />
+        <input type="hidden" name="playerName" value="<%= entry.playerName %>" />
+        <div class="consensus-discrepancy-form-head">
+          <span class="board-editor-publish-chip" data-state="<%= writeup.published ? "published" : "draft" %>"><%= writeup.published ? "Explanation published" : "Explanation draft" %></span>
+          <% if (statusMessage) { %>
+            <span class="save-status"><%= statusMessage %></span>
+          <% } %>
+          <% if (errorMessage) { %>
+            <span class="save-status save-status-error" role="alert"><%= errorMessage %></span>
+          <% } %>
+        </div>
+        <div class="consensus-discrepancy-form-grid">
+          <label class="<%= hasRyanError ? "is-validation-error" : "" %>">
+            <span><%= ryanLabel %></span>
+            <textarea name="ryanWriteup" x-model="ryan"><%= writeup.ryanWriteup %></textarea>
+            <% if (hasRyanError) { %>
+              <span class="board-editor-field-error">Ryan's explanation is required before publishing.</span>
+            <% } %>
+          </label>
+          <label class="<%= hasAleksError ? "is-validation-error" : "" %>">
+            <span><%= aleksLabel %></span>
+            <textarea name="aleksWriteup" x-model="aleks"><%= writeup.aleksWriteup %></textarea>
+            <% if (hasAleksError) { %>
+              <span class="board-editor-field-error">Aleks's explanation is required before publishing.</span>
+            <% } %>
+          </label>
+        </div>
+        <div class="consensus-discrepancy-actions">
+          <button
+            type="submit"
+            class="board-editor-save-button"
+            x-cloak
+            x-show="ryan !== initialRyan || aleks !== initialAleks"
+          >
+            Save
+          </button>
+          <button
+            type="submit"
+            class="board-editor-publish-button"
+            formaction="/bigboard/consensus/discrepancy-writeup/publish"
+            hx-post="/bigboard/consensus/discrepancy-writeup/publish"
+            hx-target="closest [data-consensus-discrepancy]"
+            hx-swap="outerHTML"
+            x-cloak
+            x-show="!savedPublished"
+          >
+            Publish
+          </button>
+        </div>
+      </form>
+  <% } %>
+</div>
+
+<% if (includeOobControlsForSwap) { %>
+  <%- include("consensusDiscrepancyControls", { board, entry, isAdmin, variant: "card", oob: true }) %>
+<% } %>

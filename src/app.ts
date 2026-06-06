@@ -1382,6 +1382,30 @@ class ExpressApp implements IApp {
     );
 
     this.app.post(
+      "/bigboard/consensus/discrepancy-writeup",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.saveConsensusDiscrepancyWriteup(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/bigboard/consensus/discrepancy-writeup/publish",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.publishConsensusDiscrepancyWriteup(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
       "/bigboard/edit/delete-entry",
       asyncHandler(async (req, res) => {
         if (!this.requireAdmin(req, res)) {

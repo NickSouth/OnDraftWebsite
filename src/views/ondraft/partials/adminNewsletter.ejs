@@ -1,7 +1,7 @@
 <section
   class="od-card p-5"
-  x-data="{ formOpen: <%= Boolean(errorMessage || (typeof values !== "undefined" && values && values.id)) ? "true" : "false" %>, articleDropdownOpen: false, videoDropdownOpen: false }"
-  x-init="$nextTick(() => { const input = $el.querySelector('input[name=date]'); if (input && !input.value) { const now = new Date(); const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000); input.value = local.toISOString().slice(0, 10); } })"
+  x-data="{ formOpen: <%= Boolean(errorMessage || (typeof values !== "undefined" && values && values.id)) ? "true" : "false" %>, articleDropdownOpen: false, videoDropdownOpen: false, articleCount: 0, videoCount: 0, refreshCounts() { this.articleCount = this.$el.querySelectorAll('input[name=articleIds]:checked').length; this.videoCount = this.$el.querySelectorAll('input[name=videoIds]:checked').length; } }"
+  x-init="$nextTick(() => { const input = $el.querySelector('input[name=date]'); if (input && !input.value) { const now = new Date(); const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000); input.value = local.toISOString().slice(0, 10); } refreshCounts(); })"
   @keydown.escape.window="articleDropdownOpen = false; videoDropdownOpen = false"
 >
   <%
@@ -32,6 +32,7 @@
   <% } %>
 
   <form
+    id="admin-newsletter-form"
     x-show="formOpen"
     x-collapse
     class="ondraft-form od-admin-form mb-6 grid gap-5 border-b border-slate-200 pb-6 dark:border-white/10"
@@ -65,7 +66,7 @@
           @click="articleDropdownOpen = !articleDropdownOpen; videoDropdownOpen = false"
           :aria-expanded="String(articleDropdownOpen)"
         >
-          <span><%= selectedArticleIds.size %> article<%= selectedArticleIds.size === 1 ? "" : "s" %> selected</span>
+          <span x-text="`${articleCount} article${articleCount === 1 ? '' : 's'} selected`"><%= selectedArticleIds.size %> article<%= selectedArticleIds.size === 1 ? "" : "s" %> selected</span>
           <svg class="size-4 transition-transform" :class="articleDropdownOpen ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" /></svg>
         </button>
         <div
@@ -77,7 +78,7 @@
         >
           <% articles.forEach((article) => { %>
             <label class="grid cursor-pointer grid-cols-[1rem_minmax(0,1fr)] gap-3 rounded px-2 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10">
-              <input class="mt-1 size-4" type="checkbox" name="articleIds" value="<%= article.id %>" <%= selectedArticleIds.has(article.id) ? "checked" : "" %> />
+              <input class="mt-1 size-4" type="checkbox" name="articleIds" value="<%= article.id %>" @change="refreshCounts()" <%= selectedArticleIds.has(article.id) ? "checked" : "" %> />
               <span>
                 <span class="block truncate font-bold"><%= article.title %></span>
                 <span class="block text-xs text-slate-500 dark:text-slate-400"><%= new Date(article.publicationDate).toLocaleDateString() %></span>
@@ -95,7 +96,7 @@
           @click="videoDropdownOpen = !videoDropdownOpen; articleDropdownOpen = false"
           :aria-expanded="String(videoDropdownOpen)"
         >
-          <span><%= selectedVideoIds.size %> video<%= selectedVideoIds.size === 1 ? "" : "s" %> selected</span>
+          <span x-text="`${videoCount} video${videoCount === 1 ? '' : 's'} selected`"><%= selectedVideoIds.size %> video<%= selectedVideoIds.size === 1 ? "" : "s" %> selected</span>
           <svg class="size-4 transition-transform" :class="videoDropdownOpen ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" /></svg>
         </button>
         <div
@@ -107,7 +108,7 @@
         >
           <% videos.forEach((video) => { %>
             <label class="grid cursor-pointer grid-cols-[1rem_minmax(0,1fr)] gap-3 rounded px-2 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10">
-              <input class="mt-1 size-4" type="checkbox" name="videoIds" value="<%= video.videoId %>" <%= selectedVideoIds.has(video.videoId) ? "checked" : "" %> />
+              <input class="mt-1 size-4" type="checkbox" name="videoIds" value="<%= video.videoId %>" @change="refreshCounts()" <%= selectedVideoIds.has(video.videoId) ? "checked" : "" %> />
               <span>
                 <span class="block truncate font-bold"><%= video.title %></span>
                 <span class="block text-xs text-slate-500 dark:text-slate-400"><%= new Date(video.createdAt).toLocaleDateString() %></span>
@@ -127,9 +128,9 @@
       <button type="submit" onclick="this.form.action='/admin/newsletters/drafts'; this.form.setAttribute('hx-post', '/admin/newsletters/drafts');">Save draft</button>
       <button
         type="button"
-        class="secondary-button od-secondary-link w-full sm:w-fit"
+        class="od-secondary-link w-full sm:w-fit"
         hx-post="/admin/newsletters/send"
-        hx-include="closest form"
+        hx-include="#admin-newsletter-form"
         hx-target="#admin-dashboard-panel"
         hx-swap="innerHTML"
         hx-confirm="Send this newsletter to every subscribed reader from no-reply@ondraftfootball.com?"

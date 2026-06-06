@@ -845,6 +845,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(dashboard.text).toContain('hx-get="/admin/tabs/content"');
     expect(dashboard.text).toContain('hx-get="/admin/tabs/newsletter"');
     expect(dashboard.text).toContain('hx-get="/admin/tabs/analytics"');
+    expect(dashboard.text).toContain("od-text-toggle-group w-full");
     expect(dashboard.text).toContain('href="/admin"');
     expect(dashboard.text).toContain("Admin Dashboard</a>");
 
@@ -863,9 +864,13 @@ describe("OnDraft HTTP contracts", () => {
     expect(newsletterTab.text).toContain('name="videoIds"');
     expect(newsletterTab.text).toContain("articleDropdownOpen");
     expect(newsletterTab.text).toContain("videoDropdownOpen");
+    expect(newsletterTab.text).toContain("refreshCounts()");
+    expect(newsletterTab.text).toContain("articleCount");
+    expect(newsletterTab.text).toContain("videoCount");
     expect(newsletterTab.text).toContain("Past newsletters");
     expect(newsletterTab.text).toContain("Resend");
     expect(newsletterTab.text).toContain('hx-post="/admin/newsletters/send"');
+    expect(newsletterTab.text).toContain('hx-include="#admin-newsletter-form"');
     expect(newsletterTab.text).toContain("no-reply@ondraftfootball.com");
     expect(newsletterTab.text).not.toContain("<!doctype html>");
 
@@ -881,6 +886,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(usersTab.status).toBe(200);
     expect(usersTab.text).toContain("Manage Users");
     expect(usersTab.text).toContain("ryan@ondraftfootball.com");
+    expect(usersTab.text).toContain("w-full min-w-[58rem]");
     expect(usersTab.text).not.toContain("<!doctype html>");
   });
 
@@ -916,8 +922,8 @@ describe("OnDraft HTTP contracts", () => {
 
     const edit = await admin.get(`/admin/newsletters/${draftId}/edit`).set("HX-Request", "true");
     expect(edit.status).toBe(200);
-    expect(edit.text).toContain('value="A1001" checked');
-    expect(edit.text).toContain('value="BH3X-llq1M4" checked');
+    expect(edit.text).toContain('value="A1001" @change="refreshCounts()" checked');
+    expect(edit.text).toContain('value="BH3X-llq1M4" @change="refreshCounts()" checked');
 
     const sent = await admin
       .post("/admin/newsletters/send")
@@ -933,7 +939,9 @@ describe("OnDraft HTTP contracts", () => {
 
     expect(sent.status).toBe(200);
     expect(sent.text).toContain("Newsletter sent to 1 subscriber.");
+    expect(sent.text).toContain("formOpen: false");
     expect(sent.text).toContain("Sent");
+    expect(sent.text).not.toContain(">Edit</button>");
     expect(emailService.newsletterEmails).toHaveLength(1);
     expect(emailService.newsletterEmails[0].articles[0]).toMatchObject({
       title: "The league is starving for pressure, and this EDGE class knows it",
@@ -1860,6 +1868,7 @@ describe("OnDraft HTTP contracts", () => {
     const fullBoard = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
     expect(fullBoard.status).toBe(200);
     expect(fullBoard.text).toContain('<select name="position" onchange=');
+    expect(fullBoard.text).toContain('hx-push-url="true"');
     expect(fullBoard.text).toContain('<option value="" selected>All</option>');
     expect(fullBoard.text).toContain('<option value="QB"');
     expect(fullBoard.text).toContain('<option value="OnDraft State"');
@@ -1922,6 +1931,10 @@ describe("OnDraft HTTP contracts", () => {
         "entries[0][heightLabel]": "6-2",
         "entries[0][weight]": "220",
         "entries[0][playerInfoPublished]": "true",
+        "entries[0][strengths]": "Copied Ryan strength should not appear.",
+        "entries[0][weaknesses]": "Copied Ryan weakness should not appear.",
+        "entries[0][rundown]": "Copied Ryan rundown should not appear.",
+        "entries[0][writeupPublished]": "true",
         "entries[1][id]": "ryan-edge",
         "entries[1][playerName]": "Edge Prospect",
         "entries[1][school]": "OnDraft State",
@@ -1988,11 +2001,184 @@ describe("OnDraft HTTP contracts", () => {
     expect(consensus.text).toContain('href="/about#aleks-ryabinkin"');
     expect(consensus.text).toMatch(/1\. Edge Prospect[\s\S]*EDGE1/);
     expect(consensus.text).toMatch(/2\. Quarterback Prospect[\s\S]*QB1/);
+    expect(consensus.text).toMatch(/Ryan(?:&#39;|')s Rank:\s*<strong>4<\/strong>[\s\S]*Aleks(?:&#39;|')s Rank:\s*<strong>6<\/strong>/);
+    expect(consensus.text).toMatch(/Ryan(?:&#39;|')s Rank:\s*<strong>1<\/strong>[\s\S]*Aleks(?:&#39;|')s Rank:\s*<strong>13<\/strong>/);
     expect(consensus.text).toContain("Ryan State");
     expect(consensus.text).not.toContain("Aleks Tech");
     expect(consensus.text).toContain("Big discrepancy");
     expect(consensus.text).toMatch(/3\. Tackle Prospect[\s\S]*Published U/);
+    expect(consensus.text).toMatch(/Tackle Prospect[\s\S]*Ryan(?:&#39;|')s Rank:\s*<strong>10<\/strong>/);
+    expect(consensus.text).not.toMatch(/Tackle Prospect[\s\S]*Aleks(?:&#39;|')s Rank:\s*<strong>30<\/strong>/);
     expect(consensus.text).not.toContain("Private U");
+    expect(consensus.text).not.toContain("read player profile");
+    expect(consensus.text).not.toContain("RUNDOWN");
+    expect(consensus.text).not.toContain("STRENGTHS");
+    expect(consensus.text).not.toContain("Copied Ryan strength should not appear.");
+    expect(consensus.text).not.toContain("Copied Ryan weakness should not appear.");
+    expect(consensus.text).not.toContain("Copied Ryan rundown should not appear.");
+  });
+
+  it("lets admins draft and publish consensus discrepancy explanations", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+
+    const saveRyan = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": "disc-ryan-qb",
+        "entries[0][playerName]": "Discrepancy Quarterback",
+        "entries[0][school]": "Ryan State",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2",
+        "entries[0][weight]": "220",
+        "entries[0][playerInfoPublished]": "true",
+      });
+    expect(saveRyan.status).toBe(200);
+
+    const saveAleks = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Aleks",
+        "entries[0][id]": "disc-aleks-qb",
+        "entries[0][playerName]": "Discrepancy Quarterback",
+        "entries[0][school]": "Aleks Tech",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "20",
+        "entries[0][posRank]": "4",
+        "entries[0][heightLabel]": "6-1",
+        "entries[0][weight]": "215",
+        "entries[0][playerInfoPublished]": "true",
+      });
+    expect(saveAleks.status).toBe(200);
+
+    const adminConsensus = await agent.get("/bigboard?year=2026&creator=Consensus");
+    expect(adminConsensus.status).toBe(200);
+    expect(adminConsensus.text).toContain("Big discrepancy");
+    expect(adminConsensus.text).toContain('hx-post="/bigboard/consensus/discrepancy-writeup"');
+    expect(adminConsensus.text).toContain('hx-post="/bigboard/consensus/discrepancy-writeup/publish"');
+    expect(adminConsensus.text).toContain("Explanation draft");
+    expect(adminConsensus.text).toContain("Why Ryan is high on this player:");
+    expect(adminConsensus.text).toContain("Why Aleks is low on this player:");
+    expect(adminConsensus.text).toContain("consensus-discrepancy-controls-card-2026-Discrepancy-Quarterback");
+    expect(adminConsensus.text).not.toContain("consensus-discrepancy-controls-list-2026-Discrepancy-Quarterback");
+    expect(adminConsensus.text).not.toContain("read player profile");
+
+    const publicBeforeSave = await request(ondraft).get("/bigboard?year=2026&creator=Consensus");
+    expect(publicBeforeSave.status).toBe(200);
+    expect(publicBeforeSave.text).toContain("Big discrepancy");
+    expect(publicBeforeSave.text).not.toContain("See why");
+
+    const saveOneSide = await agent
+      .post("/bigboard/consensus/discrepancy-writeup")
+      .set("HX-Request", "true")
+      .type("form")
+      .send({
+        year: "2026",
+        playerName: "Discrepancy Quarterback",
+        ryanWriteup: "Ryan is buying the processing and pocket courage.",
+        aleksWriteup: "",
+      });
+    expect(saveOneSide.status).toBe(200);
+    expect(saveOneSide.text).toContain("Saved.");
+    expect(saveOneSide.text).toContain("Explanation draft");
+    expect(saveOneSide.text).toContain("Ryan is buying the processing and pocket courage.");
+    expect(saveOneSide.text).toContain('hx-post="/bigboard/consensus/discrepancy-writeup/publish"');
+
+    const publicAfterDraft = await request(ondraft).get("/bigboard?year=2026&creator=Consensus");
+    expect(publicAfterDraft.status).toBe(200);
+    expect(publicAfterDraft.text).not.toContain("Ryan is buying the processing and pocket courage.");
+    expect(publicAfterDraft.text).not.toContain("See why");
+
+    const publishMissingAleks = await agent
+      .post("/bigboard/consensus/discrepancy-writeup/publish")
+      .set("HX-Request", "true")
+      .type("form")
+      .send({
+        year: "2026",
+        playerName: "Discrepancy Quarterback",
+        ryanWriteup: "Ryan is buying the processing and pocket courage.",
+        aleksWriteup: "",
+      });
+    expect(publishMissingAleks.status).toBe(200);
+    expect(publishMissingAleks.text).toContain("Ryan and Aleks discrepancy explanations are required before publishing.");
+    expect(publishMissingAleks.text).toContain("Aleks's explanation is required before publishing.");
+    expect(publishMissingAleks.text).not.toContain("Ryan's explanation is required before publishing.");
+
+    const publishBoth = await agent
+      .post("/bigboard/consensus/discrepancy-writeup/publish")
+      .set("HX-Request", "true")
+      .type("form")
+      .send({
+        year: "2026",
+        playerName: "Discrepancy Quarterback",
+        ryanWriteup: "Ryan is buying the processing and pocket courage.",
+        aleksWriteup: "Aleks wants cleaner late-down answers before moving him up.",
+      });
+    expect(publishBoth.status).toBe(200);
+    expect(publishBoth.text).toContain("Published.");
+    expect(publishBoth.text).toContain("Explanation published");
+    expect(publishBoth.text).toContain('"editMode":false');
+    expect(publishBoth.text).toContain('hx-swap-oob="outerHTML"');
+    expect(publishBoth.text).toContain("consensus-discrepancy-controls-card-2026-Discrepancy-Quarterback");
+    expect(publishBoth.text).not.toContain("consensus-discrepancy-controls-list-2026-Discrepancy-Quarterback");
+    expect(publishBoth.text).toContain("See why");
+    expect(publishBoth.text).toContain('x-show="!savedPublished"');
+    expect(publishBoth.text).not.toContain('x-show="!savedPublished ||');
+    expect(publishBoth.text).toContain("consensus-discrepancy-panel-actions");
+    expect(publishBoth.text).toContain(":aria-label=\"editMode ? 'Cancel editing discrepancy explanation' : 'Edit discrepancy explanation'\"");
+    expect(publishBoth.text).toContain('x-show="!editMode"');
+    expect(publishBoth.text).toContain('x-show="editMode"');
+
+    const savePublishedEdit = await agent
+      .post("/bigboard/consensus/discrepancy-writeup")
+      .set("HX-Request", "true")
+      .type("form")
+      .send({
+        year: "2026",
+        playerName: "Discrepancy Quarterback",
+        ryanWriteup: "Ryan still trusts the processing and pocket courage.",
+        aleksWriteup: "Aleks still wants cleaner late-down answers before moving him up.",
+      });
+    expect(savePublishedEdit.status).toBe(200);
+    expect(savePublishedEdit.text).toContain("Saved.");
+    expect(savePublishedEdit.text).toContain("Explanation draft");
+    expect(savePublishedEdit.text).toContain('"editMode":true');
+    expect(savePublishedEdit.text).toContain('"savedPublished":false');
+    expect(savePublishedEdit.text).toContain("consensus-discrepancy-panel-actions");
+    expect(savePublishedEdit.text).toContain(":aria-label=\"editMode ? 'Cancel editing discrepancy explanation' : 'Edit discrepancy explanation'\"");
+    expect(savePublishedEdit.text).toContain('x-show="!savedPublished"');
+
+    const republishEdit = await agent
+      .post("/bigboard/consensus/discrepancy-writeup/publish")
+      .set("HX-Request", "true")
+      .type("form")
+      .send({
+        year: "2026",
+        playerName: "Discrepancy Quarterback",
+        ryanWriteup: "Ryan still trusts the processing and pocket courage.",
+        aleksWriteup: "Aleks still wants cleaner late-down answers before moving him up.",
+      });
+    expect(republishEdit.status).toBe(200);
+    expect(republishEdit.text).toContain("Published.");
+    expect(republishEdit.text).toContain('"editMode":false');
+    expect(republishEdit.text).toContain('"savedPublished":true');
+    expect(republishEdit.text).toContain("consensus-discrepancy-panel-actions");
+    expect(republishEdit.text).toContain('x-show="!editMode"');
+    expect(republishEdit.text).toContain('x-show="editMode"');
+
+    const publicAfterPublish = await request(ondraft).get("/bigboard?year=2026&creator=Consensus");
+    expect(publicAfterPublish.status).toBe(200);
+    expect(publicAfterPublish.text).toContain("See why");
+    expect(publicAfterPublish.text).toContain("Ryan still trusts the processing and pocket courage.");
+    expect(publicAfterPublish.text).toContain("Aleks still wants cleaner late-down answers before moving him up.");
+    expect(publicAfterPublish.text).not.toContain('hx-post="/bigboard/consensus/discrepancy-writeup"');
   });
 
   it("lets admins create a new big board year from the editor", async () => {

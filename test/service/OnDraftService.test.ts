@@ -5,6 +5,19 @@ import { CreateUserPreferenceService } from "../../src/service/UserPreferenceSer
 import { IYoutubeVideoStatsService } from "../../src/service/YoutubeVideoStatsService";
 import { calculateDraftGrade, defaultDraftGrade, formatDraftBoardGrade, gradeTraitCategoriesForGrade, type DraftGrade } from "../../src/model/DraftGrades";
 import type { Position } from "../../src/model/OnDraftContent";
+import type { IEmailService, SendEmailVerificationEmailInput, SendNewsletterEmailInput, SendPasswordResetEmailInput } from "../../src/email/EmailService";
+
+class CaptureEmailService implements IEmailService {
+  newsletterEmails: SendNewsletterEmailInput[] = [];
+
+  async sendEmailVerificationEmail(_input: SendEmailVerificationEmailInput): Promise<void> {}
+
+  async sendPasswordResetEmail(_input: SendPasswordResetEmailInput): Promise<void> {}
+
+  async sendNewsletterEmail(input: SendNewsletterEmailInput): Promise<void> {
+    this.newsletterEmails.push(input);
+  }
+}
 
 function service() {
   return CreateOnDraftService(CreateInMemoryOnDraftRepository({ seedContent: false }));
@@ -12,6 +25,10 @@ function service() {
 
 function serviceWithYoutubeStats(youtubeStats: IYoutubeVideoStatsService) {
   return CreateOnDraftService(CreateInMemoryOnDraftRepository({ seedContent: false }), youtubeStats);
+}
+
+function serviceWithEmail(email: IEmailService) {
+  return CreateOnDraftService(CreateInMemoryOnDraftRepository({ seedContent: false }), undefined, email);
 }
 
 function userPreferenceService() {
@@ -122,6 +139,58 @@ describe("Draft grade calculations", () => {
 });
 
 describe("OnDraftService article validation", () => {
+  it("keeps sent newsletters immutable after delivery", async () => {
+    const email = new CaptureEmailService();
+    const ondraftService = serviceWithEmail(email);
+    const draft = await ondraftService.saveNewsletterDraft({
+      date: new Date("2026-06-06T12:00:00.000Z"),
+      writeup: "This week on OnDraft.",
+      changelog: "New scouting updates.",
+    });
+    expect(draft.ok).toBe(true);
+    if (draft.ok === false) {
+      return;
+    }
+
+    const sent = await ondraftService.sendNewsletter({
+      id: draft.value.id,
+      date: draft.value.date ?? undefined,
+      writeup: draft.value.writeup,
+      changelog: draft.value.changelog,
+    }, [{ email: "reader@ondraft.test", unsubscribeUrl: "http://localhost:3000/mailing-list/unsubscribe?token=test" }]);
+
+    expect(sent.ok).toBe(true);
+    expect(email.newsletterEmails).toHaveLength(1);
+    if (sent.ok === false) {
+      return;
+    }
+    expect(sent.value.status).toBe("sent");
+    expect(sent.value.recipientCount).toBe(1);
+
+    const editSent = await ondraftService.saveNewsletterDraft({
+      id: sent.value.id,
+      date: sent.value.date ?? undefined,
+      writeup: "Changed after sending.",
+      changelog: sent.value.changelog,
+    });
+    expect(editSent.ok).toBe(false);
+    if (editSent.ok === false) {
+      expect(editSent.value.message).toBe("Sent newsletters cannot be edited or re-sent.");
+    }
+
+    const resendSent = await ondraftService.sendNewsletter({
+      id: sent.value.id,
+      date: sent.value.date ?? undefined,
+      writeup: sent.value.writeup,
+      changelog: sent.value.changelog,
+    }, [{ email: "reader@ondraft.test", unsubscribeUrl: "http://localhost:3000/mailing-list/unsubscribe?token=test" }]);
+    expect(resendSent.ok).toBe(false);
+    if (resendSent.ok === false) {
+      expect(resendSent.value.message).toBe("Sent newsletters cannot be edited or re-sent.");
+    }
+    expect(email.newsletterEmails).toHaveLength(1);
+  });
+
   it("generates a five character alphanumeric article id", async () => {
     const result = await service().createArticle({
       title: "Draft Notes",

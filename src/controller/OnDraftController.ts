@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import type { IOnDraftBrowserSession } from "../session/OnDraftSession";
 import { isAdminSession, isVerifiedUserSession } from "../session/OnDraftSession";
 import type { AdminUserListItem, IAuthService } from "../auth/AuthService";
-import type { BigBoardEditableEntryInput, CreateArticleInput, CreateYoutubeVideoInput, IOnDraftService, NewsletterInput, SaveBigBoardEntriesInput } from "../service/OnDraftService";
+import type { BigBoardEditableEntryInput, ConsensusDiscrepancyWriteupInput, CreateArticleInput, CreateYoutubeVideoInput, IOnDraftService, NewsletterInput, SaveBigBoardEntriesInput } from "../service/OnDraftService";
 import type { IUserPreferenceService, UserPreferenceError } from "../service/UserPreferenceService";
 import type { ILoggingService } from "../service/LoggingService";
 import type { AnalyticsCategory, AnalyticsPeriod, IAnalyticsService } from "../service/UmamiAnalyticsService";
@@ -132,6 +132,8 @@ export interface IOnDraftController {
   publishBigBoardPlayerInfo(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   publishBigBoardGrade(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   publishBigBoardWriteup(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  saveConsensusDiscrepancyWriteup(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  publishConsensusDiscrepancyWriteup(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   deleteBigBoardEntryFromEditor(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   deleteArticle(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   deleteBigBoardEntry(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void>;
@@ -1647,6 +1649,91 @@ class OnDraftController implements IOnDraftController {
     });
   }
 
+  private consensusDiscrepancyWriteupInput(req: Request): ConsensusDiscrepancyWriteupInput {
+    return {
+      year: this.parseBigBoardYear(req.body.year),
+      playerName: this.formString(req.body.playerName),
+      ryanWriteup: this.formString(req.body.ryanWriteup),
+      aleksWriteup: this.formString(req.body.aleksWriteup),
+    };
+  }
+
+  private consensusDiscrepancyValidationFields(message: string): Array<"ryanWriteup" | "aleksWriteup"> {
+    if (message.includes("Ryan and Aleks")) {
+      return ["ryanWriteup", "aleksWriteup"];
+    }
+    return [];
+  }
+
+  private missingConsensusDiscrepancyWriteupFields(input: ConsensusDiscrepancyWriteupInput): Array<"ryanWriteup" | "aleksWriteup"> {
+    const fields: Array<"ryanWriteup" | "aleksWriteup"> = [];
+    if (!input.ryanWriteup?.trim()) {
+      fields.push("ryanWriteup");
+    }
+    if (!input.aleksWriteup?.trim()) {
+      fields.push("aleksWriteup");
+    }
+    return fields;
+  }
+
+  private renderConsensusDiscrepancyWriteup(
+    res: Response,
+    board: BigBoard,
+    entry: BigBoardEntry,
+    session: IOnDraftBrowserSession,
+    options: {
+      statusCode?: number;
+      statusMessage?: string | null;
+      errorMessage?: string | null;
+      validationFields?: Array<"ryanWriteup" | "aleksWriteup">;
+      forceOpen?: boolean;
+    } = {},
+  ): void {
+    res.status(options.statusCode ?? 200).render("ondraft/partials/consensusDiscrepancyWriteup", {
+      layout: false,
+      board,
+      entry,
+      isAdmin: isAdminSession(session),
+      statusMessage: options.statusMessage ?? null,
+      errorMessage: options.errorMessage ?? null,
+      validationFields: options.validationFields ?? [],
+      forceOpen: options.forceOpen ?? false,
+      includeOobControls: true,
+    });
+  }
+
+  private async renderUpdatedConsensusDiscrepancyWriteup(
+    req: Request,
+    res: Response,
+    session: IOnDraftBrowserSession,
+    input: ConsensusDiscrepancyWriteupInput,
+    options: {
+      statusMessage?: string | null;
+      errorMessage?: string | null;
+      validationFields?: Array<"ryanWriteup" | "aleksWriteup">;
+      forceOpen?: boolean;
+      statusCode?: number;
+    } = {},
+  ): Promise<void> {
+    const year = input.year;
+    const playerName = input.playerName?.trim() ?? "";
+    const boardResult = await this.service.getBigBoard(year, "Consensus");
+    if (boardResult.ok === false) {
+      res.status(this.mapBigBoardErrorToStatusCode(boardResult.value)).send(boardResult.value.message);
+      return;
+    }
+    const entry = boardResult.value.entries.find((candidate) => candidate.playerName === playerName);
+    if (!entry) {
+      res.status(404).send(`Consensus entry for ${playerName || "that player"} was not found.`);
+      return;
+    }
+    if (req.get("HX-Request") === "true") {
+      this.renderConsensusDiscrepancyWriteup(res, boardResult.value, entry, session, options);
+      return;
+    }
+    this.renderConsensusDiscrepancyWriteup(res, boardResult.value, entry, session, options);
+  }
+
   private bigBoardEditorEntryCardLocals(
     board: BigBoard,
     entry: BigBoardEntry,
@@ -2816,6 +2903,48 @@ class OnDraftController implements IOnDraftController {
       (board, entryId, message) => this.writeupPublishValidationIssues(board, entryId, message),
       "Writeup published.",
     );
+  }
+
+  async saveConsensusDiscrepancyWriteup(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Saving consensus discrepancy writeup");
+    const input = this.consensusDiscrepancyWriteupInput(req);
+    const result = await this.service.saveConsensusDiscrepancyWriteup(input);
+    if (result.ok === false) {
+      await this.renderUpdatedConsensusDiscrepancyWriteup(req, res, session, input, {
+        errorMessage: result.value.message,
+        validationFields: this.consensusDiscrepancyValidationFields(result.value.message),
+        forceOpen: true,
+        statusCode: req.get("HX-Request") === "true" ? 200 : this.mapBigBoardErrorToStatusCode(result.value),
+      });
+      return;
+    }
+
+    await this.renderUpdatedConsensusDiscrepancyWriteup(req, res, session, input, {
+      statusMessage: "Saved.",
+      forceOpen: true,
+    });
+  }
+
+  async publishConsensusDiscrepancyWriteup(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Publishing consensus discrepancy writeup");
+    const input = this.consensusDiscrepancyWriteupInput(req);
+    const result = await this.service.publishConsensusDiscrepancyWriteup(input);
+    if (result.ok === false) {
+      await this.renderUpdatedConsensusDiscrepancyWriteup(req, res, session, input, {
+        errorMessage: result.value.message,
+        validationFields: result.value.message.includes("Ryan and Aleks")
+          ? this.missingConsensusDiscrepancyWriteupFields(input)
+          : this.consensusDiscrepancyValidationFields(result.value.message),
+        forceOpen: true,
+        statusCode: req.get("HX-Request") === "true" ? 200 : this.mapBigBoardErrorToStatusCode(result.value),
+      });
+      return;
+    }
+
+    await this.renderUpdatedConsensusDiscrepancyWriteup(req, res, session, input, {
+      statusMessage: "Published.",
+      forceOpen: false,
+    });
   }
 
   async deleteBigBoardEntryFromEditor(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {

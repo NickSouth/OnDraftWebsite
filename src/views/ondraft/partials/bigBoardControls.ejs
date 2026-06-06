@@ -6,6 +6,7 @@
   hx-get="/bigboard"
   hx-target="#big-board-results"
   hx-swap="outerHTML"
+  hx-push-url="true"
   data-skip-global-loader
   data-loading-skeleton="big-board-results"
   data-loading-skeleton-target="#big-board-results"
@@ -14,6 +15,7 @@
     selectCreator(creator) {
       if (this.selectedCreator === creator) return;
       this.selectedCreator = creator;
+      window.localStorage.setItem('bigBoardCreator', creator);
       this.$refs.creatorInput.value = creator;
       htmx.trigger(this.$refs.bigBoardControls, 'submit');
     }

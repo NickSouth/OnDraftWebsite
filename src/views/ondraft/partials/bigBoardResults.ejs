@@ -57,9 +57,14 @@
       Consensus: ["Ryan McWalter", "Aleks Ryabinkin"],
     };
     const bylineAuthors = selectedBoard ? creatorAuthors[selectedBoard.creator] ?? [] : [];
+    const isConsensusBoard = selectedBoard?.creator === "Consensus";
     const gradeGuidePositions = (typeof positions !== "undefined" ? positions : [])
       .map((position) => typeof draftGradePositionConfig === "function" ? draftGradePositionConfig(position) : null)
       .filter(Boolean);
+    const consensusSourceRanks = (entry) => [
+      ["Ryan", entry.consensusRankingContext?.Ryan?.rank],
+      ["Aleks", entry.consensusRankingContext?.Aleks?.rank],
+    ].filter((sourceRank) => typeof sourceRank[1] === "number");
   %>
   <% if (bigBoard.length === 0) { %>
     <div class="od-card grid min-h-48 place-items-center p-8 text-center">
@@ -144,10 +149,13 @@
           const boardGradeValue = typeof publishedBoardGrade === "function" ? publishedBoardGrade(entry) : null;
           const boardGradeLabel = typeof formatDraftBoardGrade === "function" ? formatDraftBoardGrade(boardGradeValue) : "-/8";
           const hasPublishedGrade = boardGradeValue !== null;
-          const hasPublishedDetails = entry.writeupPublished || hasPublishedGrade;
+          const hasPublishedDetails = !isConsensusBoard && (entry.writeupPublished || hasPublishedGrade);
+          const publishedDiscrepancy = entry.discWriteup?.published && hasText(entry.discWriteup.ryanWriteup) && hasText(entry.discWriteup.aleksWriteup);
+          const hasConsensusDisclosure = isConsensusBoard && entry.bigDiscrepency && (isAdmin || publishedDiscrepancy);
+          const sourceRanks = isConsensusBoard ? consensusSourceRanks(entry) : [];
         %>
         <li class="border-b border-slate-200 py-3 last:border-b-0 dark:border-white/10">
-          <% if (hasPublishedDetails) { %>
+          <% if (hasPublishedDetails || hasConsensusDisclosure) { %>
             <details class="group">
               <summary class="od-focus-ring relative grid cursor-pointer list-none gap-3 overflow-hidden rounded-md p-2 transition hover:bg-white/70 dark:hover:bg-white/[0.04] sm:min-h-32 sm:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)] sm:items-center sm:pb-11 [&::-webkit-details-marker]:hidden">
                 <span class="pointer-events-none absolute inset-y-0 right-0 left-[31rem] hidden bg-slate-200/55 [clip-path:polygon(3rem_0,100%_0,100%_100%,0_100%)] dark:bg-white/[0.06] lg:block" aria-hidden="true"></span>
@@ -177,6 +185,18 @@
                       </span>
                     </span>
                     <span class="flex flex-wrap items-start gap-2 pt-1 text-slate-500 dark:text-slate-300 lg:justify-end">
+                      <% if (sourceRanks.length > 0) { %>
+                        <span class="consensus-source-ranks">
+                          <% if (entry.bigDiscrepency && isConsensusBoard) { %>
+                            <span class="consensus-discrepancy-flag">Big discrepancy</span>
+                          <% } %>
+                          <span class="consensus-source-ranks-line">
+                            <% sourceRanks.forEach(([creator, sourceRank]) => { %>
+                              <span><%= creator %>'s Rank: <strong><%= formatBoardNumber(sourceRank) %></strong></span>
+                            <% }) %>
+                          </span>
+                        </span>
+                      <% } %>
                       <% if (hasPublishedGrade) { %>
                         <span class="grid min-h-16 min-w-32 place-content-center gap-1 rounded-md border border-draft-gold/50 bg-white px-4 py-3 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink">
                           <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Grade</span>
@@ -193,22 +213,27 @@
                       </span>
                     </span>
                   </span>
-                  <% if (entry.bigDiscrepency) { %>
-                    <span class="flex flex-wrap items-center gap-2 text-sm">
-                      <span class="rounded bg-red-50 px-2.5 py-1 font-black uppercase tracking-wide text-red-700 dark:bg-red-500/10 dark:text-red-200">Big discrepancy</span>
+                </span>
+                <span class="relative z-10 flex justify-center sm:absolute sm:bottom-3 sm:left-1/2 sm:-translate-x-1/2">
+                  <% if (isConsensusBoard) { %>
+                    <% if (entry.bigDiscrepency) { %>
+                      <%- include("consensusDiscrepancyControls", { board, entry, isAdmin, variant: "card" }) %>
+                    <% } %>
+                  <% } else { %>
+                    <span class="inline-flex items-center gap-2 rounded-full border border-draft-gold/50 bg-white/90 px-3 py-1.5 text-xs font-black uppercase tracking-[0.12em] text-draft-amber shadow-sm transition group-open:bg-draft-gold group-open:text-draft-ink dark:bg-draft-ink/95 dark:text-draft-gold dark:group-open:bg-draft-gold dark:group-open:text-draft-ink">
+                      <svg class="size-4 transition group-open:rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" />
+                      </svg>
+                      <span>read player profile</span>
                     </span>
                   <% } %>
                 </span>
-                <span class="relative z-10 flex justify-center sm:absolute sm:bottom-3 sm:left-1/2 sm:-translate-x-1/2">
-                  <span class="inline-flex items-center gap-2 rounded-full border border-draft-gold/50 bg-white/90 px-3 py-1.5 text-xs font-black uppercase tracking-[0.12em] text-draft-amber shadow-sm transition group-open:bg-draft-gold group-open:text-draft-ink dark:bg-draft-ink/95 dark:text-draft-gold dark:group-open:bg-draft-gold dark:group-open:text-draft-ink">
-                    <svg class="size-4 transition group-open:rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                      <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" />
-                    </svg>
-                    <span>read player profile</span>
-                  </span>
-                </span>
               </summary>
-              <%- include("bigBoardWriteupPanel", { entry, hasText, publishedBoardGrade, formatDraftBoardGrade, gradeTraitCategoriesForGrade, abbreviateDraftGradeTrait }) %>
+              <% if (isConsensusBoard) { %>
+                <%- include("consensusDiscrepancyWriteup", { board, entry, isAdmin, statusMessage: null, errorMessage: null, validationFields: [], forceOpen: false }) %>
+              <% } else { %>
+                <%- include("bigBoardWriteupPanel", { entry, hasText, publishedBoardGrade, formatDraftBoardGrade, gradeTraitCategoriesForGrade, abbreviateDraftGradeTrait }) %>
+              <% } %>
             </details>
           <% } else { %>
             <div class="relative grid gap-3 overflow-hidden rounded-md p-2 sm:min-h-32 sm:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)] sm:items-center">
@@ -239,6 +264,18 @@
                     </span>
                   </div>
                   <div class="flex flex-wrap items-start gap-2 pt-1 text-slate-500 dark:text-slate-300 lg:justify-end">
+                    <% if (sourceRanks.length > 0) { %>
+                      <span class="consensus-source-ranks">
+                        <% if (entry.bigDiscrepency && isConsensusBoard) { %>
+                          <span class="consensus-discrepancy-flag">Big discrepancy</span>
+                        <% } %>
+                        <span class="consensus-source-ranks-line">
+                          <% sourceRanks.forEach(([creator, sourceRank]) => { %>
+                            <span><%= creator %>'s Rank: <strong><%= formatBoardNumber(sourceRank) %></strong></span>
+                          <% }) %>
+                        </span>
+                      </span>
+                    <% } %>
                     <% if (hasPublishedGrade) { %>
                       <span class="grid min-h-16 min-w-32 place-content-center gap-1 rounded-md border border-draft-gold/50 bg-white px-4 py-3 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink">
                         <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Grade</span>
@@ -255,9 +292,6 @@
                     </span>
                   </div>
                 </div>
-                <% if (entry.bigDiscrepency) { %>
-                  <span class="w-fit rounded bg-red-50 px-2.5 py-1 text-sm font-black uppercase tracking-wide text-red-700 dark:bg-red-500/10 dark:text-red-200">Big discrepancy</span>
-                <% } %>
               </div>
             </div>
           <% } %>
@@ -282,10 +316,13 @@
           const boardGradeValue = typeof publishedBoardGrade === "function" ? publishedBoardGrade(entry) : null;
           const boardGradeLabel = typeof formatDraftBoardGrade === "function" ? formatDraftBoardGrade(boardGradeValue) : "-/8";
           const hasPublishedGrade = boardGradeValue !== null;
-          const hasPublishedDetails = entry.writeupPublished || hasPublishedGrade;
+          const hasPublishedDetails = !isConsensusBoard && (entry.writeupPublished || hasPublishedGrade);
+          const publishedDiscrepancy = entry.discWriteup?.published && hasText(entry.discWriteup.ryanWriteup) && hasText(entry.discWriteup.aleksWriteup);
+          const hasConsensusDisclosure = isConsensusBoard && entry.bigDiscrepency && (isAdmin || publishedDiscrepancy);
+          const sourceRanks = isConsensusBoard ? consensusSourceRanks(entry) : [];
         %>
         <li>
-          <% if (hasPublishedDetails) { %>
+          <% if (hasPublishedDetails || hasConsensusDisclosure) { %>
             <details class="group">
               <summary class="od-focus-ring grid cursor-pointer list-none gap-3 px-3 py-3 transition hover:bg-slate-50 dark:hover:bg-white/[0.04] sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:items-center [&::-webkit-details-marker]:hidden">
                 <span class="sr-only"><%= accessibleSummary %></span>
@@ -316,6 +353,18 @@
                   </span>
                 </span>
                 <span class="flex flex-wrap items-start gap-2 sm:justify-end">
+                  <% if (sourceRanks.length > 0) { %>
+                    <span class="consensus-source-ranks">
+                      <% if (entry.bigDiscrepency && isConsensusBoard) { %>
+                        <span class="consensus-discrepancy-flag">Big discrepancy</span>
+                      <% } %>
+                      <span class="consensus-source-ranks-line">
+                        <% sourceRanks.forEach(([creator, sourceRank]) => { %>
+                          <span><%= creator %>'s Rank: <strong><%= formatBoardNumber(sourceRank) %></strong></span>
+                        <% }) %>
+                      </span>
+                    </span>
+                  <% } %>
                   <% if (hasPublishedGrade) { %>
                     <span class="grid min-h-16 min-w-32 place-content-center gap-1 rounded-md border border-draft-gold/50 bg-white px-4 py-3 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink">
                       <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Grade</span>
@@ -332,7 +381,11 @@
                   </span>
                 </span>
               </summary>
-              <%- include("bigBoardWriteupPanel", { entry, hasText, publishedBoardGrade, formatDraftBoardGrade, gradeTraitCategoriesForGrade, abbreviateDraftGradeTrait }) %>
+              <% if (isConsensusBoard) { %>
+                <%- include("consensusDiscrepancyWriteup", { board, entry, isAdmin, statusMessage: null, errorMessage: null, validationFields: [], forceOpen: false }) %>
+              <% } else { %>
+                <%- include("bigBoardWriteupPanel", { entry, hasText, publishedBoardGrade, formatDraftBoardGrade, gradeTraitCategoriesForGrade, abbreviateDraftGradeTrait }) %>
+              <% } %>
             </details>
           <% } else { %>
             <div class="grid gap-3 px-3 py-3 sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:items-center">
@@ -356,6 +409,18 @@
                 </span>
               </span>
               <span class="flex flex-wrap items-start gap-2 sm:justify-end">
+                <% if (sourceRanks.length > 0) { %>
+                  <span class="consensus-source-ranks">
+                    <% if (entry.bigDiscrepency && isConsensusBoard) { %>
+                      <span class="consensus-discrepancy-flag">Big discrepancy</span>
+                    <% } %>
+                    <span class="consensus-source-ranks-line">
+                      <% sourceRanks.forEach(([creator, sourceRank]) => { %>
+                        <span><%= creator %>'s Rank: <strong><%= formatBoardNumber(sourceRank) %></strong></span>
+                      <% }) %>
+                    </span>
+                  </span>
+                <% } %>
                 <% if (hasPublishedGrade) { %>
                   <span class="grid min-h-16 min-w-32 place-content-center gap-1 rounded-md border border-draft-gold/50 bg-white px-4 py-3 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink">
                     <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Grade</span>

@@ -323,6 +323,8 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
           rank: null,
           posRank: null,
           grade: null,
+          writeup: { strengths: "", weaknesses: "", rundown: "" },
+          writeupPublished: false,
           gradePublished: averageFinalGrade !== null,
           gradeSummary: averageFinalGrade !== null ? { finalGrade: averageFinalGrade } : undefined,
           bigDiscrepency: rankDiscrepency > 10,
