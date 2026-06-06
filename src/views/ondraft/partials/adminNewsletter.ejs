@@ -1,6 +1,8 @@
 <section
   class="od-card p-5"
-  x-data="{ formOpen: <%= Boolean(errorMessage || (typeof values !== "undefined" && values && values.id)) ? "true" : "false" %> }"
+  x-data="{ formOpen: <%= Boolean(errorMessage || (typeof values !== "undefined" && values && values.id)) ? "true" : "false" %>, articleDropdownOpen: false, videoDropdownOpen: false }"
+  x-init="$nextTick(() => { const input = $el.querySelector('input[name=date]'); if (input && !input.value) { const now = new Date(); const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000); input.value = local.toISOString().slice(0, 10); } })"
+  @keydown.escape.window="articleDropdownOpen = false; videoDropdownOpen = false"
 >
   <%
     const formValues = typeof values !== "undefined" ? values : {};
@@ -42,24 +44,37 @@
     <% if (formValues.id) { %>
       <input type="hidden" name="id" value="<%= formValues.id %>" />
     <% } %>
-    <div class="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
-      <label>
-        Date
-        <input type="date" name="date" value="<%= newsletterDate %>" />
+    <div class="grid gap-4 xl:grid-cols-[16rem_minmax(0,1fr)] xl:items-start">
+      <label class="self-start rounded-md border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.04]">
+        <span>Date</span>
+        <input class="h-11 min-h-11" type="date" name="date" value="<%= newsletterDate %>" />
       </label>
 
       <label>
-        Writeup
-        <textarea name="writeup" rows="5" placeholder="Main newsletter writeup"><%= formValues.writeup || "" %></textarea>
+        <span>Writeup</span>
+        <textarea class="min-h-52" name="writeup" rows="7" placeholder="Main newsletter writeup"><%= formValues.writeup || "" %></textarea>
       </label>
     </div>
 
     <div class="grid gap-4 lg:grid-cols-2">
-      <details class="rounded-md border border-slate-300 bg-white dark:border-white/15 dark:bg-draft-ink">
-        <summary class="cursor-pointer rounded-md px-4 py-3 text-sm font-black text-slate-800 marker:text-draft-amber dark:text-slate-100">
-          Link Articles <span class="ml-2 text-xs font-bold text-slate-500 dark:text-slate-400"><%= selectedArticleIds.size %> selected</span>
-        </summary>
-        <div class="max-h-72 overflow-y-auto border-t border-slate-200 p-2 dark:border-white/10">
+      <div class="relative">
+        <span class="mb-1 block text-sm font-bold text-slate-800 dark:text-slate-100">Link Articles</span>
+        <button
+          type="button"
+          class="od-focus-ring flex min-h-11 w-full items-center justify-between gap-3 rounded-md border border-slate-300 bg-white px-4 py-2 text-left text-sm font-black text-slate-800 shadow-sm transition hover:border-draft-gold dark:border-white/15 dark:bg-draft-ink dark:text-slate-100"
+          @click="articleDropdownOpen = !articleDropdownOpen; videoDropdownOpen = false"
+          :aria-expanded="String(articleDropdownOpen)"
+        >
+          <span><%= selectedArticleIds.size %> article<%= selectedArticleIds.size === 1 ? "" : "s" %> selected</span>
+          <svg class="size-4 transition-transform" :class="articleDropdownOpen ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" /></svg>
+        </button>
+        <div
+          class="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-30 max-h-72 overflow-y-auto rounded-md border border-slate-200 bg-white p-2 shadow-editorial dark:border-white/10 dark:bg-draft-ink"
+          x-show="articleDropdownOpen"
+          x-transition.origin.top.duration.150ms
+          @click.outside="articleDropdownOpen = false"
+          x-cloak
+        >
           <% articles.forEach((article) => { %>
             <label class="grid cursor-pointer grid-cols-[1rem_minmax(0,1fr)] gap-3 rounded px-2 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10">
               <input class="mt-1 size-4" type="checkbox" name="articleIds" value="<%= article.id %>" <%= selectedArticleIds.has(article.id) ? "checked" : "" %> />
@@ -70,13 +85,26 @@
             </label>
           <% }) %>
         </div>
-      </details>
+      </div>
 
-      <details class="rounded-md border border-slate-300 bg-white dark:border-white/15 dark:bg-draft-ink">
-        <summary class="cursor-pointer rounded-md px-4 py-3 text-sm font-black text-slate-800 marker:text-draft-amber dark:text-slate-100">
-          Link Videos <span class="ml-2 text-xs font-bold text-slate-500 dark:text-slate-400"><%= selectedVideoIds.size %> selected</span>
-        </summary>
-        <div class="max-h-72 overflow-y-auto border-t border-slate-200 p-2 dark:border-white/10">
+      <div class="relative">
+        <span class="mb-1 block text-sm font-bold text-slate-800 dark:text-slate-100">Link Videos</span>
+        <button
+          type="button"
+          class="od-focus-ring flex min-h-11 w-full items-center justify-between gap-3 rounded-md border border-slate-300 bg-white px-4 py-2 text-left text-sm font-black text-slate-800 shadow-sm transition hover:border-draft-gold dark:border-white/15 dark:bg-draft-ink dark:text-slate-100"
+          @click="videoDropdownOpen = !videoDropdownOpen; articleDropdownOpen = false"
+          :aria-expanded="String(videoDropdownOpen)"
+        >
+          <span><%= selectedVideoIds.size %> video<%= selectedVideoIds.size === 1 ? "" : "s" %> selected</span>
+          <svg class="size-4 transition-transform" :class="videoDropdownOpen ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" /></svg>
+        </button>
+        <div
+          class="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-30 max-h-72 overflow-y-auto rounded-md border border-slate-200 bg-white p-2 shadow-editorial dark:border-white/10 dark:bg-draft-ink"
+          x-show="videoDropdownOpen"
+          x-transition.origin.top.duration.150ms
+          @click.outside="videoDropdownOpen = false"
+          x-cloak
+        >
           <% videos.forEach((video) => { %>
             <label class="grid cursor-pointer grid-cols-[1rem_minmax(0,1fr)] gap-3 rounded px-2 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10">
               <input class="mt-1 size-4" type="checkbox" name="videoIds" value="<%= video.videoId %>" <%= selectedVideoIds.has(video.videoId) ? "checked" : "" %> />
@@ -87,21 +115,24 @@
             </label>
           <% }) %>
         </div>
-      </details>
+      </div>
     </div>
 
     <label>
-      Changelog
-      <textarea name="changelog" rows="4" placeholder="Site updates, fixes, and new features"><%= formValues.changelog || "" %></textarea>
+      <span>Changelog</span>
+      <textarea class="min-h-44" name="changelog" rows="5" placeholder="Site updates, fixes, and new features"><%= formValues.changelog || "" %></textarea>
     </label>
 
     <div class="od-admin-actions">
       <button type="submit" onclick="this.form.action='/admin/newsletters/drafts'; this.form.setAttribute('hx-post', '/admin/newsletters/drafts');">Save draft</button>
       <button
-        type="submit"
-        class="secondary-button"
-        formaction="/admin/newsletters/send"
-        onclick="this.form.action='/admin/newsletters/send'; this.form.setAttribute('hx-post', '/admin/newsletters/send');"
+        type="button"
+        class="secondary-button od-secondary-link w-full sm:w-fit"
+        hx-post="/admin/newsletters/send"
+        hx-include="closest form"
+        hx-target="#admin-dashboard-panel"
+        hx-swap="innerHTML"
+        hx-confirm="Send this newsletter to every subscribed reader from no-reply@ondraftfootball.com?"
       >Send newsletter</button>
     </div>
   </form>
@@ -113,7 +144,7 @@
         <% newsletters.forEach((newsletter) => { %>
           <div class="grid gap-3 rounded-md border border-slate-200 px-4 py-3 text-sm dark:border-white/10 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
             <div>
-              <p class="font-black text-slate-900 dark:text-white"><%= new Date(newsletter.date).toLocaleDateString() %></p>
+              <p class="font-black text-slate-900 dark:text-white"><%= newsletter.date ? new Date(newsletter.date).toLocaleDateString() : "Undated draft" %></p>
               <p class="mt-1 font-semibold text-slate-600 dark:text-slate-300">
                 <%= newsletter.status === "sent" ? `Sent to ${newsletter.recipientCount}` : "Draft" %>
               </p>
@@ -126,7 +157,7 @@
             <% } else { %>
               <button
                 type="button"
-                class="secondary-button"
+                class="od-secondary-link w-full sm:w-fit"
                 hx-get="/admin/newsletters/<%= newsletter.id %>/edit"
                 hx-target="#admin-dashboard-panel"
                 hx-swap="innerHTML"

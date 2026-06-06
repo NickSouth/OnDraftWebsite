@@ -7,21 +7,6 @@
     <div class="od-range-toggle-group grid w-full grid-cols-3 rounded-md border border-slate-200 bg-white p-1 shadow-sm dark:border-white/10 dark:bg-draft-slate sm:w-auto" style="--od-toggle-count: 3;" aria-label="Crowd favorites range">
       <button
         type="button"
-        class="od-range-toggle <%= popularRange === "all" ? "is-active" : "" %>"
-        :class="{ 'is-active': popularRange === 'all' }"
-        :aria-pressed="String(popularRange === 'all')"
-        hx-get="/articles/popular?range=all"
-        hx-target="#popular-articles-results"
-        hx-swap="innerHTML"
-        data-skip-global-loader
-        data-loading-skeleton="popular-articles"
-        data-loading-skeleton-target="#popular-articles-results"
-        @click="popularRange = 'all'"
-      >
-        All time
-      </button>
-      <button
-        type="button"
         class="od-range-toggle <%= popularRange === "month" ? "is-active" : "" %>"
         :class="{ 'is-active': popularRange === 'month' }"
         :aria-pressed="String(popularRange === 'month')"
@@ -49,6 +34,21 @@
         @click="popularRange = 'year'"
       >
         Last year
+      </button>
+      <button
+        type="button"
+        class="od-range-toggle <%= popularRange === "all" ? "is-active" : "" %>"
+        :class="{ 'is-active': popularRange === 'all' }"
+        :aria-pressed="String(popularRange === 'all')"
+        hx-get="/articles/popular?range=all"
+        hx-target="#popular-articles-results"
+        hx-swap="innerHTML"
+        data-skip-global-loader
+        data-loading-skeleton="popular-articles"
+        data-loading-skeleton-target="#popular-articles-results"
+        @click="popularRange = 'all'"
+      >
+        All time
       </button>
     </div>
   </div>

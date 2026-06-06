@@ -256,6 +256,7 @@
     loaderTimeout = null;
     document.getElementById("site-loader")?.classList.add("hidden");
     document.getElementById("site-loader")?.classList.remove("grid");
+    document.querySelector("#page-content > .w-full.od-page-stage")?.classList.add("is-ready");
   };
 
   window.addEventListener("ondraft:hide-global-loader", hideLoader);
@@ -308,6 +309,8 @@
     animateSwapSurfaces();
     activatePageStage();
   });
+  window.addEventListener("beforeunload", hideLoader);
+  window.addEventListener("pagehide", hideLoader);
   window.addEventListener("pageshow", () => {
     hideLoader();
     activatePageStage();

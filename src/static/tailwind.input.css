@@ -49,7 +49,7 @@
   }
 
   .od-card {
-    @apply rounded-lg border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.04];
+    @apply min-w-0 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.04];
   }
 
   .od-compact-tools {
@@ -357,7 +357,7 @@
   }
 
   .od-text-toggle {
-    @apply od-focus-ring relative z-10 inline-flex min-h-10 items-center justify-center rounded-md px-3 py-2 text-sm font-black text-slate-600 transition duration-200 hover:bg-white/70 hover:text-slate-950 active:scale-[0.98] dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white;
+    @apply od-focus-ring relative z-10 inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-md px-3 py-2 text-sm font-black text-slate-600 transition duration-200 hover:bg-white/70 hover:text-slate-950 active:scale-[0.98] dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white;
   }
 
   .od-text-toggle.is-active {
@@ -516,7 +516,7 @@
   }
 
   .od-admin-page {
-    @apply mx-auto grid w-full max-w-4xl gap-6 text-slate-950 dark:text-slate-100;
+    @apply mx-auto grid w-full max-w-4xl gap-5 text-slate-950 dark:text-slate-100 sm:gap-6;
   }
 
   .od-admin-board-page {
@@ -533,7 +533,7 @@
   }
 
   .od-admin-heading h1 {
-    @apply m-0 mt-2 font-display text-4xl font-black leading-tight text-slate-950 dark:text-white sm:text-5xl;
+    @apply m-0 mt-2 font-display text-3xl font-black leading-tight text-slate-950 dark:text-white sm:text-5xl;
   }
 
   .od-admin-back-link {
@@ -545,7 +545,7 @@
   }
 
   .od-admin-form {
-    @apply od-card mx-auto grid w-full gap-5 p-5 sm:p-6;
+    @apply od-card mx-auto grid w-full gap-4 p-4 sm:gap-5 sm:p-6;
   }
 
   .od-admin-form label,
@@ -1234,7 +1234,7 @@
 
   .board-editor-grade-panel {
     @apply border-t border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-draft-ink/40 sm:p-4;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .board-editor-grade-panel.is-validation-error {
@@ -1242,7 +1242,7 @@
   }
 
   .board-editor-grade-head {
-    @apply grid gap-3 md:grid-cols-[minmax(10rem,14rem)_minmax(8rem,10rem)_auto] md:items-end;
+    @apply grid min-w-0 gap-3 sm:grid-cols-2 md:grid-cols-[minmax(10rem,14rem)_minmax(8rem,10rem)_minmax(10rem,auto)] md:items-end;
   }
 
   .board-editor-grade-head label,
@@ -1264,6 +1264,10 @@
     @apply font-display text-2xl font-black text-slate-950 dark:text-white;
   }
 
+  .board-editor-grade-current {
+    @apply border-draft-gold/45 bg-draft-gold/10 text-left sm:col-span-2 md:col-span-1 md:text-right;
+  }
+
   .board-editor-grade-rows {
     @apply mt-3 grid gap-3;
   }
@@ -1273,7 +1277,7 @@
   }
 
   .board-editor-grade-trait-strip {
-    @apply grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6;
+    @apply grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6;
   }
 
   .board-editor-grade-trait {
@@ -1285,7 +1289,7 @@
   }
 
   .board-editor-grade-trait input {
-    @apply od-focus-ring min-h-10 rounded-md border border-slate-300 bg-white px-2 text-center text-sm font-black text-slate-950 dark:border-white/15 dark:bg-draft-slate dark:text-white;
+    @apply od-focus-ring min-h-10 min-w-0 rounded-md border border-slate-300 bg-white px-2 text-center text-sm font-black text-slate-950 dark:border-white/15 dark:bg-draft-slate dark:text-white;
   }
 
   .board-editor-grade-empty {
@@ -1296,21 +1300,13 @@
     @apply border-red-400/70 bg-red-500/10 text-red-700 ring-1 ring-red-400/30 dark:text-red-200;
   }
 
-  .draft-grade-trait-tile:hover .draft-grade-trait-full {
-    @apply block;
-  }
-
-  .draft-grade-trait-tile:hover .draft-grade-trait-abbr {
-    @apply opacity-0;
-  }
-
   .board-editor-profile-panel {
     @apply border-t border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-draft-ink/40 sm:p-4;
     overflow: hidden;
   }
 
   .board-editor-profile-grid {
-    @apply grid min-w-0 gap-3 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1fr)];
+    @apply grid min-w-0 gap-3 lg:grid-cols-2;
   }
 
   .board-editor-profile-stack {
