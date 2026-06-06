@@ -5,7 +5,7 @@ import type { AdminUserListItem, IAuthService } from "../auth/AuthService";
 import type { BigBoardEditableEntryInput, CreateArticleInput, CreateYoutubeVideoInput, IOnDraftService, NewsletterInput, SaveBigBoardEntriesInput } from "../service/OnDraftService";
 import type { IUserPreferenceService, UserPreferenceError } from "../service/UserPreferenceService";
 import type { ILoggingService } from "../service/LoggingService";
-import type { AnalyticsCategory, IAnalyticsService } from "../service/UmamiAnalyticsService";
+import type { AnalyticsCategory, AnalyticsPeriod, IAnalyticsService } from "../service/UmamiAnalyticsService";
 import { ArticleError, BigBoardError, ForumPostError } from "../repository/OnDraftRepository";
 import { publicArticleUploadUrl } from "../uploads/articlePdfUpload";
 import { BIG_BOARD_CREATORS, POSITIONS, type Article, type ArticleContent, type ArticleFilter, type BigBoard, type BigBoardCreator, type BigBoardEntry, type ForumPost, type ForumPostFilter, type Video, type VideoQuery } from "../model/OnDraftContent";
@@ -80,8 +80,9 @@ type BigBoardEditorValidationIssue = {
 
 export interface IOnDraftController {
   publicFeedItems(): Promise<Array<{ title: string; description: string; href: string; date: Date }>>;
-  showAdminDashboard(res: Response, session: IOnDraftBrowserSession, activeTab?: AdminDashboardTab): Promise<void>;
-  showAdminDashboardTab(res: Response, session: IOnDraftBrowserSession, tab: AdminDashboardTab, category?: AnalyticsCategory): Promise<void>;
+  publicSitemapEntries(): Promise<Array<{ href: string; updatedAt?: Date }>>;
+  showAdminDashboard(res: Response, session: IOnDraftBrowserSession, activeTab?: AdminDashboardTab, analyticsCategory?: AnalyticsCategory, analyticsPeriod?: AnalyticsPeriod): Promise<void>;
+  showAdminDashboardTab(res: Response, session: IOnDraftBrowserSession, tab: AdminDashboardTab, category?: AnalyticsCategory, period?: AnalyticsPeriod): Promise<void>;
   showNewsletterDraftEditor(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   saveNewsletterDraft(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   sendNewsletter(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
@@ -612,6 +613,76 @@ class OnDraftController implements IOnDraftController {
     ].sort((first, second) => second.date.getTime() - first.date.getTime());
   }
 
+  private metadataDescription(value: string, fallback: string): string {
+    const normalized = value.replace(/\s+/g, " ").trim();
+    const description = normalized || fallback;
+    return description.length > 160 ? `${description.slice(0, 157).trimEnd()}...` : description;
+  }
+
+  private jsonLd(value: unknown): string {
+    return JSON.stringify(value).replace(/</g, "\\u003c");
+  }
+
+  private organizationStructuredData(res: Response) {
+    return {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      name: "OnDraft Football",
+      url: this.absoluteMetadataUrl(res, "/"),
+      logo: this.absoluteMetadataUrl(res, "/images/brand/OnDraftLogo-cropped.png"),
+      sameAs: [
+        "https://www.youtube.com/channel/UCX7Py3t2L1pUYF6JxzzP4fA",
+        "https://x.com/OnDraftFootball",
+        "https://www.tiktok.com/@ondraftfootball",
+      ],
+    };
+  }
+
+  private websiteStructuredData(res: Response) {
+    return {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      name: "OnDraft Football",
+      url: this.absoluteMetadataUrl(res, "/"),
+      description: "NFL and NFL Draft analysis, opinions, videos, community hot takes, and draft boards from OnDraft Football.",
+      publisher: {
+        "@type": "Organization",
+        name: "OnDraft Football",
+      },
+    };
+  }
+
+  private articleStructuredData(res: Response, article: Article) {
+    const articleUrl = this.absoluteMetadataUrl(res, `/articles/${article.id}`);
+    const imageUrl = this.absoluteMetadataUrl(res, article.imageUrl ?? "/images/brand/OnDraftLogo-cropped.png");
+    return {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      headline: article.title,
+      description: this.metadataDescription(article.writeup, `Read ${article.title} on OnDraft Football.`),
+      image: [imageUrl],
+      datePublished: new Date(article.publicationDate).toISOString(),
+      dateModified: new Date(article.publicationDate).toISOString(),
+      author: {
+        "@type": "Person",
+        name: article.author,
+      },
+      publisher: {
+        "@type": "Organization",
+        name: "OnDraft Football",
+        logo: {
+          "@type": "ImageObject",
+          url: this.absoluteMetadataUrl(res, "/images/brand/OnDraftLogo-cropped.png"),
+        },
+      },
+      mainEntityOfPage: {
+        "@type": "WebPage",
+        "@id": articleUrl,
+      },
+      keywords: (article.tags ?? []).join(", "),
+    };
+  }
+
   private parseArticleTags(rawTags: unknown): string[] {
     if (typeof rawTags !== "string") {
       return [];
@@ -835,6 +906,19 @@ class OnDraftController implements IOnDraftController {
     return [];
   }
 
+  async publicSitemapEntries(): Promise<Array<{ href: string; updatedAt?: Date }>> {
+    const articlesResult = await this.service.getArticles(true);
+    if (articlesResult.ok === false) {
+      this.logger.warn(`Unable to load sitemap articles: ${articlesResult.value.message}`);
+      return [];
+    }
+
+    return articlesResult.value.map((article) => ({
+      href: `/articles/${article.id}`,
+      updatedAt: article.publicationDate,
+    }));
+  }
+
   private adminDashboardTabs(activeTab: AdminDashboardTab) {
     return [
       { id: "users", label: "Manage Users", href: "/admin/tabs/users" },
@@ -844,16 +928,24 @@ class OnDraftController implements IOnDraftController {
     ].map((tab) => ({ ...tab, active: tab.id === activeTab }));
   }
 
-  async showAdminDashboard(res: Response, session: IOnDraftBrowserSession, activeTab: AdminDashboardTab = "users"): Promise<void> {
+  async showAdminDashboard(
+    res: Response,
+    session: IOnDraftBrowserSession,
+    activeTab: AdminDashboardTab = "users",
+    analyticsCategory: AnalyticsCategory = "all",
+    analyticsPeriod: AnalyticsPeriod = "month",
+  ): Promise<void> {
     res.render("ondraft/adminDashboard", {
       session,
       isAdmin: isAdminSession(session),
       activeTab,
+      analyticsCategory,
+      analyticsPeriod,
       tabs: this.adminDashboardTabs(activeTab),
     });
   }
 
-  async showAdminDashboardTab(res: Response, _session: IOnDraftBrowserSession, tab: AdminDashboardTab, category: AnalyticsCategory = "all"): Promise<void> {
+  async showAdminDashboardTab(res: Response, _session: IOnDraftBrowserSession, tab: AdminDashboardTab, category: AnalyticsCategory = "all", period: AnalyticsPeriod = "month"): Promise<void> {
     if (tab === "content") {
       res.render("ondraft/partials/adminCreateContent", { layout: false });
       return;
@@ -864,15 +956,17 @@ class OnDraftController implements IOnDraftController {
       return;
     }
 
-    await this.renderAdminAnalytics(res, category);
+    await this.renderAdminAnalytics(res, category, period);
   }
 
-  private async renderAdminAnalytics(res: Response, category: AnalyticsCategory = "all"): Promise<void> {
-    const summary = this.analytics ? await this.analytics.getSummary(category) : null;
+  private async renderAdminAnalytics(res: Response, category: AnalyticsCategory = "all", period: AnalyticsPeriod = "month"): Promise<void> {
+    const summary = this.analytics ? await this.analytics.getSummary(category, period) : null;
     res.render("ondraft/partials/adminAnalytics", {
       layout: false,
       category,
+      period,
       summary: summary?.ok === true ? summary.value : null,
+      diagnostics: summary?.ok === false ? summary.value : null,
       errorMessage: summary?.ok === false ? summary.value.message : null,
     });
   }
@@ -941,7 +1035,6 @@ class OnDraftController implements IOnDraftController {
 
     await this.renderAdminNewsletter(res, {
       flashMessage: "Newsletter draft saved.",
-      values: { ...input, id: result.value.id },
     });
   }
 
@@ -1092,6 +1185,10 @@ class OnDraftController implements IOnDraftController {
       latestItems,
       popularArticles,
       popularRange: "all",
+      metaTitle: "OnDraft Football | NFL Draft Analysis, Articles, Videos, and Draft Boards",
+      metaDescription: "A collection of NFL and NFL Draft analysis, opinions, predictions, videos, draft boards, and community football discussion from OnDraft Football.",
+      metaKeywords: ["OnDraft Football", "NFL Draft analysis", "NFL analysis", "NFL Draft predictions", "football scouting", "draft board", "NFL videos"],
+      structuredDataJson: this.jsonLd([this.organizationStructuredData(res), this.websiteStructuredData(res)]),
     });
   }
 
@@ -1136,6 +1233,9 @@ class OnDraftController implements IOnDraftController {
       bookmarkedArticleIds: await this.bookmarkedArticleIds(session),
       hasAnyArticles,
       hasFilters,
+      metaTitle: "Articles | OnDraft Football",
+      metaDescription: "Read OnDraft Football articles with NFL analysis, NFL Draft opinions, scouting notes, predictions, and football discussion from our team.",
+      metaKeywords: ["OnDraft articles", "NFL Draft articles", "NFL analysis articles", "football scouting articles", "draft analysis"],
     });
   }
 
@@ -1169,6 +1269,9 @@ class OnDraftController implements IOnDraftController {
       },
       hasAnyVideos,
       hasFilters,
+      metaTitle: "Video Library | OnDraft Football",
+      metaDescription: "Watch OnDraft Football videos featuring breakdowns and discussions on NFL topics, NFL Draft prospects, scouting, and football analysis.",
+      metaKeywords: ["OnDraft videos", "NFL Draft videos", "NFL analysis videos", "football breakdowns", "NFL Draft prospects"],
     });
   }
 
@@ -1478,6 +1581,9 @@ class OnDraftController implements IOnDraftController {
       formatDraftBoardGrade,
       gradeTraitCategoriesForGrade,
       publishedBoardGrade: (entry: BigBoardEntry) => this.publishedBoardGrade(entry),
+      metaTitle: `${result.value.year} ${result.value.creator} Big Board | OnDraft Football`,
+      metaDescription: `Explore the ${result.value.year} ${result.value.creator} OnDraft Football big board with NFL Draft prospect rankings, positions, schools, and scouting grades.`,
+      metaKeywords: ["NFL Draft big board", `${result.value.year} NFL Draft`, "OnDraft rankings", "NFL Draft prospects", "football scouting"],
     };
     if (req.get("HX-Request") === "true") {
       res.render("ondraft/partials/bigBoardPanel", { ...viewModel, layout: false });
@@ -1759,10 +1865,17 @@ class OnDraftController implements IOnDraftController {
       userModerationById: await this.userModerationById(session),
       activeUserBan: await this.activeUserBan(session),
       metaTitle: `${article.title} | OnDraft Football`,
-      metaDescription: article.writeup || `Read ${article.title} on OnDraft Football.`,
+      metaDescription: this.metadataDescription(article.writeup, `Read ${article.title} on OnDraft Football.`),
       metaImage: this.absoluteMetadataUrl(res, article.imageUrl ?? "/images/brand/OnDraftLogo-cropped.png"),
+      metaImageAlt: `${article.title} article thumbnail`,
       metaUrl: this.absoluteMetadataUrl(res, `/articles/${article.id}`),
       metaType: "article",
+      metaKeywords: ["OnDraft Football", "NFL Draft", "NFL analysis", ...(article.tags ?? [])],
+      articleAuthor: article.author,
+      articlePublishedTime: new Date(article.publicationDate).toISOString(),
+      articleModifiedTime: new Date(article.publicationDate).toISOString(),
+      articleTags: article.tags ?? [],
+      structuredDataJson: this.jsonLd(this.articleStructuredData(res, article)),
     });
   }
 

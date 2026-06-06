@@ -1,5 +1,5 @@
 import { Result } from "../lib/result";
-import { type BigBoard, Article, BigBoardCreator, BigBoardEntry, ArticleFilter, Comment, ForumPost, ForumPostFilter, DraftBoardFilter, Video, VideoQuery, ConsensusBigBoard, Newsletter, } from "../model/OnDraftContent";
+import { type BigBoard, Article, BigBoardCreator, BigBoardEntry, ArticleFilter, Comment, ForumPost, ForumPostFilter, DraftBoardFilter, Video, VideoQuery, ConsensusBigBoard, Newsletter, ConsensusDiscrepancyWriteup, } from "../model/OnDraftContent";
 
 export type BigBoardError = 
     | {name: "BigBoardNotFound"; message: string}
@@ -97,6 +97,9 @@ export interface IOnDraftRepository {
     deleteYoutubeVideo(videoId: string): Promise<Result<void, ArticleError>>;
     getTags(): Promise<Result<string[], ArticleError>>;
     getConsensusBigBoard(year: number): Promise<Result<ConsensusBigBoard, BigBoardError>>;
+    getConsensusDiscrepancyWriteup(year: number, playerName: string): Promise<Result<ConsensusDiscrepancyWriteup, BigBoardError>>;
+    saveConsensusDiscrepancyWriteup(year: number, playerName: string, writeup: ConsensusDiscrepancyWriteup): Promise<Result<ConsensusDiscrepancyWriteup, BigBoardError>>;
+    publishConsensusDiscrepancyWriteup(year: number, playerName: string): Promise<Result<ConsensusDiscrepancyWriteup, BigBoardError>>;
     createNewsletter(newsletter: Newsletter): Promise<Result<Newsletter, NewsletterError>>;
     updateNewsletter(newsletter: Newsletter): Promise<Result<Newsletter, NewsletterError>>;
     getNewsletter(id: string): Promise<Result<Newsletter, NewsletterError>>;

@@ -279,7 +279,7 @@ model Video {
 
 model Newsletter {
   id             String    @id
-  date           DateTime
+  date           DateTime?
   writeup        String
   articleIds     String[]  @default([]) @map("article_ids")
   videoIds       String[]  @default([]) @map("video_ids")
@@ -366,4 +366,20 @@ model BigBoardEntry {
   @@index([gradePublished])
   @@index([writeupPublished])
   @@map("big_board_entries")
+}
+
+model ConsensusDiscrepancyWriteup {
+  id           String   @id
+  year         Int
+  playerName   String   @map("player_name")
+  ryanWriteup  String   @default("") @map("ryan_writeup")
+  aleksWriteup String   @default("") @map("aleks_writeup")
+  published    Boolean  @default(false)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([year, playerName])
+  @@index([year])
+  @@index([published])
+  @@map("consensus_discrepancy_writeups")
 }

@@ -1,6 +1,6 @@
 import { CreateInMemoryOnDraftRepository } from "../../src/repository/InMemoryOnDraftRepository";
 import { CreateInMemoryUserRepository } from "../../src/auth/InMemoryUserRepository";
-import { CreateOnDraftService, parseYoutubeVideoId } from "../../src/service/OnDraftService";
+import { CreateOnDraftService, parseYoutubeVideoId, type IOnDraftService } from "../../src/service/OnDraftService";
 import { CreateUserPreferenceService } from "../../src/service/UserPreferenceService";
 import { IYoutubeVideoStatsService } from "../../src/service/YoutubeVideoStatsService";
 import { calculateDraftGrade, defaultDraftGrade, formatDraftBoardGrade, gradeTraitCategoriesForGrade, type DraftGrade } from "../../src/model/DraftGrades";
@@ -16,6 +16,38 @@ function serviceWithYoutubeStats(youtubeStats: IYoutubeVideoStatsService) {
 
 function userPreferenceService() {
   return CreateUserPreferenceService(CreateInMemoryUserRepository());
+}
+
+async function seedConsensusDiscrepancyBoard(ondraftService: IOnDraftService): Promise<{ ryanEntryId: string; aleksEntryId: string }> {
+  const ryanEntry = await ondraftService.createBigBoardEntry({
+    year: 2026,
+    creator: "Ryan",
+    playerName: "Discrepancy Prospect",
+    school: "Ryan State",
+    position: "QB",
+    rank: 1,
+    posRank: 1,
+    height: { feet: 6, inches: 2 },
+    weight: 220,
+  });
+  const aleksEntry = await ondraftService.createBigBoardEntry({
+    year: 2026,
+    creator: "Aleks",
+    playerName: "Discrepancy Prospect",
+    school: "Aleks Tech",
+    position: "QB",
+    rank: 20,
+    posRank: 4,
+    height: { feet: 6, inches: 1 },
+    weight: 215,
+  });
+  if (ryanEntry.ok === false || aleksEntry.ok === false) {
+    throw new Error("Failed to seed consensus discrepancy board.");
+  }
+  return {
+    ryanEntryId: ryanEntry.value.id,
+    aleksEntryId: aleksEntry.value.id,
+  };
 }
 
 function filledGrade(position: Position, score = 6, potential = 6): DraftGrade {
@@ -594,6 +626,182 @@ describe("OnDraftService big board editing", () => {
         posRank: 1,
         bigDiscrepency: false,
       });
+    }
+  });
+
+  it("saves a one-sided consensus discrepancy explanation as an unpublished draft", async () => {
+    const ondraftService = service();
+    await seedConsensusDiscrepancyBoard(ondraftService);
+
+    const saved = await ondraftService.saveConsensusDiscrepancyWriteup({
+      year: 2026,
+      playerName: "Discrepancy Prospect",
+      ryanWriteup: "Ryan trusts the processing speed.",
+      aleksWriteup: "",
+    });
+
+    expect(saved.ok).toBe(true);
+    if (saved.ok === true) {
+      expect(saved.value).toEqual({
+        ryanWriteup: "Ryan trusts the processing speed.",
+        aleksWriteup: "",
+        published: false,
+      });
+    }
+
+    const consensus = await ondraftService.getBigBoard(2026, "Consensus");
+    expect(consensus.ok).toBe(true);
+    if (consensus.ok === true) {
+      const entry = consensus.value.entries.find((candidate) => candidate.playerName === "Discrepancy Prospect");
+      expect(entry?.bigDiscrepency).toBe(true);
+      expect(entry?.discWriteup).toEqual({
+        ryanWriteup: "Ryan trusts the processing speed.",
+        aleksWriteup: "",
+        published: false,
+      });
+      expect(entry?.consensusRankingContext).toEqual({
+        Ryan: { rank: 1, posRank: 1 },
+        Aleks: { rank: 20, posRank: 4 },
+      });
+    }
+  });
+
+  it("rejects publishing consensus discrepancy explanations until both authors have text", async () => {
+    const ondraftService = service();
+    await seedConsensusDiscrepancyBoard(ondraftService);
+
+    const published = await ondraftService.publishConsensusDiscrepancyWriteup({
+      year: 2026,
+      playerName: "Discrepancy Prospect",
+      ryanWriteup: "Ryan trusts the processing speed.",
+      aleksWriteup: "",
+    });
+
+    expect(published.ok).toBe(false);
+    if (published.ok === false) {
+      expect(published.value).toMatchObject({
+        name: "BigBoardValidationError",
+        message: "Ryan and Aleks discrepancy explanations are required before publishing.",
+      });
+    }
+
+    const consensus = await ondraftService.getBigBoard(2026, "Consensus");
+    expect(consensus.ok).toBe(true);
+    if (consensus.ok === true) {
+      const entry = consensus.value.entries.find((candidate) => candidate.playerName === "Discrepancy Prospect");
+      expect(entry?.discWriteup).toEqual({
+        ryanWriteup: "Ryan trusts the processing speed.",
+        aleksWriteup: "",
+        published: false,
+      });
+    }
+  });
+
+  it("publishes consensus discrepancy explanations when both sides are written", async () => {
+    const ondraftService = service();
+    await seedConsensusDiscrepancyBoard(ondraftService);
+
+    const published = await ondraftService.publishConsensusDiscrepancyWriteup({
+      year: 2026,
+      playerName: "Discrepancy Prospect",
+      ryanWriteup: "Ryan trusts the processing speed.",
+      aleksWriteup: "Aleks worries about the pocket answers.",
+    });
+
+    expect(published.ok).toBe(true);
+    if (published.ok === true) {
+      expect(published.value).toEqual({
+        ryanWriteup: "Ryan trusts the processing speed.",
+        aleksWriteup: "Aleks worries about the pocket answers.",
+        published: true,
+      });
+    }
+
+    const consensus = await ondraftService.getBigBoard(2026, "Consensus");
+    expect(consensus.ok).toBe(true);
+    if (consensus.ok === true) {
+      const entry = consensus.value.entries.find((candidate) => candidate.playerName === "Discrepancy Prospect");
+      expect(entry?.discWriteup?.published).toBe(true);
+    }
+  });
+
+  it("does not allow discrepancy explanations for consensus entries without a big discrepancy", async () => {
+    const ondraftService = service();
+
+    await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Ryan",
+      playerName: "Aligned Prospect",
+      school: "Ryan State",
+      position: "QB",
+      rank: 1,
+      posRank: 1,
+      height: { feet: 6, inches: 2 },
+      weight: 220,
+    });
+    await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Aleks",
+      playerName: "Aligned Prospect",
+      school: "Aleks Tech",
+      position: "QB",
+      rank: 8,
+      posRank: 2,
+      height: { feet: 6, inches: 1 },
+      weight: 215,
+    });
+
+    const saved = await ondraftService.saveConsensusDiscrepancyWriteup({
+      year: 2026,
+      playerName: "Aligned Prospect",
+      ryanWriteup: "Ryan is slightly higher.",
+      aleksWriteup: "Aleks is slightly lower.",
+    });
+
+    expect(saved.ok).toBe(false);
+    if (saved.ok === false) {
+      expect(saved.value).toMatchObject({
+        name: "BigBoardValidationError",
+        message: "Consensus entry for Aligned Prospect does not have a big discrepancy.",
+      });
+    }
+  });
+
+  it("hides saved discrepancy explanations when rankings no longer qualify as a big discrepancy", async () => {
+    const ondraftService = service();
+    const { aleksEntryId } = await seedConsensusDiscrepancyBoard(ondraftService);
+
+    const published = await ondraftService.publishConsensusDiscrepancyWriteup({
+      year: 2026,
+      playerName: "Discrepancy Prospect",
+      ryanWriteup: "Ryan trusts the processing speed.",
+      aleksWriteup: "Aleks worries about the pocket answers.",
+    });
+    expect(published.ok).toBe(true);
+
+    const savedAleks = await ondraftService.saveBigBoardEntry({
+      year: 2026,
+      creator: "Aleks",
+      entry: {
+        id: aleksEntryId,
+        playerName: "Discrepancy Prospect",
+        school: "Aleks Tech",
+        position: "QB",
+        rank: 6,
+        posRank: 2,
+        height: { feet: 6, inches: 1 },
+        weight: 215,
+        playerInfoPublished: true,
+      },
+    });
+    expect(savedAleks.ok).toBe(true);
+
+    const consensus = await ondraftService.getBigBoard(2026, "Consensus");
+    expect(consensus.ok).toBe(true);
+    if (consensus.ok === true) {
+      const entry = consensus.value.entries.find((candidate) => candidate.playerName === "Discrepancy Prospect");
+      expect(entry?.bigDiscrepency).toBe(false);
+      expect(entry?.discWriteup).toBeUndefined();
     }
   });
 

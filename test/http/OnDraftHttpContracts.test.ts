@@ -135,6 +135,10 @@ describe("OnDraft HTTP contracts", () => {
     expect(response.headers["x-content-type-options"]).toBe("nosniff");
     expect(response.headers["x-frame-options"]).toBe("DENY");
     expect(response.headers["referrer-policy"]).toBe("strict-origin-when-cross-origin");
+    expect(response.text).toContain('<meta name="robots" content="index, follow, max-image-preview:large"');
+    expect(response.text).toContain('<link rel="manifest" href="/site.webmanifest"');
+    expect(response.text).toContain('<script type="application/ld+json">');
+    expect(response.text).toContain('"@type":"WebSite"');
     expect(response.text).toContain("Articles On Tap");
     expect(response.text).toContain("Log in");
     expect(response.text).toContain('href="/about"');
@@ -425,15 +429,26 @@ describe("OnDraft HTTP contracts", () => {
     const robots = await request(ondraft).get("/robots.txt");
     const sitemap = await request(ondraft).get("/sitemap.xml");
     const feed = await request(ondraft).get("/feed.xml");
+    const manifest = await request(ondraft).get("/site.webmanifest");
+    const security = await request(ondraft).get("/.well-known/security.txt");
 
     expect(robots.status).toBe(200);
     expect(robots.text).toContain("Sitemap:");
+    expect(robots.text).toContain("Disallow: /login");
     expect(sitemap.status).toBe(200);
     expect(sitemap.text).toContain("<urlset");
     expect(sitemap.text).toContain("<loc>http://localhost:3000/terms</loc>");
+    expect(sitemap.text).toContain("<loc>http://localhost:3000/articles/");
+    expect(sitemap.text).toContain("<lastmod>");
     expect(feed.status).toBe(200);
     expect(feed.text).toContain("<rss");
     expect(feed.text).toContain("<channel>");
+    expect(feed.text).toContain("<guid>");
+    expect(manifest.status).toBe(200);
+    expect(manifest.body.name).toBe("OnDraft Football");
+    expect(manifest.body.icons[0].src).toBe("/images/brand/OnDraftLogo-favicon.png");
+    expect(security.status).toBe(200);
+    expect(security.text).toContain("Contact: mailto:support@ondraftfootball.com");
   });
 
   it("logs in a demo user and renders the home page", async () => {
@@ -454,7 +469,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(ondraft.text).toContain("Ryan McWalter");
     expect(ondraft.text).toContain('hx-get="/settings"');
     expect(ondraft.text).toContain("Open account settings");
-    expect(ondraft.text).not.toContain('href="/feed.xml"');
+    expect(ondraft.text).toContain('rel="alternate" type="application/rss+xml"');
   });
 
   it("renders and updates account settings through modal routes", async () => {
@@ -846,14 +861,18 @@ describe("OnDraft HTTP contracts", () => {
     expect(newsletterTab.text).toContain("Build newsletter");
     expect(newsletterTab.text).toContain('name="articleIds"');
     expect(newsletterTab.text).toContain('name="videoIds"');
-    expect(newsletterTab.text).toContain("<summary");
+    expect(newsletterTab.text).toContain("articleDropdownOpen");
+    expect(newsletterTab.text).toContain("videoDropdownOpen");
     expect(newsletterTab.text).toContain("Past newsletters");
     expect(newsletterTab.text).toContain("Resend");
+    expect(newsletterTab.text).toContain('hx-post="/admin/newsletters/send"');
+    expect(newsletterTab.text).toContain("no-reply@ondraftfootball.com");
     expect(newsletterTab.text).not.toContain("<!doctype html>");
 
     const analyticsTab = await admin.get("/admin/tabs/analytics").set("HX-Request", "true");
     expect(analyticsTab.status).toBe(200);
-    expect(analyticsTab.text).toContain("Umami");
+    expect(analyticsTab.text).toContain("Traffic Dashboard");
+    expect(analyticsTab.text).toContain("Last month");
     expect(analyticsTab.text).toContain("Articles");
     expect(analyticsTab.text).toContain("Draft board");
     expect(analyticsTab.text).not.toContain("<!doctype html>");
@@ -887,7 +906,9 @@ describe("OnDraft HTTP contracts", () => {
 
     expect(draft.status).toBe(200);
     expect(draft.text).toContain("Newsletter draft saved.");
+    expect(draft.text).toContain("formOpen: false");
     expect(draft.text).toContain("Past newsletters");
+    expect(draft.text).toContain("od-secondary-link");
     expect(draft.text).toContain(">Edit</button>");
     expect(draft.text).toContain('hx-get="/admin/newsletters/');
     const draftId = draft.text.match(/hx-get="\/admin\/newsletters\/([^"]+)\/edit"/)?.[1];
@@ -923,6 +944,59 @@ describe("OnDraft HTTP contracts", () => {
       imageUrl: "https://img.youtube.com/vi/BH3X-llq1M4/hqdefault.jpg",
     });
     expect(emailService.newsletterEmails[0].logoUrl).toBe("http://localhost:3000/images/brand/OnDraftLogo-cropped.png");
+  });
+
+  it("allows partial newsletter drafts but requires send-ready newsletter fields", async () => {
+    const { ondraft, emailService } = appWithEmailCapture();
+    const admin = await loginAdminAgent(ondraft);
+
+    await admin
+      .post("/settings/mailing-list")
+      .type("form")
+      .send({ preference: "subscribe" });
+
+    const emptyDraft = await admin
+      .post("/admin/newsletters/drafts")
+      .type("form")
+      .send({});
+
+    expect(emptyDraft.status).toBe(200);
+    expect(emptyDraft.text).toContain("Newsletter draft saved.");
+    expect(emptyDraft.text).toContain("Undated draft");
+
+    const missingDate = await admin
+      .post("/admin/newsletters/send")
+      .type("form")
+      .send({
+        writeup: "This week on OnDraft.",
+        changelog: "Added the admin newsletter workflow.",
+      });
+
+    expect(missingDate.status).toBe(400);
+    expect(missingDate.text).toContain("Newsletter date is required before sending.");
+
+    const missingWriteup = await admin
+      .post("/admin/newsletters/send")
+      .type("form")
+      .send({
+        date: "2026-06-05",
+        changelog: "Added the admin newsletter workflow.",
+      });
+
+    expect(missingWriteup.status).toBe(400);
+    expect(missingWriteup.text).toContain("Newsletter writeup is required before sending.");
+
+    const missingChangelog = await admin
+      .post("/admin/newsletters/send")
+      .type("form")
+      .send({
+        date: "2026-06-05",
+        writeup: "This week on OnDraft.",
+      });
+
+    expect(missingChangelog.status).toBe(400);
+    expect(missingChangelog.text).toContain("Newsletter changelog is required before sending.");
+    expect(emailService.newsletterEmails).toHaveLength(0);
   });
 
   it("lets admins manage users with verification and mailing list status", async () => {
@@ -2249,6 +2323,10 @@ describe("OnDraft HTTP contracts", () => {
     expect(article.text).toContain("A regular article body.");
     expect(article.text).toContain('<meta property="og:type" content="article"');
     expect(article.text).toContain('<meta property="og:image" content="http://localhost:3000/images/article-defaults/');
+    expect(article.text).toContain('<meta property="article:author" content="Ryan McWalter"');
+    expect(article.text).toContain('<meta property="article:tag" content="draft"');
+    expect(article.text).toContain('<meta name="twitter:image:alt" content="Plain Text Film Room article thumbnail"');
+    expect(article.text).toContain('"@type":"Article"');
     expect(article.text).toContain('class="icon-button article-share-button"');
     expect(article.text).toContain('data-share-url="/articles/');
     expect(article.text).toContain("Share");

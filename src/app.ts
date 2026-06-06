@@ -31,7 +31,7 @@ import {
   type IArticleHtmlImageAssetService,
 } from "./service/ArticleHtmlImageAssetService";
 import { ILoggingService } from "./service/LoggingService";
-import type { AnalyticsCategory } from "./service/UmamiAnalyticsService";
+import type { AnalyticsCategory, AnalyticsPeriod } from "./service/UmamiAnalyticsService";
 import type { IAnalyticsConfig, ITurnstileConfig } from "./config/AppConfig";
 
 type AsyncRequestHandler = RequestHandler;
@@ -57,6 +57,19 @@ function sessionSecret(): string {
   }
 
   return "ondraft-template-secret";
+}
+
+function xmlEscape(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function cdata(value: string): string {
+  return `<![CDATA[${value.replace(/\]\]>/g, "]]]]><![CDATA[>")}]]>`;
 }
 
 class ExpressApp implements IApp {
@@ -410,6 +423,10 @@ class ExpressApp implements IApp {
       : "all";
   }
 
+  private analyticsPeriod(value: unknown): AnalyticsPeriod {
+    return value === "week" || value === "month" || value === "all" ? value : "month";
+  }
+
   private registerRoutes(): void {
     this.app.get(
       "/",
@@ -424,7 +441,12 @@ class ExpressApp implements IApp {
       "/about",
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
-        res.render("ondraft/about", { session: browserSession });
+        res.render("ondraft/about", {
+          session: browserSession,
+          metaTitle: "About OnDraft Football",
+          metaDescription: "Learn about OnDraft Football, a student-led NFL and NFL Draft media project with articles, videos, scouting work, and community discussion.",
+          metaKeywords: ["OnDraft Football", "NFL Draft media", "football analysts", "NFL scouting", "sports media"],
+        });
       }),
     );
     this.app.get("/privacy", (req, res) => this.renderInfoPage(req, res, "privacy"));
@@ -655,7 +677,13 @@ class ExpressApp implements IApp {
         }
 
         const browserSession = recordPageView(sessionStore(req));
-        await this.controller.showAdminDashboard(res, browserSession, this.adminDashboardTab(req.query.tab));
+        await this.controller.showAdminDashboard(
+          res,
+          browserSession,
+          this.adminDashboardTab(req.query.tab),
+          this.analyticsCategory(req.query.category),
+          this.analyticsPeriod(req.query.period),
+        );
       }),
     );
 
@@ -673,7 +701,7 @@ class ExpressApp implements IApp {
           return;
         }
 
-        await this.controller.showAdminDashboardTab(res, browserSession, tab, this.analyticsCategory(req.query.category));
+        await this.controller.showAdminDashboardTab(res, browserSession, tab, this.analyticsCategory(req.query.category), this.analyticsPeriod(req.query.period));
       }),
     );
 
@@ -1004,26 +1032,57 @@ class ExpressApp implements IApp {
       res.send([
         "User-agent: *",
         "Allow: /",
+        "Disallow: /admin",
+        "Disallow: /settings",
+        "Disallow: /login",
+        "Disallow: /register",
+        "Disallow: /forgot-password",
+        "Disallow: /reset-password",
+        "Disallow: /bookmarks",
+        "Disallow: /articles/new",
+        "Disallow: /articles/filter",
+        "Disallow: /videos/new",
+        "Disallow: /hottakes/filter",
+        "Disallow: /bigboard/edit",
         "Sitemap: " + new URL("/sitemap.xml", this.siteBaseUrl).toString(),
         "",
       ].join("\n"));
     });
 
-    this.app.get("/sitemap.xml", (_req, res) => {
-      const urls = ["/", "/articles", "/videos", "/bigboard", "/hottakes", "/about", "/privacy", "/terms", "/contact"];
+    this.app.get("/sitemap.xml", asyncHandler(async (_req, res) => {
+      const staticUrls = ["/", "/articles", "/videos", "/bigboard", "/hottakes", "/about", "/privacy", "/terms", "/contact"];
+      const dynamicUrls = await this.controller.publicSitemapEntries();
+      const entries: Array<{ href: string; updatedAt?: Date }> = [
+        ...staticUrls.map((href) => ({ href })),
+        ...dynamicUrls,
+      ];
       res.type("application/xml");
-      res.send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls
-        .map((url) => `  <url><loc>${new URL(url, this.siteBaseUrl).toString()}</loc></url>`)
+      res.send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${entries
+        .map((entry) => {
+          const loc = xmlEscape(new URL(entry.href, this.siteBaseUrl).toString());
+          const lastmod = entry.updatedAt ? `<lastmod>${xmlEscape(entry.updatedAt.toISOString())}</lastmod>` : "";
+          return `  <url><loc>${loc}</loc>${lastmod}</url>`;
+        })
         .join("\n")}\n</urlset>\n`);
-    });
+    }));
 
     this.app.get("/feed.xml", asyncHandler(async (_req, res) => {
       const items = await this.controller.publicFeedItems();
       res.type("application/rss+xml");
       res.send(`<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0"><channel><title>OnDraft Football</title><link>${this.siteBaseUrl}</link><description>NFL and NFL Draft analysis from OnDraft Football.</description>${items
-        .map((item) => `<item><title><![CDATA[${item.title}]]></title><link>${new URL(item.href, this.siteBaseUrl).toString()}</link><description><![CDATA[${item.description}]]></description><pubDate>${item.date.toUTCString()}</pubDate></item>`)
+        .map((item) => `<item><title>${cdata(item.title)}</title><link>${xmlEscape(new URL(item.href, this.siteBaseUrl).toString())}</link><guid>${xmlEscape(new URL(item.href, this.siteBaseUrl).toString())}</guid><description>${cdata(item.description)}</description><pubDate>${item.date.toUTCString()}</pubDate></item>`)
         .join("")}</channel></rss>`);
     }));
+
+    this.app.get("/.well-known/security.txt", (_req, res) => {
+      res.type("text/plain");
+      res.send([
+        "Contact: mailto:support@ondraftfootball.com",
+        "Preferred-Languages: en",
+        "Canonical: " + new URL("/.well-known/security.txt", this.siteBaseUrl).toString(),
+        "",
+      ].join("\n"));
+    });
 
     this.app.post(
       "/articles/html-images",

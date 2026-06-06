@@ -8,6 +8,7 @@ import {
   BigBoardEntry,
   Comment,
   ConsensusBigBoard,
+  ConsensusDiscrepancyWriteup,
   DraftBoardFilter,
   ForumPost,
   ForumPostFilter,
@@ -226,6 +227,18 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
     };
   }
 
+  private mapConsensusDiscrepancyWriteup(record: {
+    ryanWriteup: string;
+    aleksWriteup: string;
+    published: boolean;
+  }): ConsensusDiscrepancyWriteup {
+    return {
+      ryanWriteup: record.ryanWriteup,
+      aleksWriteup: record.aleksWriteup,
+      published: record.published,
+    };
+  }
+
   private bigBoardInclude(filter?: DraftBoardFilter) {
     return {
       entries: {
@@ -267,6 +280,8 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
     aleksBoard?.entries.filter((entry) => entry.playerInfoPublished).forEach((entry) => {
       entriesByPlayer.set(entry.playerName, { ...entriesByPlayer.get(entry.playerName), Aleks: entry });
     });
+    const writeups = await this.prisma.consensusDiscrepancyWriteup.findMany({ where: { year } });
+    const writeupsByPlayer = new Map(writeups.map((writeup) => [writeup.playerName, this.mapConsensusDiscrepancyWriteup(writeup)]));
 
     const average = (values: Array<number | null | undefined>): number => {
       const rankedValues = values.filter((value): value is number => typeof value === "number");
@@ -311,6 +326,13 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
           gradePublished: averageFinalGrade !== null,
           gradeSummary: averageFinalGrade !== null ? { finalGrade: averageFinalGrade } : undefined,
           bigDiscrepency: rankDiscrepency > 10,
+          discWriteup: rankDiscrepency > 10
+            ? writeupsByPlayer.get(source.playerName) ?? { ryanWriteup: "", aleksWriteup: "", published: false }
+            : undefined,
+          consensusRankingContext: {
+            Ryan: Ryan ? { rank: Ryan.rank, posRank: Ryan.posRank } : undefined,
+            Aleks: Aleks ? { rank: Aleks.rank, posRank: Aleks.posRank } : undefined,
+          },
         },
         averageRank: average([Ryan?.rank, Aleks?.rank]),
         averagePosRank: average([Ryan?.posRank, Aleks?.posRank]),
@@ -1025,8 +1047,59 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
         height: entry.height,
         weight: entry.weight,
         bigDiscrepency: entry.bigDiscrepency ?? false,
+        discWriteup: entry.discWriteup,
+        consensusRankingContext: entry.consensusRankingContext,
       })),
     });
+  }
+
+  async getConsensusDiscrepancyWriteup(year: number, playerName: string): Promise<Result<ConsensusDiscrepancyWriteup, BigBoardError>> {
+    try {
+      const writeup = await this.prisma.consensusDiscrepancyWriteup.findUnique({
+        where: { year_playerName: { year, playerName } },
+      });
+      return writeup
+        ? Ok(this.mapConsensusDiscrepancyWriteup(writeup))
+        : Err(PlayerNotFound(`Consensus discrepancy writeup for ${playerName} in ${year} was not found.`));
+    } catch {
+      return Err(PlayerNotFound(`Consensus discrepancy writeup for ${playerName} in ${year} was not found.`));
+    }
+  }
+
+  async saveConsensusDiscrepancyWriteup(year: number, playerName: string, writeup: ConsensusDiscrepancyWriteup): Promise<Result<ConsensusDiscrepancyWriteup, BigBoardError>> {
+    try {
+      const updated = await this.prisma.consensusDiscrepancyWriteup.upsert({
+        where: { year_playerName: { year, playerName } },
+        create: {
+          id: `${year}:${playerName}`,
+          year,
+          playerName,
+          ryanWriteup: writeup.ryanWriteup,
+          aleksWriteup: writeup.aleksWriteup,
+          published: writeup.published,
+        },
+        update: {
+          ryanWriteup: writeup.ryanWriteup,
+          aleksWriteup: writeup.aleksWriteup,
+          published: writeup.published,
+        },
+      });
+      return Ok(this.mapConsensusDiscrepancyWriteup(updated));
+    } catch {
+      return Err(PlayerNotFound(`Consensus discrepancy writeup for ${playerName} in ${year} could not be saved.`));
+    }
+  }
+
+  async publishConsensusDiscrepancyWriteup(year: number, playerName: string): Promise<Result<ConsensusDiscrepancyWriteup, BigBoardError>> {
+    try {
+      const updated = await this.prisma.consensusDiscrepancyWriteup.update({
+        where: { year_playerName: { year, playerName } },
+        data: { published: true },
+      });
+      return Ok(this.mapConsensusDiscrepancyWriteup(updated));
+    } catch {
+      return Err(PlayerNotFound(`Consensus discrepancy writeup for ${playerName} in ${year} was not found.`));
+    }
   }
 
   private mapNewsletter(record: NonNullable<NewsletterRecord>): Newsletter {

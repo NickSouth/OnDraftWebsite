@@ -1,6 +1,6 @@
 import { Err, Ok, Result } from "../lib/result";
-import { Article, ArticleFilter, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, Comment, ConsensusBigBoard, DraftBoardFilter, ForumPost, ForumPostFilter, Newsletter, Video, VideoQuery } from "../model/OnDraftContent";
-import { calculateDraftGrade } from "../model/DraftGrades";
+import { Article, ArticleFilter, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, Comment, ConsensusBigBoard, ConsensusDiscrepancyWriteup, DraftBoardFilter, ForumPost, ForumPostFilter, Newsletter, Video, VideoQuery } from "../model/OnDraftContent";
+import { calculateDraftGrade, defaultDraftGrade } from "../model/DraftGrades";
 import { ArticleNotFound, BigBoardNotFound, CommentNotFound, DuplicateBigBoardYear, DuplicatePlayer, DuplicateArticle, DuplicateForumPost, DuplicateNewsletter, ForumPostCommentNotFound, type ArticleError, type BigBoardError, type IOnDraftRepository, type NewsletterError, NewsletterNotFound, PlayerNotFound, ForumPostError, ForumPostNotFound } from "./OnDraftRepository";
 
 const MEMORY_LOAD_TEST_SCHOOLS = [
@@ -68,6 +68,7 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
   private forumPosts: ForumPost[] = [];
   private videos: Video[] = [];
   private newsletters: Newsletter[] = [];
+  private consensusDiscrepancyWriteups: Array<{ year: number; playerName: string; writeup: ConsensusDiscrepancyWriteup }> = [];
   private tagList: Set<string> = new Set();
 
   constructor(options: InMemoryRepositoryOptions = {}) {
@@ -95,6 +96,33 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
   }
 
   private createMemoryLoadTestEntries(creator: "Ryan" | "Aleks"): BigBoardEntry[] {
+    const loadTestWriteups = [
+      {
+        strengths: "Easy early acceleration and enough arm strength to stress a defense vertically.",
+        weaknesses: "Can drift into pressure when the first answer is covered.",
+        rundown: "A clean quick-view test case with a short rundown. He gives the card enough real scouting texture without stretching the left column.",
+      },
+      {
+        strengths: "Good contact balance, urgent feet, and a compact release point. Shows the patience to let blocks declare before attacking daylight.",
+        weaknesses: "Needs to keep his pads down through traffic and avoid trying to win every rep with the first burst.",
+        rundown: "This profile uses a medium-length rundown so the right column can be compared against a left box with a little more body. The traits are intentionally solid across the board, and the paragraph should show how the rundown card breathes when it is longer than the strengths and weaknesses boxes but not long enough to dominate the row.",
+      },
+      {
+        strengths: "Natural separator with reliable hands.",
+        weaknesses: "Play strength is still catching up.",
+        rundown: "Short and tidy. This one is mostly here to make sure compact profiles do not leave the grade stack feeling detached.",
+      },
+      {
+        strengths: "Plays with excellent leverage, absorbs power well, and has enough recovery ability to stay attached after losing the first half-step. The hands are active and he rarely lets rushers dictate the rep cleanly.",
+        weaknesses: "The movement skills are functional rather than explosive, so wide alignments can force him to overset. He also needs to clean up the late latch penalties that show up when he is stressed by speed.",
+        rundown: "This is the intentionally long load-test profile. The rundown should extend below the top of the grades box on wide screens while the strengths and weaknesses remain aligned in the right column. He is a sturdy, assignment-sound prospect whose best reps come when he can win with angles, strike timing, and core strength. The profile gives the UI a realistic wall of copy to prove the stripe, column width, and grade card stay composed when the scouting report has more editorial weight.",
+      },
+      {
+        strengths: "Explosive first step with closing burst.",
+        weaknesses: "Counters are still developing.",
+        rundown: "A shorter pass-rush note for testing asymmetry between a narrow strengths box and the full grade grid beneath it.",
+      },
+    ];
     const positionCounts = new Map<string, number>();
     return MEMORY_LOAD_TEST_SCHOOLS.map((school, index) => {
       const position = MEMORY_LOAD_TEST_POSITIONS[index % MEMORY_LOAD_TEST_POSITIONS.length];
@@ -102,6 +130,9 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
       positionCounts.set(position, nextPosRank);
       const rank = creator === "Aleks" ? MEMORY_LOAD_TEST_SCHOOLS.length - index : index + 1;
       const inches = Number(((index % 12) + (index % 4 === 0 ? 0.5 : 0)).toFixed(3));
+      const sampleWriteup = loadTestWriteups[index % loadTestWriteups.length];
+      const grade = index < 12 ? this.createMemoryLoadTestGrade(position, index, creator) : null;
+      const hasPublishedProfile = index < 12;
       return {
         id: `memory-load-${creator.toLowerCase()}-${String(index + 1).padStart(2, "0")}`,
         playerName: `Load Test Player ${String(index + 1).padStart(2, "0")}`,
@@ -112,17 +143,35 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
         height: { feet: 6, inches },
         weight: 185 + index,
         playerInfoPublished: true,
-        grade: null,
-        gradePublished: false,
+        grade,
+        gradePublished: hasPublishedProfile && grade !== null,
         writeup: {
-          strengths: "",
-          weaknesses: "",
-          rundown: "",
+          strengths: hasPublishedProfile ? sampleWriteup.strengths : "",
+          weaknesses: hasPublishedProfile ? sampleWriteup.weaknesses : "",
+          rundown: hasPublishedProfile ? sampleWriteup.rundown : "",
         },
-        writeupPublished: false,
+        writeupPublished: hasPublishedProfile,
         notes: `Generated memory load-test entry for ${creator}.`,
       };
     });
+  }
+
+  private createMemoryLoadTestGrade(position: BigBoardEntry["position"], index: number, creator: "Ryan" | "Aleks"): BigBoardEntry["grade"] {
+    const grade = defaultDraftGrade(position);
+    if (!grade) {
+      return null;
+    }
+    const baseScore = Math.min(7, 4 + (index % 4) + (creator === "Aleks" ? 0.25 : 0));
+    grade.potential = Math.min(8, Math.max(1, Math.round(baseScore + 1)));
+    grade.physicalTraits = Object.fromEntries(Object.keys(grade.physicalTraits).map((trait, traitIndex) => [
+      trait,
+      Math.min(8, Number((baseScore + (traitIndex % 3) * 0.25).toFixed(2))),
+    ]));
+    grade.filmTraits = Object.fromEntries(Object.keys(grade.filmTraits).map((trait, traitIndex) => [
+      trait,
+      Math.min(8, Number((baseScore + ((traitIndex + 1) % 4) * 0.2).toFixed(2))),
+    ]));
+    return grade;
   }
 
   private seedSampleContent(): void {
@@ -511,6 +560,14 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
     return Ok({ ...bigBoard, entries });
   }
 
+  private cloneConsensusDiscrepancyWriteup(writeup: ConsensusDiscrepancyWriteup): ConsensusDiscrepancyWriteup {
+    return { ...writeup };
+  }
+
+  private findConsensusDiscrepancyWriteup(year: number, playerName: string): ConsensusDiscrepancyWriteup | undefined {
+    return this.consensusDiscrepancyWriteups.find((record) => record.year === year && record.playerName === playerName)?.writeup;
+  }
+
   private generateConsensusBigBoard(year: number): BigBoard {
     const ryanBoard = this.findBigBoard(year, "Ryan");
     const aleksBoard = this.findBigBoard(year, "Aleks");
@@ -595,6 +652,13 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
           gradePublished: averageFinalGrade !== null,
           gradeSummary: averageFinalGrade !== null ? { finalGrade: averageFinalGrade } : undefined,
           bigDiscrepency: rankDiscrepency > 10,
+          discWriteup: rankDiscrepency > 10
+            ? this.cloneConsensusDiscrepancyWriteup(this.findConsensusDiscrepancyWriteup(year, sourceOfTruth.playerName) ?? { ryanWriteup: "", aleksWriteup: "", published: false })
+            : undefined,
+          consensusRankingContext: {
+            Ryan: Ryan ? { rank: Ryan.rank, posRank: Ryan.posRank } : undefined,
+            Aleks: Aleks ? { rank: Aleks.rank, posRank: Aleks.posRank } : undefined,
+          },
         },
         averageRank,
         averagePosRank,
@@ -1133,15 +1197,44 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
         height: entry.height,
         weight: entry.weight,
         bigDiscrepency: entry.bigDiscrepency ?? false,
+        discWriteup: entry.discWriteup ? this.cloneConsensusDiscrepancyWriteup(entry.discWriteup) : undefined,
+        consensusRankingContext: entry.consensusRankingContext,
       })),
     };
     return Ok(consensusBigBoard);
   }
 
+  async getConsensusDiscrepancyWriteup(year: number, playerName: string): Promise<Result<ConsensusDiscrepancyWriteup, BigBoardError>> {
+    const writeup = this.findConsensusDiscrepancyWriteup(year, playerName);
+    return writeup
+      ? Ok(this.cloneConsensusDiscrepancyWriteup(writeup))
+      : Err(PlayerNotFound(`Consensus discrepancy writeup for ${playerName} in ${year} was not found.`));
+  }
+
+  async saveConsensusDiscrepancyWriteup(year: number, playerName: string, writeup: ConsensusDiscrepancyWriteup): Promise<Result<ConsensusDiscrepancyWriteup, BigBoardError>> {
+    const next = this.cloneConsensusDiscrepancyWriteup(writeup);
+    const index = this.consensusDiscrepancyWriteups.findIndex((record) => record.year === year && record.playerName === playerName);
+    if (index === -1) {
+      this.consensusDiscrepancyWriteups.push({ year, playerName, writeup: next });
+    } else {
+      this.consensusDiscrepancyWriteups[index] = { year, playerName, writeup: next };
+    }
+    return Ok(this.cloneConsensusDiscrepancyWriteup(next));
+  }
+
+  async publishConsensusDiscrepancyWriteup(year: number, playerName: string): Promise<Result<ConsensusDiscrepancyWriteup, BigBoardError>> {
+    const existing = this.findConsensusDiscrepancyWriteup(year, playerName);
+    if (!existing) {
+      return Err(PlayerNotFound(`Consensus discrepancy writeup for ${playerName} in ${year} was not found.`));
+    }
+    const next = { ...existing, published: true };
+    return this.saveConsensusDiscrepancyWriteup(year, playerName, next);
+  }
+
   private cloneNewsletter(newsletter: Newsletter): Newsletter {
     return {
       ...newsletter,
-      date: new Date(newsletter.date),
+      date: newsletter.date ? new Date(newsletter.date) : null,
       articleIds: [...newsletter.articleIds],
       videoIds: [...newsletter.videoIds],
       createdAt: new Date(newsletter.createdAt),

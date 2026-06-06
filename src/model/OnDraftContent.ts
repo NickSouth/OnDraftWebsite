@@ -24,6 +24,23 @@ export type BigBoardWriteup = {
   rundown: string;
 };
 
+export type ConsensusDiscrepancyWriteup = {
+  ryanWriteup: string;
+  aleksWriteup: string;
+  published: boolean;
+};
+
+export type ConsensusRankingContext = {
+  Ryan?: {
+    rank: number | null;
+    posRank: number | null;
+  };
+  Aleks?: {
+    rank: number | null;
+    posRank: number | null;
+  };
+};
+
 export type BigBoardEntry = {
   id: string;
   playerName: string;
@@ -41,6 +58,8 @@ export type BigBoardEntry = {
   writeupPublished: boolean;
   notes: string;
   bigDiscrepency?: boolean;
+  discWriteup?: ConsensusDiscrepancyWriteup;
+  consensusRankingContext?: ConsensusRankingContext;
 };
 
 export type ArticleFilter = {
@@ -151,7 +170,7 @@ export type NewsletterStatus = "draft" | "sent";
 
 export type Newsletter = {
   id: string;
-  date: Date;
+  date: Date | null;
   writeup: string;
   articleIds: string[];
   videoIds: string[];
@@ -178,6 +197,8 @@ export type ConsensusBigBoardEntry = {
   weight: number | null;
   writeup?: ConsensusWriteup;
   bigDiscrepency: boolean;
+  discWriteup?: ConsensusDiscrepancyWriteup;
+  consensusRankingContext?: ConsensusRankingContext;
 };
 
 export type ConsensusWriteup = {

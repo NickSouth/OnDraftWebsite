@@ -1,7 +1,7 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { Err, Ok, Result } from "../lib/result";
 import sanitizeHtml from "sanitize-html";
-import { Article, ArticleContent, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, BigBoardWriteup, Height, POSITIONS, Position, ArticleFilter, Comment, ForumPost, ForumPostFilter, DraftBoardFilter, Newsletter, Video, VideoQuery } from "../model/OnDraftContent";
+import { Article, ArticleContent, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, BigBoardWriteup, ConsensusDiscrepancyWriteup, Height, POSITIONS, Position, ArticleFilter, Comment, ForumPost, ForumPostFilter, DraftBoardFilter, Newsletter, Video, VideoQuery } from "../model/OnDraftContent";
 import { UnknownArticleError, UnknownForumPostError, ArticleError,  BigBoardError, IOnDraftRepository, ArticleValidationError, BigBoardValidationError, ForumPostError, ForumPostValidationError, NewsletterError, NewsletterValidationError } from "../repository/OnDraftRepository";
 import { DraftBoardFilterInput } from "../controller/OnDraftController";
 import { IYoutubeVideoStatsService } from "./YoutubeVideoStatsService";
@@ -140,6 +140,13 @@ export interface SaveBigBoardEntryInput {
   entry: BigBoardEditableEntryInput;
 }
 
+export interface ConsensusDiscrepancyWriteupInput {
+  year?: number;
+  playerName?: string;
+  ryanWriteup?: string;
+  aleksWriteup?: string;
+}
+
 export interface CreateCommentInput {
   articleId?: string;
   parentCommentId?: string;
@@ -192,6 +199,8 @@ export interface IOnDraftService {
   publishBigBoardEntryPlayerInfo(year: number | undefined, creator: BigBoardCreator | undefined, entryId: string): Promise<Result<BigBoardEntry, BigBoardError>>;
   publishBigBoardEntryGrade(year: number | undefined, creator: BigBoardCreator | undefined, entryId: string): Promise<Result<BigBoardEntry, BigBoardError>>;
   publishBigBoardEntryWriteup(year: number | undefined, creator: BigBoardCreator | undefined, entryId: string): Promise<Result<BigBoardEntry, BigBoardError>>;
+  saveConsensusDiscrepancyWriteup(input: ConsensusDiscrepancyWriteupInput): Promise<Result<ConsensusDiscrepancyWriteup, BigBoardError>>;
+  publishConsensusDiscrepancyWriteup(input: ConsensusDiscrepancyWriteupInput): Promise<Result<ConsensusDiscrepancyWriteup, BigBoardError>>;
   deleteArticle(id: string): Promise<Result<void, ArticleError>>;
   deleteBigBoardEntry(year: number | undefined, creator: BigBoardCreator | undefined, playerName: string): Promise<Result<void, BigBoardError>>;
   getBigBoard(year?: number, creator?: BigBoardCreator, filter?: DraftBoardFilterInput): Promise<Result<BigBoard, BigBoardError>>;
@@ -546,6 +555,39 @@ class OnDraftService implements IOnDraftService {
     const issues = validateDraftGradeForPublication(entry.position, entry.grade);
     if (issues.length > 0) {
       return Err(BigBoardValidationError(issues[0]));
+    }
+    return Ok(undefined);
+  }
+
+  private normalizeConsensusDiscrepancyWriteup(input: ConsensusDiscrepancyWriteupInput, existing?: ConsensusDiscrepancyWriteup): ConsensusDiscrepancyWriteup {
+    return {
+      ryanWriteup: input.ryanWriteup?.trim() ?? existing?.ryanWriteup ?? "",
+      aleksWriteup: input.aleksWriteup?.trim() ?? existing?.aleksWriteup ?? "",
+      published: false,
+    };
+  }
+
+  private async validateConsensusDiscrepancyWriteupTarget(year: number, playerName: string): Promise<Result<BigBoardEntry, BigBoardError>> {
+    if (!playerName.trim()) {
+      return Err(BigBoardValidationError("Player name is required for a consensus discrepancy writeup."));
+    }
+    const board = await this.getBigBoard(year, "Consensus");
+    if (board.ok === false) {
+      return Err(board.value);
+    }
+    const entry = board.value.entries.find((candidate) => candidate.playerName === playerName);
+    if (!entry) {
+      return Err(BigBoardValidationError(`Consensus entry for ${playerName} was not found.`));
+    }
+    if (!entry.bigDiscrepency) {
+      return Err(BigBoardValidationError(`Consensus entry for ${playerName} does not have a big discrepancy.`));
+    }
+    return Ok(entry);
+  }
+
+  private validateConsensusDiscrepancyWriteupForPublication(writeup: ConsensusDiscrepancyWriteup): Result<void, BigBoardError> {
+    if (!writeup.ryanWriteup || !writeup.aleksWriteup) {
+      return Err(BigBoardValidationError("Ryan and Aleks discrepancy explanations are required before publishing."));
     }
     return Ok(undefined);
   }
@@ -1057,6 +1099,47 @@ class OnDraftService implements IOnDraftService {
     });
   }
 
+  async saveConsensusDiscrepancyWriteup(input: ConsensusDiscrepancyWriteupInput): Promise<Result<ConsensusDiscrepancyWriteup, BigBoardError>> {
+    const normalizedYear = this.normalizeBigBoardYear(input.year);
+    if (normalizedYear.ok === false) {
+      return Err(normalizedYear.value);
+    }
+    const playerName = input.playerName?.trim() ?? "";
+    const target = await this.validateConsensusDiscrepancyWriteupTarget(normalizedYear.value, playerName);
+    if (target.ok === false) {
+      return Err(target.value);
+    }
+
+    const existing = await this.repository.getConsensusDiscrepancyWriteup(normalizedYear.value, playerName);
+    const writeup = this.normalizeConsensusDiscrepancyWriteup(input, existing.ok === true ? existing.value : undefined);
+    return await this.repository.saveConsensusDiscrepancyWriteup(normalizedYear.value, playerName, writeup);
+  }
+
+  async publishConsensusDiscrepancyWriteup(input: ConsensusDiscrepancyWriteupInput): Promise<Result<ConsensusDiscrepancyWriteup, BigBoardError>> {
+    const normalizedYear = this.normalizeBigBoardYear(input.year);
+    if (normalizedYear.ok === false) {
+      return Err(normalizedYear.value);
+    }
+    const playerName = input.playerName?.trim() ?? "";
+    const target = await this.validateConsensusDiscrepancyWriteupTarget(normalizedYear.value, playerName);
+    if (target.ok === false) {
+      return Err(target.value);
+    }
+
+    const existing = await this.repository.getConsensusDiscrepancyWriteup(normalizedYear.value, playerName);
+    const writeup = this.normalizeConsensusDiscrepancyWriteup(input, existing.ok === true ? existing.value : undefined);
+    const validation = this.validateConsensusDiscrepancyWriteupForPublication(writeup);
+    if (validation.ok === false) {
+      await this.repository.saveConsensusDiscrepancyWriteup(normalizedYear.value, playerName, writeup);
+      return Err(validation.value);
+    }
+    const saved = await this.repository.saveConsensusDiscrepancyWriteup(normalizedYear.value, playerName, writeup);
+    if (saved.ok === false) {
+      return Err(saved.value);
+    }
+    return await this.repository.publishConsensusDiscrepancyWriteup(normalizedYear.value, playerName);
+  }
+
   async deleteArticle(id: string): Promise<Result<void, ArticleError>> {
     return await this.repository.deleteArticle(id);
   }
@@ -1353,27 +1436,28 @@ class OnDraftService implements IOnDraftService {
     return [...new Set((values ?? []).map((value) => value.trim()).filter(Boolean))];
   }
 
-  private async prepareNewsletter(input: NewsletterInput): Promise<Result<Newsletter, NewsletterError>> {
+  private async prepareNewsletter(input: NewsletterInput, options: { requireReadyToSend?: boolean } = {}): Promise<Result<Newsletter, NewsletterError>> {
     const writeup = input.writeup.trim();
     const changelog = input.changelog.trim();
     const articleIds = this.normalizedLinkedIds(input.articleIds);
     const videoIds = this.normalizedLinkedIds(input.videoIds);
-    const date = input.date instanceof Date ? input.date : new Date("");
+    const parsedDate = input.date instanceof Date ? input.date : new Date("");
+    const date = isNaN(parsedDate.getTime()) ? null : parsedDate;
 
-    if (isNaN(date.getTime())) {
-      return Err(NewsletterValidationError("Newsletter date is required."));
+    if (options.requireReadyToSend && !date) {
+      return Err(NewsletterValidationError("Newsletter date is required before sending."));
     }
-    if (!writeup) {
-      return Err(NewsletterValidationError("Newsletter writeup is required."));
+    if (options.requireReadyToSend && !writeup) {
+      return Err(NewsletterValidationError("Newsletter writeup is required before sending."));
+    }
+    if (options.requireReadyToSend && !changelog) {
+      return Err(NewsletterValidationError("Newsletter changelog is required before sending."));
     }
     if (writeup.length > NEWSLETTER_WRITEUP_MAX_LENGTH) {
       return Err(NewsletterValidationError("Newsletter writeup is too long."));
     }
     if (changelog.length > NEWSLETTER_CHANGELOG_MAX_LENGTH) {
       return Err(NewsletterValidationError("Newsletter changelog is too long."));
-    }
-    if (articleIds.length + videoIds.length === 0) {
-      return Err(NewsletterValidationError("Choose at least one article or video."));
     }
     if (articleIds.length > NEWSLETTER_MAX_LINKED_ITEMS || videoIds.length > NEWSLETTER_MAX_LINKED_ITEMS) {
       return Err(NewsletterValidationError("Newsletters can link up to 20 articles and 20 videos."));
@@ -1477,9 +1561,12 @@ class OnDraftService implements IOnDraftService {
   }
 
   async sendNewsletter(input: NewsletterInput, recipients: NewsletterRecipientInput[]): Promise<Result<Newsletter, NewsletterError>> {
-    const prepared = await this.prepareNewsletter(input);
+    const prepared = await this.prepareNewsletter(input, { requireReadyToSend: true });
     if (prepared.ok === false) {
       return prepared;
+    }
+    if (!prepared.value.date) {
+      return Err(NewsletterValidationError("Newsletter date is required before sending."));
     }
     if (!this.email) {
       return Err(NewsletterValidationError("Newsletter email service is not configured."));
@@ -1496,14 +1583,14 @@ class OnDraftService implements IOnDraftService {
       recipientCount: recipients.length,
     };
     const emailItems = await this.newsletterEmailItems(newsletter);
-    const subject = `OnDraft Newsletter - ${this.newsletterDateLabel(newsletter.date)}`;
+    const subject = `OnDraft Newsletter - ${this.newsletterDateLabel(prepared.value.date)}`;
 
     try {
       for (const recipient of recipients) {
         await this.email.sendNewsletterEmail({
           to: recipient.email,
           subject,
-          dateLabel: this.newsletterDateLabel(newsletter.date),
+          dateLabel: this.newsletterDateLabel(prepared.value.date),
           writeup: newsletter.writeup,
           changelog: newsletter.changelog,
           articles: emailItems.articles,

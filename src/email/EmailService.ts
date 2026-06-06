@@ -1,6 +1,8 @@
 import type { IEmailConfig } from "../config/AppConfig";
 import type { ILoggingService } from "../service/LoggingService";
 
+const NEWSLETTER_FROM = "OnDraft <no-reply@ondraftfootball.com>";
+
 export interface SendEmailVerificationEmailInput {
   to: string;
   verificationUrl: string;
@@ -120,7 +122,7 @@ class ResendEmailService implements IEmailService {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: this.config.from,
+        from: NEWSLETTER_FROM,
         to: input.to,
         subject: input.subject,
         html: renderNewsletterHtml(input),
