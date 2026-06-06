@@ -4,14 +4,19 @@
     <h1 class="font-display text-4xl font-black leading-tight text-draft-amber dark:text-draft-gold sm:text-5xl">About Us</h1>
   </header>
 
-  <section class="od-card grid gap-4 p-5 sm:p-6">
-    <div>
+  <section class="od-card grid gap-5 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-center">
+    <div class="grid gap-4">
+      <div>
       <p class="m-0 text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Our Story</p>
       <h2 class="mt-2 font-display text-3xl font-black leading-tight text-slate-950 dark:text-white">How OnDraft Came To Be</h2>
-    </div>
-    <p class="max-w-3xl text-base leading-7 text-slate-700 dark:text-slate-200">
+      </div>
+      <p class="max-w-3xl text-base leading-7 text-slate-700 dark:text-slate-200">
       OnDraft (formerly known as “The Joe Cheeks Podcast,” and “The Cheekscast”) was originally created in July 2022. After initially being a podcast discussing the state of the league and weekly predictions, it soon expanded into a fast growing YouTube channel for the 2023 NFL Draft, amassing almost 100,000 views in the span of just three months. After a long hiatus and a complete rebrand, Aleks and Ryan came together again in 2026 with the vision to overhaul and re-create the product into OnDraft, spanning various social medias and mediums, including podcast episodes, written articles, YouTube videos, and TikTok content. OnDraft is not only a passion project, but a community, with this website serving as the home base for all content and discussion. 
-    </p>
+      </p>
+    </div>
+    <div class="grid justify-center lg:justify-end" aria-hidden="true">
+      <img class="h-52 w-64 object-contain drop-shadow-sm sm:h-64 sm:w-80" src="/images/brand/OnDraftLogo-cropped.png" alt="" loading="lazy" decoding="async" />
+    </div>
   </section>
 
   <section class="grid gap-5">
@@ -84,7 +89,19 @@ I am an aspiring football front office professional and current undergraduate Sp
     </article>
 
     <article id="aleks-ryabinkin" class="od-card about-profile-card grid gap-5 p-5 sm:grid-cols-[12rem_minmax(0,1fr)] sm:p-6 md:grid-cols-[14rem_minmax(0,1fr)]">
-      <div class="aspect-square w-full max-w-48 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white" aria-label="Aleks Ryabinkin headshot placeholder"></div>
+      <div class="grid w-full max-w-48 gap-3">
+        <img
+          class="aspect-square w-full rounded-lg border border-slate-200 bg-white object-cover shadow-sm dark:border-white/10"
+          src="/images/team/AleksHeadshot.jpeg"
+          alt="Aleks Ryabinkin"
+        />
+        <a
+          class="od-focus-ring rounded text-sm font-bold text-slate-700 transition hover:text-draft-amber dark:text-slate-200 dark:hover:text-draft-gold"
+          href="mailto:aleks@ondraftfootball.com"
+        >
+          aleks@ondraftfootball.com
+        </a>
+      </div>
       <div class="grid content-start gap-4">
         <div>
           <p class="m-0 text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Bio</p>
@@ -92,7 +109,7 @@ I am an aspiring football front office professional and current undergraduate Sp
           <p class="mt-1 text-sm font-black uppercase tracking-[0.14em] text-draft-amber dark:text-draft-gold">Analyst and Writer</p>
         </div>
         <p class="text-base leading-7 text-slate-700 dark:text-slate-200">
-          Placeholder bio text. This section will include background, football interests, site responsibilities, and whatever else should introduce Aleks Ryabinkin to OnDraft readers.
+          For as long as I can remember, I’ve loved football. Beginning in 2022, I turned this love into a passion project with Ryan McWalter on “The Cheekscast.” I’ve been working on scouting NFL Draft prospects in some capacity since 2023, inspired to understand the game on a deeper level after my beloved Commanders picked Emmanuel Forbes over Christian Gonzalez. As they say, there’s no better teacher than experience, and I hope to continue developing my skills as an NFL draft analyst with the OnDraft team.
         </p>
         <a
           class="od-focus-ring group flex min-h-11 w-fit items-center gap-3 rounded-md text-sm font-black text-slate-700 transition hover:text-draft-amber dark:text-slate-200 dark:hover:text-draft-gold"

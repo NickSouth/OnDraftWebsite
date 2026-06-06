@@ -1,3 +1,5 @@
+import type { DraftGrade, DraftGradeSummary } from "./DraftGrades";
+
 export interface IOnDraftContent {}
 export const BIG_BOARD_CREATORS = ["Ryan", "Aleks", "Consensus"] as const;
 export type BigBoardCreator = typeof BIG_BOARD_CREATORS[number];
@@ -22,6 +24,23 @@ export type BigBoardWriteup = {
   rundown: string;
 };
 
+export type ConsensusDiscrepancyWriteup = {
+  ryanWriteup: string;
+  aleksWriteup: string;
+  published: boolean;
+};
+
+export type ConsensusRankingContext = {
+  Ryan?: {
+    rank: number | null;
+    posRank: number | null;
+  };
+  Aleks?: {
+    rank: number | null;
+    posRank: number | null;
+  };
+};
+
 export type BigBoardEntry = {
   id: string;
   playerName: string;
@@ -32,10 +51,15 @@ export type BigBoardEntry = {
   height: Height | null;
   weight: number | null;
   playerInfoPublished: boolean;
+  grade: DraftGrade | null;
+  gradePublished: boolean;
+  gradeSummary?: DraftGradeSummary;
   writeup: BigBoardWriteup;
   writeupPublished: boolean;
   notes: string;
   bigDiscrepency?: boolean;
+  discWriteup?: ConsensusDiscrepancyWriteup;
+  consensusRankingContext?: ConsensusRankingContext;
 };
 
 export type ArticleFilter = {
@@ -134,9 +158,29 @@ export type Video = {
 export type VideoQuery = {
   keyword?: string;
   tags?: string[];
+  dateRange?: {
+    from: Date;
+    to: Date;
+  };
   sortBy?: "date" | "popularity";
   sortDirection?: "asc" | "desc";
 }
+
+export type NewsletterStatus = "draft" | "sent";
+
+export type Newsletter = {
+  id: string;
+  date: Date | null;
+  writeup: string;
+  articleIds: string[];
+  videoIds: string[];
+  changelog: string;
+  status: NewsletterStatus;
+  createdAt: Date;
+  updatedAt: Date;
+  sentAt?: Date;
+  recipientCount: number;
+};
 
 export type ConsensusBigBoard = {
   year: number;
@@ -153,6 +197,8 @@ export type ConsensusBigBoardEntry = {
   weight: number | null;
   writeup?: ConsensusWriteup;
   bigDiscrepency: boolean;
+  discWriteup?: ConsensusDiscrepancyWriteup;
+  consensusRankingContext?: ConsensusRankingContext;
 };
 
 export type ConsensusWriteup = {

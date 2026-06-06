@@ -19,15 +19,21 @@
   <% } else if (session.authenticatedUser) { %>
     <form
       class="comment-form"
+      x-data="{ text: '', get wordCount() { return this.text.trim() ? this.text.trim().split(/\s+/).length : 0 } }"
       hx-post="/articles/<%= article.id %>/comments?limit=<%= commentsLimit %>"
       hx-target="#article-comments-section"
       hx-swap="outerHTML"
+      data-loading-skeleton="comments"
+      data-loading-skeleton-target="#article-comments-section"
     >
       <label>
         Add a comment
-        <textarea name="text" maxlength="1000" required></textarea>
+        <textarea name="text" x-model="text" required></textarea>
       </label>
-      <button type="submit">Post Comment</button>
+      <div class="form-actions">
+        <button type="submit">Post Comment</button>
+        <span class="muted-text"><span x-text="wordCount">0</span>/200 words</span>
+      </div>
     </form>
   <% } else { %>
     <p class="muted-text"><a href="/login">Log in</a> to comment.</p>
@@ -59,6 +65,8 @@
                   hx-confirm="Delete this comment?"
                   hx-target="#article-comments-section"
                   hx-swap="outerHTML"
+                  data-loading-skeleton="comments"
+                  data-loading-skeleton-target="#article-comments-section"
                 >
                   Delete
                 </button>
@@ -68,6 +76,7 @@
           <p class="comment-text"><%= comment.text %></p>
           <div class="comment-actions">
             <%- include("commentLikeButton", { comment, likeActorId }) %>
+            <%- include("reportLink", { type: "article comment", id: `comment-${comment.id}`, path: `/articles/${article.id}` }) %>
           </div>
           <% if (comment.replies && comment.replies.length > 0) { %>
             <ol class="reply-list">
@@ -92,6 +101,8 @@
                           hx-confirm="Delete this comment?"
                           hx-target="#article-comments-section"
                           hx-swap="outerHTML"
+                          data-loading-skeleton="comments"
+                          data-loading-skeleton-target="#article-comments-section"
                         >
                           Delete
                         </button>
@@ -101,6 +112,7 @@
                   <p class="comment-text"><%= reply.text %></p>
                   <div class="comment-actions">
                     <%- include("commentLikeButton", { comment: reply, likeActorId }) %>
+                    <%- include("reportLink", { type: "article reply", id: `comment-${reply.id}`, path: `/articles/${article.id}` }) %>
                   </div>
                 </li>
               <% }) %>
@@ -110,15 +122,21 @@
             <form
               id="reply-form-<%= comment.id %>"
               class="comment-form reply-form"
+              x-data="{ text: '', get wordCount() { return this.text.trim() ? this.text.trim().split(/\s+/).length : 0 } }"
               hx-post="/articles/<%= article.id %>/comments/<%= comment.id %>/replies?limit=<%= commentsLimit %>"
               hx-target="#article-comments-section"
               hx-swap="outerHTML"
+              data-loading-skeleton="comments"
+              data-loading-skeleton-target="#article-comments-section"
             >
               <label>
                 Reply
-                <textarea name="text" maxlength="1000" required></textarea>
+                <textarea name="text" x-model="text" required></textarea>
               </label>
-              <button type="submit">Post Reply</button>
+              <div class="form-actions">
+                <button type="submit">Post Reply</button>
+                <span class="muted-text"><span x-text="wordCount">0</span>/200 words</span>
+              </div>
             </form>
           <% } %>
         </li>
@@ -133,6 +151,8 @@
       hx-get="/articles/<%= article.id %>/comments?limit=<%= commentsLimit + 10 %>"
       hx-target="#article-comments-section"
       hx-swap="outerHTML"
+      data-loading-skeleton="comments"
+      data-loading-skeleton-target="#article-comments-section"
     >
       Show More
     </button>

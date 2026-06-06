@@ -8,26 +8,73 @@
       const resolvedMetaDescription = typeof metaDescription !== "undefined" && metaDescription
         ? metaDescription
         : "NFL and NFL Draft analysis, opinions, videos, community hot takes, and draft boards from OnDraft Football.";
-      const resolvedMetaImage = typeof metaImage !== "undefined" && metaImage ? metaImage : defaultPreviewImageUrl;
+      const hasCustomMetaImage = typeof metaImage !== "undefined" && metaImage;
+      const resolvedMetaImage = hasCustomMetaImage ? metaImage : defaultPreviewImageUrl;
       const resolvedMetaUrl = typeof metaUrl !== "undefined" && metaUrl ? metaUrl : currentAbsoluteUrl;
       const resolvedMetaType = typeof metaType !== "undefined" && metaType ? metaType : "website";
+      const resolvedMetaImageAlt = typeof metaImageAlt !== "undefined" && metaImageAlt ? metaImageAlt : "OnDraft Football logo";
+      const resolvedMetaImageWidth = typeof metaImageWidth !== "undefined" && metaImageWidth ? metaImageWidth : (hasCustomMetaImage ? null : 1145);
+      const resolvedMetaImageHeight = typeof metaImageHeight !== "undefined" && metaImageHeight ? metaImageHeight : (hasCustomMetaImage ? null : 888);
+      const resolvedMetaRobots = typeof metaRobots !== "undefined" && metaRobots ? metaRobots : "index, follow, max-image-preview:large";
+      const resolvedMetaKeywords = typeof metaKeywords !== "undefined" && metaKeywords
+        ? (Array.isArray(metaKeywords) ? metaKeywords.join(", ") : metaKeywords)
+        : "OnDraft Football, NFL Draft, NFL analysis, NFL Draft analysis, football scouting, draft board";
+      const resolvedArticleAuthor = typeof articleAuthor !== "undefined" ? articleAuthor : null;
+      const resolvedArticlePublishedTime = typeof articlePublishedTime !== "undefined" ? articlePublishedTime : null;
+      const resolvedArticleModifiedTime = typeof articleModifiedTime !== "undefined" ? articleModifiedTime : null;
+      const resolvedArticleTags = typeof articleTags !== "undefined" && Array.isArray(articleTags) ? articleTags : [];
     %>
     <title><%= resolvedMetaTitle %></title>
     <meta name="description" content="<%= resolvedMetaDescription %>" />
+    <meta name="robots" content="<%= resolvedMetaRobots %>" />
+    <meta name="keywords" content="<%= resolvedMetaKeywords %>" />
+    <meta name="application-name" content="OnDraft Football" />
+    <meta name="apple-mobile-web-app-title" content="OnDraft Football" />
+    <meta name="theme-color" content="#0b1220" />
+    <meta name="color-scheme" content="dark light" />
     <link rel="canonical" href="<%= resolvedMetaUrl %>" />
+    <link rel="alternate" type="application/rss+xml" title="OnDraft Football Feed" href="/feed.xml" />
+    <link rel="manifest" href="/site.webmanifest" />
     <meta property="og:site_name" content="OnDraft Football" />
+    <meta property="og:locale" content="en_US" />
     <meta property="og:type" content="<%= resolvedMetaType %>" />
     <meta property="og:title" content="<%= resolvedMetaTitle %>" />
     <meta property="og:description" content="<%= resolvedMetaDescription %>" />
     <meta property="og:url" content="<%= resolvedMetaUrl %>" />
     <meta property="og:image" content="<%= resolvedMetaImage %>" />
-    <meta property="og:image:alt" content="OnDraft Football logo" />
+    <meta property="og:image:secure_url" content="<%= resolvedMetaImage %>" />
+    <meta property="og:image:alt" content="<%= resolvedMetaImageAlt %>" />
+    <% if (resolvedMetaImageWidth) { %>
+      <meta property="og:image:width" content="<%= resolvedMetaImageWidth %>" />
+    <% } %>
+    <% if (resolvedMetaImageHeight) { %>
+      <meta property="og:image:height" content="<%= resolvedMetaImageHeight %>" />
+    <% } %>
+    <% if (resolvedMetaType === "article") { %>
+      <% if (resolvedArticleAuthor) { %>
+        <meta property="article:author" content="<%= resolvedArticleAuthor %>" />
+      <% } %>
+      <% if (resolvedArticlePublishedTime) { %>
+        <meta property="article:published_time" content="<%= resolvedArticlePublishedTime %>" />
+      <% } %>
+      <% if (resolvedArticleModifiedTime) { %>
+        <meta property="article:modified_time" content="<%= resolvedArticleModifiedTime %>" />
+      <% } %>
+      <% resolvedArticleTags.forEach((tag) => { %>
+        <meta property="article:tag" content="<%= tag %>" />
+      <% }) %>
+    <% } %>
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@OnDraftFootball" />
     <meta name="twitter:title" content="<%= resolvedMetaTitle %>" />
     <meta name="twitter:description" content="<%= resolvedMetaDescription %>" />
     <meta name="twitter:image" content="<%= resolvedMetaImage %>" />
-    <link rel="icon" type="image/png" href="/images/brand/ondraft-logo.png" />
-    <link rel="apple-touch-icon" href="/images/brand/ondraft-logo.png" />
+    <meta name="twitter:image:alt" content="<%= resolvedMetaImageAlt %>" />
+    <link rel="icon" type="image/png" href="/images/brand/OnDraftLogo-favicon.png" />
+    <link rel="apple-touch-icon" href="/images/brand/OnDraftLogo-favicon.png" />
+    <% if (typeof structuredDataJson !== "undefined" && structuredDataJson) { %>
+      <script type="application/ld+json"><%- structuredDataJson %></script>
+    <% } %>
     <link rel="stylesheet" href="/styles.css" />
     <link rel="stylesheet" href="/tailwind.css" />
     <script src="/vendor/htmx/htmx.min.js" defer></script>
@@ -37,6 +84,9 @@
     <script src="/ondraftShell.js" defer></script>
     <script src="/articleShare.js" defer></script>
     <script src="/teamHelmetRecolor.js" defer></script>
+    <% if (typeof umamiWebsiteId !== "undefined" && umamiWebsiteId) { %>
+      <script defer src="https://cloud.umami.is/script.js" data-website-id="<%= umamiWebsiteId %>"></script>
+    <% } %>
   </head>
   <body class="min-h-screen bg-slate-50 p-0 text-slate-950 antialiased dark:bg-draft-ink dark:text-slate-100">
     <% const currentSession = typeof session !== "undefined" ? session : null; %>
@@ -53,7 +103,7 @@
       <%- include("partials/beerLoader") %>
       <div id="site-modal-outlet"></div>
       <main id="page-content" class="mx-0 min-h-[calc(100vh-9rem)] max-w-none px-4 pb-10 pt-20 lg:px-8 <%= currentForceOverlaySidebar ? "" : "lg:mr-80" %>">
-        <div class="w-full">
+        <div class="w-full od-page-stage">
           <%- body %>
         </div>
       </main>

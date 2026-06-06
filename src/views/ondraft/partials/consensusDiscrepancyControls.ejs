@@ -1,0 +1,35 @@
+<%
+  const hasConsensusText = (value) => typeof value === "string" && value.trim().length > 0;
+  const controlWriteup = entry.discWriteup || { ryanWriteup: "", aleksWriteup: "", published: false };
+  const hasPublishedExplanation = controlWriteup.published && hasConsensusText(controlWriteup.ryanWriteup) && hasConsensusText(controlWriteup.aleksWriteup);
+  const safePlayerKey = String(entry.playerName).replace(/[^A-Za-z0-9_-]/g, "-");
+  const controlId = `consensus-discrepancy-controls-${variant}-${board.year}-${safePlayerKey}`;
+  const swapOob = typeof oob !== "undefined" && oob;
+%>
+
+<span id="<%= controlId %>" class="consensus-discrepancy-controls consensus-discrepancy-controls-<%= variant %>" <%- swapOob ? 'hx-swap-oob="outerHTML"' : "" %>>
+  <span class="consensus-discrepancy-control-row">
+    <% if (hasPublishedExplanation) { %>
+      <span class="consensus-discrepancy-summary">
+        <span>See why</span>
+        <svg class="size-3.5 transition group-open:rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" />
+        </svg>
+      </span>
+    <% } %>
+    <% if (isAdmin && !hasPublishedExplanation) { %>
+      <button
+        type="button"
+        class="consensus-discrepancy-edit-trigger"
+        aria-label="Edit discrepancy explanation for <%= entry.playerName %>"
+        title="Edit discrepancy explanation"
+        @click.prevent.stop="$el.closest('details') && ($el.closest('details').open = true); $dispatch('consensus-edit', { playerName: '<%= entry.playerName.replace(/'/g, "\\'") %>' })"
+      >
+        <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M17 3a2.85 2.85 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+          <path d="m15 5 4 4" />
+        </svg>
+      </button>
+    <% } %>
+  </span>
+</span>

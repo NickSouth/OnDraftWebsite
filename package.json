@@ -57,5 +57,8 @@
     "tailwindcss": "^3.4.17",
     "ts-jest": "^29.4.6",
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "@hono/node-server": "^1.19.13"
   }
 }

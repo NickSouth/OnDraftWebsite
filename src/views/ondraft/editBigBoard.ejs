@@ -16,8 +16,36 @@
   const selectedHeightFeet = (height) => height ? height.feet : "";
   const selectedHeightInches = (height) => height ? Math.floor(height.inches) : "";
   const selectedHeightFraction = (height) => height ? Number((height.inches - Math.floor(height.inches)).toFixed(3)) : 0;
+  const emptyEditorEntry = {
+    id: "",
+    playerName: "",
+    position: "",
+    school: "",
+    rank: null,
+    posRank: null,
+    height: null,
+    weight: null,
+    playerInfoPublished: false,
+    grade: null,
+    gradePublished: false,
+    writeup: {
+      strengths: "",
+      weaknesses: "",
+      rundown: "",
+    },
+    writeupPublished: false,
+    notes: "",
+  };
+  const teamHelmetSources = Object.fromEntries(
+    Object.entries(typeof collegeTeamColors !== "undefined" ? collegeTeamColors : {}).map(([school, colors]) => {
+      const key = typeof helmetColorKey !== "undefined" ? helmetColorKey(colors.primaryColor, colors.secondaryColor) : null;
+      return [school, key ? `/generated/helmets/v1/${key}.png` : "/teamHelmetTemplate.png"];
+    })
+  );
+  const helmetSourcesJson = JSON.stringify(teamHelmetSources).replace(/</g, "\\u003c");
 %>
 
+<div id="big-board-editor-fragment" data-big-board-editor-fragment>
 <section class="plain-page board-editor-page od-admin-board-page">
   <div class="page-heading big-board-heading board-editor-heading od-admin-heading">
     <div>
@@ -28,23 +56,32 @@
     <div class="big-board-heading-actions">
       <div class="board-class-tools">
         <div class="board-class-selector-row">
-          <form class="big-board-controls" method="get" action="/bigboard/edit">
+          <form
+            class="big-board-controls"
+            method="get"
+            action="/bigboard/edit"
+            hx-get="/bigboard/edit"
+            hx-target="#big-board-editor-fragment"
+            hx-swap="outerHTML"
+            data-board-class-form
+            data-use-global-loader
+          >
             <label class="big-board-year-control">
               <span>Draft Class</span>
-              <select name="year" onchange="this.form.submit();">
+              <select name="year" onchange="this.form.requestSubmit();">
                 <% years.forEach((year) => { %>
                   <option value="<%= year %>" <%= board.year === year ? "selected" : "" %>><%= year %></option>
                 <% }) %>
               </select>
             </label>
             <input type="hidden" name="creator" value="<%= board.creator %>" />
-            <div class="creator-toggle" aria-label="Board creator">
+            <div class="creator-toggle od-text-toggle-group" style="--od-toggle-count: <%= creators.length %>;" aria-label="Board creator">
               <% creators.forEach((creator) => { %>
                 <button
                   type="button"
-                  class="<%= board.creator === creator ? "is-active" : "" %>"
+                  class="od-text-toggle <%= board.creator === creator ? "is-active" : "" %>"
                   aria-pressed="<%= board.creator === creator ? "true" : "false" %>"
-                  onclick="this.form.creator.value = '<%= creator %>'; this.form.submit();"
+                  onclick="this.form.creator.value = '<%= creator %>'; this.form.requestSubmit();"
                 >
                   <%= creator %>
                 </button>
@@ -77,166 +114,51 @@
     <p class="od-admin-error" role="alert"><%= errorMessage %></p>
   <% } %>
 
-  <form
-    id="big-board-editor-form"
-    class="board-editor-form"
-    method="post"
-    action="/bigboard/edit"
-    hx-post="/bigboard/edit/autosave"
-    hx-trigger="change delay:2m, every 2m"
-    hx-target="#big-board-save-status"
-    hx-swap="innerHTML"
-    hx-indicator="#big-board-autosave-indicator"
-  >
-    <input type="hidden" name="year" value="<%= board.year %>" />
-    <input type="hidden" name="creator" value="<%= board.creator %>" />
-    <input id="big-board-entry-id" type="hidden" name="entryId" value="" />
-
+  <div class="board-editor-form" id="big-board-editor-form">
     <div class="board-editor-toolbar">
       <div>
         <strong><%= board.year %> <%= board.creator %></strong>
         <span class="autosave-status-group">
           <span id="big-board-save-status" class="save-status"><%= statusMessage || "" %></span>
-          <span id="big-board-autosave-indicator" class="autosave-mini-loader htmx-indicator" aria-hidden="true"></span>
         </span>
+      </div>
+      <div class="board-editor-dirty-actions" data-board-dirty-actions hidden>
+        <span class="board-editor-unsaved-label">Unsaved</span>
+        <button type="button" class="board-editor-save-board-button" data-save-full-board>Save full board</button>
       </div>
     </div>
 
-    <div class="board-editor-table-wrap">
-      <table class="board-editor-table">
-        <thead>
-          <tr>
-            <th><span class="sr-only">Delete</span></th>
-            <th>Rank</th>
-            <th>Player</th>
-            <th>School</th>
-            <th>Position</th>
-            <th>Height</th>
-            <th>Weight</th>
-            <th>Pos Rank</th>
-            <th>Publish</th>
-            <th>Strengths</th>
-            <th>Weaknesses</th>
-            <th>Rundown</th>
-            <th>Publish</th>
-            <th>Notes</th>
-          </tr>
-        </thead>
-        <tbody id="board-editor-rows">
-          <% board.entries.forEach((entry, index) => { %>
-            <tr class="board-editor-row">
-              <td class="board-editor-delete-cell">
-                <button
-                  type="button"
-                  class="board-editor-delete-row-button"
-                  data-delete-board-entry
-                  aria-label="Delete <%= entry.playerName || "draft board entry" %>"
-                  title="Delete row"
-                >
-                  <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M3 6h18" />
-                    <path d="M8 6V4h8v2" />
-                    <path d="M19 6l-1 14H6L5 6" />
-                    <path d="M10 11v5" />
-                    <path d="M14 11v5" />
-                  </svg>
-                </button>
-              </td>
-              <td>
-                <input type="number" name="entries[<%= index %>][rank]" min="1" step="1" value="<%= entry.rank ?? "" %>" placeholder="Rank" data-publish-section="player" />
-              </td>
-              <td>
-                <input type="hidden" name="entries[<%= index %>][id]" value="<%= entry.id %>" data-entry-id />
-                <input name="entries[<%= index %>][playerName]" value="<%= entry.playerName %>" placeholder="Player name" data-publish-section="player" />
-              </td>
-              <td><input name="entries[<%= index %>][school]" list="college-team-options" value="<%= entry.school %>" placeholder="School" autocomplete="off" data-publish-section="player" /></td>
-              <td>
-                <select name="entries[<%= index %>][position]" data-publish-section="player">
-                  <option value="">Pos</option>
-                  <% positions.forEach((position) => { %>
-                    <option value="<%= position %>" <%= entry.position === position ? "selected" : "" %>><%= position %></option>
-                  <% }) %>
-                </select>
-              </td>
-              <td>
-                <div class="height-picker" data-height-picker>
-                  <input type="hidden" name="entries[<%= index %>][heightLabel]" value="<%= selectedHeightValue(entry.height) %>" data-height-label />
-                  <button type="button" class="height-picker-trigger" data-height-toggle aria-expanded="false">
-                    <span data-height-display>Height</span>
-                    <svg class="size-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                      <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" />
-                    </svg>
-                  </button>
-                  <div class="height-picker-panel" data-height-panel aria-hidden="true">
-                    <label>
-                      <span>Feet</span>
-                      <select data-height-feet data-publish-section="player" aria-label="Height feet">
-                        <option value="">--</option>
-                        <% heightFeetOptions.forEach((feet) => { %>
-                          <option value="<%= feet %>" <%= selectedHeightFeet(entry.height) === feet ? "selected" : "" %>><%= feet %></option>
-                        <% }) %>
-                      </select>
-                    </label>
-                    <label>
-                      <span>Inches</span>
-                      <select data-height-inches data-publish-section="player" aria-label="Height inches">
-                        <option value="">--</option>
-                        <% heightInchOptions.forEach((inches) => { %>
-                          <option value="<%= inches %>" <%= selectedHeightInches(entry.height) === inches ? "selected" : "" %>><%= inches %></option>
-                        <% }) %>
-                      </select>
-                    </label>
-                    <label>
-                      <span>Fraction</span>
-                      <select data-height-fraction data-publish-section="player" aria-label="Height fraction">
-                        <% heightFractionOptions.forEach((fraction) => { %>
-                          <option value="<%= fraction.value %>" <%= selectedHeightFraction(entry.height) === fraction.value ? "selected" : "" %>><%= fraction.label %></option>
-                        <% }) %>
-                      </select>
-                    </label>
-                  </div>
-                </div>
-              </td>
-              <td><input type="number" name="entries[<%= index %>][weight]" min="1" step="1" value="<%= entry.weight ?? "" %>" placeholder="lbs" data-publish-section="player" /></td>
-              <td>
-                <input type="number" name="entries[<%= index %>][posRank]" min="1" step="1" value="<%= entry.posRank ?? "" %>" placeholder="Pos rank" data-publish-section="player" />
-              </td>
-              <td class="board-editor-publish-cell">
-                <label class="publish-state" title="Player info published">
-                  <input
-                    type="checkbox"
-                    name="entries[<%= index %>][playerInfoPublished]"
-                    value="true"
-                    data-player-publish
-                    <%= entry.playerInfoPublished ? "checked" : "" %>
-                  />
-                </label>
-              </td>
-              <td><textarea name="entries[<%= index %>][strengths]" placeholder="Strengths" data-publish-section="writeup"><%= entry.writeup.strengths %></textarea></td>
-              <td><textarea name="entries[<%= index %>][weaknesses]" placeholder="Weaknesses" data-publish-section="writeup"><%= entry.writeup.weaknesses %></textarea></td>
-              <td><textarea name="entries[<%= index %>][rundown]" placeholder="Rundown" data-publish-section="writeup"><%= entry.writeup.rundown %></textarea></td>
-              <td class="board-editor-publish-cell">
-                <label class="publish-state" title="Writeup published">
-                  <input
-                    type="checkbox"
-                    name="entries[<%= index %>][writeupPublished]"
-                    value="true"
-                    data-writeup-publish
-                    <%= entry.writeupPublished ? "checked" : "" %>
-                  />
-                </label>
-              </td>
-              <td><textarea name="entries[<%= index %>][notes]" placeholder="Notes"><%= entry.notes %></textarea></td>
-            </tr>
-          <% }) %>
-        </tbody>
-      </table>
+    <div class="board-editor-list-shell">
+      <p class="board-editor-empty-state" data-board-editor-empty-state <%= board.entries.length > 0 ? "hidden" : "" %>>
+        No players on this board yet.
+      </p>
+      <ol id="board-editor-cards" class="board-editor-card-list" data-board-editor-card-list>
+        <% board.entries.forEach((entry, index) => { %>
+          <%- include("partials/bigBoardEditorEntryCard", {
+            board,
+            entry,
+            index,
+            positions,
+            heightFeetOptions,
+            heightInchOptions,
+            heightFractionOptions,
+            selectedHeightValue,
+            selectedHeightFeet,
+            selectedHeightInches,
+            selectedHeightFraction,
+            collegeTeamColors,
+            helmetColorKey,
+            validationIssues,
+            isTemplate: false,
+          }) %>
+        <% }) %>
+      </ol>
     </div>
+
     <div class="board-editor-bottom-actions">
-      <button type="button" class="secondary-button" data-add-player>Add player</button>
+      <button type="button" class="secondary-button" data-add-player>Add Player</button>
       <div class="board-editor-bottom-save-actions">
-        <button type="submit" class="secondary-button">Save</button>
-        <button type="submit" name="action" value="exit" class="save-exit-button">Save and exit</button>
+        <a class="secondary-button" href="/bigboard?year=<%= board.year %>&creator=<%= encodeURIComponent(board.creator) %>">View board</a>
         <button
           type="submit"
           form="delete-board-year-form"
@@ -247,93 +169,26 @@
         </button>
       </div>
     </div>
-  </form>
+  </div>
 
-  <template id="board-editor-row-template">
-    <tr class="board-editor-row">
-      <td class="board-editor-delete-cell">
-        <button
-          type="button"
-          class="board-editor-delete-row-button"
-          data-delete-board-entry
-          aria-label="Delete draft board entry"
-          title="Delete row"
-        >
-          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M3 6h18" />
-            <path d="M8 6V4h8v2" />
-            <path d="M19 6l-1 14H6L5 6" />
-            <path d="M10 11v5" />
-            <path d="M14 11v5" />
-          </svg>
-        </button>
-      </td>
-      <td><input type="number" data-field="rank" min="1" step="1" placeholder="Rank" data-publish-section="player" /></td>
-      <td>
-        <input type="hidden" data-field="id" data-entry-id />
-        <input data-field="playerName" placeholder="Player name" data-publish-section="player" />
-      </td>
-      <td><input data-field="school" list="college-team-options" placeholder="School" autocomplete="off" data-publish-section="player" /></td>
-      <td>
-        <select data-field="position" data-publish-section="player">
-          <option value="">Pos</option>
-          <% positions.forEach((position) => { %>
-            <option value="<%= position %>"><%= position %></option>
-          <% }) %>
-        </select>
-      </td>
-      <td>
-        <div class="height-picker" data-height-picker>
-          <input type="hidden" data-field="heightLabel" data-height-label />
-          <button type="button" class="height-picker-trigger" data-height-toggle aria-expanded="false">
-            <span data-height-display>Height</span>
-            <svg class="size-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" />
-            </svg>
-          </button>
-          <div class="height-picker-panel" data-height-panel aria-hidden="true">
-            <label>
-              <span>Feet</span>
-              <select data-height-feet data-publish-section="player" aria-label="Height feet">
-                <option value="">--</option>
-                <% heightFeetOptions.forEach((feet) => { %>
-                  <option value="<%= feet %>"><%= feet %></option>
-                <% }) %>
-              </select>
-            </label>
-            <label>
-              <span>Inches</span>
-              <select data-height-inches data-publish-section="player" aria-label="Height inches">
-                <option value="">--</option>
-                <% heightInchOptions.forEach((inches) => { %>
-                  <option value="<%= inches %>"><%= inches %></option>
-                <% }) %>
-              </select>
-            </label>
-            <label>
-              <span>Fraction</span>
-              <select data-height-fraction data-publish-section="player" aria-label="Height fraction">
-                <% heightFractionOptions.forEach((fraction) => { %>
-                  <option value="<%= fraction.value %>"><%= fraction.label %></option>
-                <% }) %>
-              </select>
-            </label>
-          </div>
-        </div>
-      </td>
-      <td><input type="number" data-field="weight" min="1" step="1" placeholder="lbs" data-publish-section="player" /></td>
-      <td><input type="number" data-field="posRank" min="1" step="1" placeholder="Pos rank" data-publish-section="player" /></td>
-      <td class="board-editor-publish-cell">
-        <label class="publish-state" title="Player info published"><input type="checkbox" data-field="playerInfoPublished" value="true" data-player-publish /></label>
-      </td>
-      <td><textarea data-field="strengths" placeholder="Strengths" data-publish-section="writeup"></textarea></td>
-      <td><textarea data-field="weaknesses" placeholder="Weaknesses" data-publish-section="writeup"></textarea></td>
-      <td><textarea data-field="rundown" placeholder="Rundown" data-publish-section="writeup"></textarea></td>
-      <td class="board-editor-publish-cell">
-        <label class="publish-state" title="Writeup published"><input type="checkbox" data-field="writeupPublished" value="true" data-writeup-publish /></label>
-      </td>
-      <td><textarea data-field="notes" placeholder="Notes"></textarea></td>
-    </tr>
+  <template id="board-editor-card-template">
+    <%- include("partials/bigBoardEditorEntryCard", {
+      board,
+      entry: emptyEditorEntry,
+      index: 0,
+      positions,
+      heightFeetOptions,
+      heightInchOptions,
+      heightFractionOptions,
+      selectedHeightValue,
+      selectedHeightFeet,
+      selectedHeightInches,
+      selectedHeightFraction,
+      collegeTeamColors,
+      helmetColorKey,
+      validationIssues: [],
+      isTemplate: true,
+    }) %>
   </template>
 
   <datalist id="college-team-options">
@@ -347,7 +202,7 @@
       <p class="board-entry-delete-kicker">Delete entry</p>
       <h2 id="board-entry-delete-title">Are you sure?</h2>
       <p>This cannot be undone.</p>
-      <p class="board-entry-delete-target">Selected row: <strong data-delete-entry-name>this draft board entry</strong></p>
+      <p class="board-entry-delete-target">Selected entry: <strong data-delete-entry-name>this draft board entry</strong></p>
       <div class="board-entry-delete-actions">
         <button type="button" class="secondary-button" data-cancel-entry-delete>Cancel</button>
         <button type="button" class="danger-button" data-confirm-entry-delete>Delete entry</button>
@@ -358,19 +213,26 @@
 
 <script>
   (() => {
-    const rows = document.querySelector("#board-editor-rows");
-    const template = document.querySelector("#board-editor-row-template");
-    const entryIdInput = document.querySelector("#big-board-entry-id");
-    const form = document.querySelector("#big-board-editor-form");
+    window.__bigBoardEditorAbortController?.abort();
+    const editorAbortController = new AbortController();
+    window.__bigBoardEditorAbortController = editorAbortController;
+    const editorListenerOptions = { signal: editorAbortController.signal };
+    const FIELD_PREFIX = "entries[0]";
+    const helmetSourcesBySchool = <%- helmetSourcesJson %>;
+    const list = document.querySelector("#board-editor-cards");
+    const template = document.querySelector("#board-editor-card-template");
+    const addPlayerButton = document.querySelector("[data-add-player]");
+    const emptyState = document.querySelector("[data-board-editor-empty-state]");
     const deleteModal = document.querySelector("#board-editor-delete-entry-modal");
     const deleteEntryName = deleteModal?.querySelector("[data-delete-entry-name]");
     const cancelEntryDelete = deleteModal?.querySelector("[data-cancel-entry-delete]");
     const confirmEntryDelete = deleteModal?.querySelector("[data-confirm-entry-delete]");
-    let pendingDeleteRow = null;
-
-    function nextIndex() {
-      return rows.querySelectorAll("tr").length;
-    }
+    const dirtyActions = document.querySelector("[data-board-dirty-actions]");
+    const saveFullBoardButton = document.querySelector("[data-save-full-board]");
+    const unsavedChangesMessage = "You have unsaved changes, are you sure you want to exit?";
+    let pendingDeleteForm = null;
+    let nativeSubmissionInProgress = false;
+    let boardStructureDirty = document.querySelector("[data-big-board-editor-fragment]")?.dataset.boardStructureDirty === "true";
 
     function entryId() {
       if (window.crypto && window.crypto.randomUUID) {
@@ -379,21 +241,36 @@
       return `draft-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     }
 
-    function reindexRows() {
-      rows.querySelectorAll("tr").forEach((row, index) => {
-        row.querySelectorAll("input[name], select[name], textarea[name]").forEach((field) => {
-          field.name = field.name.replace(/^entries\[\d+\]\[(.+)\]$/, `entries[${index}][$1]`);
-        });
-      });
+    function namedField(form, fieldName) {
+      const field = form.elements.namedItem(`${FIELD_PREFIX}[${fieldName}]`);
+      return field && "value" in field ? field : null;
     }
 
-    function markFormChanged() {
-      form?.dispatchEvent(new Event("change", { bubbles: true }));
+    function fieldValue(form, fieldName) {
+      return namedField(form, fieldName)?.value?.trim() || "";
+    }
+
+    function setFieldValue(form, fieldName, value) {
+      const field = namedField(form, fieldName);
+      if (field) {
+        field.value = value;
+      }
+    }
+
+    function serializeForm(form) {
+      const pairs = [];
+      new FormData(form).forEach((value, name) => {
+        if (name === "expandWriteup" || name === "expandGrade") {
+          return;
+        }
+        pairs.push(`${encodeURIComponent(name)}=${encodeURIComponent(String(value))}`);
+      });
+      return pairs.sort().join("&");
     }
 
     function formatHeightDisplay(feet, inches, fraction) {
       if (feet === "" || inches === "") {
-        return "Height";
+        return "Height TBD";
       }
       const fractionLabel = fraction === "" || Number(fraction) === 0
         ? ""
@@ -414,12 +291,13 @@
       const inches = picker.querySelector("[data-height-inches]")?.value || "";
       const fraction = picker.querySelector("[data-height-fraction]")?.value || "0";
       const hidden = picker.querySelector("[data-height-label]");
-      const display = picker.querySelector("[data-height-display]");
+      const label = picker.querySelector(".board-editor-field-label");
+      if (label) {
+        label.textContent = `Height`;
+        label.title = formatHeightDisplay(feet, inches, fraction);
+      }
       if (!hidden) {
         return;
-      }
-      if (display) {
-        display.textContent = formatHeightDisplay(feet, inches, fraction);
       }
       if (feet === "" || inches === "") {
         hidden.value = "";
@@ -429,113 +307,386 @@
       hidden.value = `${feet}-${Number(totalInches.toFixed(3))}`;
     }
 
-    function closeHeightPicker(picker) {
-      picker.classList.remove("is-open");
-      picker.querySelector("[data-height-toggle]")?.setAttribute("aria-expanded", "false");
-      const panel = picker.querySelector("[data-height-panel]");
-      panel?.setAttribute("aria-hidden", "true");
-      if (panel) {
-        panel.style.left = "";
-        panel.style.top = "";
+    function displayValue(editable) {
+      const input = editable.querySelector("[data-edit-input]");
+      const value = input?.value?.trim() || "";
+      if (!value) {
+        return editable.dataset.emptyLabel || "";
+      }
+      return `${value}${editable.dataset.suffix || ""}`;
+    }
+
+    function syncEditableDisplay(editable) {
+      const display = editable.querySelector("[data-field-display]");
+      if (display) {
+        display.textContent = displayValue(editable);
       }
     }
 
-    function positionHeightPicker(picker) {
-      const trigger = picker.querySelector("[data-height-toggle]");
-      const panel = picker.querySelector("[data-height-panel]");
-      if (!trigger || !panel) {
+    function openEditable(editable) {
+      if (!editable) {
         return;
       }
-
-      const gutter = 8;
-      const triggerRect = trigger.getBoundingClientRect();
-      const panelWidth = panel.offsetWidth || 256;
-      const panelHeight = panel.offsetHeight || 104;
-      const maxLeft = Math.max(gutter, window.innerWidth - panelWidth - gutter);
-      const left = Math.min(Math.max(gutter, triggerRect.left), maxLeft);
-      const hasRoomBelow = window.innerHeight - triggerRect.bottom >= panelHeight + gutter;
-      const top = hasRoomBelow
-        ? triggerRect.bottom + 4
-        : Math.max(gutter, triggerRect.top - panelHeight - 4);
-
-      panel.style.left = `${left}px`;
-      panel.style.top = `${top}px`;
+      const input = editable.querySelector("[data-edit-input]");
+      const display = editable.querySelector("[data-field-display]");
+      if (!input) {
+        return;
+      }
+      editable.dataset.editing = "true";
+      input.hidden = false;
+      if (display) {
+        display.hidden = true;
+      }
+      input.focus();
+      if (input.type !== "number") {
+        input.select();
+      }
     }
 
-    function openHeightPicker(picker) {
-      document.querySelectorAll("[data-height-picker].is-open").forEach((openPicker) => {
-        if (openPicker !== picker) {
-          closeHeightPicker(openPicker);
+    function closeEditable(editable) {
+      if (!editable) {
+        return;
+      }
+      const input = editable.querySelector("[data-edit-input]");
+      const display = editable.querySelector("[data-field-display]");
+      syncEditableDisplay(editable);
+      editable.dataset.editing = "false";
+      if (input) {
+        input.hidden = true;
+      }
+      if (display) {
+        display.hidden = false;
+      }
+    }
+
+    function hasAnyPlayerContent(form) {
+      return ["rank", "playerName", "school", "position", "posRank", "heightLabel", "weight"]
+        .some((fieldName) => fieldValue(form, fieldName) !== "");
+    }
+
+    function hasAnyWriteupContent(form) {
+      return ["strengths", "weaknesses", "rundown"].some((fieldName) => fieldValue(form, fieldName) !== "");
+    }
+
+    function hasAnyGradeContent(form) {
+      const gradeFields = Array.from(form.querySelectorAll("[name^='entries[0][grade]']"));
+      return gradeFields.some((field) => {
+        if (!(field instanceof HTMLInputElement || field instanceof HTMLSelectElement)) {
+          return false;
         }
+        if (field.name.endsWith("[position]") || field.name.endsWith("[archetype]")) {
+          return false;
+        }
+        return field.value.trim() !== "";
       });
-      picker.classList.add("is-open");
-      picker.querySelector("[data-height-toggle]")?.setAttribute("aria-expanded", "true");
-      picker.querySelector("[data-height-panel]")?.setAttribute("aria-hidden", "false");
-      positionHeightPicker(picker);
     }
 
-    function positionOpenHeightPickers() {
-      document.querySelectorAll("[data-height-picker].is-open").forEach(positionHeightPicker);
+    function setButtonsHidden(form, selector, hidden) {
+      form.querySelectorAll(selector).forEach((button) => {
+        button.hidden = hidden;
+      });
     }
 
-    function wireHeightPicker(picker) {
-      syncHeightPicker(picker);
-      picker.querySelector("[data-height-toggle]")?.addEventListener("click", () => {
-        if (picker.classList.contains("is-open")) {
-          closeHeightPicker(picker);
+    function setPanelState(form, panelName, expanded) {
+      const stateField = panelName === "grade"
+        ? form.querySelector("[data-expand-grade-state]")
+        : form.querySelector("[data-expand-writeup-state]");
+      if (stateField) {
+        stateField.value = expanded ? "true" : "false";
+      }
+    }
+
+    function syncPublishChips(form) {
+      const playerPublished = form.querySelector("[data-player-publish]")?.value === "true";
+      const gradePublished = form.querySelector("[data-grade-publish]")?.value === "true";
+      const writeupPublished = form.querySelector("[data-writeup-publish]")?.value === "true";
+      const playerChip = form.querySelector("[data-player-publish-chip]");
+      const gradeChip = form.querySelector("[data-grade-publish-chip]");
+      const writeupChip = form.querySelector("[data-writeup-publish-chip]");
+      if (playerChip) {
+        playerChip.dataset.state = playerPublished ? "published" : "draft";
+        playerChip.textContent = playerPublished ? "Info published" : "Info draft";
+      }
+      if (writeupChip) {
+        writeupChip.dataset.state = writeupPublished ? "published" : "draft";
+        writeupChip.textContent = writeupPublished ? "Profile published" : "Profile draft";
+      }
+      if (gradeChip) {
+        gradeChip.dataset.state = gradePublished ? "published" : "draft";
+        gradeChip.textContent = gradePublished ? "Grade published" : "Grade draft";
+      }
+    }
+
+    function syncHelmet(form) {
+      const school = fieldValue(form, "school");
+      const helmet = form.querySelector("[data-team-helmet]");
+      if (!helmet) {
+        return;
+      }
+      const nextSource = helmetSourcesBySchool[school] || "/teamHelmetTemplate.png";
+      helmet.dataset.generatedHelmetSrc = nextSource;
+      helmet.dataset.recoloredHelmet = "true";
+      helmet.src = nextSource;
+      helmet.style.opacity = "1";
+      helmet.alt = school ? `${school} football helmet` : "Draft board player helmet";
+    }
+
+    function syncDeleteLabel(form) {
+      const deleteButton = form.querySelector("[data-delete-board-entry]");
+      const playerName = fieldValue(form, "playerName") || "draft board entry";
+      if (deleteButton) {
+        deleteButton.setAttribute("aria-label", `Delete ${playerName}`);
+      }
+    }
+
+    function updateEmptyState() {
+      if (!emptyState || !list) {
+        return;
+      }
+      emptyState.hidden = Boolean(list.querySelector("[data-board-entry-form]"));
+    }
+
+    function hasDirtyEntries() {
+      return Boolean(document.querySelector("[data-board-entry-form][data-dirty='true']"));
+    }
+
+    function hasUnsavedBoardChanges() {
+      return boardStructureDirty || hasDirtyEntries();
+    }
+
+    function markBoardStructureDirty() {
+      boardStructureDirty = true;
+      const editorFragment = document.querySelector("[data-big-board-editor-fragment]");
+      if (editorFragment) {
+        editorFragment.dataset.boardStructureDirty = "true";
+      }
+      updateBoardDirtyState();
+    }
+
+    function updateBoardDirtyState() {
+      if (!dirtyActions) {
+        return;
+      }
+      dirtyActions.hidden = !hasUnsavedBoardChanges();
+    }
+
+    function scrollToFirstValidationError() {
+      const erroredForm = document.querySelector("[data-board-entry-form][data-has-validation-error='true']");
+      const erroredEntry = erroredForm?.closest("[data-board-entry-item]");
+      if (!erroredEntry) {
+        return;
+      }
+      window.requestAnimationFrame(() => {
+        window.setTimeout(() => {
+          erroredEntry.scrollIntoView({ block: "center", behavior: "smooth" });
+        }, 0);
+      });
+    }
+
+    function hideGlobalLoader() {
+      window.dispatchEvent(new CustomEvent("ondraft:hide-global-loader"));
+    }
+
+    function appendHiddenInput(form, name, value) {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = name;
+      input.value = value;
+      form.append(input);
+    }
+
+    function appendEntryFields(targetForm, sourceForm, index) {
+      const nextPrefix = `entries[${index}]`;
+      const sourcePrefixPattern = /^entries\[\d+\]\[(.+)\]$/;
+      const seen = new Set();
+      new FormData(sourceForm).forEach((value, name) => {
+        const match = name.match(sourcePrefixPattern);
+        if (!match) {
           return;
         }
-        openHeightPicker(picker);
+        const nextName = `${nextPrefix}[${match[1]}]`;
+        seen.add(nextName);
+        appendHiddenInput(targetForm, nextName, String(value));
       });
-      picker.querySelectorAll("[data-height-feet], [data-height-inches], [data-height-fraction]").forEach((field) => {
-        field.addEventListener("change", () => syncHeightPicker(picker));
-      });
-    }
-
-    function wireRow(row, index, id) {
-      row.querySelectorAll("[data-field]").forEach((field) => {
-        field.name = `entries[${index}][${field.dataset.field}]`;
-        if (field.dataset.field === "id") {
-          field.value = id;
+      ["id", "playerInfoPublished", "gradePublished", "writeupPublished", "playerName", "school", "position", "rank", "posRank", "heightLabel", "weight", "strengths", "weaknesses", "rundown", "notes"].forEach((fieldName) => {
+        const nextName = `${nextPrefix}[${fieldName}]`;
+        if (!seen.has(nextName)) {
+          appendHiddenInput(targetForm, nextName, "");
         }
       });
-      row.querySelectorAll("[data-height-picker]").forEach(wireHeightPicker);
-      row.querySelectorAll("[data-publish-entry]").forEach((button) => {
-        button.dataset.publishEntry = id;
+    }
+
+    function submitFullBoard() {
+      const form = document.createElement("form");
+      form.method = "post";
+      form.action = "/bigboard/edit";
+      form.setAttribute("hx-post", "/bigboard/edit");
+      form.setAttribute("hx-target", "#big-board-editor-fragment");
+      form.setAttribute("hx-swap", "outerHTML");
+      form.setAttribute("data-skip-global-loader", "");
+      form.hidden = true;
+      appendHiddenInput(form, "year", "<%= board.year %>");
+      appendHiddenInput(form, "creator", "<%= board.creator %>");
+      document.querySelectorAll("[data-board-entry-form]").forEach((entryForm, index) => {
+        if (entryForm instanceof HTMLFormElement) {
+          appendEntryFields(form, entryForm, index);
+        }
+      });
+      document.body.append(form);
+      form.addEventListener("htmx:afterRequest", () => form.remove(), { once: true });
+      if (window.htmx) {
+        window.htmx.process(form);
+      } else {
+        nativeSubmissionInProgress = true;
+      }
+      form.requestSubmit();
+    }
+
+    function updateFormState(form) {
+      form.querySelectorAll("[data-editable-field]").forEach(syncEditableDisplay);
+      form.querySelectorAll("[data-height-picker]").forEach(syncHeightPicker);
+      syncHelmet(form);
+      syncDeleteLabel(form);
+      syncPublishChips(form);
+
+      const dirty = form.dataset.newEntry === "true" || serializeForm(form) !== form.dataset.initialState;
+      form.dataset.dirty = dirty ? "true" : "false";
+      setButtonsHidden(form, "[data-save-entry]", !dirty);
+
+      const playerPublished = form.querySelector("[data-player-publish]")?.value === "true";
+      const gradePublished = form.querySelector("[data-grade-publish]")?.value === "true";
+      const writeupPublished = form.querySelector("[data-writeup-publish]")?.value === "true";
+      const showPlayerPublish = !playerPublished && hasAnyPlayerContent(form);
+      const showGradePublish = !gradePublished && hasAnyGradeContent(form);
+      const showWriteupPublish = !writeupPublished && hasAnyWriteupContent(form);
+      setButtonsHidden(form, "[data-publish-player]", !showPlayerPublish);
+      setButtonsHidden(form, "[data-publish-grade]", !showGradePublish);
+      setButtonsHidden(form, "[data-publish-writeup]", !showWriteupPublish);
+      form.dataset.actionsVisible = dirty || showPlayerPublish || showGradePublish || showWriteupPublish ? "true" : "false";
+      updateBoardDirtyState();
+    }
+
+    function clearPublishState(event, form) {
+      const field = event.target.closest("[data-publish-section]");
+      if (!field) {
+        return;
+      }
+      const publishState = field.dataset.publishSection === "player"
+        ? form.querySelector("[data-player-publish]")
+        : field.dataset.publishSection === "grade"
+          ? form.querySelector("[data-grade-publish]")
+          : form.querySelector("[data-writeup-publish]");
+      if (publishState) {
+        publishState.value = "false";
+      }
+    }
+
+    function wireEditableField(editable, form) {
+      const input = editable.querySelector("[data-edit-input]");
+      editable.querySelector("[data-edit-toggle]")?.addEventListener("click", () => openEditable(editable));
+      input?.addEventListener("blur", () => {
+        closeEditable(editable);
+        updateFormState(form);
+      });
+      input?.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== "Escape") {
+          return;
+        }
+        event.preventDefault();
+        closeEditable(editable);
+        updateFormState(form);
       });
     }
 
-    document.querySelectorAll("[data-height-picker]").forEach(wireHeightPicker);
-
-    document.addEventListener("click", (event) => {
-      if (event.target.closest("[data-height-picker]")) {
+    function toggleProfilePanel(form) {
+      const panel = form.querySelector("[data-profile-panel]");
+      const button = form.querySelector("[data-expand-entry]");
+      if (!panel || !button) {
         return;
       }
-      document.querySelectorAll("[data-height-picker].is-open").forEach(closeHeightPicker);
-    });
-
-    document.addEventListener("keydown", (event) => {
-      if (event.key !== "Escape") {
-        return;
+      const opening = panel.hidden;
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (opening) {
+        panel.hidden = false;
+        if (!reduceMotion) {
+          panel.style.height = "0px";
+          panel.style.opacity = "0";
+          panel.offsetHeight;
+          panel.style.transition = "height 220ms ease, opacity 180ms ease";
+          panel.style.height = `${panel.scrollHeight}px`;
+          panel.style.opacity = "1";
+          window.setTimeout(() => {
+            panel.style.height = "";
+            panel.style.transition = "";
+          }, 230);
+        }
+      } else if (reduceMotion) {
+        panel.hidden = true;
+      } else {
+        panel.style.height = `${panel.scrollHeight}px`;
+        panel.style.opacity = "1";
+        panel.offsetHeight;
+        panel.style.transition = "height 200ms ease, opacity 160ms ease";
+        panel.style.height = "0px";
+        panel.style.opacity = "0";
+        window.setTimeout(() => {
+          panel.hidden = true;
+          panel.style.height = "";
+          panel.style.opacity = "";
+          panel.style.transition = "";
+        }, 210);
       }
-      document.querySelectorAll("[data-height-picker].is-open").forEach(closeHeightPicker);
-    });
-
-    window.addEventListener("scroll", positionOpenHeightPickers, true);
-    window.addEventListener("resize", positionOpenHeightPickers);
-
-    function closeDeleteModal() {
-      pendingDeleteRow?.classList.remove("is-delete-target");
-      pendingDeleteRow = null;
-      deleteModal?.classList.remove("is-open");
-      deleteModal?.setAttribute("aria-hidden", "true");
+      button.setAttribute("aria-expanded", String(opening));
+      form.dataset.expanded = opening ? "true" : "false";
+      setPanelState(form, "writeup", opening);
     }
 
-    function openDeleteModal(row) {
-      pendingDeleteRow?.classList.remove("is-delete-target");
-      pendingDeleteRow = row;
-      row.classList.add("is-delete-target");
-      const playerName = row.querySelector("input[name$='[playerName]']")?.value?.trim() || "this draft board entry";
+    function toggleGradePanel(form) {
+      const panel = form.querySelector("[data-grade-panel]");
+      const button = form.querySelector("[data-expand-grade]");
+      if (!panel || !button) {
+        return;
+      }
+      const opening = panel.hidden;
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (opening) {
+        panel.hidden = false;
+        if (!reduceMotion) {
+          panel.style.height = "0px";
+          panel.style.opacity = "0";
+          panel.offsetHeight;
+          panel.style.transition = "height 220ms ease, opacity 180ms ease";
+          panel.style.height = `${panel.scrollHeight}px`;
+          panel.style.opacity = "1";
+          window.setTimeout(() => {
+            panel.style.height = "";
+            panel.style.transition = "";
+          }, 230);
+        }
+      } else if (reduceMotion) {
+        panel.hidden = true;
+      } else {
+        panel.style.height = `${panel.scrollHeight}px`;
+        panel.style.opacity = "1";
+        panel.offsetHeight;
+        panel.style.transition = "height 200ms ease, opacity 160ms ease";
+        panel.style.height = "0px";
+        panel.style.opacity = "0";
+        window.setTimeout(() => {
+          panel.hidden = true;
+          panel.style.height = "";
+          panel.style.opacity = "";
+          panel.style.transition = "";
+        }, 210);
+      }
+      button.setAttribute("aria-expanded", String(opening));
+      form.dataset.gradeExpanded = opening ? "true" : "false";
+      setPanelState(form, "grade", opening);
+    }
+
+    function openDeleteModal(form) {
+      pendingDeleteForm = form;
+      const playerName = fieldValue(form, "playerName") || "this draft board entry";
       if (deleteEntryName) {
         deleteEntryName.textContent = playerName;
       }
@@ -544,86 +695,178 @@
       confirmEntryDelete?.focus();
     }
 
-    document.querySelector("[data-add-player]")?.addEventListener("click", () => {
+    function closeDeleteModal() {
+      pendingDeleteForm = null;
+      deleteModal?.classList.remove("is-open");
+      deleteModal?.setAttribute("aria-hidden", "true");
+    }
+
+    function initializeForm(form) {
+      if (form.dataset.initialized === "true") {
+        return;
+      }
+      form.dataset.initialized = "true";
+      form.querySelectorAll("[data-height-picker]").forEach(syncHeightPicker);
+      form.querySelectorAll("[data-editable-field]").forEach((editable) => wireEditableField(editable, form));
+      form.querySelector("[data-expand-entry]")?.addEventListener("click", () => toggleProfilePanel(form));
+      form.querySelector("[data-expand-grade]")?.addEventListener("click", () => toggleGradePanel(form));
+      form.querySelector("[data-delete-board-entry]")?.addEventListener("click", () => openDeleteModal(form));
+      form.addEventListener("input", (event) => {
+        clearPublishState(event, form);
+        updateFormState(form);
+      });
+      form.addEventListener("change", (event) => {
+        clearPublishState(event, form);
+        updateFormState(form);
+      });
+      form.addEventListener("submit", (event) => {
+        const submitter = event.submitter;
+        nativeSubmissionInProgress = !(submitter instanceof HTMLElement && submitter.hasAttribute("hx-post"));
+      });
+      form.dataset.initialState = serializeForm(form);
+      setPanelState(form, "writeup", form.dataset.expanded === "true");
+      setPanelState(form, "grade", form.dataset.gradeExpanded === "true");
+      updateFormState(form);
+      if (form.dataset.newEntry !== "true") {
+        form.dataset.initialState = serializeForm(form);
+        updateFormState(form);
+      }
+    }
+
+    function initializeFormsIn(root) {
+      root.querySelectorAll("[data-board-entry-form]").forEach(initializeForm);
+    }
+
+    initializeFormsIn(document);
+    updateEmptyState();
+
+    addPlayerButton?.addEventListener("click", () => {
+      if (!list || !template) {
+        return;
+      }
+      const fragment = template.content.cloneNode(true);
+      const item = fragment.querySelector("[data-board-entry-item]");
+      const form = fragment.querySelector("[data-board-entry-form]");
       const id = entryId();
-      const row = template.content.firstElementChild.cloneNode(true);
-      wireRow(row, nextIndex(), id);
-      rows.append(row);
-      row.querySelector("input:not([type='hidden'])")?.focus();
-    });
-
-    form?.addEventListener("click", (event) => {
-      const deleteButton = event.target.closest("[data-delete-board-entry]");
-      if (deleteButton) {
-        const row = deleteButton.closest("tr");
-        if (row) {
-          openDeleteModal(row);
-        }
+      if (!form || !item) {
         return;
       }
-
-      const button = event.target.closest("[data-publish-entry]");
-      if (!button) {
-        return;
+      form.dataset.newEntry = "true";
+      form.dataset.persistedEntry = "false";
+      form.querySelector("[data-entry-id]").value = id;
+      form.querySelector("[data-entry-action-id]").value = id;
+      setFieldValue(form, "id", id);
+      list.append(fragment);
+      initializeForm(form);
+      if (window.htmx) {
+        window.htmx.process(item);
       }
-      const row = button.closest("tr");
-      const rowId = button.dataset.publishEntry || row?.querySelector("[data-entry-id]")?.value || "";
-      entryIdInput.value = rowId;
+      updateEmptyState();
+      item.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      openEditable(form.querySelector("[data-field-key='playerName']")?.closest("[data-editable-field]"));
     });
 
     cancelEntryDelete?.addEventListener("click", closeDeleteModal);
-
     deleteModal?.addEventListener("click", (event) => {
       if (event.target === deleteModal) {
         closeDeleteModal();
       }
-    });
-
+    }, editorListenerOptions);
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && deleteModal?.classList.contains("is-open")) {
         closeDeleteModal();
       }
-    });
+    }, editorListenerOptions);
 
     confirmEntryDelete?.addEventListener("click", () => {
-      if (!pendingDeleteRow) {
+      if (!pendingDeleteForm) {
         closeDeleteModal();
         return;
       }
-      const row = pendingDeleteRow;
-      pendingDeleteRow = null;
-      row.remove();
-      reindexRows();
+      const form = pendingDeleteForm;
+      if (form.dataset.persistedEntry !== "true") {
+        form.closest("[data-board-entry-item]")?.remove();
+        closeDeleteModal();
+        updateEmptyState();
+        updateBoardDirtyState();
+        return;
+      }
+      markBoardStructureDirty();
+      form.action = "/bigboard/edit/delete-entry";
+      const deleteSubmit = form.querySelector("[data-delete-submit]");
       closeDeleteModal();
-      markFormChanged();
+      if (deleteSubmit instanceof HTMLElement) {
+        deleteSubmit.click();
+        return;
+      }
+      nativeSubmissionInProgress = true;
+      form.submit();
     });
 
-    function clearPublishState(event) {
-      const field = event.target.closest("[data-publish-section]");
-      if (!field) {
-        return;
+    document.body.addEventListener("htmx:afterSwap", (event) => {
+      initializeFormsIn(document);
+      updateEmptyState();
+      updateBoardDirtyState();
+      const target = event.detail?.target;
+      if (target instanceof Element && target.matches("#big-board-editor-fragment")) {
+        scrollToFirstValidationError();
       }
-      const row = field.closest("tr");
-      const checkbox = field.dataset.publishSection === "player"
-        ? row?.querySelector("[data-player-publish]")
-        : row?.querySelector("[data-writeup-publish]");
-      if (checkbox) {
-        checkbox.checked = false;
-      }
-    }
+    }, editorListenerOptions);
 
-    form?.addEventListener("input", clearPublishState);
-    form?.addEventListener("change", clearPublishState);
+    document.body.addEventListener("htmx:afterRequest", () => {
+      nativeSubmissionInProgress = false;
+    }, editorListenerOptions);
 
-    form?.addEventListener("htmx:afterSwap", (event) => {
-      if (event.detail?.target?.id !== "big-board-save-status" || event.detail?.xhr?.status >= 400) {
+    document.body.addEventListener("htmx:beforeRequest", (event) => {
+      const source = event.detail?.elt || event.target;
+      if (source instanceof Element && source.closest("[data-delete-submit]")) {
+        markBoardStructureDirty();
         return;
       }
-      const status = event.detail.target;
-      if (!status.textContent?.toLowerCase().includes("autosaved")) {
+      if (!(source instanceof Element) || !source.closest("[data-board-class-form]") || !hasUnsavedBoardChanges()) {
         return;
       }
-      status.textContent = `Autosaved at ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
-    });
+      if (window.confirm(unsavedChangesMessage)) {
+        return;
+      }
+      event.preventDefault();
+      hideGlobalLoader();
+    }, editorListenerOptions);
+
+    saveFullBoardButton?.addEventListener("click", submitFullBoard);
+    scrollToFirstValidationError();
+
+    document.addEventListener("click", (event) => {
+      if (!hasUnsavedBoardChanges() || event.defaultPrevented) {
+        return;
+      }
+      const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
+      if (!(link instanceof HTMLAnchorElement)) {
+        return;
+      }
+      if (link.target && link.target !== "_self") {
+        return;
+      }
+      const href = link.getAttribute("href");
+      if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) {
+        return;
+      }
+      if (window.confirm(unsavedChangesMessage)) {
+        nativeSubmissionInProgress = true;
+        return;
+      }
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      hideGlobalLoader();
+    }, { capture: true, signal: editorAbortController.signal });
+
+    window.addEventListener("beforeunload", (event) => {
+      if (!hasUnsavedBoardChanges() || nativeSubmissionInProgress) {
+        return;
+      }
+      event.preventDefault();
+      event.returnValue = unsavedChangesMessage;
+    }, editorListenerOptions);
   })();
 </script>
+</div>

@@ -1,6 +1,8 @@
 import type { IEmailConfig } from "../config/AppConfig";
 import type { ILoggingService } from "../service/LoggingService";
 
+const NEWSLETTER_FROM = "OnDraft <no-reply@ondraftfootball.com>";
+
 export interface SendEmailVerificationEmailInput {
   to: string;
   verificationUrl: string;
@@ -11,9 +13,29 @@ export interface SendPasswordResetEmailInput {
   resetUrl: string;
 }
 
+export interface NewsletterEmailItem {
+  title: string;
+  url: string;
+  description?: string;
+  imageUrl?: string;
+}
+
+export interface SendNewsletterEmailInput {
+  to: string;
+  subject: string;
+  dateLabel: string;
+  writeup: string;
+  changelog: string;
+  articles: NewsletterEmailItem[];
+  videos: NewsletterEmailItem[];
+  unsubscribeUrl: string;
+  logoUrl: string;
+}
+
 export interface IEmailService {
   sendEmailVerificationEmail(input: SendEmailVerificationEmailInput): Promise<void>;
   sendPasswordResetEmail(input: SendPasswordResetEmailInput): Promise<void>;
+  sendNewsletterEmail(input: SendNewsletterEmailInput): Promise<void>;
 }
 
 class LoggingEmailService implements IEmailService {
@@ -25,6 +47,10 @@ class LoggingEmailService implements IEmailService {
 
   async sendPasswordResetEmail(input: SendPasswordResetEmailInput): Promise<void> {
     this.logger.info(`Password reset URL for ${input.to}: ${redactToken(input.resetUrl)}`);
+  }
+
+  async sendNewsletterEmail(input: SendNewsletterEmailInput): Promise<void> {
+    this.logger.info(`Newsletter "${input.subject}" queued for ${input.to}.`);
   }
 }
 
@@ -76,6 +102,31 @@ class ResendEmailService implements IEmailService {
         subject: "Reset your OnDraft password",
         html: renderPasswordResetHtml(input.resetUrl),
         text: renderPasswordResetText(input.resetUrl),
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Resend email request failed with status ${response.status}.`);
+    }
+  }
+
+  async sendNewsletterEmail(input: SendNewsletterEmailInput): Promise<void> {
+    if (!this.config.from || !this.config.resendApiKey) {
+      throw new Error("Resend email service is missing required configuration.");
+    }
+
+    const response = await this.fetcher("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.config.resendApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: NEWSLETTER_FROM,
+        to: input.to,
+        subject: input.subject,
+        html: renderNewsletterHtml(input),
+        text: renderNewsletterText(input),
       }),
     });
 
@@ -193,12 +244,114 @@ function renderPasswordResetText(resetUrl: string): string {
   ].join("\n");
 }
 
+function renderNewsletterHtml(input: SendNewsletterEmailInput): string {
+  const articleRows = input.articles.map((item) => renderNewsletterItemHtml(item)).join("");
+  const videoRows = input.videos.map((item) => renderNewsletterItemHtml(item)).join("");
+  const escapedSubject = escapeHtml(input.subject);
+  const escapedDate = escapeHtml(input.dateLabel);
+  const escapedWriteup = paragraphHtml(input.writeup);
+  const escapedChangelog = paragraphHtml(input.changelog);
+  const escapedUnsubscribeUrl = escapeHtmlAttribute(input.unsubscribeUrl);
+  const escapedLogoUrl = escapeHtmlAttribute(input.logoUrl);
+  return [
+    "<!doctype html>",
+    '<html lang="en">',
+    '<body style="margin:0;background:#f8fafc;color:#0b1220;font-family:Segoe UI,Inter,Arial,sans-serif;">',
+    '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8fafc;margin:0;padding:32px 16px;">',
+    "<tr>",
+    '<td align="center">',
+    '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:680px;overflow:hidden;border:1px solid #cbd5e1;border-radius:8px;background:#ffffff;box-shadow:0 24px 70px rgba(7,17,31,0.14);">',
+    "<tr>",
+    '<td style="background:#0b1220;padding:28px 28px 24px;border-bottom:4px solid #d99822;">',
+    `<img src="${escapedLogoUrl}" width="112" alt="OnDraft Football" style="display:block;width:112px;height:auto;margin:0 0 14px;" />`,
+    '<p style="margin:0 0 8px;color:#d99822;font-size:12px;font-weight:900;letter-spacing:0.16em;text-transform:uppercase;">OnDraft Football</p>',
+    `<h1 style="margin:0;color:#ffffff;font-family:Georgia,Cambria,Times New Roman,serif;font-size:32px;line-height:1.1;font-weight:900;">${escapedSubject}</h1>`,
+    `<p style="margin:12px 0 0;color:#cbd5e1;font-size:14px;font-weight:700;">${escapedDate}</p>`,
+    "</td>",
+    "</tr>",
+    '<tr><td style="padding:28px;color:#334155;font-size:16px;line-height:1.65;font-weight:600;">',
+    escapedWriteup,
+    sectionHtml("Articles", articleRows),
+    sectionHtml("Videos", videoRows),
+    sectionHtml("Changelog", escapedChangelog),
+    "</td></tr>",
+    '<tr><td style="border-top:1px solid #e2e8f0;background:#f8fafc;padding:18px 28px;">',
+    `<p style="margin:0;color:#64748b;font-size:12px;line-height:1.6;">You are receiving this because you subscribed to OnDraft Football updates. <a href="${escapedUnsubscribeUrl}" style="color:#a75f12;font-weight:700;">Unsubscribe</a>.</p>`,
+    "</td></tr>",
+    "</table>",
+    "</td>",
+    "</tr>",
+    "</table>",
+    "</body>",
+    "</html>",
+  ].join("");
+}
+
+function renderNewsletterItemHtml(item: NewsletterEmailItem): string {
+  const escapedTitle = escapeHtml(item.title);
+  const escapedUrl = escapeHtmlAttribute(item.url);
+  const escapedDescription = item.description ? `<p style="margin:6px 0 0;color:#64748b;font-size:14px;line-height:1.5;">${escapeHtml(item.description)}</p>` : "";
+  const escapedImageUrl = item.imageUrl ? escapeHtmlAttribute(item.imageUrl) : "";
+  return [
+    '<tr><td style="padding:12px 0;border-top:1px solid #e2e8f0;">',
+    escapedImageUrl
+      ? `<a href="${escapedUrl}" style="display:block;margin:0 0 10px;text-decoration:none;"><img src="${escapedImageUrl}" width="620" alt="" style="display:block;width:100%;max-width:620px;height:auto;border-radius:8px;border:1px solid #e2e8f0;" /></a>`
+      : "",
+    `<a href="${escapedUrl}" style="color:#0b1220;font-size:16px;font-weight:900;text-decoration:none;">${escapedTitle}</a>`,
+    escapedDescription,
+    "</td></tr>",
+  ].join("");
+}
+
+function sectionHtml(title: string, body: string): string {
+  if (!body.trim()) {
+    return "";
+  }
+
+  return [
+    `<h2 style="margin:28px 0 8px;color:#0b1220;font-size:18px;line-height:1.25;font-weight:900;">${escapeHtml(title)}</h2>`,
+    title === "Changelog"
+      ? `<div style="color:#334155;font-size:15px;line-height:1.6;font-weight:600;">${body}</div>`
+      : `<table role="presentation" width="100%" cellspacing="0" cellpadding="0">${body}</table>`,
+  ].join("");
+}
+
+function paragraphHtml(value: string): string {
+  return value
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
+    .map((paragraph) => `<p style="margin:0 0 14px;">${escapeHtml(paragraph).replace(/\n/g, "<br>")}</p>`)
+    .join("");
+}
+
+function renderNewsletterText(input: SendNewsletterEmailInput): string {
+  const lines = [
+    input.subject,
+    input.dateLabel,
+    "",
+    input.writeup,
+    "",
+  ];
+  if (input.articles.length > 0) {
+    lines.push("Articles", ...input.articles.map((item) => `${item.title}: ${item.url}`), "");
+  }
+  if (input.videos.length > 0) {
+    lines.push("Videos", ...input.videos.map((item) => `${item.title}: ${item.url}`), "");
+  }
+  if (input.changelog.trim()) {
+    lines.push("Changelog", input.changelog, "");
+  }
+  lines.push(`Unsubscribe: ${input.unsubscribeUrl}`);
+  return lines.join("\n");
+}
+
 function redactVerificationToken(verificationUrl: string): string {
   return redactToken(verificationUrl);
 }
 
 function buildBrandLogoUrl(actionUrl: string): string {
-  return new URL("/images/brand/ondraft-logo.png", actionUrl).toString();
+  return new URL("/images/brand/OnDraftLogo-cropped.png", actionUrl).toString();
 }
 
 function redactToken(verificationUrl: string): string {
@@ -214,6 +367,10 @@ function redactToken(verificationUrl: string): string {
 }
 
 function escapeHtmlAttribute(value: string): string {
+  return escapeHtml(value);
+}
+
+function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
     .replace(/"/g, "&quot;")

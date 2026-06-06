@@ -31,6 +31,8 @@
                   hx-confirm="Delete this comment?"
                   hx-target="#hot-take-comments-<%= post.id %>"
                   hx-swap="outerHTML"
+                  data-loading-skeleton="comments"
+                  data-loading-skeleton-target="#hot-take-comments-<%= post.id %>"
                 >
                   Delete
                 </button>
@@ -38,6 +40,9 @@
             </div>
           </div>
           <p class="comment-text"><%= comment.text %></p>
+          <div class="comment-actions">
+            <%- include("reportLink", { type: "hot take comment", id: `hot-take-comment-${comment.id}`, path: "/hottakes" }) %>
+          </div>
         </li>
       <% }) %>
     </ol>
@@ -50,15 +55,21 @@
   <% } else if (session.authenticatedUser) { %>
     <form
       class="comment-form reply-form hot-take-comment-form"
+      x-data="{ text: '', get wordCount() { return this.text.trim() ? this.text.trim().split(/\s+/).length : 0 } }"
       hx-post="/hottakes/<%= post.id %>/comments"
       hx-target="#hot-take-comments-<%= post.id %>"
       hx-swap="outerHTML"
+      data-loading-skeleton="comments"
+      data-loading-skeleton-target="#hot-take-comments-<%= post.id %>"
     >
       <label>
         Comment
-        <textarea name="text" maxlength="1000" required></textarea>
+        <textarea name="text" x-model="text" required></textarea>
       </label>
-      <button type="submit">Post Comment</button>
+      <div class="form-actions">
+        <button type="submit">Post Comment</button>
+        <span class="muted-text"><span x-text="wordCount">0</span>/200 words</span>
+      </div>
     </form>
   <% } else { %>
     <p class="muted-text"><a href="/login">Log in</a> to comment.</p>

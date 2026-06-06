@@ -1,38 +1,55 @@
 <% const currentViewMode = typeof viewMode !== "undefined" && viewMode === "list" ? "list" : "card"; %>
 <% if (articles.length === 0) { %>
-  <div class="od-card grid min-h-48 place-items-center p-8 text-center">
+  <% const anyArticlesExist = typeof hasAnyArticles !== "undefined" ? hasAnyArticles : articles.length > 0; %>
+  <% const currentHasFilters = typeof hasFilters !== "undefined" ? hasFilters : false; %>
+  <div class="od-empty-state">
     <div>
-      <p class="text-xs font-black uppercase tracking-[0.18em] text-draft-amber dark:text-draft-gold">Dry tap</p>
-      <p class="mt-2 font-display text-2xl font-bold text-slate-950 dark:text-white">No articles match those filters.</p>
-      <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">Try a wider search or clear the filters.</p>
-      <% if (isAdmin) { %>
-        <div class="mt-5 flex flex-col justify-center gap-3 sm:flex-row">
+      <% if (!anyArticlesExist) { %>
+        <p class="od-empty-state-kicker">No articles yet</p>
+        <p class="od-empty-state-title">No articles have been created yet.</p>
+        <p class="od-empty-state-copy">Create the first article when a story is ready for the board.</p>
+        <% if (isAdmin) { %>
+          <div class="od-empty-state-actions">
+            <a class="od-primary-link" href="/articles/new">Create article</a>
+          </div>
+        <% } %>
+      <% } else { %>
+        <p class="od-empty-state-kicker">Dry tap</p>
+        <p class="od-empty-state-title">No articles match those filters.</p>
+        <p class="od-empty-state-copy">Try a wider search or clear the filters.</p>
+        <% if (currentHasFilters) { %>
+          <div class="od-empty-state-actions">
+            <% if (isAdmin) { %>
+              <a class="od-primary-link" href="/articles/new">Create article</a>
+            <% } %>
+            <button
+              type="button"
+              class="od-secondary-link"
+              onclick="window.dispatchEvent(new CustomEvent('ondraft:clear-filters', { detail: { formId: 'article-filter-form' } }));"
+            >
+              Clear filters
+            </button>
+          </div>
+        <% } else if (isAdmin) { %>
+          <div class="od-empty-state-actions">
           <a class="od-primary-link" href="/articles/new">Create article</a>
-          <button
-            type="button"
-            class="od-secondary-link"
-            onclick="const form = document.getElementById('article-filter-form'); if (!form) return; const status = document.getElementById('article-status-field')?.value || 'published'; form.reset(); const statusField = document.getElementById('article-status-field'); if (statusField) statusField.value = status; htmx.trigger(form, 'submit');"
-          >
-            Clear filters
-          </button>
-        </div>
+          </div>
+        <% } %>
       <% } %>
     </div>
   </div>
 <% } else if (currentViewMode === "list") { %>
-  <ul class="grid list-none gap-3 p-0">
+  <ul class="od-stagger-list grid list-none gap-3 p-0">
     <% articles.forEach((article) => { %>
       <% const articleHref = isAdmin && !article.published ? `/articles/${article.id}/preview` : `/articles/${article.id}`; %>
       <li id="article-list-item-<%= article.id %>" class="article-list-row od-card">
         <a class="group grid min-w-0 grid-cols-[4rem_minmax(0,1fr)] gap-3 text-slate-950 no-underline dark:text-white md:grid-cols-[4.5rem_minmax(0,1fr)_auto]" href="<%= articleHref %>">
           <span class="relative block aspect-square overflow-hidden rounded-md bg-draft-ink">
             <% if (article.imageUrl) { %>
-              <img class="article-list-thumb" src="<%= article.imageUrl %>" alt="" />
+              <img class="article-list-thumb" src="<%= article.imageUrl %>" alt="" loading="lazy" decoding="async" />
             <% } else { %>
               <span class="article-list-thumb article-list-thumb-empty">
-                <span class="grid size-8 place-items-center overflow-hidden rounded bg-white/90 ring-1 ring-slate-200 dark:bg-white/10 dark:ring-white/10" aria-hidden="true">
-                  <img class="h-7 w-8 object-contain" src="/images/brand/ondraft-logo.png" alt="" />
-                </span>
+                <img class="h-9 w-11 object-contain drop-shadow-sm" src="/images/brand/OnDraftLogo-cropped.png" alt="" loading="lazy" decoding="async" />
               </span>
             <% } %>
           </span>
@@ -84,19 +101,17 @@
     <% }) %>
   </ul>
 <% } else { %>
-  <ul class="grid list-none gap-5 p-0">
+  <ul class="od-stagger-list grid list-none gap-5 p-0">
     <% articles.forEach((article) => { %>
       <% const articleHref = isAdmin && !article.published ? `/articles/${article.id}/preview` : `/articles/${article.id}`; %>
       <li id="article-list-item-<%= article.id %>" class="od-card grid overflow-hidden transition hover:-translate-y-0.5 hover:border-draft-gold hover:shadow-editorial lg:grid-cols-[18rem_minmax(0,1fr)_auto]">
         <a class="group grid min-w-0 text-slate-950 no-underline dark:text-white lg:contents" href="<%= articleHref %>">
           <span class="relative block aspect-[16/10] overflow-hidden bg-draft-ink lg:aspect-auto lg:min-h-56">
             <% if (article.imageUrl) { %>
-              <img class="article-list-thumb" src="<%= article.imageUrl %>" alt="" />
+              <img class="article-list-thumb" src="<%= article.imageUrl %>" alt="" loading="lazy" decoding="async" />
             <% } else { %>
               <span class="article-list-thumb article-list-thumb-empty">
-                <span class="grid size-14 place-items-center overflow-hidden rounded-lg bg-white/90 ring-1 ring-slate-200 dark:bg-white/10 dark:ring-white/10" aria-hidden="true">
-                  <img class="h-12 w-14 object-contain" src="/images/brand/ondraft-logo.png" alt="" />
-                </span>
+                <img class="h-16 w-20 object-contain drop-shadow-sm" src="/images/brand/OnDraftLogo-cropped.png" alt="" loading="lazy" decoding="async" />
               </span>
             <% } %>
             <% if (!article.published) { %>

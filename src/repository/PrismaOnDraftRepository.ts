@@ -8,13 +8,16 @@ import {
   BigBoardEntry,
   Comment,
   ConsensusBigBoard,
+  ConsensusDiscrepancyWriteup,
   DraftBoardFilter,
   ForumPost,
   ForumPostFilter,
+  Newsletter,
   Position,
   Video,
   VideoQuery,
 } from "../model/OnDraftContent";
+import { calculateDraftGrade, toDraftGrade } from "../model/DraftGrades";
 import { getPrismaClient, type OnDraftPrismaClient } from "../prisma/client";
 import {
   ArticleNotFound,
@@ -23,6 +26,7 @@ import {
   DuplicateArticle,
   DuplicateBigBoardYear,
   DuplicateForumPost,
+  DuplicateNewsletter,
   DuplicatePlayer,
   ForumPostCommentNotFound,
   ForumPostNotFound,
@@ -31,12 +35,15 @@ import {
   type BigBoardError,
   type ForumPostError,
   type IOnDraftRepository,
+  type NewsletterError,
+  NewsletterNotFound,
 } from "./OnDraftRepository";
 
 type ArticleRecord = Awaited<ReturnType<OnDraftPrismaClient["article"]["findUnique"]>>;
 type BigBoardRecord = Awaited<ReturnType<OnDraftPrismaClient["bigBoard"]["findUnique"]>>;
 type ForumPostRecord = Awaited<ReturnType<OnDraftPrismaClient["forumPost"]["findUnique"]>>;
 type VideoRecord = Awaited<ReturnType<OnDraftPrismaClient["video"]["findUnique"]>>;
+type NewsletterRecord = Awaited<ReturnType<OnDraftPrismaClient["newsletter"]["findUnique"]>>;
 
 class PrismaOnDraftRepository implements IOnDraftRepository {
   constructor(private readonly prisma: OnDraftPrismaClient = getPrismaClient()) {}
@@ -181,7 +188,9 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
     weaknesses: string;
     rundown: string;
     notes: string;
+    grade: unknown;
     playerInfoPublished: boolean;
+    gradePublished: boolean;
     writeupPublished: boolean;
   }): BigBoardEntry {
     return {
@@ -196,6 +205,8 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
         : { feet: record.heightFeet, inches: record.heightInches },
       weight: record.weight,
       playerInfoPublished: record.playerInfoPublished,
+      grade: toDraftGrade(record.grade, record.position as Position | ""),
+      gradePublished: record.gradePublished,
       writeup: {
         strengths: record.strengths,
         weaknesses: record.weaknesses,
@@ -213,6 +224,18 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
       year: record.year,
       creator: record.creator as BigBoardCreator,
       entries: (record.entries ?? []).map((entry) => this.mapBigBoardEntry(entry)),
+    };
+  }
+
+  private mapConsensusDiscrepancyWriteup(record: {
+    ryanWriteup: string;
+    aleksWriteup: string;
+    published: boolean;
+  }): ConsensusDiscrepancyWriteup {
+    return {
+      ryanWriteup: record.ryanWriteup,
+      aleksWriteup: record.aleksWriteup,
+      published: record.published,
     };
   }
 
@@ -257,12 +280,20 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
     aleksBoard?.entries.filter((entry) => entry.playerInfoPublished).forEach((entry) => {
       entriesByPlayer.set(entry.playerName, { ...entriesByPlayer.get(entry.playerName), Aleks: entry });
     });
+    const writeups = await this.prisma.consensusDiscrepancyWriteup.findMany({ where: { year } });
+    const writeupsByPlayer = new Map(writeups.map((writeup) => [writeup.playerName, this.mapConsensusDiscrepancyWriteup(writeup)]));
 
     const average = (values: Array<number | null | undefined>): number => {
       const rankedValues = values.filter((value): value is number => typeof value === "number");
       return rankedValues.length === 0
         ? Number.MAX_SAFE_INTEGER
         : rankedValues.reduce((sum, value) => sum + value, 0) / rankedValues.length;
+    };
+    const nullableAverage = (values: Array<number | null | undefined>): number | null => {
+      const numericValues = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+      return numericValues.length === 0
+        ? null
+        : numericValues.reduce((sum, value) => sum + value, 0) / numericValues.length;
     };
     type ConsensusEntryDraft = {
       entry: BigBoardEntry;
@@ -281,13 +312,29 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
       const rankDiscrepency = typeof Ryan?.rank === "number" && typeof Aleks?.rank === "number"
         ? Math.abs(Ryan.rank - Aleks.rank)
         : 0;
+      const averageFinalGrade = nullableAverage([
+        Ryan?.gradePublished ? calculateDraftGrade(Ryan.grade)?.displayGrade : null,
+        Aleks?.gradePublished ? calculateDraftGrade(Aleks.grade)?.displayGrade : null,
+      ]);
       return {
         entry: {
           ...source,
           id: `consensus-${source.id}`,
           rank: null,
           posRank: null,
+          grade: null,
+          writeup: { strengths: "", weaknesses: "", rundown: "" },
+          writeupPublished: false,
+          gradePublished: averageFinalGrade !== null,
+          gradeSummary: averageFinalGrade !== null ? { finalGrade: averageFinalGrade } : undefined,
           bigDiscrepency: rankDiscrepency > 10,
+          discWriteup: rankDiscrepency > 10
+            ? writeupsByPlayer.get(source.playerName) ?? { ryanWriteup: "", aleksWriteup: "", published: false }
+            : undefined,
+          consensusRankingContext: {
+            Ryan: Ryan ? { rank: Ryan.rank, posRank: Ryan.posRank } : undefined,
+            Aleks: Aleks ? { rank: Aleks.rank, posRank: Aleks.posRank } : undefined,
+          },
         },
         averageRank: average([Ryan?.rank, Aleks?.rank]),
         averagePosRank: average([Ryan?.posRank, Aleks?.posRank]),
@@ -487,11 +534,13 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
       heightFeet: entry.height?.feet ?? null,
       heightInches: entry.height?.inches ?? null,
       weight: entry.weight,
+      grade: entry.grade,
       strengths: entry.writeup.strengths,
       weaknesses: entry.writeup.weaknesses,
       rundown: entry.writeup.rundown,
       notes: entry.notes,
       playerInfoPublished: entry.playerInfoPublished,
+      gradePublished: entry.gradePublished,
       writeupPublished: entry.writeupPublished,
     };
   }
@@ -882,6 +931,14 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
     return Ok(videos.map((video) => this.mapVideo(video)));
   }
 
+  async getVideoTags(): Promise<Result<string[], ArticleError>> {
+    const tags = await this.prisma.tag.findMany({
+      where: { videos: { some: {} } },
+      orderBy: { name: "asc" },
+    });
+    return Ok(tags.map((tag) => tag.name));
+  }
+
   async filterYoutubeVideos(query: VideoQuery): Promise<Result<Video[], ArticleError>> {
     const all = await this.getYoutubeVideos();
     if (all.ok === false) return all;
@@ -893,6 +950,10 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
       if (query.tags && query.tags.length > 0) {
         const videoTags = video.tags.map((tag) => tag.toLowerCase());
         if (!query.tags.map((tag) => tag.toLowerCase()).every((tag) => videoTags.includes(tag))) return false;
+      }
+      if (query.dateRange) {
+        const createdAt = video.createdAt.getTime();
+        if (createdAt < query.dateRange.from.getTime() || createdAt > query.dateRange.to.getTime()) return false;
       }
       return true;
     });
@@ -988,8 +1049,130 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
         height: entry.height,
         weight: entry.weight,
         bigDiscrepency: entry.bigDiscrepency ?? false,
+        discWriteup: entry.discWriteup,
+        consensusRankingContext: entry.consensusRankingContext,
       })),
     });
+  }
+
+  async getConsensusDiscrepancyWriteup(year: number, playerName: string): Promise<Result<ConsensusDiscrepancyWriteup, BigBoardError>> {
+    try {
+      const writeup = await this.prisma.consensusDiscrepancyWriteup.findUnique({
+        where: { year_playerName: { year, playerName } },
+      });
+      return writeup
+        ? Ok(this.mapConsensusDiscrepancyWriteup(writeup))
+        : Err(PlayerNotFound(`Consensus discrepancy writeup for ${playerName} in ${year} was not found.`));
+    } catch {
+      return Err(PlayerNotFound(`Consensus discrepancy writeup for ${playerName} in ${year} was not found.`));
+    }
+  }
+
+  async saveConsensusDiscrepancyWriteup(year: number, playerName: string, writeup: ConsensusDiscrepancyWriteup): Promise<Result<ConsensusDiscrepancyWriteup, BigBoardError>> {
+    try {
+      const updated = await this.prisma.consensusDiscrepancyWriteup.upsert({
+        where: { year_playerName: { year, playerName } },
+        create: {
+          id: `${year}:${playerName}`,
+          year,
+          playerName,
+          ryanWriteup: writeup.ryanWriteup,
+          aleksWriteup: writeup.aleksWriteup,
+          published: writeup.published,
+        },
+        update: {
+          ryanWriteup: writeup.ryanWriteup,
+          aleksWriteup: writeup.aleksWriteup,
+          published: writeup.published,
+        },
+      });
+      return Ok(this.mapConsensusDiscrepancyWriteup(updated));
+    } catch {
+      return Err(PlayerNotFound(`Consensus discrepancy writeup for ${playerName} in ${year} could not be saved.`));
+    }
+  }
+
+  async publishConsensusDiscrepancyWriteup(year: number, playerName: string): Promise<Result<ConsensusDiscrepancyWriteup, BigBoardError>> {
+    try {
+      const updated = await this.prisma.consensusDiscrepancyWriteup.update({
+        where: { year_playerName: { year, playerName } },
+        data: { published: true },
+      });
+      return Ok(this.mapConsensusDiscrepancyWriteup(updated));
+    } catch {
+      return Err(PlayerNotFound(`Consensus discrepancy writeup for ${playerName} in ${year} was not found.`));
+    }
+  }
+
+  private mapNewsletter(record: NonNullable<NewsletterRecord>): Newsletter {
+    return {
+      id: record.id,
+      date: record.date,
+      writeup: record.writeup,
+      articleIds: [...record.articleIds],
+      videoIds: [...record.videoIds],
+      changelog: record.changelog,
+      status: record.status === "sent" ? "sent" : "draft",
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+      sentAt: record.sentAt ?? undefined,
+      recipientCount: record.recipientCount,
+    };
+  }
+
+  private newsletterData(newsletter: Newsletter) {
+    return {
+      date: newsletter.date,
+      writeup: newsletter.writeup,
+      articleIds: newsletter.articleIds,
+      videoIds: newsletter.videoIds,
+      changelog: newsletter.changelog,
+      status: newsletter.status,
+      recipientCount: newsletter.recipientCount,
+      sentAt: newsletter.sentAt ?? null,
+      createdAt: newsletter.createdAt,
+      updatedAt: newsletter.updatedAt,
+    };
+  }
+
+  async createNewsletter(newsletter: Newsletter): Promise<Result<Newsletter, NewsletterError>> {
+    try {
+      const created = await this.prisma.newsletter.create({
+        data: {
+          id: newsletter.id,
+          ...this.newsletterData(newsletter),
+        },
+      });
+      return Ok(this.mapNewsletter(created));
+    } catch {
+      return Err(DuplicateNewsletter(`Newsletter with id "${newsletter.id}" already exists.`));
+    }
+  }
+
+  async updateNewsletter(newsletter: Newsletter): Promise<Result<Newsletter, NewsletterError>> {
+    try {
+      const updated = await this.prisma.newsletter.update({
+        where: { id: newsletter.id },
+        data: this.newsletterData(newsletter),
+      });
+      return Ok(this.mapNewsletter(updated));
+    } catch {
+      return Err(NewsletterNotFound(`Newsletter with id "${newsletter.id}" not found.`));
+    }
+  }
+
+  async getNewsletter(id: string): Promise<Result<Newsletter, NewsletterError>> {
+    const newsletter = await this.prisma.newsletter.findUnique({ where: { id } });
+    return newsletter
+      ? Ok(this.mapNewsletter(newsletter))
+      : Err(NewsletterNotFound(`Newsletter with id "${id}" not found.`));
+  }
+
+  async listNewsletters(): Promise<Result<Newsletter[], NewsletterError>> {
+    const newsletters = await this.prisma.newsletter.findMany({
+      orderBy: { updatedAt: "desc" },
+    });
+    return Ok(newsletters.map((newsletter) => this.mapNewsletter(newsletter)));
   }
 }
 

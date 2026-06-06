@@ -1,11 +1,14 @@
-import { randomInt } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import { Err, Ok, Result } from "../lib/result";
 import sanitizeHtml from "sanitize-html";
-import { Article, ArticleContent, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, BigBoardWriteup, Height, POSITIONS, Position, ArticleFilter, Comment, ForumPost, ForumPostFilter, DraftBoardFilter, Video, VideoQuery } from "../model/OnDraftContent";
-import { UnknownArticleError, UnknownForumPostError, ArticleError,  BigBoardError, IOnDraftRepository, ArticleValidationError, BigBoardValidationError, ForumPostError, ForumPostValidationError } from "../repository/OnDraftRepository";
+import { Article, ArticleContent, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, BigBoardWriteup, ConsensusDiscrepancyWriteup, Height, POSITIONS, Position, ArticleFilter, Comment, ForumPost, ForumPostFilter, DraftBoardFilter, Newsletter, Video, VideoQuery } from "../model/OnDraftContent";
+import { UnknownArticleError, UnknownForumPostError, ArticleError,  BigBoardError, IOnDraftRepository, ArticleValidationError, BigBoardValidationError, ForumPostError, ForumPostValidationError, NewsletterError, NewsletterValidationError } from "../repository/OnDraftRepository";
 import { DraftBoardFilterInput } from "../controller/OnDraftController";
 import { IYoutubeVideoStatsService } from "./YoutubeVideoStatsService";
 import { BANNED_PHRASES } from "./bannedPhrases";
+import { toDraftGrade, validateDraftGradeForPublication, type DraftGrade } from "../model/DraftGrades";
+import type { IEmailConfig } from "../config/AppConfig";
+import type { IEmailService, NewsletterEmailItem } from "../email/EmailService";
 
 const ARTICLE_PDF_MAX_BYTES = 5 * 1024 * 1024;
 const ARTICLE_ID_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -18,15 +21,19 @@ const DEFAULT_ARTICLE_IMAGE_URLS = [
   "/images/article-defaults/helmet.png",
   "/images/article-defaults/uprights.png",
 ];
-const ARTICLE_WRITEUP_MAX_LENGTH = 200;
+const ARTICLE_WRITEUP_MAX_WORDS = 300;
 const ARTICLE_TAG_MAX_LENGTH = 24;
 const ARTICLE_TAG_MAX_COUNT = 12;
 const ARTICLE_TAG_PATTERN = /^[a-z0-9-]+$/;
-const COMMENT_TEXT_MAX_LENGTH = 1000;
+const COMMENT_TEXT_MAX_WORDS = 200;
+const COMMENT_TEXT_MAX_LENGTH = 2000;
 const DEFAULT_BIG_BOARD_CREATOR: BigBoardCreator = "Ryan";
 const HOT_TAKE_MAX_LENGTH = 300;
 const VIDEO_DESCRIPTION_MAX_LENGTH = 500;
-const YOUTUBE_STATS_TTL_MS = 6 * 60 * 60 * 1000;
+const NEWSLETTER_WRITEUP_MAX_LENGTH = 5000;
+const NEWSLETTER_CHANGELOG_MAX_LENGTH = 4000;
+const NEWSLETTER_MAX_LINKED_ITEMS = 20;
+const YOUTUBE_STATS_TTL_MS = 24 * 60 * 60 * 1000;
 const PROFANITY_VALIDATION_MESSAGE = "The comment/post contains profanity. Please edit it and try again.";
 const BANNED_PHRASE_PATTERNS = [...new Set(BANNED_PHRASES.map((phrase) => phrase.trim().toLowerCase()).filter(Boolean))]
   .map((phrase) => {
@@ -95,7 +102,9 @@ export interface BigBoardEntryInput {
     inches: number;
   };
   weight: number;
+  grade?: DraftGrade | null;
   playerInfoPublished?: boolean;
+  gradePublished?: boolean;
   writeupPublished?: boolean;
 }
 
@@ -108,12 +117,14 @@ export interface BigBoardEditableEntryInput {
   posRank?: number | string | null;
   height?: Height | null;
   weight?: number | string | null;
+  grade?: DraftGrade | null;
   writeup?: Partial<BigBoardWriteup> | string;
   strengths?: string;
   weaknesses?: string;
   rundown?: string;
   notes?: string;
   playerInfoPublished?: boolean;
+  gradePublished?: boolean;
   writeupPublished?: boolean;
 }
 
@@ -121,6 +132,19 @@ export interface SaveBigBoardEntriesInput {
   year?: number;
   creator?: BigBoardCreator;
   entries: BigBoardEditableEntryInput[];
+}
+
+export interface SaveBigBoardEntryInput {
+  year?: number;
+  creator?: BigBoardCreator;
+  entry: BigBoardEditableEntryInput;
+}
+
+export interface ConsensusDiscrepancyWriteupInput {
+  year?: number;
+  playerName?: string;
+  ryanWriteup?: string;
+  aleksWriteup?: string;
 }
 
 export interface CreateCommentInput {
@@ -146,6 +170,24 @@ export interface CreateYoutubeVideoInput {
   tags?: string[];
 }
 
+export interface NewsletterInput {
+  id?: string;
+  date?: Date;
+  writeup: string;
+  articleIds?: string[];
+  videoIds?: string[];
+  changelog: string;
+}
+
+export interface NewsletterRecipientInput {
+  email: string;
+  unsubscribeUrl: string;
+}
+
+type YoutubeCatalogRefreshOptions = {
+  force?: boolean;
+};
+
 export interface IOnDraftService {
   previewArticle(input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
   createArticle(input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
@@ -153,8 +195,12 @@ export interface IOnDraftService {
   updateArticle(id: string, input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
   createBigBoardEntry(input: BigBoardEntryInput): Promise<Result<BigBoardEntry, BigBoardError>>;
   saveBigBoardEntries(input: SaveBigBoardEntriesInput): Promise<Result<BigBoard, BigBoardError>>;
+  saveBigBoardEntry(input: SaveBigBoardEntryInput): Promise<Result<BigBoardEntry, BigBoardError>>;
   publishBigBoardEntryPlayerInfo(year: number | undefined, creator: BigBoardCreator | undefined, entryId: string): Promise<Result<BigBoardEntry, BigBoardError>>;
+  publishBigBoardEntryGrade(year: number | undefined, creator: BigBoardCreator | undefined, entryId: string): Promise<Result<BigBoardEntry, BigBoardError>>;
   publishBigBoardEntryWriteup(year: number | undefined, creator: BigBoardCreator | undefined, entryId: string): Promise<Result<BigBoardEntry, BigBoardError>>;
+  saveConsensusDiscrepancyWriteup(input: ConsensusDiscrepancyWriteupInput): Promise<Result<ConsensusDiscrepancyWriteup, BigBoardError>>;
+  publishConsensusDiscrepancyWriteup(input: ConsensusDiscrepancyWriteupInput): Promise<Result<ConsensusDiscrepancyWriteup, BigBoardError>>;
   deleteArticle(id: string): Promise<Result<void, ArticleError>>;
   deleteBigBoardEntry(year: number | undefined, creator: BigBoardCreator | undefined, playerName: string): Promise<Result<void, BigBoardError>>;
   getBigBoard(year?: number, creator?: BigBoardCreator, filter?: DraftBoardFilterInput): Promise<Result<BigBoard, BigBoardError>>;
@@ -183,17 +229,27 @@ export interface IOnDraftService {
   createYoutubeVideo(input: CreateYoutubeVideoInput): Promise<Result<Video, ArticleError>>;
   getYoutubeVideo(videoId: string): Promise<Result<Video, ArticleError>>;
   getYoutubeVideos(): Promise<Result<Video[], ArticleError>>;
+  getVideoTags(): Promise<Result<string[], ArticleError>>;
+  saveNewsletterDraft(input: NewsletterInput): Promise<Result<Newsletter, NewsletterError>>;
+  sendNewsletter(input: NewsletterInput, recipients: NewsletterRecipientInput[]): Promise<Result<Newsletter, NewsletterError>>;
+  getNewsletter(id: string): Promise<Result<Newsletter, NewsletterError>>;
+  listNewsletters(): Promise<Result<Newsletter[], NewsletterError>>;
   filterYoutubeVideos(query: VideoQuery): Promise<Result<Video[], ArticleError>>;
   updateYoutubeVideo(videoId: string, input: CreateYoutubeVideoInput): Promise<Result<Video, ArticleError>>;
   updateYoutubeVideoStats(videoId: string, stats: { thumbnailUrl?: string; viewCount?: number; youtubeStatsFetchedAt: Date }): Promise<Result<Video, ArticleError>>;
+  refreshYoutubeVideoCatalog(options?: YoutubeCatalogRefreshOptions): Promise<Result<number, ArticleError>>;
   deleteYoutubeVideo(videoId: string): Promise<Result<void, ArticleError>>;
   getTags(): Promise<Result<string[], ArticleError>>;
 }
 
 class OnDraftService implements IOnDraftService {
+  private youtubeCatalogRefreshPromise: Promise<Result<number, ArticleError>> | null = null;
+
   constructor(
     private readonly repository: IOnDraftRepository,
     private readonly youtubeStats?: IYoutubeVideoStatsService,
+    private readonly email?: IEmailService,
+    private readonly emailConfig: Pick<IEmailConfig, "appBaseUrl"> = { appBaseUrl: "http://localhost:3000" },
   ) {}
 
   private defaultBigBoardYear(): number {
@@ -285,6 +341,7 @@ class OnDraftService implements IOnDraftService {
         "h3",
         "h4",
         "hr",
+        "img",
         "li",
         "ol",
         "p",
@@ -295,6 +352,7 @@ class OnDraftService implements IOnDraftService {
       ],
       allowedAttributes: {
         a: ["href", "title", "target", "rel"],
+        img: ["src", "alt", "title", "loading", "decoding"],
       },
       allowedSchemes: ["http", "https", "mailto"],
       transformTags: {
@@ -379,8 +437,8 @@ class OnDraftService implements IOnDraftService {
     if (input.title.trim() === "" || input.author.trim() === "" || input.writeup.trim() === "") {
       return Err(ArticleValidationError("Title, author, and writeup cannot be empty."));
     }
-    if (input.writeup.length > ARTICLE_WRITEUP_MAX_LENGTH) {
-      return Err(ArticleValidationError(`Writeup cannot be more than ${ARTICLE_WRITEUP_MAX_LENGTH} characters.`));
+    if (this.wordCount(input.writeup) > ARTICLE_WRITEUP_MAX_WORDS) {
+      return Err(ArticleValidationError(`Writeup cannot be more than ${ARTICLE_WRITEUP_MAX_WORDS} words.`));
     }
     if (isNaN(input.publicationDate.getTime())) {
       return Err(ArticleValidationError("Invalid publication date."));
@@ -430,19 +488,19 @@ class OnDraftService implements IOnDraftService {
     return { feet, inches };
   }
 
-  private normalizeBigBoardWriteup(input: BigBoardEntryInput | BigBoardEditableEntryInput): BigBoardWriteup {
+  private normalizeBigBoardWriteup(input: BigBoardEntryInput | BigBoardEditableEntryInput, existing?: BigBoardWriteup): BigBoardWriteup {
     if (typeof input.writeup === "object" && input.writeup !== null) {
       return {
-        strengths: input.writeup.strengths?.trim() ?? "",
-        weaknesses: input.writeup.weaknesses?.trim() ?? "",
-        rundown: input.writeup.rundown?.trim() ?? "",
+        strengths: input.writeup.strengths?.trim() ?? existing?.strengths ?? "",
+        weaknesses: input.writeup.weaknesses?.trim() ?? existing?.weaknesses ?? "",
+        rundown: input.writeup.rundown?.trim() ?? existing?.rundown ?? "",
       };
     }
 
     return {
-      strengths: input.strengths?.trim() ?? "",
-      weaknesses: input.weaknesses?.trim() ?? "",
-      rundown: input.rundown?.trim() ?? (typeof input.writeup === "string" ? input.writeup.trim() : ""),
+      strengths: input.strengths?.trim() ?? existing?.strengths ?? "",
+      weaknesses: input.weaknesses?.trim() ?? existing?.weaknesses ?? "",
+      rundown: input.rundown?.trim() ?? (typeof input.writeup === "string" ? input.writeup.trim() : existing?.rundown ?? ""),
     };
   }
 
@@ -457,7 +515,11 @@ class OnDraftService implements IOnDraftService {
       height: this.normalizeHeight(input.height),
       weight: this.normalizeNullableInteger(input.weight),
       playerInfoPublished: existing?.playerInfoPublished ?? false,
-      writeup: this.normalizeBigBoardWriteup(input),
+      grade: input.grade === undefined
+        ? existing?.grade ?? null
+        : toDraftGrade(input.grade, POSITIONS.includes(input.position as Position) ? input.position as Position : existing?.position ?? ""),
+      gradePublished: existing?.gradePublished ?? false,
+      writeup: this.normalizeBigBoardWriteup(input, existing?.writeup),
       writeupPublished: existing?.writeupPublished ?? false,
       notes: input.notes?.trim() ?? existing?.notes ?? "",
     };
@@ -485,6 +547,47 @@ class OnDraftService implements IOnDraftService {
   private validateWriteupForPublication(entry: BigBoardEntry): Result<void, BigBoardError> {
     if (!entry.writeup.strengths || !entry.writeup.weaknesses || !entry.writeup.rundown) {
       return Err(BigBoardValidationError("Strengths, weaknesses, and rundown are required before publishing a player writeup."));
+    }
+    return Ok(undefined);
+  }
+
+  private validateGradeForPublication(entry: BigBoardEntry): Result<void, BigBoardError> {
+    const issues = validateDraftGradeForPublication(entry.position, entry.grade);
+    if (issues.length > 0) {
+      return Err(BigBoardValidationError(issues[0]));
+    }
+    return Ok(undefined);
+  }
+
+  private normalizeConsensusDiscrepancyWriteup(input: ConsensusDiscrepancyWriteupInput, existing?: ConsensusDiscrepancyWriteup): ConsensusDiscrepancyWriteup {
+    return {
+      ryanWriteup: input.ryanWriteup?.trim() ?? existing?.ryanWriteup ?? "",
+      aleksWriteup: input.aleksWriteup?.trim() ?? existing?.aleksWriteup ?? "",
+      published: false,
+    };
+  }
+
+  private async validateConsensusDiscrepancyWriteupTarget(year: number, playerName: string): Promise<Result<BigBoardEntry, BigBoardError>> {
+    if (!playerName.trim()) {
+      return Err(BigBoardValidationError("Player name is required for a consensus discrepancy writeup."));
+    }
+    const board = await this.getBigBoard(year, "Consensus");
+    if (board.ok === false) {
+      return Err(board.value);
+    }
+    const entry = board.value.entries.find((candidate) => candidate.playerName === playerName);
+    if (!entry) {
+      return Err(BigBoardValidationError(`Consensus entry for ${playerName} was not found.`));
+    }
+    if (!entry.bigDiscrepency) {
+      return Err(BigBoardValidationError(`Consensus entry for ${playerName} does not have a big discrepancy.`));
+    }
+    return Ok(entry);
+  }
+
+  private validateConsensusDiscrepancyWriteupForPublication(writeup: ConsensusDiscrepancyWriteup): Result<void, BigBoardError> {
+    if (!writeup.ryanWriteup || !writeup.aleksWriteup) {
+      return Err(BigBoardValidationError("Ryan and Aleks discrepancy explanations are required before publishing."));
     }
     return Ok(undefined);
   }
@@ -531,6 +634,13 @@ class OnDraftService implements IOnDraftService {
       }
     }
 
+    for (const entry of entries.filter((entry) => entry.gradePublished)) {
+      const gradeValidation = this.validateGradeForPublication(entry);
+      if (gradeValidation.ok === false) {
+        return Err(gradeValidation.value);
+      }
+    }
+
     return Ok(undefined);
   }
 
@@ -551,6 +661,10 @@ class OnDraftService implements IOnDraftService {
       existing.writeup.rundown !== next.writeup.rundown;
   }
 
+  private gradeChanged(existing: BigBoardEntry, next: BigBoardEntry): boolean {
+    return JSON.stringify(existing.grade ?? null) !== JSON.stringify(next.grade ?? null);
+  }
+
   private validateCommentInput(input: CreateCommentInput): Result<void, ArticleError> {
     if (!input.userId || !input.userName || !input.text) {
       return Err(ArticleValidationError("User, user name, and comment text are required."));
@@ -558,8 +672,11 @@ class OnDraftService implements IOnDraftService {
     if (input.userId.trim() === "" || input.userName.trim() === "" || input.text.trim() === "") {
       return Err(ArticleValidationError("User, user name, and comment text cannot be empty."));
     }
+    if (this.wordCount(input.text) > COMMENT_TEXT_MAX_WORDS) {
+      return Err(ArticleValidationError(`Comment text cannot be more than ${COMMENT_TEXT_MAX_WORDS} words.`));
+    }
     if (input.text.length > COMMENT_TEXT_MAX_LENGTH) {
-      return Err(ArticleValidationError(`Comment text cannot be more than ${COMMENT_TEXT_MAX_LENGTH} characters.`));
+      return Err(ArticleValidationError("Comment text is too long."));
     }
     if (!input.isAdmin && this.containsBannedPhrase(input.text)) {
       return Err(ArticleValidationError(PROFANITY_VALIDATION_MESSAGE));
@@ -590,8 +707,11 @@ class OnDraftService implements IOnDraftService {
     if (input.userId.trim() === "" || input.userName.trim() === "" || input.text.trim() === "") {
       return Err(ForumPostValidationError("User, user name, and comment text cannot be empty."));
     }
+    if (this.wordCount(input.text) > COMMENT_TEXT_MAX_WORDS) {
+      return Err(ForumPostValidationError(`Comment text cannot be more than ${COMMENT_TEXT_MAX_WORDS} words.`));
+    }
     if (input.text.length > COMMENT_TEXT_MAX_LENGTH) {
-      return Err(ForumPostValidationError(`Comment text cannot be more than ${COMMENT_TEXT_MAX_LENGTH} characters.`));
+      return Err(ForumPostValidationError("Comment text is too long."));
     }
     if (!input.isAdmin && this.containsBannedPhrase(input.text)) {
       return Err(ForumPostValidationError(PROFANITY_VALIDATION_MESSAGE));
@@ -602,6 +722,11 @@ class OnDraftService implements IOnDraftService {
   private containsBannedPhrase(text: string): boolean {
     const normalizedText = text.toLowerCase().replace(/\s+/g, " ").trim();
     return BANNED_PHRASE_PATTERNS.some((pattern) => pattern.test(normalizedText));
+  }
+
+  private wordCount(text: string): number {
+    const words = text.trim().match(/\S+/g);
+    return words ? words.length : 0;
   }
 
   private validateYoutubeVideoInput(input: CreateYoutubeVideoInput): Result<void, ArticleError> {
@@ -642,24 +767,27 @@ class OnDraftService implements IOnDraftService {
     return now.getTime() - new Date(video.youtubeStatsFetchedAt).getTime() > YOUTUBE_STATS_TTL_MS;
   }
 
-  private async refreshStaleYoutubeStats(videos: Video[]): Promise<boolean> {
+  private async refreshStaleYoutubeStats(videos: Video[], options: YoutubeCatalogRefreshOptions = {}): Promise<Result<number, ArticleError>> {
     if (!this.youtubeStats) {
-      return false;
+      return Ok(0);
     }
 
     const staleVideoIds = videos
-      .filter((video) => this.youtubeStatsAreStale(video))
+      .filter((video) => options.force === true || this.youtubeStatsAreStale(video))
       .map((video) => video.videoId);
     if (staleVideoIds.length === 0) {
-      return false;
+      return Ok(0);
     }
 
     const stats = await this.youtubeStats.fetchVideoStats(staleVideoIds);
-    if (stats.ok === false || stats.value.size === 0) {
-      return false;
+    if (stats.ok === false) {
+      return Err(stats.value);
+    }
+    if (stats.value.size === 0) {
+      return Ok(0);
     }
 
-    let updated = false;
+    let updated = 0;
     for (const [videoId, videoStats] of stats.value) {
       const result = await this.repository.updateYoutubeVideoStats(videoId, {
         thumbnailUrl: videoStats.thumbnailUrl,
@@ -667,10 +795,21 @@ class OnDraftService implements IOnDraftService {
         youtubeStatsFetchedAt: new Date(),
       });
       if (result.ok === true) {
-        updated = true;
+        updated += 1;
       }
     }
-    return updated;
+    return Ok(updated);
+  }
+
+  private queueYoutubeCatalogRefresh(options: YoutubeCatalogRefreshOptions = {}): void {
+    if (this.youtubeCatalogRefreshPromise) {
+      return;
+    }
+
+    this.youtubeCatalogRefreshPromise = this.refreshYoutubeVideoCatalog(options)
+      .finally(() => {
+        this.youtubeCatalogRefreshPromise = null;
+      });
   }
 
   private async fetchYoutubeStatsForVideo(videoId: string): Promise<Pick<Video, "thumbnailUrl" | "viewCount" | "youtubeStatsFetchedAt">> {
@@ -808,6 +947,7 @@ class OnDraftService implements IOnDraftService {
     }
     const entry = this.normalizeBigBoardEntry(input);
     entry.playerInfoPublished = input.playerInfoPublished ?? true;
+    entry.gradePublished = input.gradePublished ?? false;
     entry.writeupPublished = input.writeupPublished ?? false;
 
     let board = await this.repository.getBigBoard(key.value.year, key.value.creator);
@@ -849,8 +989,9 @@ class OnDraftService implements IOnDraftService {
     const entries = input.entries.map((entryInput) => {
       const existing = entryInput.id ? existingById.get(entryInput.id) : undefined;
       const next = this.normalizeBigBoardEntry(entryInput, existing);
-      next.playerInfoPublished = entryInput.playerInfoPublished ?? false;
-      next.writeupPublished = entryInput.writeupPublished ?? false;
+      next.playerInfoPublished = entryInput.playerInfoPublished ?? existing?.playerInfoPublished ?? false;
+      next.gradePublished = entryInput.gradePublished ?? existing?.gradePublished ?? false;
+      next.writeupPublished = entryInput.writeupPublished ?? existing?.writeupPublished ?? false;
       return next;
     });
 
@@ -860,6 +1001,38 @@ class OnDraftService implements IOnDraftService {
     }
 
     return await this.repository.replaceBigBoardEntries(key.value.year, key.value.creator, entries);
+  }
+
+  async saveBigBoardEntry(input: SaveBigBoardEntryInput): Promise<Result<BigBoardEntry, BigBoardError>> {
+    const key = await this.normalizeBigBoardKey(input.year, input.creator);
+    if (key.ok === false) {
+      return Err(key.value);
+    }
+
+    const existingBoard = await this.getBigBoard(key.value.year, key.value.creator);
+    if (existingBoard.ok === false) {
+      return Err(existingBoard.value);
+    }
+
+    const existing = input.entry.id
+      ? existingBoard.value.entries.find((entry) => entry.id === input.entry.id)
+      : undefined;
+    const next = this.normalizeBigBoardEntry(input.entry, existing);
+    next.playerInfoPublished = input.entry.playerInfoPublished ?? existing?.playerInfoPublished ?? false;
+    next.gradePublished = input.entry.gradePublished ?? existing?.gradePublished ?? false;
+    next.writeupPublished = input.entry.writeupPublished ?? existing?.writeupPublished ?? false;
+
+    const entries = existing
+      ? existingBoard.value.entries.map((entry) => entry.id === existing.id ? next : entry)
+      : [...existingBoard.value.entries, next];
+    const validation = this.validatePublishedBigBoardEntries(entries);
+    if (validation.ok === false) {
+      return Err(validation.value);
+    }
+
+    return existing
+      ? await this.repository.updateBigBoardEntry(key.value.year, key.value.creator, next)
+      : await this.repository.createBigBoardEntry(key.value.year, key.value.creator, next);
   }
 
   async publishBigBoardEntryPlayerInfo(year: number | undefined, creator: BigBoardCreator | undefined, entryId: string): Promise<Result<BigBoardEntry, BigBoardError>> {
@@ -884,6 +1057,28 @@ class OnDraftService implements IOnDraftService {
     return await this.repository.updateBigBoardEntry(key.value.year, key.value.creator, next);
   }
 
+  async publishBigBoardEntryGrade(year: number | undefined, creator: BigBoardCreator | undefined, entryId: string): Promise<Result<BigBoardEntry, BigBoardError>> {
+    const key = await this.normalizeBigBoardKey(year, creator);
+    if (key.ok === false) {
+      return Err(key.value);
+    }
+
+    const board = await this.getBigBoard(key.value.year, key.value.creator);
+    if (board.ok === false) {
+      return Err(board.value);
+    }
+    const entry = board.value.entries.find((candidate) => candidate.id === entryId);
+    if (!entry) {
+      return Err(BigBoardValidationError(`Big board entry with id "${entryId}" was not found.`));
+    }
+    const next = { ...entry, gradePublished: true };
+    const validation = this.validateGradeForPublication(next);
+    if (validation.ok === false) {
+      return Err(validation.value);
+    }
+    return await this.repository.updateBigBoardEntry(key.value.year, key.value.creator, next);
+  }
+
   async publishBigBoardEntryWriteup(year: number | undefined, creator: BigBoardCreator | undefined, entryId: string): Promise<Result<BigBoardEntry, BigBoardError>> {
     const key = await this.normalizeBigBoardKey(year, creator);
     if (key.ok === false) {
@@ -902,6 +1097,47 @@ class OnDraftService implements IOnDraftService {
       ...entry.value,
       writeupPublished: true,
     });
+  }
+
+  async saveConsensusDiscrepancyWriteup(input: ConsensusDiscrepancyWriteupInput): Promise<Result<ConsensusDiscrepancyWriteup, BigBoardError>> {
+    const normalizedYear = this.normalizeBigBoardYear(input.year);
+    if (normalizedYear.ok === false) {
+      return Err(normalizedYear.value);
+    }
+    const playerName = input.playerName?.trim() ?? "";
+    const target = await this.validateConsensusDiscrepancyWriteupTarget(normalizedYear.value, playerName);
+    if (target.ok === false) {
+      return Err(target.value);
+    }
+
+    const existing = await this.repository.getConsensusDiscrepancyWriteup(normalizedYear.value, playerName);
+    const writeup = this.normalizeConsensusDiscrepancyWriteup(input, existing.ok === true ? existing.value : undefined);
+    return await this.repository.saveConsensusDiscrepancyWriteup(normalizedYear.value, playerName, writeup);
+  }
+
+  async publishConsensusDiscrepancyWriteup(input: ConsensusDiscrepancyWriteupInput): Promise<Result<ConsensusDiscrepancyWriteup, BigBoardError>> {
+    const normalizedYear = this.normalizeBigBoardYear(input.year);
+    if (normalizedYear.ok === false) {
+      return Err(normalizedYear.value);
+    }
+    const playerName = input.playerName?.trim() ?? "";
+    const target = await this.validateConsensusDiscrepancyWriteupTarget(normalizedYear.value, playerName);
+    if (target.ok === false) {
+      return Err(target.value);
+    }
+
+    const existing = await this.repository.getConsensusDiscrepancyWriteup(normalizedYear.value, playerName);
+    const writeup = this.normalizeConsensusDiscrepancyWriteup(input, existing.ok === true ? existing.value : undefined);
+    const validation = this.validateConsensusDiscrepancyWriteupForPublication(writeup);
+    if (validation.ok === false) {
+      await this.repository.saveConsensusDiscrepancyWriteup(normalizedYear.value, playerName, writeup);
+      return Err(validation.value);
+    }
+    const saved = await this.repository.saveConsensusDiscrepancyWriteup(normalizedYear.value, playerName, writeup);
+    if (saved.ok === false) {
+      return Err(saved.value);
+    }
+    return await this.repository.publishConsensusDiscrepancyWriteup(normalizedYear.value, playerName);
   }
 
   async deleteArticle(id: string): Promise<Result<void, ArticleError>> {
@@ -1186,8 +1422,202 @@ class OnDraftService implements IOnDraftService {
     if (result.ok === false) {
       return Err(result.value);
     }
-    const refreshed = await this.refreshStaleYoutubeStats(result.value);
-    return refreshed ? await this.repository.getYoutubeVideos() : result;
+    if (result.value.some((video) => this.youtubeStatsAreStale(video))) {
+      this.queueYoutubeCatalogRefresh();
+    }
+    return result;
+  }
+
+  async getVideoTags(): Promise<Result<string[], ArticleError>> {
+    return await this.repository.getVideoTags();
+  }
+
+  private normalizedLinkedIds(values: string[] | undefined): string[] {
+    return [...new Set((values ?? []).map((value) => value.trim()).filter(Boolean))];
+  }
+
+  private async prepareNewsletter(input: NewsletterInput, options: { requireReadyToSend?: boolean } = {}): Promise<Result<Newsletter, NewsletterError>> {
+    const writeup = input.writeup.trim();
+    const changelog = input.changelog.trim();
+    const articleIds = this.normalizedLinkedIds(input.articleIds);
+    const videoIds = this.normalizedLinkedIds(input.videoIds);
+    const parsedDate = input.date instanceof Date ? input.date : new Date("");
+    const date = isNaN(parsedDate.getTime()) ? null : parsedDate;
+
+    if (options.requireReadyToSend && !date) {
+      return Err(NewsletterValidationError("Newsletter date is required before sending."));
+    }
+    if (options.requireReadyToSend && !writeup) {
+      return Err(NewsletterValidationError("Newsletter writeup is required before sending."));
+    }
+    if (options.requireReadyToSend && !changelog) {
+      return Err(NewsletterValidationError("Newsletter changelog is required before sending."));
+    }
+    if (writeup.length > NEWSLETTER_WRITEUP_MAX_LENGTH) {
+      return Err(NewsletterValidationError("Newsletter writeup is too long."));
+    }
+    if (changelog.length > NEWSLETTER_CHANGELOG_MAX_LENGTH) {
+      return Err(NewsletterValidationError("Newsletter changelog is too long."));
+    }
+    if (articleIds.length > NEWSLETTER_MAX_LINKED_ITEMS || videoIds.length > NEWSLETTER_MAX_LINKED_ITEMS) {
+      return Err(NewsletterValidationError("Newsletters can link up to 20 articles and 20 videos."));
+    }
+
+    for (const articleId of articleIds) {
+      const article = await this.repository.getArticle(articleId);
+      if (article.ok === false || !article.value.published) {
+        return Err(NewsletterValidationError("One or more selected articles are unavailable."));
+      }
+    }
+    for (const videoId of videoIds) {
+      const video = await this.repository.getYoutubeVideo(videoId);
+      if (video.ok === false) {
+        return Err(NewsletterValidationError("One or more selected videos are unavailable."));
+      }
+    }
+
+    const now = new Date();
+    if (input.id) {
+      const existing = await this.repository.getNewsletter(input.id);
+      if (existing.ok === true) {
+        if (existing.value.status === "sent") {
+          return Err(NewsletterValidationError("Sent newsletters cannot be edited or re-sent."));
+        }
+
+        return Ok({
+          ...existing.value,
+          date,
+          writeup,
+          articleIds,
+          videoIds,
+          changelog,
+          updatedAt: now,
+        });
+      }
+    }
+
+    return Ok({
+      id: input.id?.trim() || randomUUID(),
+      date,
+      writeup,
+      articleIds,
+      videoIds,
+      changelog,
+      status: "draft",
+      createdAt: now,
+      updatedAt: now,
+      recipientCount: 0,
+    });
+  }
+
+  async saveNewsletterDraft(input: NewsletterInput): Promise<Result<Newsletter, NewsletterError>> {
+    const prepared = await this.prepareNewsletter(input);
+    if (prepared.ok === false) {
+      return prepared;
+    }
+
+    return input.id
+      ? this.repository.updateNewsletter({ ...prepared.value, status: "draft", sentAt: undefined, recipientCount: 0 })
+      : this.repository.createNewsletter(prepared.value);
+  }
+
+  private newsletterDateLabel(date: Date): string {
+    return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  }
+
+  private absoluteContentUrl(pathOrUrl: string | undefined): string | undefined {
+    if (!pathOrUrl) {
+      return undefined;
+    }
+    try {
+      return new URL(pathOrUrl, this.emailConfig.appBaseUrl).toString();
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async newsletterEmailItems(newsletter: Newsletter) {
+    const articles: NewsletterEmailItem[] = [];
+    const videos: NewsletterEmailItem[] = [];
+    for (const articleId of newsletter.articleIds) {
+      const article = await this.repository.getArticle(articleId);
+      if (article.ok === true) {
+        articles.push({
+          title: article.value.title,
+          url: new URL(`/articles/${article.value.id}`, this.emailConfig.appBaseUrl).toString(),
+          description: article.value.writeup,
+          imageUrl: this.absoluteContentUrl(article.value.imageUrl),
+        });
+      }
+    }
+    for (const videoId of newsletter.videoIds) {
+      const video = await this.repository.getYoutubeVideo(videoId);
+      if (video.ok === true) {
+        videos.push({
+          title: video.value.title,
+          url: new URL(`/videos/${video.value.videoId}`, this.emailConfig.appBaseUrl).toString(),
+          description: video.value.description,
+          imageUrl: this.absoluteContentUrl(video.value.thumbnailUrl),
+        });
+      }
+    }
+    return { articles, videos };
+  }
+
+  async sendNewsletter(input: NewsletterInput, recipients: NewsletterRecipientInput[]): Promise<Result<Newsletter, NewsletterError>> {
+    const prepared = await this.prepareNewsletter(input, { requireReadyToSend: true });
+    if (prepared.ok === false) {
+      return prepared;
+    }
+    if (!prepared.value.date) {
+      return Err(NewsletterValidationError("Newsletter date is required before sending."));
+    }
+    if (!this.email) {
+      return Err(NewsletterValidationError("Newsletter email service is not configured."));
+    }
+    if (recipients.length === 0) {
+      return Err(NewsletterValidationError("There are no subscribed recipients."));
+    }
+
+    const newsletter = {
+      ...prepared.value,
+      status: "sent" as const,
+      sentAt: new Date(),
+      updatedAt: new Date(),
+      recipientCount: recipients.length,
+    };
+    const emailItems = await this.newsletterEmailItems(newsletter);
+    const subject = `OnDraft Newsletter - ${this.newsletterDateLabel(prepared.value.date)}`;
+
+    try {
+      for (const recipient of recipients) {
+        await this.email.sendNewsletterEmail({
+          to: recipient.email,
+          subject,
+          dateLabel: this.newsletterDateLabel(prepared.value.date),
+          writeup: newsletter.writeup,
+          changelog: newsletter.changelog,
+          articles: emailItems.articles,
+          videos: emailItems.videos,
+          unsubscribeUrl: recipient.unsubscribeUrl,
+          logoUrl: new URL("/images/brand/OnDraftLogo-cropped.png", this.emailConfig.appBaseUrl).toString(),
+        });
+      }
+    } catch {
+      return Err(NewsletterValidationError("Unable to send the newsletter."));
+    }
+
+    return input.id
+      ? this.repository.updateNewsletter(newsletter)
+      : this.repository.createNewsletter(newsletter);
+  }
+
+  async listNewsletters(): Promise<Result<Newsletter[], NewsletterError>> {
+    return this.repository.listNewsletters();
+  }
+
+  async getNewsletter(id: string): Promise<Result<Newsletter, NewsletterError>> {
+    return this.repository.getNewsletter(id);
   }
 
   async filterYoutubeVideos(query: VideoQuery): Promise<Result<Video[], ArticleError>> {
@@ -1195,8 +1625,10 @@ class OnDraftService implements IOnDraftService {
     if (result.ok === false) {
       return Err(result.value);
     }
-    const refreshed = await this.refreshStaleYoutubeStats(result.value);
-    return refreshed ? await this.repository.filterYoutubeVideos(query) : result;
+    if (result.value.some((video) => this.youtubeStatsAreStale(video))) {
+      this.queueYoutubeCatalogRefresh();
+    }
+    return result;
   }
 
   async updateYoutubeVideo(videoId: string, input: CreateYoutubeVideoInput): Promise<Result<Video, ArticleError>> {
@@ -1236,6 +1668,15 @@ class OnDraftService implements IOnDraftService {
     return await this.repository.updateYoutubeVideoStats(videoId.trim(), stats);
   }
 
+  async refreshYoutubeVideoCatalog(options: YoutubeCatalogRefreshOptions = {}): Promise<Result<number, ArticleError>> {
+    const videos = await this.repository.getYoutubeVideos();
+    if (videos.ok === false) {
+      return Err(videos.value);
+    }
+
+    return await this.refreshStaleYoutubeStats(videos.value, options);
+  }
+
   async deleteYoutubeVideo(videoId: string): Promise<Result<void, ArticleError>> {
     if (!videoId || videoId.trim() === "") {
       return Err(ArticleValidationError("YouTube video id is required."));
@@ -1248,6 +1689,11 @@ class OnDraftService implements IOnDraftService {
   }
 }
 
-export function CreateOnDraftService(repository: IOnDraftRepository, youtubeStats?: IYoutubeVideoStatsService): IOnDraftService {
-  return new OnDraftService(repository, youtubeStats);
+export function CreateOnDraftService(
+  repository: IOnDraftRepository,
+  youtubeStats?: IYoutubeVideoStatsService,
+  email?: IEmailService,
+  emailConfig?: Pick<IEmailConfig, "appBaseUrl">,
+): IOnDraftService {
+  return new OnDraftService(repository, youtubeStats, email, emailConfig);
 }

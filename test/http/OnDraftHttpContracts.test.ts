@@ -2,7 +2,7 @@ import request from "supertest";
 import fs from "node:fs";
 import path from "node:path";
 import { createComposedApp } from "../../src/composition";
-import type { IEmailService, SendEmailVerificationEmailInput, SendPasswordResetEmailInput } from "../../src/email/EmailService";
+import type { IEmailService, SendEmailVerificationEmailInput, SendNewsletterEmailInput, SendPasswordResetEmailInput } from "../../src/email/EmailService";
 
 function testConfig(turnstile = { siteKey: null as string | null, secretKey: null as string | null, verificationDisabled: false }) {
   return {
@@ -18,12 +18,18 @@ function testConfig(turnstile = { siteKey: null as string | null, secretKey: nul
       mailingListUnsubscribeSecret: "test-mailing-secret",
     },
     turnstile,
+    analytics: {
+      umamiWebsiteId: null,
+      umamiApiKey: null,
+      umamiApiBaseUrl: "https://api.umami.is/v1",
+    },
   };
 }
 
 class CapturingEmailService implements IEmailService {
   verificationEmails: SendEmailVerificationEmailInput[] = [];
   passwordResetEmails: SendPasswordResetEmailInput[] = [];
+  newsletterEmails: SendNewsletterEmailInput[] = [];
 
   async sendEmailVerificationEmail(input: SendEmailVerificationEmailInput): Promise<void> {
     this.verificationEmails.push(input);
@@ -31,6 +37,10 @@ class CapturingEmailService implements IEmailService {
 
   async sendPasswordResetEmail(input: SendPasswordResetEmailInput): Promise<void> {
     this.passwordResetEmails.push(input);
+  }
+
+  async sendNewsletterEmail(input: SendNewsletterEmailInput): Promise<void> {
+    this.newsletterEmails.push(input);
   }
 }
 
@@ -78,10 +88,36 @@ async function loginAdminAgent(ondraft: ReturnType<typeof app>) {
   return agent;
 }
 
+function edgeGradePayload(prefix: string, score = "6", potential = "6") {
+  const physicalTraits = ["Speed", "Acceleration", "Agility", "Change of Direction", "Strength", "Size / Frame"];
+  const filmTraits = ["Get Off", "Bend", "Power", "Finesse", "Pass Rush Plan", "Block Shed", "Pad Level", "Anchor", "Discipline & Diagnostics", "Tackling", "Pursuit", "Coverage"];
+  const payload: Record<string, string> = {
+    [`${prefix}[grade][position]`]: "EDGE",
+    [`${prefix}[grade][archetype]`]: "Balanced",
+    [`${prefix}[grade][potential]`]: potential,
+  };
+  physicalTraits.forEach((trait) => {
+    payload[`${prefix}[grade][physicalTraits][${trait}]`] = score;
+  });
+  filmTraits.forEach((trait) => {
+    payload[`${prefix}[grade][filmTraits][${trait}]`] = score;
+  });
+  return payload;
+}
+
 function removeUploadedAssetsFromHtml(html: string) {
   const matches = html.matchAll(/\/uploads\/articles\/([^"#]+?\.(?:pdf|jpg|jpeg|png|gif|webp))/g);
   for (const match of matches) {
     fs.rmSync(path.join(process.cwd(), "public", "uploads", "articles", decodeURIComponent(match[1])), {
+      force: true,
+    });
+  }
+}
+
+function removeGeneratedArticleImagesFromHtml(html: string) {
+  const matches = html.matchAll(/\/generated\/article-images\/v1\/([^"#]+?\.(?:jpg|png|gif|webp))/g);
+  for (const match of matches) {
+    fs.rmSync(path.join(process.cwd(), "public", "generated", "article-images", "v1", decodeURIComponent(match[1])), {
       force: true,
     });
   }
@@ -93,22 +129,99 @@ describe("OnDraft HTTP contracts", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers["x-powered-by"]).toBeUndefined();
+    expect(response.headers["content-security-policy"]).toContain("default-src 'self'");
+    expect(response.headers["content-security-policy"]).toContain("frame-ancestors 'none'");
+    expect(response.headers["content-security-policy"]).toContain("https://i.ytimg.com");
     expect(response.headers["x-content-type-options"]).toBe("nosniff");
     expect(response.headers["x-frame-options"]).toBe("DENY");
     expect(response.headers["referrer-policy"]).toBe("strict-origin-when-cross-origin");
+    expect(response.text).toContain('<meta name="robots" content="index, follow, max-image-preview:large"');
+    expect(response.text).toContain('<link rel="manifest" href="/site.webmanifest"');
+    expect(response.text).toContain('<script type="application/ld+json">');
+    expect(response.text).toContain('"@type":"WebSite"');
     expect(response.text).toContain("Articles On Tap");
     expect(response.text).toContain("Log in");
     expect(response.text).toContain('href="/about"');
     expect(response.text).not.toContain('hx-get="/about"');
     expect(response.text).toContain('hx-target="#site-modal-outlet"');
-    expect(response.text).toContain("/images/brand/ondraft-logo.png");
-    expect(response.text).toContain('<meta property="og:image" content="http://localhost:3000/images/brand/ondraft-logo.png"');
-    expect(response.text).toContain('<meta name="twitter:image" content="http://localhost:3000/images/brand/ondraft-logo.png"');
+    expect(response.text).toContain("/images/brand/OnDraftLogo-cropped.png");
+    expect(response.text).toContain('<meta property="og:image" content="http://localhost:3000/images/brand/OnDraftLogo-cropped.png"');
+    expect(response.text).toContain('<meta name="twitter:image" content="http://localhost:3000/images/brand/OnDraftLogo-cropped.png"');
     expect(response.text).toContain("/images/social/youtube-icon.svg");
     expect(response.text).toContain("/images/social/x-icon.svg");
     expect(response.text).toContain("/images/social/tiktok-icon.svg");
     expect(response.text).toContain("https://www.venmo.com/u/OnDraft-Football");
+    expect(response.text).toContain('id="site-loader"');
+    expect(response.text).toContain('id="loading-skeleton-templates"');
+    expect(response.text).toContain('data-page-skeleton="articles"');
+    expect(response.text).toContain('data-result-skeleton="article-results-card"');
+    expect(response.text).toContain('data-result-skeleton="article-results-list"');
+    expect(response.text).toContain("od-loading-card");
     expect(response.text).not.toContain("[PLACEHOLDER FOR SOCIAL MEDIA LINKS]");
+  });
+
+  it("enables spellcheck for editable text fields from the shell script", async () => {
+    const response = await request(app()).get("/ondraftShell.js");
+
+    expect(response.status).toBe(200);
+    expect(response.text).toContain("spellcheckSelector");
+    expect(response.text).toContain('field.setAttribute("spellcheck", "true")');
+    expect(response.text).toContain("MutationObserver");
+    expect(response.text).toContain("htmx:afterSettle");
+    expect(response.text).toContain("showRouteSkeleton");
+    expect(response.text).toContain("showResultSkeleton");
+    expect(response.text).toContain("resolvedResultSkeletonName");
+    expect(response.text).toContain("data-loading-skeleton");
+  });
+
+  it("generates cacheable helmet assets for validated color pairs", async () => {
+    const generatedPath = path.join(process.cwd(), "public", "generated", "helmets", "v1", "690014-f1f2f3.png");
+    await fs.promises.rm(generatedPath, { force: true });
+
+    const response = await request(app()).get("/generated/helmets/v1/690014-f1f2f3.png");
+
+    expect(response.status).toBe(200);
+    expect(response.headers["content-type"]).toContain("image/png");
+    expect(response.headers["cache-control"]).toBe("public, max-age=31536000, immutable");
+    expect(response.body.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))).toBe(true);
+    expect(fs.existsSync(generatedPath)).toBe(true);
+
+    await fs.promises.rm(generatedPath, { force: true });
+  });
+
+  it("rejects generated helmet paths outside the color-key boundary", async () => {
+    const response = await request(app()).get("/generated/helmets/v1/not-a-key.png");
+
+    expect(response.status).toBe(404);
+  });
+
+  it("stores HTML article images under predictable cacheable generated URLs", async () => {
+    const agent = await adminAgent();
+    const png = Buffer.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+      0x00, 0x00, 0x00, 0x0d,
+    ]);
+
+    const upload = await agent
+      .post("/articles/html-images")
+      .attach("htmlImage", png, { filename: "Pocket Passer.png", contentType: "image/png" });
+
+    expect(upload.status).toBe(200);
+    expect(upload.body.url).toMatch(/^\/generated\/article-images\/v1\/[0-9a-f]{16}-pocket-passer\.png$/);
+
+    const secondUpload = await agent
+      .post("/articles/html-images")
+      .attach("htmlImage", png, { filename: "Pocket Passer.png", contentType: "image/png" });
+
+    expect(secondUpload.status).toBe(200);
+    expect(secondUpload.body.url).toBe(upload.body.url);
+
+    const image = await request(app()).get(upload.body.url);
+    expect(image.status).toBe(200);
+    expect(image.headers["cache-control"]).toBe("public, max-age=31536000, immutable");
+    expect(image.headers["content-type"]).toContain("image/png");
+
+    removeGeneratedArticleImagesFromHtml(upload.body.url);
   });
 
   it("blocks cross-origin state-changing requests when an origin is present", async () => {
@@ -120,6 +233,34 @@ describe("OnDraft HTTP contracts", () => {
 
     expect(response.status).toBe(403);
     expect(response.text).toContain("Request blocked.");
+  });
+
+  it("blocks production state-changing requests when origin and referrer are missing", async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalSessionSecret = process.env.SESSION_SECRET;
+    process.env.NODE_ENV = "production";
+    process.env.SESSION_SECRET = "test-production-session-secret";
+
+    try {
+      const response = await request(app())
+        .post("/login")
+        .type("form")
+        .send({ email: "ryan@ondraftfootball.com", password: "password123" });
+
+      expect(response.status).toBe(403);
+      expect(response.text).toContain("Request blocked.");
+    } finally {
+      if (originalNodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = originalNodeEnv;
+      }
+      if (originalSessionSecret === undefined) {
+        delete process.env.SESSION_SECRET;
+      } else {
+        process.env.SESSION_SECRET = originalSessionSecret;
+      }
+    }
   });
 
   it("rate limits repeated login attempts", async () => {
@@ -227,10 +368,12 @@ describe("OnDraft HTTP contracts", () => {
     }
   });
 
-  it("renders about as a full page and footer legal pages as modal content", async () => {
+  it("renders about and legal routes as full pages, with HTMX modal partials available", async () => {
     const about = await request(app()).get("/about");
     const privacy = await request(app()).get("/privacy");
     const contact = await request(app()).get("/contact");
+    const terms = await request(app()).get("/terms");
+    const privacyModal = await request(app()).get("/privacy").set("HX-Request", "true");
 
     expect(about.status).toBe(200);
     expect(about.text).toContain("<h1");
@@ -258,12 +401,54 @@ describe("OnDraft HTTP contracts", () => {
     expect(about.text).not.toContain('role="dialog"');
 
     expect(privacy.status).toBe(200);
+    expect(privacy.text).toContain("<!doctype html>");
+    expect(privacy.text).toContain("<h1");
     expect(privacy.text).toContain("OnDraft Football");
     expect(privacy.text).toContain("ondraftfootball.com");
     expect(privacy.text).toContain("support@ondraftfootball.com");
+    expect(privacy.text).toContain("1. Information We Collect");
+    expect(privacy.text).toContain("8. Social Media Affiliation and Icon Use");
+    expect(privacy.text).toContain("15. Contact Us");
 
     expect(contact.status).toBe(200);
+    expect(contact.text).toContain("<!doctype html>");
     expect(contact.text).toContain("For all business inquiries or suggestions");
+
+    expect(terms.status).toBe(200);
+    expect(terms.text).toContain("<!doctype html>");
+    expect(terms.text).toContain("Terms and Community Guidelines");
+    expect(terms.text).toContain("Community Guidelines");
+
+    expect(privacyModal.status).toBe(200);
+    expect(privacyModal.text).toContain('role="dialog"');
+    expect(privacyModal.text).not.toContain("<!doctype html>");
+  });
+
+  it("serves crawler and feed discovery endpoints", async () => {
+    const ondraft = app();
+    const robots = await request(ondraft).get("/robots.txt");
+    const sitemap = await request(ondraft).get("/sitemap.xml");
+    const feed = await request(ondraft).get("/feed.xml");
+    const manifest = await request(ondraft).get("/site.webmanifest");
+    const security = await request(ondraft).get("/.well-known/security.txt");
+
+    expect(robots.status).toBe(200);
+    expect(robots.text).toContain("Sitemap:");
+    expect(robots.text).toContain("Disallow: /login");
+    expect(sitemap.status).toBe(200);
+    expect(sitemap.text).toContain("<urlset");
+    expect(sitemap.text).toContain("<loc>http://localhost:3000/terms</loc>");
+    expect(sitemap.text).toContain("<loc>http://localhost:3000/articles/");
+    expect(sitemap.text).toContain("<lastmod>");
+    expect(feed.status).toBe(200);
+    expect(feed.text).toContain("<rss");
+    expect(feed.text).toContain("<channel>");
+    expect(feed.text).toContain("<guid>");
+    expect(manifest.status).toBe(200);
+    expect(manifest.body.name).toBe("OnDraft Football");
+    expect(manifest.body.icons[0].src).toBe("/images/brand/OnDraftLogo-favicon.png");
+    expect(security.status).toBe(200);
+    expect(security.text).toContain("Contact: mailto:support@ondraftfootball.com");
   });
 
   it("logs in a demo user and renders the home page", async () => {
@@ -284,6 +469,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(ondraft.text).toContain("Ryan McWalter");
     expect(ondraft.text).toContain('hx-get="/settings"');
     expect(ondraft.text).toContain("Open account settings");
+    expect(ondraft.text).toContain('rel="alternate" type="application/rss+xml"');
   });
 
   it("renders and updates account settings through modal routes", async () => {
@@ -304,6 +490,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(modal.text).toContain("Send reset link");
     expect(modal.text).toContain("Delete account");
     expect(modal.text).toContain("This cannot be undone.");
+    expect(modal.text).toContain('action="/settings/delete-account"');
 
     const passwordReset = await agent.post("/settings/change-password");
     expect(passwordReset.status).toBe(200);
@@ -352,6 +539,45 @@ describe("OnDraft HTTP contracts", () => {
     expect(resent.text).toContain("we sent a new verification link");
   });
 
+  it("lets non-admin users delete their own account from settings", async () => {
+    const ondraft = app();
+    const agent = request.agent(ondraft);
+
+    await agent
+      .post("/register")
+      .type("form")
+      .send({
+        displayName: "Delete Me",
+        email: "delete-me@ondraft.test",
+        password: "password123",
+        confirmPassword: "password123",
+      });
+
+    const deleted = await agent.post("/settings/delete-account");
+    expect(deleted.status).toBe(302);
+    expect(deleted.headers.location).toBe("/");
+
+    const home = await agent.get("/");
+    expect(home.status).toBe(200);
+    expect(home.text).toContain("Log in");
+    expect(home.text).not.toContain("Delete Me");
+
+    const login = await request(ondraft)
+      .post("/login")
+      .type("form")
+      .send({ email: "delete-me@ondraft.test", password: "password123" });
+    expect(login.status).toBe(401);
+  });
+
+  it("does not allow admin self-deletion from settings", async () => {
+    const agent = await adminAgent();
+
+    const deleted = await agent.post("/settings/delete-account");
+
+    expect(deleted.status).toBe(200);
+    expect(deleted.text).toContain("Admin accounts cannot be deleted from account settings.");
+  });
+
   it("registers a new user and signs them in", async () => {
     const agent = request.agent(app());
 
@@ -373,6 +599,34 @@ describe("OnDraft HTTP contracts", () => {
     expect(ondraft.status).toBe(200);
     expect(ondraft.text).toContain("New Analyst");
     expect(ondraft.text).not.toContain("Resend verification email");
+  });
+
+  it("requires verified email before posting hot takes", async () => {
+    const ondraft = app();
+    const reader = request.agent(ondraft);
+    await reader
+      .post("/register")
+      .type("form")
+      .send({
+        displayName: "Unverified Hot Take",
+        email: "unverified-hot-take@ondraft.test",
+        password: "password123",
+        confirmPassword: "password123",
+      });
+
+    const page = await reader.get("/hottakes");
+    expect(page.status).toBe(200);
+    expect(page.text).toContain("Verify your email before posting a hot take.");
+    expect(page.text).not.toContain("Post Hot Take");
+
+    const create = await reader
+      .post("/hottakes")
+      .type("form")
+      .set("HX-Request", "true")
+      .send({ content: "This should be blocked." });
+
+    expect(create.status).toBe(403);
+    expect(create.text).toContain("Verify your email before posting a hot take.");
   });
 
   it("verifies an email token through the routed verification page", async () => {
@@ -576,6 +830,183 @@ describe("OnDraft HTTP contracts", () => {
     expect(exportResponse.text).toContain('"email","status","consentSource","consentTextVersion"');
   });
 
+  it("renders the admin dashboard with HTMX tabs for admin workflows", async () => {
+    const ondraft = app();
+
+    const anonymous = await request(ondraft).get("/admin");
+    expect(anonymous.status).toBe(403);
+
+    const admin = await loginAdminAgent(ondraft);
+    const dashboard = await admin.get("/admin");
+
+    expect(dashboard.status).toBe(200);
+    expect(dashboard.text).toContain("Admin Dashboard");
+    expect(dashboard.text).toContain('hx-get="/admin/tabs/users"');
+    expect(dashboard.text).toContain('hx-get="/admin/tabs/content"');
+    expect(dashboard.text).toContain('hx-get="/admin/tabs/newsletter"');
+    expect(dashboard.text).toContain('hx-get="/admin/tabs/analytics"');
+    expect(dashboard.text).toContain("od-text-toggle-group w-full");
+    expect(dashboard.text).toContain('href="/admin"');
+    expect(dashboard.text).toContain("Admin Dashboard</a>");
+
+    const contentTab = await admin.get("/admin/tabs/content").set("HX-Request", "true");
+    expect(contentTab.status).toBe(200);
+    expect(contentTab.text).toContain('href="/articles/new"');
+    expect(contentTab.text).toContain('href="/bigboard/edit"');
+    expect(contentTab.text).toContain('href="/videos/new"');
+    expect(contentTab.text).not.toContain("<!doctype html>");
+
+    const newsletterTab = await admin.get("/admin/tabs/newsletter").set("HX-Request", "true");
+    expect(newsletterTab.status).toBe(200);
+    expect(newsletterTab.text).toContain("Newsletter Desk");
+    expect(newsletterTab.text).toContain("Build newsletter");
+    expect(newsletterTab.text).toContain('name="articleIds"');
+    expect(newsletterTab.text).toContain('name="videoIds"');
+    expect(newsletterTab.text).toContain("articleDropdownOpen");
+    expect(newsletterTab.text).toContain("videoDropdownOpen");
+    expect(newsletterTab.text).toContain("refreshCounts()");
+    expect(newsletterTab.text).toContain("articleCount");
+    expect(newsletterTab.text).toContain("videoCount");
+    expect(newsletterTab.text).toContain("Past newsletters");
+    expect(newsletterTab.text).toContain("Resend");
+    expect(newsletterTab.text).toContain('hx-post="/admin/newsletters/send"');
+    expect(newsletterTab.text).toContain('hx-include="#admin-newsletter-form"');
+    expect(newsletterTab.text).toContain("no-reply@ondraftfootball.com");
+    expect(newsletterTab.text).not.toContain("<!doctype html>");
+
+    const analyticsTab = await admin.get("/admin/tabs/analytics").set("HX-Request", "true");
+    expect(analyticsTab.status).toBe(200);
+    expect(analyticsTab.text).toContain("Traffic Dashboard");
+    expect(analyticsTab.text).toContain("Last month");
+    expect(analyticsTab.text).toContain("Articles");
+    expect(analyticsTab.text).toContain("Draft board");
+    expect(analyticsTab.text).not.toContain("<!doctype html>");
+
+    const usersTab = await admin.get("/admin/tabs/users").set("HX-Request", "true");
+    expect(usersTab.status).toBe(200);
+    expect(usersTab.text).toContain("Manage Users");
+    expect(usersTab.text).toContain("ryan@ondraftfootball.com");
+    expect(usersTab.text).toContain("w-full min-w-[58rem]");
+    expect(usersTab.text).not.toContain("<!doctype html>");
+  });
+
+  it("lets admins save, edit, and send newsletters through the admin dashboard", async () => {
+    const { ondraft, emailService } = appWithEmailCapture();
+    const admin = await loginAdminAgent(ondraft);
+
+    await admin
+      .post("/settings/mailing-list")
+      .type("form")
+      .send({ preference: "subscribe" });
+
+    const draft = await admin
+      .post("/admin/newsletters/drafts")
+      .type("form")
+      .send({
+        date: "2026-06-05",
+        writeup: "This week on OnDraft.",
+        articleIds: ["A1001"],
+        videoIds: ["BH3X-llq1M4"],
+        changelog: "Added the admin newsletter workflow.",
+      });
+
+    expect(draft.status).toBe(200);
+    expect(draft.text).toContain("Newsletter draft saved.");
+    expect(draft.text).toContain("formOpen: false");
+    expect(draft.text).toContain("Past newsletters");
+    expect(draft.text).toContain("od-secondary-link");
+    expect(draft.text).toContain(">Edit</button>");
+    expect(draft.text).toContain('hx-get="/admin/newsletters/');
+    const draftId = draft.text.match(/hx-get="\/admin\/newsletters\/([^"]+)\/edit"/)?.[1];
+    expect(draftId).toBeDefined();
+
+    const edit = await admin.get(`/admin/newsletters/${draftId}/edit`).set("HX-Request", "true");
+    expect(edit.status).toBe(200);
+    expect(edit.text).toContain('value="A1001" @change="refreshCounts()" checked');
+    expect(edit.text).toContain('value="BH3X-llq1M4" @change="refreshCounts()" checked');
+
+    const sent = await admin
+      .post("/admin/newsletters/send")
+      .type("form")
+      .send({
+        id: draftId,
+        date: "2026-06-05",
+        writeup: "This week on OnDraft.",
+        articleIds: ["A1001"],
+        videoIds: ["BH3X-llq1M4"],
+        changelog: "Added the admin newsletter workflow.",
+      });
+
+    expect(sent.status).toBe(200);
+    expect(sent.text).toContain("Newsletter sent to 1 subscriber.");
+    expect(sent.text).toContain("formOpen: false");
+    expect(sent.text).toContain("Sent");
+    expect(sent.text).not.toContain(">Edit</button>");
+    expect(emailService.newsletterEmails).toHaveLength(1);
+    expect(emailService.newsletterEmails[0].articles[0]).toMatchObject({
+      title: "The league is starving for pressure, and this EDGE class knows it",
+      imageUrl: "http://localhost:3000/images/article-defaults/uprights.png",
+    });
+    expect(emailService.newsletterEmails[0].videos[0]).toMatchObject({
+      title: "Quarterback room check-in: what still translates on Sundays",
+      imageUrl: "https://img.youtube.com/vi/BH3X-llq1M4/hqdefault.jpg",
+    });
+    expect(emailService.newsletterEmails[0].logoUrl).toBe("http://localhost:3000/images/brand/OnDraftLogo-cropped.png");
+  });
+
+  it("allows partial newsletter drafts but requires send-ready newsletter fields", async () => {
+    const { ondraft, emailService } = appWithEmailCapture();
+    const admin = await loginAdminAgent(ondraft);
+
+    await admin
+      .post("/settings/mailing-list")
+      .type("form")
+      .send({ preference: "subscribe" });
+
+    const emptyDraft = await admin
+      .post("/admin/newsletters/drafts")
+      .type("form")
+      .send({});
+
+    expect(emptyDraft.status).toBe(200);
+    expect(emptyDraft.text).toContain("Newsletter draft saved.");
+    expect(emptyDraft.text).toContain("Undated draft");
+
+    const missingDate = await admin
+      .post("/admin/newsletters/send")
+      .type("form")
+      .send({
+        writeup: "This week on OnDraft.",
+        changelog: "Added the admin newsletter workflow.",
+      });
+
+    expect(missingDate.status).toBe(400);
+    expect(missingDate.text).toContain("Newsletter date is required before sending.");
+
+    const missingWriteup = await admin
+      .post("/admin/newsletters/send")
+      .type("form")
+      .send({
+        date: "2026-06-05",
+        changelog: "Added the admin newsletter workflow.",
+      });
+
+    expect(missingWriteup.status).toBe(400);
+    expect(missingWriteup.text).toContain("Newsletter writeup is required before sending.");
+
+    const missingChangelog = await admin
+      .post("/admin/newsletters/send")
+      .type("form")
+      .send({
+        date: "2026-06-05",
+        writeup: "This week on OnDraft.",
+      });
+
+    expect(missingChangelog.status).toBe(400);
+    expect(missingChangelog.text).toContain("Newsletter changelog is required before sending.");
+    expect(emailService.newsletterEmails).toHaveLength(0);
+  });
+
   it("lets admins manage users with verification and mailing list status", async () => {
     const ondraft = app();
 
@@ -711,7 +1142,12 @@ describe("OnDraft HTTP contracts", () => {
     const article = await reader.get(`/articles/${articleId}`);
     expect(article.status).toBe(200);
     expect(article.text).toContain("Banned User Comment Target");
-    expect(article.text).toContain("Cool down before posting again.");
+    expect(article.text).toContain(`hx-get="/articles/${articleId}/comments?limit=10"`);
+
+    const articleComments = await reader.get(`/articles/${articleId}/comments`);
+    expect(articleComments.status).toBe(200);
+    expect(articleComments.text).toContain("Cool down before posting again.");
+    expect(articleComments.text).not.toContain("Post Comment");
     expect(article.text).not.toContain("Post Comment");
 
     const comment = await reader
@@ -750,9 +1186,27 @@ describe("OnDraft HTTP contracts", () => {
     const editor = await agent.get("/bigboard/edit?year=2026&creator=Ryan");
     expect(editor.status).toBe(200);
     expect(editor.text).toContain("Edit Big Board");
-    expect(editor.text).toContain("Add player");
+    expect(editor.text).toContain("Add Player");
     expect(editor.text).toContain("Publish");
     expect(editor.text).toContain("data-delete-board-entry");
+    expect(editor.text).toContain("data-board-editor-card-list");
+    expect(editor.text).toContain("data-expand-entry");
+    expect(editor.text).toContain('id="big-board-editor-fragment"');
+    expect(editor.text).toContain('hx-get="/bigboard/edit"');
+    expect(editor.text).toContain('hx-target="#big-board-editor-fragment"');
+    expect(editor.text).toContain("data-use-global-loader");
+    expect(editor.text).toContain('action="/bigboard/edit/player"');
+    expect(editor.text).toContain('hx-post="/bigboard/edit/player"');
+    expect(editor.text).toContain('hx-post="/bigboard/edit/publish-player-info"');
+    expect(editor.text).toContain('hx-post="/bigboard/edit/publish-writeup"');
+    expect(editor.text).toContain('hx-post="/bigboard/edit/delete-entry"');
+    expect(editor.text).toContain("add player writeup");
+    expect(editor.text).toContain("Save full board");
+    expect(editor.text).toContain("data-board-dirty-actions");
+    expect(editor.text).toContain("markBoardStructureDirty");
+    expect(editor.text).toContain("scrollToFirstValidationError");
+    expect(editor.text).toContain("You have unsaved changes, are you sure you want to exit?");
+    expect(editor.text).toContain("/bigboard/edit/delete-entry");
     expect(editor.text).toContain("Are you sure?");
     expect(editor.text).toContain("This cannot be undone.");
     expect(editor.text).toContain('list="college-team-options"');
@@ -818,8 +1272,9 @@ describe("OnDraft HTTP contracts", () => {
     expect(visibleWithoutWriteup.text).toContain("Hidden Prospect");
     expect(visibleWithoutWriteup.text).toContain("Alabama football helmet");
     expect(visibleWithoutWriteup.text).toContain('src="/teamHelmetTemplate.png"');
-    expect(visibleWithoutWriteup.text).toContain('data-primary-color="#690014"');
-    expect(visibleWithoutWriteup.text).toContain('data-secondary-color="#F1F2F3"');
+    expect(visibleWithoutWriteup.text).toContain('loading="lazy"');
+    expect(visibleWithoutWriteup.text).toContain('decoding="async"');
+    expect(visibleWithoutWriteup.text).toContain('data-generated-helmet-src="/generated/helmets/v1/690014-f1f2f3.png"');
     expect(visibleWithoutWriteup.text).toContain("6&#39;2 3/8&#34;");
     expect(visibleWithoutWriteup.text).not.toContain("Starter traits.");
     expect(visibleWithoutWriteup.text).not.toContain("Private eval note.");
@@ -854,6 +1309,347 @@ describe("OnDraft HTTP contracts", () => {
     expect(visibleWithWriteup.text).toContain("Starter traits.");
     expect(visibleWithWriteup.text).toContain("Pocket movement");
     expect(visibleWithWriteup.text).not.toContain("Private eval note.");
+  });
+
+  it("saves one draft board editor card without replacing neighboring entries", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+
+    const saveTwoEntries = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": "single-save-entry-1",
+        "entries[0][playerName]": "Single Save One",
+        "entries[0][school]": "Alabama",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2",
+        "entries[0][weight]": "220",
+        "entries[1][id]": "single-save-entry-2",
+        "entries[1][playerName]": "Single Save Two",
+        "entries[1][school]": "OnDraft State",
+        "entries[1][position]": "WR",
+        "entries[1][rank]": "2",
+        "entries[1][posRank]": "1",
+        "entries[1][heightLabel]": "6-0",
+        "entries[1][weight]": "195",
+      });
+    expect(saveTwoEntries.status).toBe(200);
+
+    const saveOne = await agent
+      .post("/bigboard/edit/player")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        entryId: "single-save-entry-1",
+        "entries[0][id]": "single-save-entry-1",
+        "entries[0][playerName]": "Single Save One Updated",
+        "entries[0][school]": "Alabama",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2",
+        "entries[0][weight]": "221",
+        "entries[0][playerInfoPublished]": "false",
+        "entries[0][writeupPublished]": "false",
+      });
+
+    expect(saveOne.status).toBe(200);
+    expect(saveOne.text).toContain("Saved Single Save One Updated.");
+    expect(saveOne.text).toContain("Single Save One Updated");
+    expect(saveOne.text).toContain("Single Save Two");
+
+    const htmxSaveOne = await agent
+      .post("/bigboard/edit/player")
+      .set("HX-Request", "true")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        entryId: "single-save-entry-1",
+        "entries[0][id]": "single-save-entry-1",
+        "entries[0][playerName]": "Single Save One HTMX",
+        "entries[0][school]": "Alabama",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2",
+        "entries[0][weight]": "222",
+        "entries[0][playerInfoPublished]": "false",
+        "entries[0][writeupPublished]": "false",
+        expandWriteup: "true",
+        expandGrade: "true",
+      });
+
+    expect(htmxSaveOne.status).toBe(200);
+    expect(htmxSaveOne.text).toContain("data-board-entry-item");
+    expect(htmxSaveOne.text).toContain("Single Save One HTMX");
+    expect(htmxSaveOne.text).toContain('data-expanded="true"');
+    expect(htmxSaveOne.text).toContain('data-grade-expanded="true"');
+    expect(htmxSaveOne.text).toContain('name="expandWriteup" value="true"');
+    expect(htmxSaveOne.text).toContain('name="expandGrade" value="true"');
+    expect(htmxSaveOne.text).not.toContain("Edit Big Board");
+    expect(htmxSaveOne.text).not.toContain("Single Save Two");
+
+    const htmxPublishInfo = await agent
+      .post("/bigboard/edit/publish-player-info")
+      .set("HX-Request", "true")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        entryId: "single-save-entry-1",
+        "entries[0][id]": "single-save-entry-1",
+        "entries[0][playerName]": "Single Save One HTMX",
+        "entries[0][school]": "Alabama",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2",
+        "entries[0][weight]": "222",
+        "entries[0][playerInfoPublished]": "false",
+        "entries[0][writeupPublished]": "false",
+      });
+
+    expect(htmxPublishInfo.status).toBe(200);
+    expect(htmxPublishInfo.text).toContain("data-board-entry-item");
+    expect(htmxPublishInfo.text).toContain('name="entries[0][playerInfoPublished]" value="true"');
+    expect(htmxPublishInfo.text).not.toContain("Edit Big Board");
+
+    const htmxPublishWriteup = await agent
+      .post("/bigboard/edit/publish-writeup")
+      .set("HX-Request", "true")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        entryId: "single-save-entry-1",
+        "entries[0][id]": "single-save-entry-1",
+        "entries[0][playerName]": "Single Save One HTMX",
+        "entries[0][school]": "Alabama",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2",
+        "entries[0][weight]": "222",
+        "entries[0][strengths]": "HTMX profile strength",
+        "entries[0][weaknesses]": "HTMX profile weakness",
+        "entries[0][rundown]": "HTMX profile rundown.",
+        "entries[0][playerInfoPublished]": "true",
+        "entries[0][writeupPublished]": "false",
+      });
+
+    expect(htmxPublishWriteup.status).toBe(200);
+    expect(htmxPublishWriteup.text).toContain("data-board-entry-item");
+    expect(htmxPublishWriteup.text).toContain('name="entries[0][writeupPublished]" value="true"');
+    expect(htmxPublishWriteup.text).toContain("data-publish-writeup");
+    expect(htmxPublishWriteup.text).toContain("hidden");
+    expect(htmxPublishWriteup.text).not.toContain("Edit Big Board");
+
+    const boardAfterWriteupPublish = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
+    expect(boardAfterWriteupPublish.status).toBe(200);
+    expect(boardAfterWriteupPublish.text).toContain("HTMX profile rundown.");
+
+    const htmxDelete = await agent
+      .post("/bigboard/edit/delete-entry")
+      .set("HX-Request", "true")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        entryId: "single-save-entry-1",
+        "entries[0][id]": "single-save-entry-1",
+        "entries[0][playerName]": "Single Save One HTMX",
+      });
+
+    expect(htmxDelete.status).toBe(200);
+    expect(htmxDelete.text).toBe("");
+
+    const boardAfterHtmxDelete = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
+    expect(boardAfterHtmxDelete.status).toBe(200);
+    expect(boardAfterHtmxDelete.text).toContain("Single Save One HTMX");
+
+    const editorAfterHtmxDelete = await agent.get("/bigboard/edit?year=2026&creator=Ryan");
+    expect(editorAfterHtmxDelete.status).toBe(200);
+    expect(editorAfterHtmxDelete.text).toContain("Single Save One HTMX");
+    expect(editorAfterHtmxDelete.text).toContain("Single Save Two");
+
+    const saveFullBoardAfterDelete = await agent
+      .post("/bigboard/edit")
+      .set("HX-Request", "true")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": "single-save-entry-2",
+        "entries[0][playerName]": "Single Save Two",
+        "entries[0][school]": "OnDraft State",
+        "entries[0][position]": "WR",
+        "entries[0][rank]": "2",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-0",
+        "entries[0][weight]": "195",
+        "entries[0][playerInfoPublished]": "false",
+        "entries[0][writeupPublished]": "false",
+      });
+
+    expect(saveFullBoardAfterDelete.status).toBe(200);
+    expect(saveFullBoardAfterDelete.text).toContain("Saved.");
+    expect(saveFullBoardAfterDelete.text).toContain('id="big-board-editor-fragment"');
+    expect(saveFullBoardAfterDelete.text).not.toContain("<!DOCTYPE html>");
+
+    const boardAfterFullSave = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
+    expect(boardAfterFullSave.status).toBe(200);
+    expect(boardAfterFullSave.text).not.toContain("Single Save One HTMX");
+
+    const editorAfterFullSave = await agent.get("/bigboard/edit?year=2026&creator=Ryan");
+    expect(editorAfterFullSave.status).toBe(200);
+    expect(editorAfterFullSave.text).not.toContain("Single Save One HTMX");
+    expect(editorAfterFullSave.text).toContain("Single Save Two");
+  });
+
+  it("shows field-level validation errors when publishing invalid draft board cards", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+
+    const saveCards = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": "validation-published-qb",
+        "entries[0][playerName]": "Published QB",
+        "entries[0][school]": "Alabama",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2",
+        "entries[0][weight]": "220",
+        "entries[0][playerInfoPublished]": "true",
+        "entries[1][id]": "validation-unpublished-qb",
+        "entries[1][playerName]": "Unpublished QB",
+        "entries[1][school]": "OnDraft State",
+        "entries[1][position]": "QB",
+        "entries[1][rank]": "2",
+        "entries[1][posRank]": "1",
+        "entries[1][heightLabel]": "6-0",
+        "entries[1][weight]": "195",
+      });
+    expect(saveCards.status).toBe(200);
+
+    const invalidWriteupPublish = await agent
+      .post("/bigboard/edit/publish-writeup")
+      .set("HX-Request", "true")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        entryId: "validation-unpublished-qb",
+        "entries[0][id]": "validation-unpublished-qb",
+        "entries[0][playerName]": "Unpublished QB",
+        "entries[0][school]": "OnDraft State",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "2",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-0",
+        "entries[0][weight]": "195",
+        "entries[0][strengths]": "",
+        "entries[0][weaknesses]": "Needs cleaner counters.",
+        "entries[0][rundown]": "Has enough to test partial validation.",
+        "entries[0][playerInfoPublished]": "false",
+        "entries[0][writeupPublished]": "false",
+      });
+
+    expect(invalidWriteupPublish.status).toBe(200);
+    expect(invalidWriteupPublish.headers["hx-retarget"]).toBe("#big-board-editor-fragment");
+    expect(invalidWriteupPublish.headers["hx-reswap"]).toBe("outerHTML show:none");
+    expect(invalidWriteupPublish.text).toContain("Strengths are required before publishing a player writeup.");
+    expect(invalidWriteupPublish.text).toContain("board-editor-profile-box is-validation-error");
+    expect(invalidWriteupPublish.text).toContain('data-expanded="true"');
+
+    const duplicatePositionRankPublish = await agent
+      .post("/bigboard/edit/publish-player-info")
+      .set("HX-Request", "true")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        entryId: "validation-unpublished-qb",
+        "entries[0][id]": "validation-unpublished-qb",
+        "entries[0][playerName]": "Unpublished QB",
+        "entries[0][school]": "OnDraft State",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "2",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-0",
+        "entries[0][weight]": "195",
+        "entries[0][strengths]": "Enough burst.",
+        "entries[0][weaknesses]": "Needs cleaner counters.",
+        "entries[0][rundown]": "Has enough to test duplicate ranking.",
+        "entries[0][playerInfoPublished]": "false",
+        "entries[0][writeupPublished]": "false",
+      });
+
+    expect(duplicatePositionRankPublish.status).toBe(200);
+    expect(duplicatePositionRankPublish.headers["hx-retarget"]).toBe("#big-board-editor-fragment");
+    expect(duplicatePositionRankPublish.headers["hx-reswap"]).toBe("outerHTML show:none");
+    expect(duplicatePositionRankPublish.text).toContain("QB1 is already used by Published QB.");
+    expect((duplicatePositionRankPublish.text.match(/board-editor-pos-rank-field is-validation-error/g) ?? []).length).toBe(2);
+    expect((duplicatePositionRankPublish.text.match(/QB1 is already used by Published QB\./g) ?? []).length).toBe(1);
+
+    const publicBoard = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
+    expect(publicBoard.status).toBe(200);
+    expect(publicBoard.text).not.toContain("Unpublished QB");
+  });
+
+  it("publishes draft board grades and renders public grade details", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+
+    const publishGrade = await agent
+      .post("/bigboard/edit/publish-grade")
+      .set("HX-Request", "true")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        entryId: "published-grade-edge",
+        "entries[0][id]": "published-grade-edge",
+        "entries[0][playerName]": "Published Grade Edge",
+        "entries[0][school]": "Alabama",
+        "entries[0][position]": "EDGE",
+        "entries[0][rank]": "4",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-4",
+        "entries[0][weight]": "255",
+        "entries[0][playerInfoPublished]": "true",
+        "entries[0][gradePublished]": "false",
+        "entries[0][writeupPublished]": "false",
+        ...edgeGradePayload("entries[0]", "6", "6"),
+      });
+
+    expect(publishGrade.status).toBe(200);
+    expect(publishGrade.text).toContain("data-board-entry-item");
+    expect(publishGrade.text).toContain('name="entries[0][gradePublished]" value="true"');
+    expect(publishGrade.text).toContain("Publish Grade");
+    expect(publishGrade.text).toContain("Speed");
+    expect(publishGrade.text).not.toContain("Edit Big Board");
+
+    const publicBoard = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
+
+    expect(publicBoard.status).toBe(200);
+    expect(publicBoard.text).toContain("Published Grade Edge");
+    expect(publicBoard.text).toContain("6.15/8");
+    expect(publicBoard.text).toContain("How we grade players");
+    expect(publicBoard.text).toContain('title="Pass Rush Plan"');
+    expect(publicBoard.text).toContain("PRP");
+    expect(publicBoard.text).not.toContain("Balanced archetype");
   });
 
   it("removes omitted draft board ranking entries when admins save the editor", async () => {
@@ -1072,6 +1868,7 @@ describe("OnDraft HTTP contracts", () => {
     const fullBoard = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
     expect(fullBoard.status).toBe(200);
     expect(fullBoard.text).toContain('<select name="position" onchange=');
+    expect(fullBoard.text).toContain('hx-push-url="true"');
     expect(fullBoard.text).toContain('<option value="" selected>All</option>');
     expect(fullBoard.text).toContain('<option value="QB"');
     expect(fullBoard.text).toContain('<option value="OnDraft State"');
@@ -1084,6 +1881,9 @@ describe("OnDraft HTTP contracts", () => {
     expect(fullBoard.text).toMatch(/>\s*Ryan\s*<\/button>/);
     expect(fullBoard.text).toMatch(/>\s*Aleks\s*<\/button>/);
     expect(fullBoard.text).toMatch(/>\s*Consensus\s*<\/button>/);
+    expect(fullBoard.text).toContain("Player analysis and opinions by");
+    expect(fullBoard.text).toContain('href="/about#ryan-mcwalter"');
+    expect(fullBoard.text).toContain("Ryan McWalter");
 
     const filteredBoard = await request(ondraft)
       .get("/bigboard?year=2026&creator=Ryan&position=QB&school=OnDraft%20State")
@@ -1099,6 +1899,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(filteredBoard.text).toContain('hx-get="/bigboard?year=2026&creator=Ryan"');
     expect(filteredBoard.text).toContain('id="draft-board-info-popover"');
     expect(filteredBoard.text).toContain("x-bind:hidden=\"!infoOpen\"");
+    expect(filteredBoard.text).toContain('href="/about#ryan-mcwalter"');
 
     const resetBoard = await request(ondraft)
       .get("/bigboard?year=2026&creator=Ryan")
@@ -1130,6 +1931,10 @@ describe("OnDraft HTTP contracts", () => {
         "entries[0][heightLabel]": "6-2",
         "entries[0][weight]": "220",
         "entries[0][playerInfoPublished]": "true",
+        "entries[0][strengths]": "Copied Ryan strength should not appear.",
+        "entries[0][weaknesses]": "Copied Ryan weakness should not appear.",
+        "entries[0][rundown]": "Copied Ryan rundown should not appear.",
+        "entries[0][writeupPublished]": "true",
         "entries[1][id]": "ryan-edge",
         "entries[1][playerName]": "Edge Prospect",
         "entries[1][school]": "OnDraft State",
@@ -1192,13 +1997,188 @@ describe("OnDraft HTTP contracts", () => {
     expect(consensus.text).toContain('value="Consensus"');
     expect(consensus.text).toMatch(/aria-pressed="true"[\s\S]*Consensus/);
     expect(consensus.text).not.toContain("/bigboard/edit?year=2026&amp;creator=Consensus");
+    expect(consensus.text).toContain('href="/about#ryan-mcwalter"');
+    expect(consensus.text).toContain('href="/about#aleks-ryabinkin"');
     expect(consensus.text).toMatch(/1\. Edge Prospect[\s\S]*EDGE1/);
     expect(consensus.text).toMatch(/2\. Quarterback Prospect[\s\S]*QB1/);
+    expect(consensus.text).toMatch(/Ryan(?:&#39;|')s Rank:\s*<strong>4<\/strong>[\s\S]*Aleks(?:&#39;|')s Rank:\s*<strong>6<\/strong>/);
+    expect(consensus.text).toMatch(/Ryan(?:&#39;|')s Rank:\s*<strong>1<\/strong>[\s\S]*Aleks(?:&#39;|')s Rank:\s*<strong>13<\/strong>/);
     expect(consensus.text).toContain("Ryan State");
     expect(consensus.text).not.toContain("Aleks Tech");
     expect(consensus.text).toContain("Big discrepancy");
     expect(consensus.text).toMatch(/3\. Tackle Prospect[\s\S]*Published U/);
+    expect(consensus.text).toMatch(/Tackle Prospect[\s\S]*Ryan(?:&#39;|')s Rank:\s*<strong>10<\/strong>/);
+    expect(consensus.text).not.toMatch(/Tackle Prospect[\s\S]*Aleks(?:&#39;|')s Rank:\s*<strong>30<\/strong>/);
     expect(consensus.text).not.toContain("Private U");
+    expect(consensus.text).not.toContain("read player profile");
+    expect(consensus.text).not.toContain("RUNDOWN");
+    expect(consensus.text).not.toContain("STRENGTHS");
+    expect(consensus.text).not.toContain("Copied Ryan strength should not appear.");
+    expect(consensus.text).not.toContain("Copied Ryan weakness should not appear.");
+    expect(consensus.text).not.toContain("Copied Ryan rundown should not appear.");
+  });
+
+  it("lets admins draft and publish consensus discrepancy explanations", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+
+    const saveRyan = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": "disc-ryan-qb",
+        "entries[0][playerName]": "Discrepancy Quarterback",
+        "entries[0][school]": "Ryan State",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-2",
+        "entries[0][weight]": "220",
+        "entries[0][playerInfoPublished]": "true",
+      });
+    expect(saveRyan.status).toBe(200);
+
+    const saveAleks = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Aleks",
+        "entries[0][id]": "disc-aleks-qb",
+        "entries[0][playerName]": "Discrepancy Quarterback",
+        "entries[0][school]": "Aleks Tech",
+        "entries[0][position]": "QB",
+        "entries[0][rank]": "20",
+        "entries[0][posRank]": "4",
+        "entries[0][heightLabel]": "6-1",
+        "entries[0][weight]": "215",
+        "entries[0][playerInfoPublished]": "true",
+      });
+    expect(saveAleks.status).toBe(200);
+
+    const adminConsensus = await agent.get("/bigboard?year=2026&creator=Consensus");
+    expect(adminConsensus.status).toBe(200);
+    expect(adminConsensus.text).toContain("Big discrepancy");
+    expect(adminConsensus.text).toContain('hx-post="/bigboard/consensus/discrepancy-writeup"');
+    expect(adminConsensus.text).toContain('hx-post="/bigboard/consensus/discrepancy-writeup/publish"');
+    expect(adminConsensus.text).toContain("Explanation draft");
+    expect(adminConsensus.text).toContain("Why Ryan is high on this player:");
+    expect(adminConsensus.text).toContain("Why Aleks is low on this player:");
+    expect(adminConsensus.text).toContain("consensus-discrepancy-controls-card-2026-Discrepancy-Quarterback");
+    expect(adminConsensus.text).not.toContain("consensus-discrepancy-controls-list-2026-Discrepancy-Quarterback");
+    expect(adminConsensus.text).not.toContain("read player profile");
+
+    const publicBeforeSave = await request(ondraft).get("/bigboard?year=2026&creator=Consensus");
+    expect(publicBeforeSave.status).toBe(200);
+    expect(publicBeforeSave.text).toContain("Big discrepancy");
+    expect(publicBeforeSave.text).not.toContain("See why");
+
+    const saveOneSide = await agent
+      .post("/bigboard/consensus/discrepancy-writeup")
+      .set("HX-Request", "true")
+      .type("form")
+      .send({
+        year: "2026",
+        playerName: "Discrepancy Quarterback",
+        ryanWriteup: "Ryan is buying the processing and pocket courage.",
+        aleksWriteup: "",
+      });
+    expect(saveOneSide.status).toBe(200);
+    expect(saveOneSide.text).toContain("Saved.");
+    expect(saveOneSide.text).toContain("Explanation draft");
+    expect(saveOneSide.text).toContain("Ryan is buying the processing and pocket courage.");
+    expect(saveOneSide.text).toContain('hx-post="/bigboard/consensus/discrepancy-writeup/publish"');
+
+    const publicAfterDraft = await request(ondraft).get("/bigboard?year=2026&creator=Consensus");
+    expect(publicAfterDraft.status).toBe(200);
+    expect(publicAfterDraft.text).not.toContain("Ryan is buying the processing and pocket courage.");
+    expect(publicAfterDraft.text).not.toContain("See why");
+
+    const publishMissingAleks = await agent
+      .post("/bigboard/consensus/discrepancy-writeup/publish")
+      .set("HX-Request", "true")
+      .type("form")
+      .send({
+        year: "2026",
+        playerName: "Discrepancy Quarterback",
+        ryanWriteup: "Ryan is buying the processing and pocket courage.",
+        aleksWriteup: "",
+      });
+    expect(publishMissingAleks.status).toBe(200);
+    expect(publishMissingAleks.text).toContain("Ryan and Aleks discrepancy explanations are required before publishing.");
+    expect(publishMissingAleks.text).toContain("Aleks's explanation is required before publishing.");
+    expect(publishMissingAleks.text).not.toContain("Ryan's explanation is required before publishing.");
+
+    const publishBoth = await agent
+      .post("/bigboard/consensus/discrepancy-writeup/publish")
+      .set("HX-Request", "true")
+      .type("form")
+      .send({
+        year: "2026",
+        playerName: "Discrepancy Quarterback",
+        ryanWriteup: "Ryan is buying the processing and pocket courage.",
+        aleksWriteup: "Aleks wants cleaner late-down answers before moving him up.",
+      });
+    expect(publishBoth.status).toBe(200);
+    expect(publishBoth.text).toContain("Published.");
+    expect(publishBoth.text).toContain("Explanation published");
+    expect(publishBoth.text).toContain('"editMode":false');
+    expect(publishBoth.text).toContain('hx-swap-oob="outerHTML"');
+    expect(publishBoth.text).toContain("consensus-discrepancy-controls-card-2026-Discrepancy-Quarterback");
+    expect(publishBoth.text).not.toContain("consensus-discrepancy-controls-list-2026-Discrepancy-Quarterback");
+    expect(publishBoth.text).toContain("See why");
+    expect(publishBoth.text).toContain('x-show="!savedPublished"');
+    expect(publishBoth.text).not.toContain('x-show="!savedPublished ||');
+    expect(publishBoth.text).toContain("consensus-discrepancy-panel-actions");
+    expect(publishBoth.text).toContain(":aria-label=\"editMode ? 'Cancel editing discrepancy explanation' : 'Edit discrepancy explanation'\"");
+    expect(publishBoth.text).toContain('x-show="!editMode"');
+    expect(publishBoth.text).toContain('x-show="editMode"');
+
+    const savePublishedEdit = await agent
+      .post("/bigboard/consensus/discrepancy-writeup")
+      .set("HX-Request", "true")
+      .type("form")
+      .send({
+        year: "2026",
+        playerName: "Discrepancy Quarterback",
+        ryanWriteup: "Ryan still trusts the processing and pocket courage.",
+        aleksWriteup: "Aleks still wants cleaner late-down answers before moving him up.",
+      });
+    expect(savePublishedEdit.status).toBe(200);
+    expect(savePublishedEdit.text).toContain("Saved.");
+    expect(savePublishedEdit.text).toContain("Explanation draft");
+    expect(savePublishedEdit.text).toContain('"editMode":true');
+    expect(savePublishedEdit.text).toContain('"savedPublished":false');
+    expect(savePublishedEdit.text).toContain("consensus-discrepancy-panel-actions");
+    expect(savePublishedEdit.text).toContain(":aria-label=\"editMode ? 'Cancel editing discrepancy explanation' : 'Edit discrepancy explanation'\"");
+    expect(savePublishedEdit.text).toContain('x-show="!savedPublished"');
+
+    const republishEdit = await agent
+      .post("/bigboard/consensus/discrepancy-writeup/publish")
+      .set("HX-Request", "true")
+      .type("form")
+      .send({
+        year: "2026",
+        playerName: "Discrepancy Quarterback",
+        ryanWriteup: "Ryan still trusts the processing and pocket courage.",
+        aleksWriteup: "Aleks still wants cleaner late-down answers before moving him up.",
+      });
+    expect(republishEdit.status).toBe(200);
+    expect(republishEdit.text).toContain("Published.");
+    expect(republishEdit.text).toContain('"editMode":false');
+    expect(republishEdit.text).toContain('"savedPublished":true');
+    expect(republishEdit.text).toContain("consensus-discrepancy-panel-actions");
+    expect(republishEdit.text).toContain('x-show="!editMode"');
+    expect(republishEdit.text).toContain('x-show="editMode"');
+
+    const publicAfterPublish = await request(ondraft).get("/bigboard?year=2026&creator=Consensus");
+    expect(publicAfterPublish.status).toBe(200);
+    expect(publicAfterPublish.text).toContain("See why");
+    expect(publicAfterPublish.text).toContain("Ryan still trusts the processing and pocket courage.");
+    expect(publicAfterPublish.text).toContain("Aleks still wants cleaner late-down answers before moving him up.");
+    expect(publicAfterPublish.text).not.toContain('hx-post="/bigboard/consensus/discrepancy-writeup"');
   });
 
   it("lets admins create a new big board year from the editor", async () => {
@@ -1208,6 +2188,9 @@ describe("OnDraft HTTP contracts", () => {
     const editor = await agent.get("/bigboard/edit");
     expect(editor.status).toBe(200);
     expect(editor.text).toContain("Create draft class");
+    expect(editor.text).toContain('data-board-editor-card-list');
+    expect(editor.text).toContain('data-add-player');
+    expect(editor.text).toContain("initializeForm");
 
     const createYear = await agent
       .post("/bigboard/years")
@@ -1265,6 +2248,8 @@ describe("OnDraft HTTP contracts", () => {
     expect(create.text).toContain("hx-swap-oob");
     expect(create.text).toContain("verified-admin-badge");
     expect(create.text).toContain("Verified OnDraft admin");
+    expect(create.text).toContain("Report");
+    expect(create.text).toContain("mailto:support@ondraftfootball.com");
 
     const postId = create.text.match(/id="hot-take-([A-Za-z0-9]{5})"/)?.[1];
     expect(postId).toBeTruthy();
@@ -1288,6 +2273,8 @@ describe("OnDraft HTTP contracts", () => {
     expect(comment.text).toContain("Counterpoint: special teams matter.");
     expect(comment.text).toContain("verified-admin-badge");
     expect(comment.text).toContain(`hx-delete="/hottakes/${postId}/comments/`);
+    expect(comment.text).toContain("Report");
+    expect(comment.text).toContain("hot%20take%20comment");
 
     const commentId = comment.text.match(/id="hot-take-comment-([A-Za-z0-9]{8})"/)?.[1];
     expect(commentId).toBeTruthy();
@@ -1361,8 +2348,12 @@ describe("OnDraft HTTP contracts", () => {
     expect(bookmarks.status).toBe(200);
     expect(bookmarks.text).toContain("Bookmarkable Article");
     expect(bookmarks.text).toContain(`/articles/${articleId}`);
+    expect(bookmarks.text).toContain(`hx-post="/articles/${articleId}/bookmark"`);
+    expect(bookmarks.text).toContain(`hx-target="#article-bookmark-${articleId}"`);
     expect(bookmarks.text).toContain("Bookmark this hot take.");
     expect(bookmarks.text).toContain(`/hottakes#hot-take-${postId}`);
+    expect(bookmarks.text).toContain(`hx-post="/hottakes/${postId}/bookmark"`);
+    expect(bookmarks.text).toContain(`hx-target="#forum-post-bookmark-${postId}"`);
 
     const removeArticleBookmark = await agent
       .post(`/articles/${articleId}/bookmark`)
@@ -1387,6 +2378,11 @@ describe("OnDraft HTTP contracts", () => {
     const form = await agent.get("/videos/new");
     expect(form.status).toBe(200);
     expect(form.text).toContain("Add YouTube Video");
+    expect(form.text).toContain('class="tag-editor"');
+    expect(form.text).toContain('data-tag-input');
+    expect(form.text).toContain('data-tag-toggle');
+    expect(form.text).toContain('data-tag-value');
+    expect(form.text).toContain('<script src="/articleTags.js" defer></script>');
 
     const invalid = await agent
       .post("/videos")
@@ -1399,6 +2395,8 @@ describe("OnDraft HTTP contracts", () => {
       });
     expect(invalid.status).toBe(400);
     expect(invalid.text).toContain("Enter a valid YouTube video URL");
+    expect(invalid.text).toContain('class="tag-editor"');
+    expect(invalid.text).toContain('value="draft" data-tag-value');
 
     const first = await agent
       .post("/videos")
@@ -1429,15 +2427,25 @@ describe("OnDraft HTTP contracts", () => {
     expect(videos.text).toContain("Receiver Notes");
     expect(videos.text).toContain("https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg");
     expect(videos.text).toContain("Views unavailable");
+    expect(videos.text).toContain('id="video-filter-panel"');
+    expect(videos.text).toContain('name="dateFrom"');
+    expect(videos.text).toContain('name="dateTo"');
+    expect(videos.text).toContain('value="film-room" data-tag-checkbox');
     expect(videos.text).not.toContain("YOUTUBE_API_KEY");
 
-    const filtered = await request(ondraft).get("/videos?keyword=quarterback&sortBy=date&sortDirection=asc");
+    const filtered = await request(ondraft).get("/videos?keyword=quarterback&tags=qb&sortBy=date&sortDirection=asc");
     expect(filtered.status).toBe(200);
     expect(filtered.text).toContain("Quarterback Film");
     expect(filtered.text).not.toContain("Receiver Notes");
     expect(filtered.text).toContain('value="quarterback"');
-    expect(filtered.text).not.toContain('name="tags"');
+    expect(filtered.text).toContain('name="tags" value="qb" data-tag-value');
+    expect(filtered.text).toContain('value="qb" data-tag-checkbox checked');
     expect(filtered.text).toContain('<option value="asc" selected>Ascending</option>');
+
+    const dateExcluded = await request(ondraft).get("/videos?dateTo=2000-01-01");
+    expect(dateExcluded.status).toBe(200);
+    expect(dateExcluded.text).not.toContain("Quarterback Film");
+    expect(dateExcluded.text).not.toContain("Receiver Notes");
 
     const adminVideos = await agent.get("/videos");
     expect(adminVideos.status).toBe(200);
@@ -1448,6 +2456,8 @@ describe("OnDraft HTTP contracts", () => {
     expect(editForm.status).toBe(200);
     expect(editForm.text).toContain("Edit YouTube Video");
     expect(editForm.text).toContain('value="Quarterback Film"');
+    expect(editForm.text).toContain('value="film-room,qb" data-tag-value');
+    expect(editForm.text).toContain('value="film-room" data-tag-checkbox checked');
 
     const update = await agent
       .post("/videos/dQw4w9WgXcQ")
@@ -1499,6 +2509,10 @@ describe("OnDraft HTTP contracts", () => {
     expect(article.text).toContain("A regular article body.");
     expect(article.text).toContain('<meta property="og:type" content="article"');
     expect(article.text).toContain('<meta property="og:image" content="http://localhost:3000/images/article-defaults/');
+    expect(article.text).toContain('<meta property="article:author" content="Ryan McWalter"');
+    expect(article.text).toContain('<meta property="article:tag" content="draft"');
+    expect(article.text).toContain('<meta name="twitter:image:alt" content="Plain Text Film Room article thumbnail"');
+    expect(article.text).toContain('"@type":"Article"');
     expect(article.text).toContain('class="icon-button article-share-button"');
     expect(article.text).toContain('data-share-url="/articles/');
     expect(article.text).toContain("Share");
@@ -1509,6 +2523,15 @@ describe("OnDraft HTTP contracts", () => {
     expect(articles.text).toContain("A short plain text summary.");
     expect(articles.text).toContain("draft");
     expect(articles.text).toContain("film-room");
+    expect(articles.text).toContain('id="article-filter-tag-options"');
+    expect(articles.text).toContain('value="draft" data-tag-checkbox');
+    expect(articles.text).toContain('name="tags" value="" data-tag-value');
+
+    const tagFiltered = await agent.get("/articles?tags=film-room");
+    expect(tagFiltered.status).toBe(200);
+    expect(tagFiltered.text).toContain("Plain Text Film Room");
+    expect(tagFiltered.text).toContain('name="tags" value="film-room" data-tag-value');
+    expect(tagFiltered.text).toContain('value="film-room" data-tag-checkbox checked');
   });
 
   it("keeps plain text article content escaped", async () => {
@@ -1554,6 +2577,12 @@ describe("OnDraft HTTP contracts", () => {
     expect(create.status).toBe(302);
     const articlePath = create.headers.location;
     const articleId = articlePath.split("/").pop();
+
+    const article = await request(ondraft).get(articlePath);
+    expect(article.status).toBe(200);
+    expect(article.text).toContain(`hx-get="/articles/${articleId}/comments?limit=10"`);
+    expect(article.text).toContain('hx-trigger="revealed"');
+    expect(article.text).toContain("Loading comments");
 
     const anonymous = request.agent(ondraft);
     const like = await anonymous.post(`/articles/${articleId}/like`);
@@ -1611,6 +2640,8 @@ describe("OnDraft HTTP contracts", () => {
     expect(comment.text).toContain("Ryan McWalter");
     expect(comment.text).toContain("verified-admin-badge");
     expect(comment.text).toContain("Verified OnDraft admin");
+    expect(comment.text).toContain("Report");
+    expect(comment.text).toContain("article%20comment");
 
     const commentId = comment.text.match(/id="comment-([A-Za-z0-9]{8})"/)?.[1];
     expect(commentId).toBeDefined();
@@ -1624,6 +2655,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(reply.text).toContain("Agree with this.");
     expect(reply.text).toContain("reply-list");
     expect(reply.text).toContain("verified-admin-badge");
+    expect(reply.text).toContain("article%20reply");
 
     const likedComment = await anonymous.post(`/comments/${commentId}/like`);
     expect(likedComment.status).toBe(200);
@@ -1669,8 +2701,10 @@ describe("OnDraft HTTP contracts", () => {
         .send({ text: `Comment ${index}` });
     }
 
-    const firstPage = await request(ondraft).get(`/articles/${articleId}/comments`);
+    const firstPage = await admin.get(`/articles/${articleId}/comments`);
     expect(firstPage.status).toBe(200);
+    expect(firstPage.text).toContain('id="article-comments-section"');
+    expect(firstPage.text).toContain('hx-post="/articles/');
     expect(firstPage.text).toContain("Comment 10");
     expect(firstPage.text).not.toContain("Comment 11");
     expect(firstPage.text).toContain("Show More");
@@ -1742,6 +2776,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(articlesPage.status).toBe(200);
     expect(articlesPage.text).toContain('name="sortBy"');
     expect(articlesPage.text).toContain('name="sortDirection"');
+    expect(articlesPage.text).toMatch(/Author[\s\S]*Tags[\s\S]*To[\s\S]*From/);
     expect(articlesPage.text).toContain("htmx.trigger(this.form, 'submit')");
 
     const dateAsc = await request(ondraft).get("/articles/filter?sortBy=date&sortDirection=asc");
@@ -1755,7 +2790,7 @@ describe("OnDraft HTTP contracts", () => {
 
     const allPopular = await request(ondraft).get("/articles/popular?range=all").set("HX-Request", "true");
     expect(allPopular.status).toBe(200);
-    expect(allPopular.text).toContain('id="popular-articles-panel"');
+    expect(allPopular.text).not.toContain('id="popular-articles-panel"');
     expect(allPopular.text).toContain("Older Sort Article");
     expect(allPopular.text).toContain("Current Favorite Article");
 
@@ -1777,7 +2812,7 @@ describe("OnDraft HTTP contracts", () => {
         writeup: "A short HTML summary.",
         publicationDate: "2024-01-01",
         contentType: "html",
-        content: '<h2>Film Room</h2><p onclick="alert(1)">Safe copy</p><script>alert(1)</script><iframe src="https://example.com"></iframe>',
+        content: '<h2>Film Room</h2><p onclick="alert(1)">Safe copy</p><img src="/generated/article-images/v1/1234567890abcdef-pocket-passer.png" alt="Pocket passer"><script>alert(1)</script><iframe src="https://example.com"></iframe>',
       });
 
     expect(create.status).toBe(302);
@@ -1785,7 +2820,7 @@ describe("OnDraft HTTP contracts", () => {
     const article = await agent.get(create.headers.location);
 
     expect(article.status).toBe(200);
-    expect(article.text).toContain('<div class="article-body article-html-body"><h2>Film Room</h2><p>Safe copy</p></div>');
+    expect(article.text).toContain('<div class="article-body article-html-body"><h2>Film Room</h2><p>Safe copy</p><img src="/generated/article-images/v1/1234567890abcdef-pocket-passer.png" alt="Pocket passer" /></div>');
     expect(article.text).not.toContain("<script>alert");
     expect(article.text).not.toContain("onclick");
     expect(article.text).not.toContain("<iframe");
@@ -1798,6 +2833,10 @@ describe("OnDraft HTTP contracts", () => {
     expect(createForm.status).toBe(200);
     expect(createForm.text).toContain('hx-get="/articles/new/content-fields"');
     expect(createForm.text).toContain('id="article-content-fields"');
+    expect(createForm.text).toContain('type="date" name="publicationDate"');
+    expect(createForm.text).toContain('data-hook-count');
+    expect(createForm.text).toContain('data-hook-max-words="300"');
+    expect(createForm.text.indexOf('data-tag-editor')).toBeLessThan(createForm.text.indexOf('data-hook-input'));
 
     const pdfFields = await agent.get("/articles/new/content-fields?contentType=pdf");
     expect(pdfFields.status).toBe(200);
@@ -1808,6 +2847,8 @@ describe("OnDraft HTTP contracts", () => {
     expect(htmlFields.status).toBe(200);
     expect(htmlFields.text).toContain("HTML content");
     expect(htmlFields.text).toContain("<textarea");
+    expect(htmlFields.text).toContain('data-html-image-uploader');
+    expect(htmlFields.text).toContain('name="htmlImage"');
 
     const plainTextFields = await agent.get("/articles/new/content-fields?contentType=plainText");
     expect(plainTextFields.status).toBe(200);

@@ -1,5 +1,5 @@
 import { Result } from "../lib/result";
-import { type BigBoard, Article, BigBoardCreator, BigBoardEntry, ArticleFilter, Comment, ForumPost, ForumPostFilter, DraftBoardFilter, Video, VideoQuery, ConsensusBigBoard, } from "../model/OnDraftContent";
+import { type BigBoard, Article, BigBoardCreator, BigBoardEntry, ArticleFilter, Comment, ForumPost, ForumPostFilter, DraftBoardFilter, Video, VideoQuery, ConsensusBigBoard, Newsletter, ConsensusDiscrepancyWriteup, } from "../model/OnDraftContent";
 
 export type BigBoardError = 
     | {name: "BigBoardNotFound"; message: string}
@@ -26,6 +26,13 @@ export type ForumPostError =
     | {name: "DatabaseError"; message: string}
     | {name: "UnknownForumPostError"; message: string};
 
+export type NewsletterError =
+    | {name: "NewsletterNotFound"; message: string}
+    | {name: "DuplicateNewsletter"; message: string}
+    | {name: "NewsletterValidationError"; message: string}
+    | {name: "DatabaseError"; message: string}
+    | {name: "UnknownNewsletterError"; message: string};
+
 export const ArticleNotFound = (message: string): ArticleError => ({ name: "ArticleNotFound", message });
 export const CommentNotFound = (message: string): ArticleError => ({ name: "CommentNotFound", message });
 export const ForumPostNotFound = (message: string): ForumPostError => ({ name: "ForumPostNotFound", message });
@@ -38,11 +45,15 @@ export const DuplicateBigBoardYear = (message: string): BigBoardError => ({ name
 export const PlayerNotFound = (message: string): BigBoardError => ({ name: "PlayerNotFound", message });
 export const DuplicateArticle = (message: string): ArticleError => ({ name: "DuplicateArticle", message });
 export const DuplicatePlayer = (message: string): BigBoardError => ({ name: "DuplicatePlayer", message });
-export const DatabaseError = (message: string): ArticleError | BigBoardError | ForumPostError => ({ name: "DatabaseError", message });
+export const DatabaseError = (message: string): ArticleError | BigBoardError | ForumPostError | NewsletterError => ({ name: "DatabaseError", message });
 export const ArticleValidationError = (message: string): ArticleError => ({ name: "ArticleValidationError", message });
 export const BigBoardValidationError = (message: string): BigBoardError => ({ name: "BigBoardValidationError", message });
 export const UnknownArticleError = (message: string): ArticleError => ({ name: "UnknownArticleError", message });
 export const UnknownBigBoardError = (message: string): BigBoardError => ({ name: "UnknownBigBoardError", message });
+export const NewsletterNotFound = (message: string): NewsletterError => ({ name: "NewsletterNotFound", message });
+export const DuplicateNewsletter = (message: string): NewsletterError => ({ name: "DuplicateNewsletter", message });
+export const NewsletterValidationError = (message: string): NewsletterError => ({ name: "NewsletterValidationError", message });
+export const UnknownNewsletterError = (message: string): NewsletterError => ({ name: "UnknownNewsletterError", message });
 
 export interface IOnDraftRepository {
     getBigBoard(year: number, creator: BigBoardCreator, filter?: DraftBoardFilter): Promise<Result<BigBoard, BigBoardError>>;
@@ -79,10 +90,18 @@ export interface IOnDraftRepository {
     createYoutubeVideo(video: Video): Promise<Result<Video, ArticleError>>;
     getYoutubeVideo(videoId: string): Promise<Result<Video, ArticleError>>;
     getYoutubeVideos(): Promise<Result<Video[], ArticleError>>;
+    getVideoTags(): Promise<Result<string[], ArticleError>>;
     filterYoutubeVideos(query: VideoQuery): Promise<Result<Video[], ArticleError>>;
     updateYoutubeVideo(videoId: string, video: Video): Promise<Result<Video, ArticleError>>;
     updateYoutubeVideoStats(videoId: string, stats: { thumbnailUrl?: string; viewCount?: number; youtubeStatsFetchedAt: Date }): Promise<Result<Video, ArticleError>>;
     deleteYoutubeVideo(videoId: string): Promise<Result<void, ArticleError>>;
     getTags(): Promise<Result<string[], ArticleError>>;
     getConsensusBigBoard(year: number): Promise<Result<ConsensusBigBoard, BigBoardError>>;
+    getConsensusDiscrepancyWriteup(year: number, playerName: string): Promise<Result<ConsensusDiscrepancyWriteup, BigBoardError>>;
+    saveConsensusDiscrepancyWriteup(year: number, playerName: string, writeup: ConsensusDiscrepancyWriteup): Promise<Result<ConsensusDiscrepancyWriteup, BigBoardError>>;
+    publishConsensusDiscrepancyWriteup(year: number, playerName: string): Promise<Result<ConsensusDiscrepancyWriteup, BigBoardError>>;
+    createNewsletter(newsletter: Newsletter): Promise<Result<Newsletter, NewsletterError>>;
+    updateNewsletter(newsletter: Newsletter): Promise<Result<Newsletter, NewsletterError>>;
+    getNewsletter(id: string): Promise<Result<Newsletter, NewsletterError>>;
+    listNewsletters(): Promise<Result<Newsletter[], NewsletterError>>;
 }

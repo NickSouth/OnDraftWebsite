@@ -1,0 +1,513 @@
+<%
+  const fieldPrefix = "entries[0]";
+  const persistedEntry = !isTemplate && Boolean(entry.id);
+  const formatBoardNumber = (value) => {
+    if (typeof value !== "number") {
+      return "";
+    }
+    return Number.isInteger(value) ? value.toString() : value.toFixed(1);
+  };
+  const formatHeightInches = (value) => {
+    if (typeof value !== "number") {
+      return "";
+    }
+    const whole = Math.floor(value);
+    const fractional = value - whole;
+    const eighths = Math.round(fractional * 8);
+    const fractions = {
+      1: " 1/8",
+      2: " 1/4",
+      3: " 3/8",
+      4: " 1/2",
+      5: " 5/8",
+      6: " 3/4",
+      7: " 7/8",
+    };
+    if (eighths === 0) {
+      return whole.toString();
+    }
+    if (eighths === 8) {
+      return (whole + 1).toString();
+    }
+    return `${whole}${fractions[eighths] ?? ""}`;
+  };
+  const hasText = (value) => typeof value === "string" && value.trim().length > 0;
+  const rankLabel = formatBoardNumber(entry.rank) || "NR";
+  const playerNameLabel = hasText(entry.playerName) ? entry.playerName : "New Player";
+  const schoolLabel = hasText(entry.school) ? entry.school : "School TBD";
+  const posRankLabel = formatBoardNumber(entry.posRank) || "Pos rank";
+  const weightLabel = typeof entry.weight === "number" ? `${entry.weight} lbs` : "Weight TBD";
+  const gradeConfig = typeof draftGradePositionConfig === "function" ? draftGradePositionConfig(entry.position) : null;
+  const fallbackGrade = typeof defaultDraftGrade === "function" ? defaultDraftGrade(entry.position) : null;
+  const grade = entry.grade || fallbackGrade;
+  const gradeCalculation = typeof calculateDraftGrade === "function" ? calculateDraftGrade(entry.grade) : null;
+  const gradeDisplayValue = typeof publishedBoardGrade === "function" ? publishedBoardGrade(entry) : gradeCalculation?.displayGrade;
+  const gradeDisplayLabel = typeof formatDraftBoardGrade === "function" ? formatDraftBoardGrade(gradeDisplayValue) : "-/8";
+  const gradeArchetypeNames = gradeConfig ? gradeConfig.archetypes.map((archetype) => archetype.name) : [];
+  const gradeCategories = grade && typeof gradeTraitCategoriesForGrade === "function" ? gradeTraitCategoriesForGrade(grade, entry.position) : [];
+  const gradeTraitValue = (categoryKey, trait) => {
+    if (!entry.grade) {
+      return "";
+    }
+    const category = categoryKey === "physicalTraits" ? entry.grade.physicalTraits : entry.grade.filmTraits;
+    const value = category ? category[trait] : "";
+    return value === null || value === undefined ? "" : value;
+  };
+  const teamColors = typeof collegeTeamColors !== "undefined" ? collegeTeamColors[entry.school] : undefined;
+  const helmetPrimaryColor = teamColors?.primaryColor || "#111111";
+  const helmetSecondaryColor = teamColors?.secondaryColor || "#F8FAFC";
+  const helmetKey = typeof helmetColorKey !== "undefined" ? helmetColorKey(helmetPrimaryColor, helmetSecondaryColor) : null;
+  const generatedHelmetSrc = helmetKey ? `/generated/helmets/v1/${helmetKey}.png` : "/teamHelmetTemplate.png";
+  const hasPlayerContent = hasText(entry.playerName)
+    || hasText(entry.school)
+    || hasText(entry.position)
+    || typeof entry.rank === "number"
+    || typeof entry.posRank === "number"
+    || entry.height
+    || typeof entry.weight === "number";
+  const hasWriteupContent = hasText(entry.writeup.strengths) || hasText(entry.writeup.weaknesses) || hasText(entry.writeup.rundown);
+  const hasStoredGradeScores = Boolean(entry.grade && (
+    entry.grade.potential !== null
+      || Object.values(entry.grade.physicalTraits ?? {}).some((value) => value !== null && value !== undefined)
+      || Object.values(entry.grade.filmTraits ?? {}).some((value) => value !== null && value !== undefined)
+  ));
+  const hasGradeContent = Boolean(hasStoredGradeScores);
+  const showPlayerPublish = !entry.playerInfoPublished && hasPlayerContent;
+  const showGradePublish = !entry.gradePublished && hasGradeContent;
+  const showWriteupPublish = !entry.writeupPublished && hasWriteupContent;
+  const entryValidationIssues = (typeof validationIssues !== "undefined" && Array.isArray(validationIssues))
+    ? validationIssues.filter((issue) => issue && issue.entryId === entry.id)
+    : [];
+  const fieldHasError = (field) => entryValidationIssues.some((issue) => issue.field === field);
+  const fieldErrorMessage = (field) => {
+    const issue = entryValidationIssues.find((candidate) => candidate.field === field && candidate.message);
+    return issue ? issue.message : "";
+  };
+  const fieldErrorClass = (field) => fieldHasError(field) ? "is-validation-error" : "";
+  const escapeHtml = (value) => String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+  const fieldErrorMarkup = (field) => {
+    const message = fieldErrorMessage(field);
+    return message ? `<span class="board-editor-field-error">${escapeHtml(message)}</span>` : "";
+  };
+  const hasWriteupValidationError = ["strengths", "weaknesses", "rundown"].some(fieldHasError);
+  const hasGradeValidationError = fieldHasError("grade");
+  const expandWriteup = hasWriteupValidationError || Boolean(typeof forceExpandWriteup !== "undefined" && forceExpandWriteup);
+  const expandGrade = hasGradeValidationError || Boolean(typeof forceExpandGrade !== "undefined" && forceExpandGrade);
+%>
+
+<li class="board-editor-entry-item" data-board-entry-item>
+  <form
+    class="board-editor-entry-shell"
+    method="post"
+    action="/bigboard/edit/player"
+    data-board-entry-form
+    data-persisted-entry="<%= persistedEntry ? "true" : "false" %>"
+    data-actions-visible="<%= showPlayerPublish || showGradePublish || showWriteupPublish ? "true" : "false" %>"
+    data-expanded="<%= expandWriteup ? "true" : "false" %>"
+    data-grade-expanded="<%= expandGrade ? "true" : "false" %>"
+    data-has-validation-error="<%= entryValidationIssues.length > 0 ? "true" : "false" %>"
+  >
+    <input type="hidden" name="year" value="<%= board.year %>" />
+    <input type="hidden" name="creator" value="<%= board.creator %>" />
+    <input type="hidden" name="entryId" value="<%= entry.id %>" data-entry-action-id />
+    <input type="hidden" name="<%= fieldPrefix %>[id]" value="<%= entry.id %>" data-entry-id />
+    <input type="hidden" name="<%= fieldPrefix %>[playerInfoPublished]" value="<%= entry.playerInfoPublished ? "true" : "false" %>" data-player-publish />
+    <input type="hidden" name="<%= fieldPrefix %>[gradePublished]" value="<%= entry.gradePublished ? "true" : "false" %>" data-grade-publish />
+    <input type="hidden" name="<%= fieldPrefix %>[writeupPublished]" value="<%= entry.writeupPublished ? "true" : "false" %>" data-writeup-publish />
+    <input type="hidden" name="expandWriteup" value="<%= expandWriteup ? "true" : "false" %>" data-expand-writeup-state />
+    <input type="hidden" name="expandGrade" value="<%= expandGrade ? "true" : "false" %>" data-expand-grade-state />
+
+    <article class="board-editor-entry-card">
+      <div class="board-editor-card-main">
+        <div class="board-editor-delete-cell">
+          <button
+            type="button"
+            class="board-editor-delete-row-button board-editor-entry-delete"
+            data-delete-board-entry
+            aria-label="Delete <%= hasText(entry.playerName) ? entry.playerName : "draft board entry" %>"
+            title="Delete entry"
+          >
+            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 6h18" />
+              <path d="M8 6V4h8v2" />
+              <path d="M19 6l-1 14H6L5 6" />
+              <path d="M10 11v5" />
+              <path d="M14 11v5" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="board-editor-rank-cell">
+          <div class="board-editor-editable-field board-editor-rank-field <%= fieldErrorClass("rank") %>" data-editable-field data-empty-label="NR">
+            <span class="board-editor-display board-editor-rank-display" data-field-display><%= rankLabel %></span>
+            <input
+              class="board-editor-inline-input board-editor-number-input"
+              type="number"
+              name="<%= fieldPrefix %>[rank]"
+              min="1"
+              step="1"
+              value="<%= entry.rank ?? "" %>"
+              placeholder="Rank"
+              aria-label="Rank"
+              data-edit-input
+              data-field-key="rank"
+              data-publish-section="player"
+              hidden
+            />
+            <button type="button" class="board-editor-edit-button" data-edit-toggle aria-label="Edit rank" title="Edit rank">
+              <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M17 3a2.85 2.85 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                <path d="m15 5 4 4" />
+              </svg>
+            </button>
+            <%- fieldErrorMarkup("rank") %>
+          </div>
+        </div>
+
+        <div class="board-editor-helmet-cell">
+          <img
+            class="board-editor-helmet"
+            src="/teamHelmetTemplate.png"
+            alt="<%= hasText(entry.school) ? `${entry.school} football helmet` : "Draft board player helmet" %>"
+            loading="lazy"
+            decoding="async"
+            data-team-helmet
+            data-generated-helmet-src="<%= generatedHelmetSrc %>"
+          />
+        </div>
+
+        <div class="board-editor-player-cell">
+          <div class="board-editor-editable-field board-editor-player-name-field <%= fieldErrorClass("playerName") %>" data-editable-field data-empty-label="New Player">
+            <span class="board-editor-display board-editor-player-name" data-field-display><%= playerNameLabel %></span>
+            <input
+              class="board-editor-inline-input board-editor-name-input"
+              name="<%= fieldPrefix %>[playerName]"
+              value="<%= entry.playerName %>"
+              placeholder="Player name"
+              aria-label="Player name"
+              data-edit-input
+              data-field-key="playerName"
+              data-publish-section="player"
+              hidden
+            />
+            <button type="button" class="board-editor-edit-button" data-edit-toggle aria-label="Edit player name" title="Edit player name">
+              <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M17 3a2.85 2.85 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                <path d="m15 5 4 4" />
+              </svg>
+            </button>
+            <%- fieldErrorMarkup("playerName") %>
+          </div>
+
+          <div class="board-editor-meta-row">
+            <label class="board-editor-position-select <%= fieldErrorClass("position") %>">
+              <span>Position</span>
+              <select name="<%= fieldPrefix %>[position]" data-position-select data-publish-section="player" aria-label="Position">
+                <option value="">POS</option>
+                <% positions.forEach((position) => { %>
+                  <option value="<%= position %>" <%= entry.position === position ? "selected" : "" %>><%= position %></option>
+                <% }) %>
+              </select>
+              <%- fieldErrorMarkup("position") %>
+            </label>
+
+            <div class="board-editor-editable-field board-editor-pos-rank-field <%= fieldErrorClass("posRank") %>" data-editable-field data-empty-label="Pos rank">
+              <span class="board-editor-display board-editor-pos-rank-display" data-field-display><%= posRankLabel %></span>
+              <input
+                class="board-editor-inline-input board-editor-number-input"
+                type="number"
+                name="<%= fieldPrefix %>[posRank]"
+                min="1"
+                step="1"
+                value="<%= entry.posRank ?? "" %>"
+                placeholder="Pos rank"
+                aria-label="Position rank"
+                data-edit-input
+                data-field-key="posRank"
+                data-publish-section="player"
+                hidden
+              />
+              <button type="button" class="board-editor-edit-button" data-edit-toggle aria-label="Edit position rank" title="Edit position rank">
+                <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M17 3a2.85 2.85 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                  <path d="m15 5 4 4" />
+                </svg>
+              </button>
+              <%- fieldErrorMarkup("posRank") %>
+            </div>
+
+            <div class="board-editor-editable-field board-editor-school-field <%= fieldErrorClass("school") %>" data-editable-field data-empty-label="School TBD">
+              <span class="board-editor-display board-editor-school-display" data-field-display><%= schoolLabel %></span>
+              <input
+                class="board-editor-inline-input board-editor-school-input"
+                name="<%= fieldPrefix %>[school]"
+                list="college-team-options"
+                value="<%= entry.school %>"
+                placeholder="School"
+                autocomplete="off"
+                aria-label="School"
+                data-edit-input
+                data-field-key="school"
+                data-publish-section="player"
+                hidden
+              />
+              <button type="button" class="board-editor-edit-button" data-edit-toggle aria-label="Edit school" title="Edit school">
+                <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M17 3a2.85 2.85 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                  <path d="m15 5 4 4" />
+                </svg>
+              </button>
+              <%- fieldErrorMarkup("school") %>
+            </div>
+          </div>
+        </div>
+
+        <div class="board-editor-grade-cell">
+          <div class="board-editor-grade-summary">
+            <span class="board-editor-field-label">Grade</span>
+            <strong data-grade-summary><%= entry.gradePublished || entry.grade ? gradeDisplayLabel : "-/8" %></strong>
+            <button type="button" class="board-editor-expand-button" data-expand-grade aria-expanded="<%= expandGrade ? "true" : "false" %>" aria-label="Edit grade" title="Edit grade">
+              <svg class="size-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" />
+              </svg>
+              <span>grade</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="board-editor-measurement-cell">
+          <div class="board-editor-height-picker <%= fieldErrorClass("height") %>" data-height-picker>
+            <input type="hidden" name="<%= fieldPrefix %>[heightLabel]" value="<%= selectedHeightValue(entry.height) %>" data-height-label />
+            <span class="board-editor-field-label">Height</span>
+            <div class="board-editor-height-selects">
+              <select data-height-feet data-publish-section="player" aria-label="Height feet">
+                <option value="">--</option>
+                <% heightFeetOptions.forEach((feet) => { %>
+                  <option value="<%= feet %>" <%= selectedHeightFeet(entry.height) === feet ? "selected" : "" %>><%= feet %></option>
+                <% }) %>
+              </select>
+              <select data-height-inches data-publish-section="player" aria-label="Height inches">
+                <option value="">--</option>
+                <% heightInchOptions.forEach((inches) => { %>
+                  <option value="<%= inches %>" <%= selectedHeightInches(entry.height) === inches ? "selected" : "" %>><%= inches %></option>
+                <% }) %>
+              </select>
+              <select data-height-fraction data-publish-section="player" aria-label="Height fraction">
+                <% heightFractionOptions.forEach((fraction) => { %>
+                  <option value="<%= fraction.value %>" <%= selectedHeightFraction(entry.height) === fraction.value ? "selected" : "" %>><%= fraction.label %></option>
+                <% }) %>
+              </select>
+            </div>
+            <%- fieldErrorMarkup("height") %>
+          </div>
+
+          <div class="board-editor-editable-field board-editor-weight-field <%= fieldErrorClass("weight") %>" data-editable-field data-empty-label="Weight TBD" data-suffix=" lbs">
+            <span class="board-editor-field-label">Weight</span>
+            <span class="board-editor-display board-editor-weight-display" data-field-display><%= weightLabel %></span>
+            <input
+              class="board-editor-inline-input board-editor-number-input"
+              type="number"
+              name="<%= fieldPrefix %>[weight]"
+              min="1"
+              step="1"
+              value="<%= entry.weight ?? "" %>"
+              placeholder="lbs"
+              aria-label="Weight"
+              data-edit-input
+              data-field-key="weight"
+              data-publish-section="player"
+              hidden
+            />
+            <button type="button" class="board-editor-edit-button" data-edit-toggle aria-label="Edit weight" title="Edit weight">
+              <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M17 3a2.85 2.85 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                <path d="m15 5 4 4" />
+              </svg>
+            </button>
+            <%- fieldErrorMarkup("weight") %>
+          </div>
+
+          <div class="board-editor-writeup-toggle-row">
+            <button type="button" class="board-editor-expand-button" data-expand-entry aria-expanded="<%= expandWriteup ? "true" : "false" %>" aria-label="Add player writeup" title="Add player writeup">
+              <svg class="size-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" />
+              </svg>
+              <span>add player writeup</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="board-editor-card-footer">
+        <div class="board-editor-card-actions">
+          <button
+            type="submit"
+            class="board-editor-hidden-submit"
+            formaction="/bigboard/edit/delete-entry"
+            hx-post="/bigboard/edit/delete-entry"
+            hx-include="closest form"
+            hx-target="closest [data-board-entry-item]"
+            hx-swap="outerHTML"
+            data-delete-submit
+            hidden
+          >
+            Delete entry
+          </button>
+          <button
+            type="submit"
+            class="board-editor-save-button"
+            formaction="/bigboard/edit/player"
+            hx-post="/bigboard/edit/player"
+            hx-include="closest form"
+            hx-target="closest [data-board-entry-item]"
+            hx-swap="outerHTML"
+            data-save-entry
+            hidden
+          >
+            Save Changes
+          </button>
+          <button
+            type="submit"
+            class="board-editor-publish-button"
+            formaction="/bigboard/edit/publish-player-info"
+            hx-post="/bigboard/edit/publish-player-info"
+            hx-include="closest form"
+            hx-target="closest [data-board-entry-item]"
+            hx-swap="outerHTML"
+            data-publish-entry
+            data-publish-player
+            <%= showPlayerPublish ? "" : "hidden" %>
+          >
+            Publish Info
+          </button>
+          <button
+            type="submit"
+            class="board-editor-publish-button"
+            formaction="/bigboard/edit/publish-grade"
+            hx-post="/bigboard/edit/publish-grade"
+            hx-include="closest form"
+            hx-target="closest [data-board-entry-item]"
+            hx-swap="outerHTML"
+            data-publish-entry
+            data-publish-grade
+            <%= showGradePublish ? "" : "hidden" %>
+          >
+            Publish Grade
+          </button>
+          <button
+            type="submit"
+            class="board-editor-publish-button"
+            formaction="/bigboard/edit/publish-writeup"
+            hx-post="/bigboard/edit/publish-writeup"
+            hx-include="closest form"
+            hx-target="closest [data-board-entry-item]"
+            hx-swap="outerHTML"
+            data-publish-entry
+            data-publish-writeup
+            <%= showWriteupPublish ? "" : "hidden" %>
+          >
+            Publish Writeup
+          </button>
+        </div>
+      </div>
+
+      <div class="board-editor-grade-panel <%= hasGradeValidationError ? "is-validation-error" : "" %>" data-grade-panel <%= expandGrade ? "" : "hidden" %>>
+        <% if (gradeConfig && grade) { %>
+          <input type="hidden" name="<%= fieldPrefix %>[grade][position]" value="<%= entry.position %>" data-grade-position />
+          <div class="board-editor-grade-head">
+            <label>
+              <span>Archetype</span>
+              <select name="<%= fieldPrefix %>[grade][archetype]" data-publish-section="grade" aria-label="Archetype">
+                <% gradeArchetypeNames.forEach((archetype) => { %>
+                  <option value="<%= archetype %>" <%= grade.archetype === archetype ? "selected" : "" %>><%= archetype %></option>
+                <% }) %>
+              </select>
+            </label>
+            <label>
+              <span>Potential</span>
+              <select name="<%= fieldPrefix %>[grade][potential]" data-publish-section="grade" aria-label="Potential">
+                <option value="">--</option>
+                <% [1, 2, 3, 4, 5, 6, 7, 8].forEach((value) => { %>
+                  <option value="<%= value %>" <%= grade.potential === value ? "selected" : "" %>><%= value %></option>
+                <% }) %>
+              </select>
+            </label>
+            <div class="board-editor-grade-current">
+              <span>Overall:</span>
+              <strong data-grade-panel-summary><%= gradeCalculation ? formatDraftBoardGrade(gradeCalculation.displayGrade) : "-/8" %></strong>
+            </div>
+          </div>
+          <div class="board-editor-grade-rows">
+            <% gradeCategories.forEach((category) => { %>
+              <div class="board-editor-grade-row">
+                <span class="board-editor-grade-row-label"><%= category.label %></span>
+                <div class="board-editor-grade-trait-strip">
+                  <% category.traits.forEach((trait) => { %>
+                    <label class="board-editor-grade-trait">
+                      <span><%= trait %></span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="8"
+                        step="any"
+                        name="<%= fieldPrefix %>[grade][<%= category.key %>][<%= trait %>]"
+                        value="<%= gradeTraitValue(category.key, trait) %>"
+                        data-publish-section="grade"
+                        aria-label="<%= trait %>"
+                      />
+                    </label>
+                  <% }) %>
+                </div>
+              </div>
+            <% }) %>
+          </div>
+          <%- fieldErrorMarkup("grade") %>
+        <% } else { %>
+          <div class="board-editor-grade-empty <%= hasGradeValidationError ? "is-validation-error" : "" %>">
+            <p>Choose a position before adding a grade.</p>
+            <%- fieldErrorMarkup("grade") %>
+          </div>
+        <% } %>
+      </div>
+
+      <div class="board-editor-profile-panel" data-profile-panel <%= expandWriteup ? "" : "hidden" %>>
+        <div class="board-editor-profile-grid">
+          <section class="board-editor-profile-box board-editor-rundown-box <%= fieldErrorClass("rundown") %>">
+            <label>
+              <span>Rundown</span>
+              <textarea name="<%= fieldPrefix %>[rundown]" placeholder="Rundown" data-publish-section="writeup"><%= entry.writeup.rundown %></textarea>
+              <%- fieldErrorMarkup("rundown") %>
+            </label>
+          </section>
+          <div class="board-editor-profile-stack">
+            <section class="board-editor-profile-box <%= fieldErrorClass("strengths") %>">
+              <label>
+                <span>Strengths</span>
+                <textarea name="<%= fieldPrefix %>[strengths]" placeholder="Strengths" data-publish-section="writeup"><%= entry.writeup.strengths %></textarea>
+                <%- fieldErrorMarkup("strengths") %>
+              </label>
+            </section>
+            <section class="board-editor-profile-box <%= fieldErrorClass("weaknesses") %>">
+              <label>
+                <span>Weaknesses</span>
+                <textarea name="<%= fieldPrefix %>[weaknesses]" placeholder="Weaknesses" data-publish-section="writeup"><%= entry.writeup.weaknesses %></textarea>
+                <%- fieldErrorMarkup("weaknesses") %>
+              </label>
+            </section>
+          </div>
+        </div>
+        <section class="board-editor-profile-box board-editor-notes-box">
+          <label>
+            <span>Private notes - these are not published</span>
+            <textarea name="<%= fieldPrefix %>[notes]" placeholder="Private notes"><%= entry.notes %></textarea>
+          </label>
+        </section>
+      </div>
+    </article>
+  </form>
+</li>

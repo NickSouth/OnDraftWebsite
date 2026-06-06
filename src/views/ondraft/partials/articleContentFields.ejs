@@ -70,8 +70,16 @@
 <% } else if (values.contentType === "html") { %>
   <label>
     HTML content
-    <textarea name="content"><%= values.content || "" %></textarea>
+    <textarea name="content" data-html-content><%= values.content || "" %></textarea>
   </label>
+  <div class="html-image-uploader" data-html-image-uploader>
+    <label>
+      HTML article image
+      <input type="file" name="htmlImage" accept="image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp" data-html-image-input />
+    </label>
+    <button type="button" class="secondary-button" data-html-image-upload>Upload image</button>
+    <p class="html-image-uploader-status" data-html-image-status aria-live="polite">Uploaded image URLs will appear here for embedding.</p>
+  </div>
 <% } else { %>
   <label>
     Content

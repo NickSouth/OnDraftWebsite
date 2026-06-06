@@ -2,14 +2,29 @@ import type { Request, Response } from "express";
 import type { IOnDraftBrowserSession } from "../session/OnDraftSession";
 import { isAdminSession, isVerifiedUserSession } from "../session/OnDraftSession";
 import type { AdminUserListItem, IAuthService } from "../auth/AuthService";
-import type { BigBoardEditableEntryInput, CreateArticleInput, CreateYoutubeVideoInput, IOnDraftService, SaveBigBoardEntriesInput } from "../service/OnDraftService";
+import type { BigBoardEditableEntryInput, ConsensusDiscrepancyWriteupInput, CreateArticleInput, CreateYoutubeVideoInput, IOnDraftService, NewsletterInput, SaveBigBoardEntriesInput } from "../service/OnDraftService";
 import type { IUserPreferenceService, UserPreferenceError } from "../service/UserPreferenceService";
 import type { ILoggingService } from "../service/LoggingService";
+import type { AnalyticsCategory, AnalyticsPeriod, IAnalyticsService } from "../service/UmamiAnalyticsService";
 import { ArticleError, BigBoardError, ForumPostError } from "../repository/OnDraftRepository";
 import { publicArticleUploadUrl } from "../uploads/articlePdfUpload";
-import { BIG_BOARD_CREATORS, POSITIONS, type Article, type ArticleContent, type ArticleFilter, type BigBoard, type BigBoardCreator, type ForumPost, type ForumPostFilter, type Video, type VideoQuery } from "../model/OnDraftContent";
+import { BIG_BOARD_CREATORS, POSITIONS, type Article, type ArticleContent, type ArticleFilter, type BigBoard, type BigBoardCreator, type BigBoardEntry, type ForumPost, type ForumPostFilter, type Video, type VideoQuery } from "../model/OnDraftContent";
+import {
+  abbreviateDraftGradeTrait,
+  calculateDraftGrade,
+  defaultDraftGrade,
+  draftGradeArchetypeNames,
+  draftGradePositionConfig,
+  formatDraftBoardGrade,
+  gradeTraitCategoriesForGrade,
+  normalizeDraftGradeTraitScore,
+  normalizePotential,
+  validateDraftGradeForPublication,
+  type DraftGrade,
+} from "../model/DraftGrades";
 import type { Bookmark, IUserBanRecord } from "../auth/User";
 import { collegeTeam } from "../CollegeFootballColors";
+import { helmetColorKey } from "../service/HelmetAssetService";
 
 export interface DraftBoardFilterInput {
   school?: string;
@@ -38,12 +53,39 @@ type HomeFeedItem =
       date: Date;
       tags: string[];
       imageUrl?: string;
+      fallbackImageUrl?: string;
       viewCount?: number;
     };
 
 const collegeTeamNames = Object.keys(collegeTeam).sort((first, second) => first.localeCompare(second));
 
+type BigBoardEditorField =
+  | "playerName"
+  | "school"
+  | "position"
+  | "rank"
+  | "posRank"
+  | "height"
+  | "weight"
+  | "grade"
+  | "strengths"
+  | "weaknesses"
+  | "rundown";
+
+type BigBoardEditorValidationIssue = {
+  entryId: string;
+  field: BigBoardEditorField;
+  message?: string;
+};
+
 export interface IOnDraftController {
+  publicFeedItems(): Promise<Array<{ title: string; description: string; href: string; date: Date }>>;
+  publicSitemapEntries(): Promise<Array<{ href: string; updatedAt?: Date }>>;
+  showAdminDashboard(res: Response, session: IOnDraftBrowserSession, activeTab?: AdminDashboardTab, analyticsCategory?: AnalyticsCategory, analyticsPeriod?: AnalyticsPeriod): Promise<void>;
+  showAdminDashboardTab(res: Response, session: IOnDraftBrowserSession, tab: AdminDashboardTab, category?: AnalyticsCategory, period?: AnalyticsPeriod): Promise<void>;
+  showNewsletterDraftEditor(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  saveNewsletterDraft(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  sendNewsletter(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showHome(res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showPopularArticles(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showArticles(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
@@ -85,13 +127,20 @@ export interface IOnDraftController {
   createBigBoardYear(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   deleteBigBoardYear(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   saveBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  saveBigBoardEntry(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   autosaveBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   publishBigBoardPlayerInfo(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  publishBigBoardGrade(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   publishBigBoardWriteup(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  saveConsensusDiscrepancyWriteup(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  publishConsensusDiscrepancyWriteup(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  deleteBigBoardEntryFromEditor(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   deleteArticle(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   deleteBigBoardEntry(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   getSavedSchools(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
 }
+
+export type AdminDashboardTab = "users" | "content" | "newsletter" | "analytics";
 
 class OnDraftController implements IOnDraftController {
   constructor(
@@ -99,6 +148,7 @@ class OnDraftController implements IOnDraftController {
     private readonly userPreferences: IUserPreferenceService,
     private readonly logger: ILoggingService,
     private readonly authService: IAuthService,
+    private readonly analytics?: IAnalyticsService,
   ) {}
 
   private mapArticleErrorToStatusCode(error: ArticleError): number {
@@ -191,8 +241,49 @@ class OnDraftController implements IOnDraftController {
     return typeof value === "string" ? value : "";
   }
 
+  private formStrings(value: unknown): string[] {
+    if (Array.isArray(value)) {
+      return value.filter((entry): entry is string => typeof entry === "string");
+    }
+    return typeof value === "string" && value.trim() ? [value] : [];
+  }
+
   private formBoolean(value: unknown): boolean {
     return value === "true" || value === "on";
+  }
+
+  private formRecord(value: unknown): Record<string, unknown> {
+    return value && typeof value === "object" && !Array.isArray(value)
+      ? value as Record<string, unknown>
+      : {};
+  }
+
+  private formTraitScores(value: unknown): Record<string, DraftGrade["physicalTraits"][string]> {
+    return Object.fromEntries(
+      Object.entries(this.formRecord(value)).map(([trait, score]) => [trait, normalizeDraftGradeTraitScore(score)])
+    );
+  }
+
+  private buildDraftGradeInput(entry: Record<string, unknown>): DraftGrade | null {
+    const rawGrade = this.formRecord(entry.grade);
+    const position = this.formString(entry.position) || this.formString(rawGrade.position);
+    const archetype = this.formString(rawGrade.archetype);
+    const physicalTraits = this.formRecord(rawGrade.physicalTraits);
+    const filmTraits = this.formRecord(rawGrade.filmTraits);
+
+    if (!POSITIONS.includes(position as typeof POSITIONS[number])) {
+      return null;
+    }
+
+    return {
+      position: position as typeof POSITIONS[number],
+      archetype: draftGradeArchetypeNames(position as typeof POSITIONS[number]).includes(archetype)
+        ? archetype
+        : draftGradeArchetypeNames(position as typeof POSITIONS[number])[0] ?? "",
+      potential: normalizePotential(rawGrade.potential),
+      physicalTraits: this.formTraitScores(physicalTraits),
+      filmTraits: this.formTraitScores(filmTraits),
+    };
   }
 
   private parseHeightLabel(value: unknown): { feet: number; inches: number } | null {
@@ -230,8 +321,9 @@ class OnDraftController implements IOnDraftController {
       const heightFeet = this.parseOptionalNumber(height.feet);
       const heightInches = this.parseOptionalNumber(height.inches);
       const heightLabel = this.parseHeightLabel(entry.heightLabel);
+      const hasField = (field: string) => Object.prototype.hasOwnProperty.call(entry, field);
 
-      return {
+      const input: BigBoardEditableEntryInput = {
         id: this.formString(entry.id),
         playerName: this.formString(entry.playerName),
         school: this.formString(entry.school),
@@ -240,13 +332,26 @@ class OnDraftController implements IOnDraftController {
         posRank: this.parseOptionalNumber(entry.posRank),
         height: heightLabel ?? (heightFeet === null && heightInches === null ? null : { feet: heightFeet ?? 0, inches: heightInches ?? 0 }),
         weight: this.parseOptionalNumber(entry.weight),
-        strengths: this.formString(entry.strengths),
-        weaknesses: this.formString(entry.weaknesses),
-        rundown: this.formString(entry.rundown),
-        notes: this.formString(entry.notes),
         playerInfoPublished: this.formBoolean(entry.playerInfoPublished),
+        gradePublished: this.formBoolean(entry.gradePublished),
         writeupPublished: this.formBoolean(entry.writeupPublished),
       };
+      if (hasField("grade")) {
+        input.grade = this.buildDraftGradeInput(entry);
+      }
+      if (hasField("strengths")) {
+        input.strengths = this.formString(entry.strengths);
+      }
+      if (hasField("weaknesses")) {
+        input.weaknesses = this.formString(entry.weaknesses);
+      }
+      if (hasField("rundown")) {
+        input.rundown = this.formString(entry.rundown);
+      }
+      if (hasField("notes")) {
+        input.notes = this.formString(entry.notes);
+      }
+      return input;
     }).filter((entry) => !this.isBlankBigBoardEntryInput(entry));
 
     return {
@@ -257,18 +362,20 @@ class OnDraftController implements IOnDraftController {
   }
 
   private isBlankBigBoardEntryInput(entry: BigBoardEditableEntryInput): boolean {
-    return entry.playerName.trim() === ""
-      && entry.school.trim() === ""
-      && entry.position.trim() === ""
+    return (entry.playerName ?? "").trim() === ""
+      && (entry.school ?? "").trim() === ""
+      && (entry.position ?? "").trim() === ""
       && entry.rank === null
       && entry.posRank === null
       && entry.height === null
       && entry.weight === null
-      && entry.strengths.trim() === ""
-      && entry.weaknesses.trim() === ""
-      && entry.rundown.trim() === ""
-      && entry.notes.trim() === ""
+      && (entry.grade === null || entry.grade === undefined)
+      && (entry.strengths ?? "").trim() === ""
+      && (entry.weaknesses ?? "").trim() === ""
+      && (entry.rundown ?? "").trim() === ""
+      && (entry.notes ?? "").trim() === ""
       && !entry.playerInfoPublished
+      && !entry.gradePublished
       && !entry.writeupPublished;
   }
 
@@ -324,6 +431,33 @@ class OnDraftController implements IOnDraftController {
 
   private articleViewMode(req: Request): "card" | "list" {
     return this.queryString(req, "view") === "list" ? "list" : "card";
+  }
+
+  private hasArticleFilters(req: Request): boolean {
+    return Boolean(
+      this.queryString(req, "keyword") ||
+      this.queryString(req, "author") ||
+      this.queryString(req, "tags") ||
+      this.queryString(req, "dateFrom") ||
+      this.queryString(req, "dateTo")
+    );
+  }
+
+  private hasVideoFilters(req: Request): boolean {
+    return Boolean(
+      this.queryString(req, "keyword") ||
+      this.queryString(req, "tags") ||
+      this.queryString(req, "dateFrom") ||
+      this.queryString(req, "dateTo")
+    );
+  }
+
+  private hasForumPostFilters(req: Request): boolean {
+    return Boolean(
+      this.queryString(req, "keyword") ||
+      this.queryString(req, "dateFrom") ||
+      this.queryString(req, "dateTo")
+    );
   }
 
   private favoritesRange(req: Request): "all" | "month" | "year" {
@@ -417,6 +551,8 @@ class OnDraftController implements IOnDraftController {
 
   private buildVideoQuery(req: Request): VideoQuery {
     const keyword = this.queryString(req, "keyword");
+    const dateFrom = this.queryDate(req, "dateFrom");
+    const dateTo = this.queryDate(req, "dateTo");
     const tags = this.queryString(req, "tags")
       ?.split(",")
       .map((tag) => tag.trim())
@@ -431,6 +567,12 @@ class OnDraftController implements IOnDraftController {
     }
     if (tags && tags.length > 0) {
       query.tags = tags;
+    }
+    if (dateFrom || dateTo) {
+      query.dateRange = {
+        from: dateFrom ?? new Date(0),
+        to: dateTo ?? new Date(),
+      };
     }
     return query;
   }
@@ -451,6 +593,7 @@ class OnDraftController implements IOnDraftController {
   }
 
   private videoHomeItem(video: Video): HomeFeedItem {
+    const fallbackImageUrl = `https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`;
     return {
       type: "video",
       id: video.videoId,
@@ -459,7 +602,8 @@ class OnDraftController implements IOnDraftController {
       href: video.youtubeUrl,
       date: video.createdAt,
       tags: video.tags,
-      imageUrl: video.thumbnailUrl || `https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`,
+      imageUrl: video.thumbnailUrl || fallbackImageUrl,
+      fallbackImageUrl: video.thumbnailUrl && video.thumbnailUrl !== fallbackImageUrl ? fallbackImageUrl : undefined,
       viewCount: video.viewCount,
     };
   }
@@ -469,6 +613,76 @@ class OnDraftController implements IOnDraftController {
       ...articles.map((article) => this.articleHomeItem(article)),
       ...videos.map((video) => this.videoHomeItem(video)),
     ].sort((first, second) => second.date.getTime() - first.date.getTime());
+  }
+
+  private metadataDescription(value: string, fallback: string): string {
+    const normalized = value.replace(/\s+/g, " ").trim();
+    const description = normalized || fallback;
+    return description.length > 160 ? `${description.slice(0, 157).trimEnd()}...` : description;
+  }
+
+  private jsonLd(value: unknown): string {
+    return JSON.stringify(value).replace(/</g, "\\u003c");
+  }
+
+  private organizationStructuredData(res: Response) {
+    return {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      name: "OnDraft Football",
+      url: this.absoluteMetadataUrl(res, "/"),
+      logo: this.absoluteMetadataUrl(res, "/images/brand/OnDraftLogo-cropped.png"),
+      sameAs: [
+        "https://www.youtube.com/channel/UCX7Py3t2L1pUYF6JxzzP4fA",
+        "https://x.com/OnDraftFootball",
+        "https://www.tiktok.com/@ondraftfootball",
+      ],
+    };
+  }
+
+  private websiteStructuredData(res: Response) {
+    return {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      name: "OnDraft Football",
+      url: this.absoluteMetadataUrl(res, "/"),
+      description: "NFL and NFL Draft analysis, opinions, videos, community hot takes, and draft boards from OnDraft Football.",
+      publisher: {
+        "@type": "Organization",
+        name: "OnDraft Football",
+      },
+    };
+  }
+
+  private articleStructuredData(res: Response, article: Article) {
+    const articleUrl = this.absoluteMetadataUrl(res, `/articles/${article.id}`);
+    const imageUrl = this.absoluteMetadataUrl(res, article.imageUrl ?? "/images/brand/OnDraftLogo-cropped.png");
+    return {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      headline: article.title,
+      description: this.metadataDescription(article.writeup, `Read ${article.title} on OnDraft Football.`),
+      image: [imageUrl],
+      datePublished: new Date(article.publicationDate).toISOString(),
+      dateModified: new Date(article.publicationDate).toISOString(),
+      author: {
+        "@type": "Person",
+        name: article.author,
+      },
+      publisher: {
+        "@type": "Organization",
+        name: "OnDraft Football",
+        logo: {
+          "@type": "ImageObject",
+          url: this.absoluteMetadataUrl(res, "/images/brand/OnDraftLogo-cropped.png"),
+        },
+      },
+      mainEntityOfPage: {
+        "@type": "WebPage",
+        "@id": articleUrl,
+      },
+      keywords: (article.tags ?? []).join(", "),
+    };
   }
 
   private parseArticleTags(rawTags: unknown): string[] {
@@ -660,8 +874,191 @@ class OnDraftController implements IOnDraftController {
   }
 
   private async getArticleTagSuggestions(): Promise<string[]> {
-    const result = await this.service.getArticleTags();
-    return result.ok === true ? result.value : [];
+    const articleTags = await this.service.getArticleTags();
+    if (articleTags.ok === true) {
+      return [...articleTags.value].sort((first, second) => first.localeCompare(second));
+    }
+
+    return [];
+  }
+
+  async publicFeedItems(): Promise<Array<{ title: string; description: string; href: string; date: Date }>> {
+    const articlesResult = await this.service.getArticles(true);
+    const videosResult = await this.service.getYoutubeVideos();
+    const articles = articlesResult.ok === true ? articlesResult.value : [];
+    const videos = videosResult.ok === true ? videosResult.value : [];
+    return this.homeFeedItems(articles, videos).slice(0, 20).map((item) => ({
+      title: item.title,
+      description: item.description,
+      href: item.href,
+      date: item.date,
+    }));
+  }
+
+  private canCreateHotTake(session: IOnDraftBrowserSession, activeBan: IUserBanRecord | null): boolean {
+    return Boolean(session.authenticatedUser?.emailVerifiedAt && !activeBan);
+  }
+
+  private async getVideoTagSuggestions(): Promise<string[]> {
+    const videoTags = await this.service.getVideoTags();
+    if (videoTags.ok === true) {
+      return [...videoTags.value].sort((first, second) => first.localeCompare(second));
+    }
+
+    return [];
+  }
+
+  async publicSitemapEntries(): Promise<Array<{ href: string; updatedAt?: Date }>> {
+    const articlesResult = await this.service.getArticles(true);
+    if (articlesResult.ok === false) {
+      this.logger.warn(`Unable to load sitemap articles: ${articlesResult.value.message}`);
+      return [];
+    }
+
+    return articlesResult.value.map((article) => ({
+      href: `/articles/${article.id}`,
+      updatedAt: article.publicationDate,
+    }));
+  }
+
+  private adminDashboardTabs(activeTab: AdminDashboardTab) {
+    return [
+      { id: "users", label: "Manage Users", href: "/admin/tabs/users" },
+      { id: "content", label: "Create Content", href: "/admin/tabs/content" },
+      { id: "newsletter", label: "Newsletter", href: "/admin/tabs/newsletter" },
+      { id: "analytics", label: "Analytics", href: "/admin/tabs/analytics" },
+    ].map((tab) => ({ ...tab, active: tab.id === activeTab }));
+  }
+
+  async showAdminDashboard(
+    res: Response,
+    session: IOnDraftBrowserSession,
+    activeTab: AdminDashboardTab = "users",
+    analyticsCategory: AnalyticsCategory = "all",
+    analyticsPeriod: AnalyticsPeriod = "month",
+  ): Promise<void> {
+    res.render("ondraft/adminDashboard", {
+      session,
+      isAdmin: isAdminSession(session),
+      activeTab,
+      analyticsCategory,
+      analyticsPeriod,
+      tabs: this.adminDashboardTabs(activeTab),
+    });
+  }
+
+  async showAdminDashboardTab(res: Response, _session: IOnDraftBrowserSession, tab: AdminDashboardTab, category: AnalyticsCategory = "all", period: AnalyticsPeriod = "month"): Promise<void> {
+    if (tab === "content") {
+      res.render("ondraft/partials/adminCreateContent", { layout: false });
+      return;
+    }
+
+    if (tab === "newsletter") {
+      await this.renderAdminNewsletter(res);
+      return;
+    }
+
+    await this.renderAdminAnalytics(res, category, period);
+  }
+
+  private async renderAdminAnalytics(res: Response, category: AnalyticsCategory = "all", period: AnalyticsPeriod = "month"): Promise<void> {
+    const summary = this.analytics ? await this.analytics.getSummary(category, period) : null;
+    res.render("ondraft/partials/adminAnalytics", {
+      layout: false,
+      category,
+      period,
+      summary: summary?.ok === true ? summary.value : null,
+      diagnostics: summary?.ok === false ? summary.value : null,
+      errorMessage: summary?.ok === false ? summary.value.message : null,
+    });
+  }
+
+  private parseNewsletterDate(value: unknown): Date | undefined {
+    const raw = this.formString(value);
+    if (!raw) {
+      return undefined;
+    }
+    const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) {
+      return new Date(raw);
+    }
+    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12);
+  }
+
+  private buildNewsletterInput(req: Request): NewsletterInput {
+    return {
+      id: this.formString(req.body.id) || undefined,
+      date: this.parseNewsletterDate(req.body.date),
+      writeup: this.formString(req.body.writeup),
+      articleIds: this.formStrings(req.body.articleIds),
+      videoIds: this.formStrings(req.body.videoIds),
+      changelog: this.formString(req.body.changelog),
+    };
+  }
+
+  private async renderAdminNewsletter(
+    res: Response,
+    options: { flashMessage?: string | null; errorMessage?: string | null; values?: Partial<NewsletterInput> } = {},
+  ): Promise<void> {
+    const articlesResult = await this.service.getFilteredArticles({ published: true, sortBy: "date", sortDirection: "desc" });
+    const videosResult = await this.service.filterYoutubeVideos({ sortBy: "date", sortDirection: "desc" });
+    const newslettersResult = await this.service.listNewsletters();
+    res.render("ondraft/partials/adminNewsletter", {
+      layout: false,
+      articles: articlesResult.ok === true ? articlesResult.value.slice(0, 30) : [],
+      videos: videosResult.ok === true ? videosResult.value.slice(0, 30) : [],
+      newsletters: newslettersResult.ok === true ? newslettersResult.value.slice(0, 6) : [],
+      flashMessage: options.flashMessage ?? null,
+      errorMessage: options.errorMessage ?? null,
+      values: options.values ?? {},
+    });
+  }
+
+  async showNewsletterDraftEditor(req: Request, res: Response, _session: IOnDraftBrowserSession): Promise<void> {
+    const newsletterId = this.formString(req.params.id);
+    const newsletter = await this.service.getNewsletter(newsletterId);
+    if (newsletter.ok === false || newsletter.value.status !== "draft") {
+      res.status(404);
+      await this.renderAdminNewsletter(res, { errorMessage: "Newsletter draft not found." });
+      return;
+    }
+
+    await this.renderAdminNewsletter(res, { values: newsletter.value });
+  }
+
+  async saveNewsletterDraft(req: Request, res: Response, _session: IOnDraftBrowserSession): Promise<void> {
+    const input = this.buildNewsletterInput(req);
+    const result = await this.service.saveNewsletterDraft(input);
+    if (result.ok === false) {
+      res.status(400);
+      await this.renderAdminNewsletter(res, { errorMessage: result.value.message, values: input });
+      return;
+    }
+
+    await this.renderAdminNewsletter(res, {
+      flashMessage: "Newsletter draft saved.",
+    });
+  }
+
+  async sendNewsletter(req: Request, res: Response, _session: IOnDraftBrowserSession): Promise<void> {
+    const input = this.buildNewsletterInput(req);
+    const recipients = await this.authService.listNewsletterRecipients();
+    if (recipients.ok === false) {
+      res.status(500);
+      await this.renderAdminNewsletter(res, { errorMessage: "Unable to load newsletter recipients.", values: input });
+      return;
+    }
+
+    const result = await this.service.sendNewsletter(input, recipients.value);
+    if (result.ok === false) {
+      res.status(400);
+      await this.renderAdminNewsletter(res, { errorMessage: result.value.message, values: input });
+      return;
+    }
+
+    await this.renderAdminNewsletter(res, {
+      flashMessage: `Newsletter sent to ${result.value.recipientCount} subscriber${result.value.recipientCount === 1 ? "" : "s"}.`,
+    });
   }
 
   private buildArticleContent(req: Request): ArticleContent {
@@ -790,15 +1187,18 @@ class OnDraftController implements IOnDraftController {
       latestItems,
       popularArticles,
       popularRange: "all",
+      metaTitle: "OnDraft Football | NFL Draft Analysis, Articles, Videos, and Draft Boards",
+      metaDescription: "A collection of NFL and NFL Draft analysis, opinions, predictions, videos, draft boards, and community football discussion from OnDraft Football.",
+      metaKeywords: ["OnDraft Football", "NFL Draft analysis", "NFL analysis", "NFL Draft predictions", "football scouting", "draft board", "NFL videos"],
+      structuredDataJson: this.jsonLd([this.organizationStructuredData(res), this.websiteStructuredData(res)]),
     });
   }
 
   async showPopularArticles(req: Request, res: Response, _session: IOnDraftBrowserSession): Promise<void> {
     const popularRange = this.favoritesRange(req);
-    res.render("ondraft/partials/popularArticles", {
+    res.render("ondraft/partials/popularArticlesResultsBody", {
       layout: false,
       popularArticles: await this.popularArticles(popularRange),
-      popularRange,
     });
   }
 
@@ -811,6 +1211,11 @@ class OnDraftController implements IOnDraftController {
       res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
       return;
     }
+    const hasFilters = this.hasArticleFilters(req);
+    const unfilteredResult = hasFilters
+      ? await this.service.getFilteredArticles({ published: showingPublished, sortBy: "date", sortDirection: "desc" })
+      : result;
+    const hasAnyArticles = unfilteredResult.ok === true ? unfilteredResult.value.length > 0 : result.value.length > 0;
     res.render("ondraft/articles", {
       session,
       isAdmin: isAdminSession(session),
@@ -819,7 +1224,20 @@ class OnDraftController implements IOnDraftController {
       sortBy: this.articleSortBy(req),
       sortDirection: this.articleSortDirection(req),
       viewMode: this.articleViewMode(req),
+      articleTags: await this.getArticleTagSuggestions(),
+      values: {
+        keyword: this.queryString(req, "keyword") ?? "",
+        author: this.queryString(req, "author") ?? "",
+        tags: this.queryString(req, "tags") ?? "",
+        dateFrom: this.queryString(req, "dateFrom") ?? "",
+        dateTo: this.queryString(req, "dateTo") ?? "",
+      },
       bookmarkedArticleIds: await this.bookmarkedArticleIds(session),
+      hasAnyArticles,
+      hasFilters,
+      metaTitle: "Articles | OnDraft Football",
+      metaDescription: "Read OnDraft Football articles with NFL analysis, NFL Draft opinions, scouting notes, predictions, and football discussion from our team.",
+      metaKeywords: ["OnDraft articles", "NFL Draft articles", "NFL analysis articles", "football scouting articles", "draft analysis"],
     });
   }
 
@@ -833,16 +1251,29 @@ class OnDraftController implements IOnDraftController {
       return;
     }
 
+    const hasFilters = this.hasVideoFilters(req);
+    const unfilteredResult = hasFilters
+      ? await this.service.filterYoutubeVideos({ sortBy: "date", sortDirection: "desc" })
+      : result;
+    const hasAnyVideos = unfilteredResult.ok === true ? unfilteredResult.value.length > 0 : result.value.length > 0;
     res.render("ondraft/videos", {
       session,
       isAdmin: isAdminSession(session),
       videos: result.value,
+      videoTags: await this.getVideoTagSuggestions(),
       values: {
         keyword: this.queryString(req, "keyword") ?? "",
         tags: this.queryString(req, "tags") ?? "",
+        dateFrom: this.queryString(req, "dateFrom") ?? "",
+        dateTo: this.queryString(req, "dateTo") ?? "",
         sortBy: this.videoSortBy(req),
         sortDirection: this.videoSortDirection(req),
       },
+      hasAnyVideos,
+      hasFilters,
+      metaTitle: "Video Library | OnDraft Football",
+      metaDescription: "Watch OnDraft Football videos featuring breakdowns and discussions on NFL topics, NFL Draft prospects, scouting, and football analysis.",
+      metaKeywords: ["OnDraft videos", "NFL Draft videos", "NFL analysis videos", "football breakdowns", "NFL Draft prospects"],
     });
   }
 
@@ -906,6 +1337,10 @@ class OnDraftController implements IOnDraftController {
       return;
     }
 
+    const hasFilters = this.hasArticleFilters(req);
+    const unfilteredResult = hasFilters
+      ? await this.service.getFilteredArticles({ published: showingPublished, sortBy: "date", sortDirection: "desc" })
+      : result;
     res.render("ondraft/partials/articleList", {
       layout: false,
       articles: result.value,
@@ -914,6 +1349,8 @@ class OnDraftController implements IOnDraftController {
       session,
       viewMode: this.articleViewMode(req),
       bookmarkedArticleIds: await this.bookmarkedArticleIds(session),
+      hasAnyArticles: unfilteredResult.ok === true ? unfilteredResult.value.length > 0 : result.value.length > 0,
+      hasFilters,
     });
   }
 
@@ -963,6 +1400,7 @@ class OnDraftController implements IOnDraftController {
   }
 
   private async renderHotTakeList(res: Response, posts: ForumPost[], session: IOnDraftBrowserSession, errorMessage: string | null = null): Promise<void> {
+    const activeBan = await this.activeUserBan(session);
     res.render("ondraft/partials/hotTakeList", {
       layout: false,
       posts,
@@ -972,7 +1410,8 @@ class OnDraftController implements IOnDraftController {
       bookmarkedForumPostIds: await this.bookmarkedForumPostIds(session),
       userDirectoryById: await this.userDirectoryById(),
       userModerationById: await this.userModerationById(session),
-      activeUserBan: await this.activeUserBan(session),
+      activeUserBan: activeBan,
+      canCreateHotTake: this.canCreateHotTake(session, activeBan),
       errorMessage,
     });
   }
@@ -986,6 +1425,11 @@ class OnDraftController implements IOnDraftController {
       return;
     }
 
+    const activeBan = await this.activeUserBan(session);
+    const hasFilters = this.hasForumPostFilters(req);
+    const unfilteredResult = hasFilters
+      ? await this.service.getFilteredForumPosts({ sortBy: "date", sortDirection: "desc" })
+      : result;
     res.render("ondraft/hotTakes", {
       session,
       isAdmin: isAdminSession(session),
@@ -996,9 +1440,14 @@ class OnDraftController implements IOnDraftController {
       bookmarkedForumPostIds: await this.bookmarkedForumPostIds(session),
       userDirectoryById: await this.userDirectoryById(),
       userModerationById: await this.userModerationById(session),
-      activeUserBan: await this.activeUserBan(session),
+      activeUserBan: activeBan,
+      canCreateHotTake: this.canCreateHotTake(session, activeBan),
+      hasAnyHotTakes: unfilteredResult.ok === true ? unfilteredResult.value.length > 0 : result.value.length > 0,
+      hasFilters,
       errorMessage: null,
-      values: {},
+      values: {
+        keyword: this.queryString(req, "keyword") ?? "",
+      },
     });
   }
 
@@ -1010,7 +1459,26 @@ class OnDraftController implements IOnDraftController {
       return;
     }
 
-    await this.renderHotTakeList(res, result.value, session);
+    const hasFilters = this.hasForumPostFilters(req);
+    const unfilteredResult = hasFilters
+      ? await this.service.getFilteredForumPosts({ sortBy: "date", sortDirection: "desc" })
+      : result;
+    const activeBan = await this.activeUserBan(session);
+    res.render("ondraft/partials/hotTakeList", {
+      layout: false,
+      posts: result.value,
+      session,
+      isAdmin: isAdminSession(session),
+      likeActorId: this.likeActorId(session),
+      bookmarkedForumPostIds: await this.bookmarkedForumPostIds(session),
+      userDirectoryById: await this.userDirectoryById(),
+      userModerationById: await this.userModerationById(session),
+      activeUserBan: activeBan,
+      canCreateHotTake: this.canCreateHotTake(session, activeBan),
+      hasAnyHotTakes: unfilteredResult.ok === true ? unfilteredResult.value.length > 0 : result.value.length > 0,
+      hasFilters,
+      errorMessage: null,
+    });
   }
 
   async getSavedSchools(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
@@ -1041,6 +1509,13 @@ class OnDraftController implements IOnDraftController {
       filter.position = position;
     }
     return filter;
+  }
+
+  private publishedBoardGrade(entry: BigBoardEntry): number | null {
+    if (!entry.gradePublished) {
+      return null;
+    }
+    return entry.gradeSummary?.finalGrade ?? calculateDraftGrade(entry.grade)?.displayGrade ?? null;
   }
 
   async showBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
@@ -1100,6 +1575,17 @@ class OnDraftController implements IOnDraftController {
       schools,
       filters: filter ?? {},
       collegeTeamColors: collegeTeam,
+      helmetColorKey,
+      abbreviateDraftGradeTrait,
+      calculateDraftGrade,
+      defaultDraftGrade,
+      draftGradePositionConfig,
+      formatDraftBoardGrade,
+      gradeTraitCategoriesForGrade,
+      publishedBoardGrade: (entry: BigBoardEntry) => this.publishedBoardGrade(entry),
+      metaTitle: `${result.value.year} ${result.value.creator} Big Board | OnDraft Football`,
+      metaDescription: `Explore the ${result.value.year} ${result.value.creator} OnDraft Football big board with NFL Draft prospect rankings, positions, schools, and scouting grades.`,
+      metaKeywords: ["NFL Draft big board", `${result.value.year} NFL Draft`, "OnDraft rankings", "NFL Draft prospects", "football scouting"],
     };
     if (req.get("HX-Request") === "true") {
       res.render("ondraft/partials/bigBoardPanel", { ...viewModel, layout: false });
@@ -1115,6 +1601,8 @@ class OnDraftController implements IOnDraftController {
     errorMessage: string | null = null,
     statusMessage: string | null = null,
     statusCode = 200,
+    fragment = false,
+    validationIssues: BigBoardEditorValidationIssue[] = [],
   ): Promise<void> {
     const yearsResult = await this.service.getBigBoardYears();
     if (yearsResult.ok === false) {
@@ -1136,9 +1624,20 @@ class OnDraftController implements IOnDraftController {
       creators: BIG_BOARD_CREATORS.filter((creator) => creator !== "Consensus"),
       positions: POSITIONS,
       collegeTeamNames,
+      collegeTeamColors: collegeTeam,
+      helmetColorKey,
+      abbreviateDraftGradeTrait,
+      calculateDraftGrade,
+      defaultDraftGrade,
+      draftGradePositionConfig,
+      formatDraftBoardGrade,
+      gradeTraitCategoriesForGrade,
+      publishedBoardGrade: (entry: BigBoardEntry) => this.publishedBoardGrade(entry),
       errorMessage,
       statusMessage,
+      validationIssues,
       forceOverlaySidebar: true,
+      layout: fragment ? false : undefined,
     });
   }
 
@@ -1148,6 +1647,258 @@ class OnDraftController implements IOnDraftController {
       message,
       isError,
     });
+  }
+
+  private consensusDiscrepancyWriteupInput(req: Request): ConsensusDiscrepancyWriteupInput {
+    return {
+      year: this.parseBigBoardYear(req.body.year),
+      playerName: this.formString(req.body.playerName),
+      ryanWriteup: this.formString(req.body.ryanWriteup),
+      aleksWriteup: this.formString(req.body.aleksWriteup),
+    };
+  }
+
+  private consensusDiscrepancyValidationFields(message: string): Array<"ryanWriteup" | "aleksWriteup"> {
+    if (message.includes("Ryan and Aleks")) {
+      return ["ryanWriteup", "aleksWriteup"];
+    }
+    return [];
+  }
+
+  private missingConsensusDiscrepancyWriteupFields(input: ConsensusDiscrepancyWriteupInput): Array<"ryanWriteup" | "aleksWriteup"> {
+    const fields: Array<"ryanWriteup" | "aleksWriteup"> = [];
+    if (!input.ryanWriteup?.trim()) {
+      fields.push("ryanWriteup");
+    }
+    if (!input.aleksWriteup?.trim()) {
+      fields.push("aleksWriteup");
+    }
+    return fields;
+  }
+
+  private renderConsensusDiscrepancyWriteup(
+    res: Response,
+    board: BigBoard,
+    entry: BigBoardEntry,
+    session: IOnDraftBrowserSession,
+    options: {
+      statusCode?: number;
+      statusMessage?: string | null;
+      errorMessage?: string | null;
+      validationFields?: Array<"ryanWriteup" | "aleksWriteup">;
+      forceOpen?: boolean;
+    } = {},
+  ): void {
+    res.status(options.statusCode ?? 200).render("ondraft/partials/consensusDiscrepancyWriteup", {
+      layout: false,
+      board,
+      entry,
+      isAdmin: isAdminSession(session),
+      statusMessage: options.statusMessage ?? null,
+      errorMessage: options.errorMessage ?? null,
+      validationFields: options.validationFields ?? [],
+      forceOpen: options.forceOpen ?? false,
+      includeOobControls: true,
+    });
+  }
+
+  private async renderUpdatedConsensusDiscrepancyWriteup(
+    req: Request,
+    res: Response,
+    session: IOnDraftBrowserSession,
+    input: ConsensusDiscrepancyWriteupInput,
+    options: {
+      statusMessage?: string | null;
+      errorMessage?: string | null;
+      validationFields?: Array<"ryanWriteup" | "aleksWriteup">;
+      forceOpen?: boolean;
+      statusCode?: number;
+    } = {},
+  ): Promise<void> {
+    const year = input.year;
+    const playerName = input.playerName?.trim() ?? "";
+    const boardResult = await this.service.getBigBoard(year, "Consensus");
+    if (boardResult.ok === false) {
+      res.status(this.mapBigBoardErrorToStatusCode(boardResult.value)).send(boardResult.value.message);
+      return;
+    }
+    const entry = boardResult.value.entries.find((candidate) => candidate.playerName === playerName);
+    if (!entry) {
+      res.status(404).send(`Consensus entry for ${playerName || "that player"} was not found.`);
+      return;
+    }
+    if (req.get("HX-Request") === "true") {
+      this.renderConsensusDiscrepancyWriteup(res, boardResult.value, entry, session, options);
+      return;
+    }
+    this.renderConsensusDiscrepancyWriteup(res, boardResult.value, entry, session, options);
+  }
+
+  private bigBoardEditorEntryCardLocals(
+    board: BigBoard,
+    entry: BigBoardEntry,
+    isTemplate = false,
+    options: { forceExpandWriteup?: boolean; forceExpandGrade?: boolean } = {},
+  ) {
+    const heightFractionOptions = [
+      { value: 0, label: "0" },
+      { value: 0.125, label: " 1/8" },
+      { value: 0.25, label: " 1/4" },
+      { value: 0.375, label: " 3/8" },
+      { value: 0.5, label: " 1/2" },
+      { value: 0.625, label: " 5/8" },
+      { value: 0.75, label: " 3/4" },
+      { value: 0.875, label: " 7/8" },
+    ];
+    const heightFeetOptions = [5, 6, 7];
+    const heightInchOptions = Array.from({ length: 12 }, (_, index) => index);
+    const heightValue = (feet: number, inches: number) => `${feet}-${Number(inches.toFixed(3))}`;
+    const selectedHeightValue = (height: BigBoardEntry["height"]) => height ? heightValue(height.feet, height.inches) : "";
+    const selectedHeightFeet = (height: BigBoardEntry["height"]) => height ? height.feet : "";
+    const selectedHeightInches = (height: BigBoardEntry["height"]) => height ? Math.floor(height.inches) : "";
+    const selectedHeightFraction = (height: BigBoardEntry["height"]) => height ? Number((height.inches - Math.floor(height.inches)).toFixed(3)) : 0;
+
+    return {
+      layout: false,
+      board,
+      entry,
+      index: 0,
+      positions: POSITIONS,
+      heightFeetOptions,
+      heightInchOptions,
+      heightFractionOptions,
+      abbreviateDraftGradeTrait,
+      calculateDraftGrade,
+      defaultDraftGrade,
+      draftGradePositionConfig,
+      formatDraftBoardGrade,
+      gradeTraitCategoriesForGrade,
+      publishedBoardGrade: (candidate: BigBoardEntry) => this.publishedBoardGrade(candidate),
+      selectedHeightValue,
+      selectedHeightFeet,
+      selectedHeightInches,
+      selectedHeightFraction,
+      collegeTeamColors: collegeTeam,
+      helmetColorKey,
+      validationIssues: [],
+      isTemplate,
+      forceExpandWriteup: options.forceExpandWriteup ?? false,
+      forceExpandGrade: options.forceExpandGrade ?? false,
+    };
+  }
+
+  private renderBigBoardEditorEntryCard(
+    res: Response,
+    board: BigBoard,
+    entry: BigBoardEntry,
+    statusCode = 200,
+    options: { forceExpandWriteup?: boolean; forceExpandGrade?: boolean } = {},
+  ): void {
+    res.status(statusCode).render("ondraft/partials/bigBoardEditorEntryCard", this.bigBoardEditorEntryCardLocals(board, entry, false, options));
+  }
+
+  private addPublishValidationIssue(
+    issues: BigBoardEditorValidationIssue[],
+    entryId: string,
+    field: BigBoardEditorField,
+    message?: string,
+  ): void {
+    issues.push({ entryId, field, message });
+  }
+
+  private playerInfoPublishValidationIssues(board: BigBoard, attemptedEntryId: string, fallbackMessage: string): BigBoardEditorValidationIssue[] {
+    const issues: BigBoardEditorValidationIssue[] = [];
+    const attempted = board.entries.find((entry) => entry.id === attemptedEntryId);
+    if (!attempted) {
+      return issues;
+    }
+
+    if (!attempted.playerName) {
+      this.addPublishValidationIssue(issues, attempted.id, "playerName", "Player name is required before publishing player info.");
+    }
+    if (!attempted.school) {
+      this.addPublishValidationIssue(issues, attempted.id, "school", "School is required before publishing player info.");
+    }
+    if (!attempted.position || !POSITIONS.includes(attempted.position as typeof POSITIONS[number])) {
+      this.addPublishValidationIssue(issues, attempted.id, "position", "Choose a valid position before publishing player info.");
+    }
+    if (!attempted.height) {
+      this.addPublishValidationIssue(issues, attempted.id, "height", "Height is required before publishing player info.");
+    }
+    if (attempted.weight === null || attempted.weight <= 0) {
+      this.addPublishValidationIssue(issues, attempted.id, "weight", "Weight must be a positive number before publishing player info.");
+    }
+    if (attempted.rank === null || attempted.rank <= 0) {
+      this.addPublishValidationIssue(issues, attempted.id, "rank", "Overall rank must be a positive number before publishing player info.");
+    }
+    if (attempted.posRank === null || attempted.posRank <= 0) {
+      this.addPublishValidationIssue(issues, attempted.id, "posRank", "Position rank must be a positive number before publishing player info.");
+    }
+
+    if (attempted.rank !== null && attempted.rank > 0) {
+      const rankConflict = board.entries.find((entry) => entry.id !== attempted.id && entry.playerInfoPublished && entry.rank === attempted.rank);
+      if (rankConflict) {
+        this.addPublishValidationIssue(issues, attempted.id, "rank", `Overall rank ${attempted.rank} is already used by ${rankConflict.playerName || "another player"}.`);
+        this.addPublishValidationIssue(issues, rankConflict.id, "rank");
+      }
+    }
+
+    if (attempted.position && attempted.posRank !== null && attempted.posRank > 0) {
+      const posRankConflict = board.entries.find((entry) =>
+        entry.id !== attempted.id &&
+        entry.playerInfoPublished &&
+        entry.position === attempted.position &&
+        entry.posRank === attempted.posRank
+      );
+      if (posRankConflict) {
+        this.addPublishValidationIssue(issues, attempted.id, "posRank", `${attempted.position}${attempted.posRank} is already used by ${posRankConflict.playerName || "another player"}.`);
+        this.addPublishValidationIssue(issues, posRankConflict.id, "posRank");
+      }
+    }
+
+    if (issues.length === 0) {
+      this.addPublishValidationIssue(issues, attempted.id, "rank", fallbackMessage);
+    }
+    return issues;
+  }
+
+  private writeupPublishValidationIssues(board: BigBoard, attemptedEntryId: string, fallbackMessage: string): BigBoardEditorValidationIssue[] {
+    const issues: BigBoardEditorValidationIssue[] = [];
+    const attempted = board.entries.find((entry) => entry.id === attemptedEntryId);
+    if (!attempted) {
+      return issues;
+    }
+
+    if (!attempted.writeup.strengths) {
+      this.addPublishValidationIssue(issues, attempted.id, "strengths", "Strengths are required before publishing a player writeup.");
+    }
+    if (!attempted.writeup.weaknesses) {
+      this.addPublishValidationIssue(issues, attempted.id, "weaknesses", "Weaknesses are required before publishing a player writeup.");
+    }
+    if (!attempted.writeup.rundown) {
+      this.addPublishValidationIssue(issues, attempted.id, "rundown", "Rundown is required before publishing a player writeup.");
+    }
+
+    if (issues.length === 0) {
+      this.addPublishValidationIssue(issues, attempted.id, "rundown", fallbackMessage);
+    }
+    return issues;
+  }
+
+  private gradePublishValidationIssues(board: BigBoard, attemptedEntryId: string, fallbackMessage: string): BigBoardEditorValidationIssue[] {
+    const issues: BigBoardEditorValidationIssue[] = [];
+    const attempted = board.entries.find((entry) => entry.id === attemptedEntryId);
+    if (!attempted) {
+      return issues;
+    }
+
+    const messages = validateDraftGradeForPublication(attempted.position, attempted.grade);
+    messages.forEach((message) => this.addPublishValidationIssue(issues, attempted.id, "grade", message));
+
+    if (issues.length === 0) {
+      this.addPublishValidationIssue(issues, attempted.id, "grade", fallbackMessage);
+    }
+    return issues;
   }
 
   async showEditBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
@@ -1160,7 +1911,7 @@ class OnDraftController implements IOnDraftController {
       return;
     }
 
-    await this.renderBigBoardEditor(res, session, result.value);
+    await this.renderBigBoardEditor(res, session, result.value, null, null, 200, req.get("HX-Request") === "true");
   }
 
   async showOneArticle(res: Response, session: IOnDraftBrowserSession, id: string): Promise<void> {
@@ -1201,10 +1952,17 @@ class OnDraftController implements IOnDraftController {
       userModerationById: await this.userModerationById(session),
       activeUserBan: await this.activeUserBan(session),
       metaTitle: `${article.title} | OnDraft Football`,
-      metaDescription: article.writeup || `Read ${article.title} on OnDraft Football.`,
-      metaImage: this.absoluteMetadataUrl(res, article.imageUrl ?? "/images/brand/ondraft-logo.png"),
+      metaDescription: this.metadataDescription(article.writeup, `Read ${article.title} on OnDraft Football.`),
+      metaImage: this.absoluteMetadataUrl(res, article.imageUrl ?? "/images/brand/OnDraftLogo-cropped.png"),
+      metaImageAlt: `${article.title} article thumbnail`,
       metaUrl: this.absoluteMetadataUrl(res, `/articles/${article.id}`),
       metaType: "article",
+      metaKeywords: ["OnDraft Football", "NFL Draft", "NFL analysis", ...(article.tags ?? [])],
+      articleAuthor: article.author,
+      articlePublishedTime: new Date(article.publicationDate).toISOString(),
+      articleModifiedTime: new Date(article.publicationDate).toISOString(),
+      articleTags: article.tags ?? [],
+      structuredDataJson: this.jsonLd(this.articleStructuredData(res, article)),
     });
   }
 
@@ -1246,6 +2004,7 @@ class OnDraftController implements IOnDraftController {
       isAdmin: isAdminSession(session),
       errorMessage: null,
       values: {},
+      existingTags: await this.getVideoTagSuggestions(),
       heading: "Add YouTube Video",
       formAction: "/videos",
       submitLabel: "Add video",
@@ -1272,6 +2031,7 @@ class OnDraftController implements IOnDraftController {
       isAdmin: isAdminSession(session),
       errorMessage: null,
       values: this.videoFormValues(result.value),
+      existingTags: await this.getVideoTagSuggestions(),
       heading: "Edit YouTube Video",
       formAction: `/videos/${result.value.videoId}`,
       submitLabel: "Save video",
@@ -1377,6 +2137,7 @@ class OnDraftController implements IOnDraftController {
         isAdmin: isAdminSession(session),
         errorMessage: result.value.message,
         values: req.body,
+        existingTags: await this.getVideoTagSuggestions(),
         heading: "Add YouTube Video",
         formAction: "/videos",
         submitLabel: "Add video",
@@ -1397,6 +2158,7 @@ class OnDraftController implements IOnDraftController {
         isAdmin: isAdminSession(session),
         errorMessage: result.value.message,
         values: req.body,
+        existingTags: await this.getVideoTagSuggestions(),
         heading: "Edit YouTube Video",
         formAction: `/videos/${videoId}`,
         submitLabel: "Save video",
@@ -1642,6 +2404,17 @@ class OnDraftController implements IOnDraftController {
         errorMessage: null,
         values: req.body,
         activeUserBan: activeBan,
+      });
+      return;
+    }
+    if (!isVerifiedUserSession(session)) {
+      res.set("HX-Retarget", "#hot-take-composer");
+      res.status(403).render("ondraft/partials/hotTakeComposer", {
+        layout: false,
+        session,
+        errorMessage: "Verify your email before posting a hot take.",
+        values: req.body,
+        activeUserBan: null,
       });
       return;
     }
@@ -1947,7 +2720,15 @@ class OnDraftController implements IOnDraftController {
     if (result.ok === false) {
       const board = await this.service.getBigBoard(input.year, input.creator);
       if (board.ok === true) {
-        await this.renderBigBoardEditor(res, session, board.value, result.value.message, null, this.mapBigBoardErrorToStatusCode(result.value));
+        await this.renderBigBoardEditor(
+          res,
+          session,
+          board.value,
+          result.value.message,
+          null,
+          this.mapBigBoardErrorToStatusCode(result.value),
+          req.get("HX-Request") === "true",
+        );
         return;
       }
       res.status(this.mapBigBoardErrorToStatusCode(result.value)).send(result.value.message);
@@ -1959,7 +2740,52 @@ class OnDraftController implements IOnDraftController {
       return;
     }
 
-    await this.renderBigBoardEditor(res, session, result.value, null, "Saved.");
+    await this.renderBigBoardEditor(res, session, result.value, null, "Saved.", 200, req.get("HX-Request") === "true");
+  }
+
+  async saveBigBoardEntry(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Saving big board entry edits");
+    const input = this.buildBigBoardEntriesInput(req);
+    const forceExpandWriteup = this.formBoolean(req.body.expandWriteup);
+    const forceExpandGrade = this.formBoolean(req.body.expandGrade);
+    const entry = input.entries[0];
+    if (!entry) {
+      const board = await this.service.getBigBoard(input.year, input.creator);
+      if (board.ok === true) {
+        await this.renderBigBoardEditor(res, session, board.value, "Add at least one player detail before saving this card.", null, 400);
+        return;
+      }
+      res.status(400).send("Add at least one player detail before saving this card.");
+      return;
+    }
+
+    const result = await this.service.saveBigBoardEntry({
+      year: input.year,
+      creator: input.creator,
+      entry,
+    });
+    const board = await this.service.getBigBoard(input.year, input.creator);
+    if (board.ok === false) {
+      res.status(this.mapBigBoardErrorToStatusCode(board.value)).send(board.value.message);
+      return;
+    }
+    if (result.ok === false) {
+      if (req.get("HX-Request") === "true") {
+        res.set("HX-Retarget", "#big-board-editor-fragment");
+        res.set("HX-Reswap", "outerHTML show:none");
+        await this.renderBigBoardEditor(res, session, board.value, result.value.message, null, 200, true);
+        return;
+      }
+      await this.renderBigBoardEditor(res, session, board.value, result.value.message, null, this.mapBigBoardErrorToStatusCode(result.value));
+      return;
+    }
+
+    const playerName = result.value.playerName || "draft board entry";
+    if (req.get("HX-Request") === "true") {
+      this.renderBigBoardEditorEntryCard(res, board.value, result.value, 200, { forceExpandWriteup, forceExpandGrade });
+      return;
+    }
+    await this.renderBigBoardEditor(res, session, board.value, null, `Saved ${playerName}.`);
   }
 
   async autosaveBigBoard(req: Request, res: Response, _session: IOnDraftBrowserSession): Promise<void> {
@@ -1977,15 +2803,39 @@ class OnDraftController implements IOnDraftController {
     req: Request,
     res: Response,
     session: IOnDraftBrowserSession,
-    publish: (year: number | undefined, creator: BigBoardCreator | undefined, entryId: string) => Promise<{ ok: true; value: unknown } | { ok: false; value: BigBoardError }>,
+    publish: (year: number | undefined, creator: BigBoardCreator | undefined, entryId: string) => Promise<{ ok: true; value: BigBoardEntry } | { ok: false; value: BigBoardError }>,
+    validationIssuesFor: (board: BigBoard, attemptedEntryId: string, message: string) => BigBoardEditorValidationIssue[],
     successMessage: string,
   ): Promise<void> {
     const input = this.buildBigBoardEntriesInput(req);
-    const saved = await this.service.saveBigBoardEntries(input);
+    const forceExpandWriteup = this.formBoolean(req.body.expandWriteup);
+    const forceExpandGrade = this.formBoolean(req.body.expandGrade);
     const entryId = this.formString(req.body.entryId);
+    const entry = input.entries.find((candidate) => candidate.id === entryId) ?? input.entries[0];
+    if (!entry) {
+      const board = await this.service.getBigBoard(input.year, input.creator);
+      if (board.ok === true) {
+        await this.renderBigBoardEditor(res, session, board.value, "Save the player card before publishing it.", null, 400);
+        return;
+      }
+      res.status(400).send("Save the player card before publishing it.");
+      return;
+    }
+
+    const saved = await this.service.saveBigBoardEntry({
+      year: input.year,
+      creator: input.creator,
+      entry,
+    });
     if (saved.ok === false) {
       const board = await this.service.getBigBoard(input.year, input.creator);
       if (board.ok === true) {
+        if (req.get("HX-Request") === "true") {
+          res.set("HX-Retarget", "#big-board-editor-fragment");
+          res.set("HX-Reswap", "outerHTML show:none");
+          await this.renderBigBoardEditor(res, session, board.value, saved.value.message, null, 200, true);
+          return;
+        }
         await this.renderBigBoardEditor(res, session, board.value, saved.value.message, null, this.mapBigBoardErrorToStatusCode(saved.value));
         return;
       }
@@ -1993,17 +2843,29 @@ class OnDraftController implements IOnDraftController {
       return;
     }
 
-    const published = await publish(input.year, input.creator, entryId);
+    const published = await publish(input.year, input.creator, saved.value.id);
     const updatedBoard = await this.service.getBigBoard(input.year, input.creator);
     if (updatedBoard.ok === false) {
       res.status(this.mapBigBoardErrorToStatusCode(updatedBoard.value)).send(updatedBoard.value.message);
       return;
     }
     if (published.ok === false) {
-      await this.renderBigBoardEditor(res, session, updatedBoard.value, published.value.message, null, this.mapBigBoardErrorToStatusCode(published.value));
+      const validationIssues = validationIssuesFor(updatedBoard.value, saved.value.id, published.value.message);
+      if (req.get("HX-Request") === "true") {
+        res.set("HX-Retarget", "#big-board-editor-fragment");
+        res.set("HX-Reswap", "outerHTML show:none");
+        await this.renderBigBoardEditor(res, session, updatedBoard.value, published.value.message, null, 200, true, validationIssues);
+        return;
+      }
+      await this.renderBigBoardEditor(res, session, updatedBoard.value, published.value.message, null, this.mapBigBoardErrorToStatusCode(published.value), false, validationIssues);
       return;
     }
 
+    if (req.get("HX-Request") === "true") {
+      const publishedEntry = updatedBoard.value.entries.find((candidate) => candidate.id === published.value.id) ?? published.value;
+      this.renderBigBoardEditorEntryCard(res, updatedBoard.value, publishedEntry, 200, { forceExpandWriteup, forceExpandGrade });
+      return;
+    }
     await this.renderBigBoardEditor(res, session, updatedBoard.value, null, successMessage);
   }
 
@@ -2014,7 +2876,20 @@ class OnDraftController implements IOnDraftController {
       res,
       session,
       (year, creator, entryId) => this.service.publishBigBoardEntryPlayerInfo(year, creator, entryId),
+      (board, entryId, message) => this.playerInfoPublishValidationIssues(board, entryId, message),
       "Player info published.",
+    );
+  }
+
+  async publishBigBoardGrade(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Publishing big board grade");
+    await this.saveThenPublishBigBoardEntry(
+      req,
+      res,
+      session,
+      (year, creator, entryId) => this.service.publishBigBoardEntryGrade(year, creator, entryId),
+      (board, entryId, message) => this.gradePublishValidationIssues(board, entryId, message),
+      "Grade published.",
     );
   }
 
@@ -2025,8 +2900,98 @@ class OnDraftController implements IOnDraftController {
       res,
       session,
       (year, creator, entryId) => this.service.publishBigBoardEntryWriteup(year, creator, entryId),
+      (board, entryId, message) => this.writeupPublishValidationIssues(board, entryId, message),
       "Writeup published.",
     );
+  }
+
+  async saveConsensusDiscrepancyWriteup(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Saving consensus discrepancy writeup");
+    const input = this.consensusDiscrepancyWriteupInput(req);
+    const result = await this.service.saveConsensusDiscrepancyWriteup(input);
+    if (result.ok === false) {
+      await this.renderUpdatedConsensusDiscrepancyWriteup(req, res, session, input, {
+        errorMessage: result.value.message,
+        validationFields: this.consensusDiscrepancyValidationFields(result.value.message),
+        forceOpen: true,
+        statusCode: req.get("HX-Request") === "true" ? 200 : this.mapBigBoardErrorToStatusCode(result.value),
+      });
+      return;
+    }
+
+    await this.renderUpdatedConsensusDiscrepancyWriteup(req, res, session, input, {
+      statusMessage: "Saved.",
+      forceOpen: true,
+    });
+  }
+
+  async publishConsensusDiscrepancyWriteup(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Publishing consensus discrepancy writeup");
+    const input = this.consensusDiscrepancyWriteupInput(req);
+    const result = await this.service.publishConsensusDiscrepancyWriteup(input);
+    if (result.ok === false) {
+      await this.renderUpdatedConsensusDiscrepancyWriteup(req, res, session, input, {
+        errorMessage: result.value.message,
+        validationFields: result.value.message.includes("Ryan and Aleks")
+          ? this.missingConsensusDiscrepancyWriteupFields(input)
+          : this.consensusDiscrepancyValidationFields(result.value.message),
+        forceOpen: true,
+        statusCode: req.get("HX-Request") === "true" ? 200 : this.mapBigBoardErrorToStatusCode(result.value),
+      });
+      return;
+    }
+
+    await this.renderUpdatedConsensusDiscrepancyWriteup(req, res, session, input, {
+      statusMessage: "Published.",
+      forceOpen: false,
+    });
+  }
+
+  async deleteBigBoardEntryFromEditor(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Deleting big board entry from editor");
+    const year = this.parseBigBoardYear(req.body.year);
+    const creator = this.parseBigBoardCreator(req.body.creator);
+    const entryId = this.formString(req.body.entryId);
+    const input = this.buildBigBoardEntriesInput(req);
+    const postedEntry = input.entries[0];
+    const postedPlayerName = this.formString(postedEntry?.playerName);
+    const board = await this.service.getBigBoard(year, creator);
+    if (board.ok === false) {
+      res.status(this.mapBigBoardErrorToStatusCode(board.value)).send(board.value.message);
+      return;
+    }
+
+    const entry = board.value.entries.find((candidate) => candidate.id === entryId)
+      ?? board.value.entries.find((candidate) => postedPlayerName !== "" && candidate.playerName === postedPlayerName);
+    if (!entry) {
+      if (req.get("HX-Request") === "true") {
+        res.status(200).send("");
+        return;
+      }
+      await this.renderBigBoardEditor(res, session, board.value, `Big board entry with id "${entryId}" was not found.`, null, 404);
+      return;
+    }
+
+    if (req.get("HX-Request") === "true") {
+      res.status(200).send("");
+      return;
+    }
+
+    const result = await this.service.deleteBigBoardEntry(year, creator, entry.playerName);
+    const updatedBoard = await this.service.getBigBoard(year, creator);
+    if (updatedBoard.ok === false) {
+      res.status(this.mapBigBoardErrorToStatusCode(updatedBoard.value)).send(updatedBoard.value.message);
+      return;
+    }
+    if (result.ok === false) {
+      if (req.get("HX-Request") === "true") {
+        res.status(200).send("");
+        return;
+      }
+      await this.renderBigBoardEditor(res, session, updatedBoard.value, result.value.message, null, this.mapBigBoardErrorToStatusCode(result.value));
+      return;
+    }
+    await this.renderBigBoardEditor(res, session, updatedBoard.value, null, `Deleted ${entry.playerName || "draft board entry"}.`);
   }
 
   async deleteArticle(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void> {
@@ -2071,6 +3036,7 @@ export function CreateOnDraftController(
   userPreferences: IUserPreferenceService,
   logger: ILoggingService,
   authService: IAuthService,
+  analytics?: IAnalyticsService,
 ): IOnDraftController {
-  return new OnDraftController(service, userPreferences, logger, authService);
+  return new OnDraftController(service, userPreferences, logger, authService, analytics);
 }

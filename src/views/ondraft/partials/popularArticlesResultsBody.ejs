@@ -1,0 +1,37 @@
+<% if (popularArticles.length === 0) { %>
+  <div class="od-empty-state">
+    <div>
+      <p class="od-empty-state-kicker">Waiting on the crowd</p>
+      <p class="od-empty-state-title">No crowd favorites yet.</p>
+      <p class="od-empty-state-copy">Once readers start backing stories with likes, the leaders will stack up here.</p>
+    </div>
+  </div>
+<% } else { %>
+  <div class="od-stagger-list grid gap-3 px-1 py-1">
+    <% popularArticles.forEach((article, index) => { %>
+      <a href="/articles/<%= article.id %>" class="od-card od-focus-ring grid grid-cols-[2.75rem_4.5rem_minmax(0,1fr)] items-center gap-3 overflow-hidden p-3 text-slate-950 no-underline transition hover:-translate-y-0.5 hover:border-draft-gold dark:text-white sm:grid-cols-[3.5rem_6rem_minmax(0,1fr)_auto] sm:p-0">
+        <span class="grid size-10 place-items-center rounded-md bg-slate-100 font-display text-lg font-black text-slate-700 dark:bg-white/10 dark:text-white sm:size-12 sm:text-xl"><%= index + 1 %></span>
+        <span class="relative block aspect-square overflow-hidden rounded-md bg-draft-ink sm:h-full sm:min-h-24 sm:rounded-none">
+          <% if (article.imageUrl) { %>
+            <img class="article-list-thumb" src="<%= article.imageUrl %>" alt="" loading="lazy" decoding="async" />
+          <% } else { %>
+            <span class="article-list-thumb article-list-thumb-empty">
+              <img class="h-9 w-11 object-contain drop-shadow-sm" src="/images/brand/OnDraftLogo-cropped.png" alt="" loading="lazy" decoding="async" />
+            </span>
+          <% } %>
+        </span>
+        <span class="grid min-w-0 gap-1 sm:p-0">
+          <span class="line-clamp-2 font-display text-base font-bold leading-tight sm:text-xl"><%= article.title %></span>
+          <span class="text-xs text-slate-600 dark:text-slate-300 sm:text-sm">
+            by <%= article.author %> on <%= article.publicationDate.toLocaleDateString() %>
+          </span>
+          <span class="hidden text-sm text-slate-700 dark:text-slate-200 sm:line-clamp-2 sm:block"><%= article.writeup %></span>
+        </span>
+        <span class="col-span-3 inline-flex w-fit items-center gap-1 rounded bg-draft-foam px-2.5 py-1 text-xs font-black text-draft-amber dark:bg-white/10 dark:text-draft-gold sm:col-span-1 sm:m-0 sm:mr-4 sm:px-3 sm:text-sm">
+          <span aria-hidden="true">&hearts;</span>
+          <span><%= article.likes %></span>
+        </span>
+      </a>
+    <% }) %>
+  </div>
+<% } %>

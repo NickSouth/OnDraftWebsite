@@ -83,6 +83,11 @@ export interface IAuthController {
     store: OnDraftSessionStore,
     subscribe: boolean,
   ): Promise<void>;
+  deleteAccountFromSettings(
+    req: Request,
+    res: Response,
+    store: OnDraftSessionStore,
+  ): Promise<void>;
   changePasswordFromSettings(
     res: Response,
     store: OnDraftSessionStore,
@@ -97,7 +102,7 @@ export interface IAuthController {
     store: OnDraftSessionStore,
   ): Promise<void>;
   exportSubscribedMailingListCsv(res: Response): Promise<void>;
-  showAdminUsers(res: Response, store: OnDraftSessionStore): Promise<void>;
+  showAdminUsers(res: Response, store: OnDraftSessionStore, layout?: boolean): Promise<void>;
   showUserModerationMenu(res: Response, store: OnDraftSessionStore, userId: string, contextId: string): Promise<void>;
   banUserFromForm(res: Response, store: OnDraftSessionStore, userId: string, contextId: string, message: string, duration: string): Promise<void>;
   unbanUserFromForm(res: Response, store: OnDraftSessionStore, userId: string, contextId: string): Promise<void>;
@@ -470,6 +475,35 @@ class AuthController implements IAuthController {
     this.renderSettingsModal(res, session, result.value, message, null);
   }
 
+  async deleteAccountFromSettings(
+    req: Request,
+    res: Response,
+    store: OnDraftSessionStore,
+  ): Promise<void> {
+    const session = touchOnDraftSession(store);
+    const userId = session.authenticatedUser?.userId;
+
+    if (!userId) {
+      await this.showSettingsModal(res, store, null, "Log in to manage account settings.");
+      return;
+    }
+
+    const result = await this.service.deleteAccount({ userId });
+    if (result.ok === false) {
+      await this.showSettingsModal(res, store, null, result.value.message);
+      return;
+    }
+
+    signOutAuthenticatedUser(store);
+    await this.destroySession(req);
+    res.clearCookie("ondraft.sid", {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    });
+    res.redirect("/");
+  }
+
   async changePasswordFromSettings(
     res: Response,
     store: OnDraftSessionStore,
@@ -559,7 +593,7 @@ class AuthController implements IAuthController {
     res.send(result.value);
   }
 
-  async showAdminUsers(res: Response, store: OnDraftSessionStore): Promise<void> {
+  async showAdminUsers(res: Response, store: OnDraftSessionStore, layout = true): Promise<void> {
     const session = touchOnDraftSession(store);
     const result = await this.service.listAdminUsers();
 
@@ -572,6 +606,7 @@ class AuthController implements IAuthController {
     }
 
     res.render("auth/adminUsers", {
+      ...(layout ? {} : { layout: false }),
       session,
       users: result.value,
     });

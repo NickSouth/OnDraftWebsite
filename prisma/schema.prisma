@@ -277,6 +277,25 @@ model Video {
   @@map("videos")
 }
 
+model Newsletter {
+  id             String    @id
+  date           DateTime?
+  writeup        String
+  articleIds     String[]  @default([]) @map("article_ids")
+  videoIds       String[]  @default([]) @map("video_ids")
+  changelog      String
+  status         String
+  recipientCount Int       @default(0) @map("recipient_count")
+  sentAt         DateTime? @map("sent_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([date])
+  @@index([updatedAt])
+  @@map("newsletters")
+}
+
 model VideoTag {
   videoId String @map("video_id")
   tagId   String @map("tag_id")
@@ -327,7 +346,9 @@ model BigBoardEntry {
   weaknesses          String   @default("")
   rundown             String   @default("")
   notes               String   @default("")
+  grade               Json?
   playerInfoPublished Boolean  @default(false) @map("player_info_published")
+  gradePublished      Boolean  @default(false) @map("grade_published")
   writeupPublished    Boolean  @default(false) @map("writeup_published")
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
@@ -342,6 +363,23 @@ model BigBoardEntry {
   @@index([sortOrder])
   @@index([posRank])
   @@index([playerInfoPublished])
+  @@index([gradePublished])
   @@index([writeupPublished])
   @@map("big_board_entries")
+}
+
+model ConsensusDiscrepancyWriteup {
+  id           String   @id
+  year         Int
+  playerName   String   @map("player_name")
+  ryanWriteup  String   @default("") @map("ryan_writeup")
+  aleksWriteup String   @default("") @map("aleks_writeup")
+  published    Boolean  @default(false)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([year, playerName])
+  @@index([year])
+  @@index([published])
+  @@map("consensus_discrepancy_writeups")
 }

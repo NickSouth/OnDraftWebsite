@@ -5,12 +5,13 @@
   { href: "/bigboard", label: "Draft Board", kicker: "Rankings and reports" },
   { href: "/hottakes", label: "The Taproom", kicker: "Community takes" },
   { href: "/bookmarks", label: "Saved Pints", kicker: "Your bookmarks" },
+  { href: "/about", label: "About Us", kicker: "Meet the OnDraft crew" },
 ]; %>
 <% const activePath = typeof currentPath !== "undefined" ? currentPath : ""; %>
 
 <div
   x-cloak
-  class="fixed inset-0 z-50 bg-slate-950/50 <%= forceOverlaySidebar ? "" : "lg:hidden" %>"
+  class="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-[2px] transition-opacity duration-300 <%= forceOverlaySidebar ? "" : "lg:hidden" %>"
   x-show="sidebarOpen"
   x-transition.opacity
   @click="sidebarOpen = false"
@@ -18,26 +19,24 @@
 
 <aside
   id="site-sidebar"
-  class="fixed right-0 top-14 z-50 flex h-[calc(100vh-3.5rem)] w-80 max-w-[calc(100vw-1rem)] flex-col border-l border-slate-200 bg-white shadow-editorial transition-transform duration-200 dark:border-white/10 dark:bg-draft-slate <%= forceOverlaySidebar ? "" : "lg:top-0 lg:h-screen lg:translate-x-0" %>"
-  :class="sidebarOpen ? 'translate-x-0' : 'translate-x-full <%= forceOverlaySidebar ? "" : "lg:translate-x-0" %>'"
+  class="fixed right-0 top-14 z-50 flex h-[calc(100vh-3.5rem)] w-80 max-w-[calc(100vw-1rem)] flex-col border-l border-slate-200 bg-white shadow-editorial transition-transform duration-300 ease-out dark:border-white/10 dark:bg-draft-slate <%= forceOverlaySidebar ? "" : "lg:top-0 lg:h-screen lg:translate-x-0" %>"
+  :class="sidebarOpen ? 'translate-x-0' : 'translate-x-[calc(100%+1rem)] <%= forceOverlaySidebar ? "" : "lg:translate-x-0" %>'"
   x-trap.noscroll="sidebarOpen <%= forceOverlaySidebar ? "" : "&& window.innerWidth < 1024" %>"
   @keydown.escape.window="sidebarOpen = false"
 >
   <div class="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4 dark:border-white/10">
     <div class="flex min-w-0 items-center gap-3">
-      <span class="grid size-12 shrink-0 place-items-center overflow-hidden rounded-md bg-white/80 ring-1 ring-slate-200 dark:bg-white/10 dark:ring-white/10" aria-hidden="true">
-        <img class="h-11 w-12 object-contain" src="/images/brand/ondraft-logo.png" alt="" />
-      </span>
-      <div class="min-w-0">
+      <img class="h-16 w-20 shrink-0 object-contain drop-shadow-sm" src="/images/brand/OnDraftLogo-cropped.png" alt="" aria-hidden="true" />
+      <div class="min-w-0 pt-1">
         <p class="text-xs font-black uppercase tracking-[0.14em] text-draft-amber dark:text-draft-gold">Navigate</p>
-        <h2 class="truncate text-xl font-black tracking-normal text-slate-950 dark:text-white">OnDraft Menu</h2>
+        <h2 class="truncate text-lg font-black tracking-normal text-slate-950 dark:text-white">OnDraft Menu</h2>
       </div>
     </div>
     <div class="flex shrink-0 items-center gap-2">
       <% if (currentSession?.authenticatedUser) { %>
         <button
           type="button"
-          class="od-focus-ring inline-flex size-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:hover:bg-white/15"
+          class="od-focus-ring -mt-1 inline-flex size-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 transition duration-200 hover:-translate-y-0.5 hover:bg-slate-50 active:scale-95 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:hover:bg-white/15"
           hx-get="/settings"
           hx-target="#site-modal-outlet"
           hx-swap="innerHTML"
@@ -52,7 +51,7 @@
       <% } %>
       <button
         type="button"
-        class="od-focus-ring inline-flex size-9 items-center justify-center rounded-md text-2xl leading-none text-slate-600 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 <%= forceOverlaySidebar ? "" : "lg:hidden" %>"
+        class="od-focus-ring inline-flex size-9 items-center justify-center rounded-md text-2xl leading-none text-slate-600 transition duration-200 hover:scale-[1.03] hover:bg-slate-100 active:scale-95 dark:text-slate-200 dark:hover:bg-white/10 <%= forceOverlaySidebar ? "" : "lg:hidden" %>"
         aria-label="Close navigation"
         @click="sidebarOpen = false"
       >
@@ -61,12 +60,13 @@
     </div>
   </div>
 
-  <nav class="grid gap-2 overflow-y-auto p-4" aria-label="Primary">
+  <nav class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 lg:overflow-visible" aria-label="Primary">
+    <div class="grid gap-2">
     <% navItems.forEach((item) => { %>
       <% const isActive = item.href === "/" ? activePath === "/" : activePath === item.href || activePath.startsWith(`${item.href}/`); %>
       <a href="<%= item.href %>" class="od-bartop-nav group grid grid-cols-[3.25rem_minmax(0,1fr)] gap-3 <%= isActive ? "is-active" : "" %>" <%= isActive ? 'aria-current="page"' : "" %>>
         <span class="grid size-12 place-items-center overflow-visible" aria-hidden="true">
-          <img src="/images/ui/beer-spout.png" alt="" class="h-10 w-11 object-contain opacity-90 transition group-hover:scale-105 group-hover:opacity-100" />
+          <img src="/images/brand/BeerSpout-menu.png" alt="" class="h-12 w-12 object-contain opacity-90 transition group-hover:scale-105 group-hover:opacity-100" />
         </span>
         <span class="grid min-w-0 gap-0.5">
           <span class="block text-sm font-black tracking-normal text-white"><%= item.label %></span>
@@ -74,16 +74,19 @@
         </span>
       </a>
     <% }) %>
+    </div>
 
     <% if (currentIsAdmin) { %>
-      <div class="mt-4 border-t border-slate-200 pt-4 dark:border-white/10">
-        <p class="mb-2 px-3 text-xs font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Admin</p>
-        <% const adminUsersActive = activePath === "/admin/users" || activePath.startsWith("/admin/users/"); %>
+      <div class="mt-5 border-t border-slate-200 pt-4 dark:border-white/10">
+        <p class="mb-1 px-2 text-[0.62rem] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Admin</p>
+        <% const adminDashboardActive = activePath === "/admin" || activePath.startsWith("/admin/"); %>
         <% const newArticleActive = activePath === "/articles/new"; %>
         <% const editBoardActive = activePath === "/bigboard/edit"; %>
-        <a href="/admin/users" class="od-shell-link flex <%= adminUsersActive ? "is-active" : "" %>" <%= adminUsersActive ? 'aria-current="page"' : "" %>>Manage users</a>
-        <a href="/articles/new" class="od-shell-link flex <%= newArticleActive ? "is-active" : "" %>" <%= newArticleActive ? 'aria-current="page"' : "" %>>Create article</a>
-        <a href="/bigboard/edit" class="od-shell-link flex <%= editBoardActive ? "is-active" : "" %>" <%= editBoardActive ? 'aria-current="page"' : "" %>>Edit draft board</a>
+        <div class="grid gap-2">
+          <a href="/admin" class="od-shell-link flex min-h-10 px-3 py-2 text-xs leading-tight <%= adminDashboardActive ? "is-active" : "" %>" <%= adminDashboardActive ? 'aria-current="page"' : "" %>>Admin Dashboard</a>
+          <a href="/articles/new" class="od-shell-link flex min-h-10 px-3 py-2 text-xs leading-tight <%= newArticleActive ? "is-active" : "" %>" <%= newArticleActive ? 'aria-current="page"' : "" %>>Create article</a>
+          <a href="/bigboard/edit" class="od-shell-link flex min-h-10 px-3 py-2 text-xs leading-tight <%= editBoardActive ? "is-active" : "" %>" <%= editBoardActive ? 'aria-current="page"' : "" %>>Edit draft board</a>
+        </div>
       </div>
     <% } %>
   </nav>

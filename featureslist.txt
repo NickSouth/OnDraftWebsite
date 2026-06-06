@@ -1,9 +1,3 @@
-- Add actual logo
-- Draft Board grades
-- Ryan Bio/Headshot
-- Aleks Bio/Headshot
-- Actual social media links
-- Character count on hot takes 
-- Comment lengths
-- Save and exit with empty draft board rows breaks the page
-- Add fractional heights as player options
+- Discrepencys
+
+- Google discoverability

@@ -1,22 +1,196 @@
 import { CreateInMemoryOnDraftRepository } from "../../src/repository/InMemoryOnDraftRepository";
 import { CreateInMemoryUserRepository } from "../../src/auth/InMemoryUserRepository";
-import { CreateOnDraftService, parseYoutubeVideoId } from "../../src/service/OnDraftService";
+import { CreateOnDraftService, parseYoutubeVideoId, type IOnDraftService } from "../../src/service/OnDraftService";
 import { CreateUserPreferenceService } from "../../src/service/UserPreferenceService";
 import { IYoutubeVideoStatsService } from "../../src/service/YoutubeVideoStatsService";
+import { calculateDraftGrade, defaultDraftGrade, formatDraftBoardGrade, gradeTraitCategoriesForGrade, type DraftGrade } from "../../src/model/DraftGrades";
+import type { Position } from "../../src/model/OnDraftContent";
+import type { IEmailService, SendEmailVerificationEmailInput, SendNewsletterEmailInput, SendPasswordResetEmailInput } from "../../src/email/EmailService";
+
+class CaptureEmailService implements IEmailService {
+  newsletterEmails: SendNewsletterEmailInput[] = [];
+
+  async sendEmailVerificationEmail(_input: SendEmailVerificationEmailInput): Promise<void> {}
+
+  async sendPasswordResetEmail(_input: SendPasswordResetEmailInput): Promise<void> {}
+
+  async sendNewsletterEmail(input: SendNewsletterEmailInput): Promise<void> {
+    this.newsletterEmails.push(input);
+  }
+}
 
 function service() {
-  return CreateOnDraftService(CreateInMemoryOnDraftRepository());
+  return CreateOnDraftService(CreateInMemoryOnDraftRepository({ seedContent: false }));
 }
 
 function serviceWithYoutubeStats(youtubeStats: IYoutubeVideoStatsService) {
-  return CreateOnDraftService(CreateInMemoryOnDraftRepository(), youtubeStats);
+  return CreateOnDraftService(CreateInMemoryOnDraftRepository({ seedContent: false }), youtubeStats);
+}
+
+function serviceWithEmail(email: IEmailService) {
+  return CreateOnDraftService(CreateInMemoryOnDraftRepository({ seedContent: false }), undefined, email);
 }
 
 function userPreferenceService() {
   return CreateUserPreferenceService(CreateInMemoryUserRepository());
 }
 
+async function seedConsensusDiscrepancyBoard(ondraftService: IOnDraftService): Promise<{ ryanEntryId: string; aleksEntryId: string }> {
+  const ryanEntry = await ondraftService.createBigBoardEntry({
+    year: 2026,
+    creator: "Ryan",
+    playerName: "Discrepancy Prospect",
+    school: "Ryan State",
+    position: "QB",
+    rank: 1,
+    posRank: 1,
+    height: { feet: 6, inches: 2 },
+    weight: 220,
+  });
+  const aleksEntry = await ondraftService.createBigBoardEntry({
+    year: 2026,
+    creator: "Aleks",
+    playerName: "Discrepancy Prospect",
+    school: "Aleks Tech",
+    position: "QB",
+    rank: 20,
+    posRank: 4,
+    height: { feet: 6, inches: 1 },
+    weight: 215,
+  });
+  if (ryanEntry.ok === false || aleksEntry.ok === false) {
+    throw new Error("Failed to seed consensus discrepancy board.");
+  }
+  return {
+    ryanEntryId: ryanEntry.value.id,
+    aleksEntryId: aleksEntry.value.id,
+  };
+}
+
+function filledGrade(position: Position, score = 6, potential = 6): DraftGrade {
+  const base = defaultDraftGrade(position);
+  if (!base) {
+    throw new Error(`Missing grade config for ${position}`);
+  }
+  const categories = gradeTraitCategoriesForGrade(base, position);
+  return {
+    ...base,
+    potential,
+    physicalTraits: Object.fromEntries(categories[0].traits.map((trait) => [trait, score])),
+    filmTraits: Object.fromEntries(categories[1].traits.map((trait) => [trait, score])),
+  };
+}
+
+describe("Draft grade calculations", () => {
+  it("matches Ryan's weighted WR final grade math to two decimals", () => {
+    const grade: DraftGrade = {
+      position: "WR",
+      archetype: "Balanced",
+      potential: 6,
+      physicalTraits: {
+        Speed: 6,
+        Acceleration: 6,
+        Agility: 7,
+        "Change of Direction": 7,
+        Strength: 5,
+        "Size / Frame": 5,
+      },
+      filmTraits: {
+        "Blocking / Toughness": 4,
+        "Route Tree": 7,
+        "Short Route Running": 7,
+        "Intermediate Route Running": 7,
+        "Deep Route Running": 6,
+        Release: 7,
+        Catching: 6,
+        "Catch In Traffic": 6,
+        "Contested Catching": 5,
+        "Body Control": 7,
+        "Run After Catch": 4,
+      },
+    };
+
+    const result = calculateDraftGrade(grade);
+
+    expect(result).not.toBeNull();
+    expect(result?.physicalGrade).toBeCloseTo(6.14, 4);
+    expect(result?.filmGrade).toBeCloseTo(6.08, 4);
+    expect(formatDraftBoardGrade(result?.displayGrade)).toBe("6.26/8");
+  });
+
+  it("maps OnDraft EDGE to Ryan's ED formula and supports NA in calculations", () => {
+    const edgeGrade = filledGrade("EDGE", 6, 6);
+    edgeGrade.physicalTraits.Speed = "NA";
+
+    const result = calculateDraftGrade(edgeGrade);
+
+    expect(result).not.toBeNull();
+    expect(formatDraftBoardGrade(result?.displayGrade)).toBe("6.15/8");
+  });
+
+  it("accepts decimal trait grades and keeps displayed grades within the eight point scale", () => {
+    const decimalGrade = filledGrade("WR", 6.5, 6);
+    const maxGrade = filledGrade("WR", 8, 8);
+
+    expect(formatDraftBoardGrade(calculateDraftGrade(decimalGrade)?.displayGrade)).toBe("6.65/8");
+    expect(calculateDraftGrade(maxGrade)?.finalGrade).toBeCloseTo(8.3, 4);
+    expect(formatDraftBoardGrade(calculateDraftGrade(maxGrade)?.displayGrade)).toBe("8.00/8");
+  });
+});
+
 describe("OnDraftService article validation", () => {
+  it("keeps sent newsletters immutable after delivery", async () => {
+    const email = new CaptureEmailService();
+    const ondraftService = serviceWithEmail(email);
+    const draft = await ondraftService.saveNewsletterDraft({
+      date: new Date("2026-06-06T12:00:00.000Z"),
+      writeup: "This week on OnDraft.",
+      changelog: "New scouting updates.",
+    });
+    expect(draft.ok).toBe(true);
+    if (draft.ok === false) {
+      return;
+    }
+
+    const sent = await ondraftService.sendNewsletter({
+      id: draft.value.id,
+      date: draft.value.date ?? undefined,
+      writeup: draft.value.writeup,
+      changelog: draft.value.changelog,
+    }, [{ email: "reader@ondraft.test", unsubscribeUrl: "http://localhost:3000/mailing-list/unsubscribe?token=test" }]);
+
+    expect(sent.ok).toBe(true);
+    expect(email.newsletterEmails).toHaveLength(1);
+    if (sent.ok === false) {
+      return;
+    }
+    expect(sent.value.status).toBe("sent");
+    expect(sent.value.recipientCount).toBe(1);
+
+    const editSent = await ondraftService.saveNewsletterDraft({
+      id: sent.value.id,
+      date: sent.value.date ?? undefined,
+      writeup: "Changed after sending.",
+      changelog: sent.value.changelog,
+    });
+    expect(editSent.ok).toBe(false);
+    if (editSent.ok === false) {
+      expect(editSent.value.message).toBe("Sent newsletters cannot be edited or re-sent.");
+    }
+
+    const resendSent = await ondraftService.sendNewsletter({
+      id: sent.value.id,
+      date: sent.value.date ?? undefined,
+      writeup: sent.value.writeup,
+      changelog: sent.value.changelog,
+    }, [{ email: "reader@ondraft.test", unsubscribeUrl: "http://localhost:3000/mailing-list/unsubscribe?token=test" }]);
+    expect(resendSent.ok).toBe(false);
+    if (resendSent.ok === false) {
+      expect(resendSent.value.message).toBe("Sent newsletters cannot be edited or re-sent.");
+    }
+    expect(email.newsletterEmails).toHaveLength(1);
+  });
+
   it("generates a five character alphanumeric article id", async () => {
     const result = await service().createArticle({
       title: "Draft Notes",
@@ -191,6 +365,53 @@ describe("OnDraftService article validation", () => {
     }
   });
 
+  it("rejects article and hot take comments over 200 words", async () => {
+    const ondraftService = service();
+    const tooManyWords = Array.from({ length: 201 }, (_, index) => `word${index}`).join(" ");
+    const createdArticle = await ondraftService.createArticle({
+      title: "Long Comment Discussion",
+      author: "Alice OnDraft",
+      writeup: "A short discussion summary.",
+      publicationDate: new Date("2024-01-01"),
+      content: {
+        type: "plainText",
+        text: "A regular article body.",
+      },
+    });
+    const createdPost = await ondraftService.createForumPost({
+      userId: "reader-1",
+      userName: "Reader One",
+      content: "A normal hot take.",
+    });
+
+    expect(createdArticle.ok).toBe(true);
+    expect(createdPost.ok).toBe(true);
+    if (createdArticle.ok === false || createdPost.ok === false) {
+      return;
+    }
+
+    const articleComment = await ondraftService.commentByArticleId({
+      articleId: createdArticle.value.id,
+      userId: "reader-1",
+      userName: "Reader One",
+      text: tooManyWords,
+    });
+    const hotTakeComment = await ondraftService.commentByForumPostId(createdPost.value.id, {
+      userId: "reader-1",
+      userName: "Reader One",
+      text: tooManyWords,
+    });
+
+    expect(articleComment.ok).toBe(false);
+    expect(hotTakeComment.ok).toBe(false);
+    if (articleComment.ok === false) {
+      expect(articleComment.value.message).toBe("Comment text cannot be more than 200 words.");
+    }
+    if (hotTakeComment.ok === false) {
+      expect(hotTakeComment.value.message).toBe("Comment text cannot be more than 200 words.");
+    }
+  });
+
   it("allows admins to submit text that would otherwise match the banned phrase list", async () => {
     const ondraftService = service();
     const created = await ondraftService.createArticle({
@@ -245,7 +466,7 @@ describe("OnDraftService article validation", () => {
     }
   });
 
-  it("normalizes unique short tags and rejects long writeups", async () => {
+  it("normalizes unique short tags and rejects writeups over 300 words", async () => {
     const created = await service().createArticle({
       title: "Tagged Notes",
       author: "Alice OnDraft",
@@ -266,7 +487,7 @@ describe("OnDraftService article validation", () => {
     const rejected = await service().createArticle({
       title: "Long Writeup",
       author: "Alice OnDraft",
-      writeup: "x".repeat(201),
+      writeup: Array.from({ length: 301 }, (_, index) => `word${index}`).join(" "),
       publicationDate: new Date("2024-01-01"),
       content: {
         type: "plainText",
@@ -276,7 +497,7 @@ describe("OnDraftService article validation", () => {
 
     expect(rejected.ok).toBe(false);
     if (rejected.ok === false) {
-      expect(rejected.value.message).toContain("Writeup cannot be more than 200 characters");
+      expect(rejected.value.message).toContain("Writeup cannot be more than 300 words");
     }
   });
 
@@ -474,6 +695,182 @@ describe("OnDraftService big board editing", () => {
         posRank: 1,
         bigDiscrepency: false,
       });
+    }
+  });
+
+  it("saves a one-sided consensus discrepancy explanation as an unpublished draft", async () => {
+    const ondraftService = service();
+    await seedConsensusDiscrepancyBoard(ondraftService);
+
+    const saved = await ondraftService.saveConsensusDiscrepancyWriteup({
+      year: 2026,
+      playerName: "Discrepancy Prospect",
+      ryanWriteup: "Ryan trusts the processing speed.",
+      aleksWriteup: "",
+    });
+
+    expect(saved.ok).toBe(true);
+    if (saved.ok === true) {
+      expect(saved.value).toEqual({
+        ryanWriteup: "Ryan trusts the processing speed.",
+        aleksWriteup: "",
+        published: false,
+      });
+    }
+
+    const consensus = await ondraftService.getBigBoard(2026, "Consensus");
+    expect(consensus.ok).toBe(true);
+    if (consensus.ok === true) {
+      const entry = consensus.value.entries.find((candidate) => candidate.playerName === "Discrepancy Prospect");
+      expect(entry?.bigDiscrepency).toBe(true);
+      expect(entry?.discWriteup).toEqual({
+        ryanWriteup: "Ryan trusts the processing speed.",
+        aleksWriteup: "",
+        published: false,
+      });
+      expect(entry?.consensusRankingContext).toEqual({
+        Ryan: { rank: 1, posRank: 1 },
+        Aleks: { rank: 20, posRank: 4 },
+      });
+    }
+  });
+
+  it("rejects publishing consensus discrepancy explanations until both authors have text", async () => {
+    const ondraftService = service();
+    await seedConsensusDiscrepancyBoard(ondraftService);
+
+    const published = await ondraftService.publishConsensusDiscrepancyWriteup({
+      year: 2026,
+      playerName: "Discrepancy Prospect",
+      ryanWriteup: "Ryan trusts the processing speed.",
+      aleksWriteup: "",
+    });
+
+    expect(published.ok).toBe(false);
+    if (published.ok === false) {
+      expect(published.value).toMatchObject({
+        name: "BigBoardValidationError",
+        message: "Ryan and Aleks discrepancy explanations are required before publishing.",
+      });
+    }
+
+    const consensus = await ondraftService.getBigBoard(2026, "Consensus");
+    expect(consensus.ok).toBe(true);
+    if (consensus.ok === true) {
+      const entry = consensus.value.entries.find((candidate) => candidate.playerName === "Discrepancy Prospect");
+      expect(entry?.discWriteup).toEqual({
+        ryanWriteup: "Ryan trusts the processing speed.",
+        aleksWriteup: "",
+        published: false,
+      });
+    }
+  });
+
+  it("publishes consensus discrepancy explanations when both sides are written", async () => {
+    const ondraftService = service();
+    await seedConsensusDiscrepancyBoard(ondraftService);
+
+    const published = await ondraftService.publishConsensusDiscrepancyWriteup({
+      year: 2026,
+      playerName: "Discrepancy Prospect",
+      ryanWriteup: "Ryan trusts the processing speed.",
+      aleksWriteup: "Aleks worries about the pocket answers.",
+    });
+
+    expect(published.ok).toBe(true);
+    if (published.ok === true) {
+      expect(published.value).toEqual({
+        ryanWriteup: "Ryan trusts the processing speed.",
+        aleksWriteup: "Aleks worries about the pocket answers.",
+        published: true,
+      });
+    }
+
+    const consensus = await ondraftService.getBigBoard(2026, "Consensus");
+    expect(consensus.ok).toBe(true);
+    if (consensus.ok === true) {
+      const entry = consensus.value.entries.find((candidate) => candidate.playerName === "Discrepancy Prospect");
+      expect(entry?.discWriteup?.published).toBe(true);
+    }
+  });
+
+  it("does not allow discrepancy explanations for consensus entries without a big discrepancy", async () => {
+    const ondraftService = service();
+
+    await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Ryan",
+      playerName: "Aligned Prospect",
+      school: "Ryan State",
+      position: "QB",
+      rank: 1,
+      posRank: 1,
+      height: { feet: 6, inches: 2 },
+      weight: 220,
+    });
+    await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Aleks",
+      playerName: "Aligned Prospect",
+      school: "Aleks Tech",
+      position: "QB",
+      rank: 8,
+      posRank: 2,
+      height: { feet: 6, inches: 1 },
+      weight: 215,
+    });
+
+    const saved = await ondraftService.saveConsensusDiscrepancyWriteup({
+      year: 2026,
+      playerName: "Aligned Prospect",
+      ryanWriteup: "Ryan is slightly higher.",
+      aleksWriteup: "Aleks is slightly lower.",
+    });
+
+    expect(saved.ok).toBe(false);
+    if (saved.ok === false) {
+      expect(saved.value).toMatchObject({
+        name: "BigBoardValidationError",
+        message: "Consensus entry for Aligned Prospect does not have a big discrepancy.",
+      });
+    }
+  });
+
+  it("hides saved discrepancy explanations when rankings no longer qualify as a big discrepancy", async () => {
+    const ondraftService = service();
+    const { aleksEntryId } = await seedConsensusDiscrepancyBoard(ondraftService);
+
+    const published = await ondraftService.publishConsensusDiscrepancyWriteup({
+      year: 2026,
+      playerName: "Discrepancy Prospect",
+      ryanWriteup: "Ryan trusts the processing speed.",
+      aleksWriteup: "Aleks worries about the pocket answers.",
+    });
+    expect(published.ok).toBe(true);
+
+    const savedAleks = await ondraftService.saveBigBoardEntry({
+      year: 2026,
+      creator: "Aleks",
+      entry: {
+        id: aleksEntryId,
+        playerName: "Discrepancy Prospect",
+        school: "Aleks Tech",
+        position: "QB",
+        rank: 6,
+        posRank: 2,
+        height: { feet: 6, inches: 1 },
+        weight: 215,
+        playerInfoPublished: true,
+      },
+    });
+    expect(savedAleks.ok).toBe(true);
+
+    const consensus = await ondraftService.getBigBoard(2026, "Consensus");
+    expect(consensus.ok).toBe(true);
+    if (consensus.ok === true) {
+      const entry = consensus.value.entries.find((candidate) => candidate.playerName === "Discrepancy Prospect");
+      expect(entry?.bigDiscrepency).toBe(false);
+      expect(entry?.discWriteup).toBeUndefined();
     }
   });
 
@@ -721,6 +1118,209 @@ describe("OnDraftService big board editing", () => {
       expect(changedWriteup.value.entries[0].writeupPublished).toBe(false);
     }
   });
+
+  it("saves one big board entry without replacing the rest of the board", async () => {
+    const ondraftService = service();
+
+    const saved = await ondraftService.saveBigBoardEntries({
+      year: 2026,
+      creator: "Ryan",
+      entries: [
+        {
+          id: "targeted-entry-one",
+          playerName: "Targeted One",
+          school: "OnDraft State",
+          position: "QB",
+          rank: 1,
+          posRank: 1,
+          height: { feet: 6, inches: 2 },
+          weight: 220,
+        },
+        {
+          id: "targeted-entry-two",
+          playerName: "Targeted Two",
+          school: "Mock Tech",
+          position: "WR",
+          rank: 2,
+          posRank: 1,
+          height: { feet: 6, inches: 0 },
+          weight: 195,
+        },
+      ],
+    });
+    expect(saved.ok).toBe(true);
+
+    const updated = await ondraftService.saveBigBoardEntry({
+      year: 2026,
+      creator: "Ryan",
+      entry: {
+        id: "targeted-entry-one",
+        playerName: "Targeted One Updated",
+        school: "OnDraft State",
+        position: "QB",
+        rank: 1,
+        posRank: 1,
+        height: { feet: 6, inches: 2 },
+        weight: 221,
+      },
+    });
+    expect(updated.ok).toBe(true);
+
+    const board = await ondraftService.getBigBoard(2026, "Ryan");
+    expect(board.ok).toBe(true);
+    if (board.ok === true) {
+      expect(board.value.entries.map((entry) => entry.playerName)).toEqual([
+        "Targeted One Updated",
+        "Targeted Two",
+      ]);
+      expect(board.value.entries[0].weight).toBe(221);
+    }
+  });
+
+  it("saves draft grades and only publishes fully numeric grade entries", async () => {
+    const ondraftService = service();
+    const invalidGrade = filledGrade("EDGE", 6, 6);
+    invalidGrade.physicalTraits.Speed = "NA";
+
+    const saved = await ondraftService.saveBigBoardEntries({
+      year: 2026,
+      creator: "Ryan",
+      entries: [
+        {
+          id: "edge-grade-draft",
+          playerName: "Graded Edge",
+          school: "OnDraft State",
+          position: "EDGE",
+          rank: 1,
+          posRank: 1,
+          height: { feet: 6, inches: 4 },
+          weight: 255,
+          grade: invalidGrade,
+        },
+      ],
+    });
+
+    expect(saved.ok).toBe(true);
+    if (saved.ok === false) {
+      return;
+    }
+    expect(saved.value.entries[0].gradePublished).toBe(false);
+
+    const rejected = await ondraftService.publishBigBoardEntryGrade(2026, "Ryan", "edge-grade-draft");
+    expect(rejected.ok).toBe(false);
+    if (rejected.ok === false) {
+      expect(rejected.value.message).toContain("Speed must be a number from 1 to 8");
+    }
+
+    const validGrade = filledGrade("EDGE", 6, 6);
+    const corrected = await ondraftService.saveBigBoardEntry({
+      year: 2026,
+      creator: "Ryan",
+      entry: {
+        ...saved.value.entries[0],
+        grade: validGrade,
+        gradePublished: false,
+      },
+    });
+    expect(corrected.ok).toBe(true);
+
+    const published = await ondraftService.publishBigBoardEntryGrade(2026, "Ryan", "edge-grade-draft");
+    expect(published.ok).toBe(true);
+    if (published.ok === true) {
+      expect(published.value.gradePublished).toBe(true);
+      expect(formatDraftBoardGrade(calculateDraftGrade(published.value.grade)?.displayGrade)).toBe("6.15/8");
+    }
+  });
+
+  it("preserves omitted writeup and grade data when saving a single draft board card", async () => {
+    const ondraftService = service();
+    const grade = filledGrade("WR", 6.5, 6);
+    const created = await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Ryan",
+      id: "partial-save-preserves-nested",
+      playerName: "Partial Save",
+      school: "OnDraft State",
+      position: "WR",
+      rank: 1,
+      posRank: 1,
+      height: { feet: 6, inches: 1 },
+      weight: 205,
+      grade,
+      gradePublished: true,
+      strengths: "Original strength.",
+      weaknesses: "Original weakness.",
+      rundown: "Original rundown.",
+      writeupPublished: true,
+    });
+    expect(created.ok).toBe(true);
+
+    const saved = await ondraftService.saveBigBoardEntry({
+      year: 2026,
+      creator: "Ryan",
+      entry: {
+        id: "partial-save-preserves-nested",
+        playerName: "Partial Save Updated",
+        school: "OnDraft State",
+        position: "WR",
+        rank: 1,
+        posRank: 1,
+        height: { feet: 6, inches: 1 },
+        weight: 206,
+      },
+    });
+
+    expect(saved.ok).toBe(true);
+    if (saved.ok === true) {
+      expect(saved.value.writeup).toEqual({
+        strengths: "Original strength.",
+        weaknesses: "Original weakness.",
+        rundown: "Original rundown.",
+      });
+      expect(saved.value.writeupPublished).toBe(true);
+      expect(saved.value.gradePublished).toBe(true);
+      expect(formatDraftBoardGrade(calculateDraftGrade(saved.value.grade)?.displayGrade)).toBe("6.65/8");
+    }
+  });
+
+  it("averages published board grades on the consensus board", async () => {
+    const ondraftService = service();
+
+    await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Ryan",
+      playerName: "Consensus Grade",
+      school: "OnDraft State",
+      position: "WR",
+      rank: 1,
+      posRank: 1,
+      height: { feet: 6, inches: 1 },
+      weight: 205,
+      grade: filledGrade("WR", 6, 6),
+      gradePublished: true,
+    });
+    await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Aleks",
+      playerName: "Consensus Grade",
+      school: "OnDraft State",
+      position: "WR",
+      rank: 3,
+      posRank: 1,
+      height: { feet: 6, inches: 1 },
+      weight: 205,
+      grade: filledGrade("WR", 8, 8),
+      gradePublished: true,
+    });
+
+    const consensus = await ondraftService.getBigBoard(2026, "Consensus");
+
+    expect(consensus.ok).toBe(true);
+    if (consensus.ok === true) {
+      expect(consensus.value.entries[0].gradePublished).toBe(true);
+      expect(formatDraftBoardGrade(consensus.value.entries[0].gradeSummary?.finalGrade)).toBe("7.08/8");
+    }
+  });
 });
 
 describe("UserPreferenceService bookmarks", () => {
@@ -805,6 +1405,20 @@ describe("OnDraftService YouTube videos", () => {
       expect(filtered.value[0].viewCount).toBe(25);
     }
 
+    const videoTags = await ondraftService.getVideoTags();
+    expect(videoTags.ok).toBe(true);
+    if (videoTags.ok === true) {
+      expect(videoTags.value).toEqual(["film-room", "qb", "wr"]);
+    }
+
+    const excludedByDate = await ondraftService.filterYoutubeVideos({
+      dateRange: { from: new Date("2000-01-01T00:00:00.000Z"), to: new Date("2000-01-02T00:00:00.000Z") },
+    });
+    expect(excludedByDate.ok).toBe(true);
+    if (excludedByDate.ok === true) {
+      expect(excludedByDate.value).toEqual([]);
+    }
+
     const popularity = await ondraftService.filterYoutubeVideos({ sortBy: "popularity", sortDirection: "desc" });
     expect(popularity.ok).toBe(true);
     if (popularity.ok === true) {
@@ -824,6 +1438,131 @@ describe("OnDraftService YouTube videos", () => {
       expect(updated.value.title).toBe("Quarterback Film Updated");
       expect(updated.value.thumbnailUrl).toContain("maxresdefault");
       expect(updated.value.viewCount).toBe(99);
+    }
+  });
+
+  it("refreshes stale cached youtube stats across the whole catalog", async () => {
+    let currentViewCount = 25;
+    const statsService: IYoutubeVideoStatsService = {
+      async fetchVideoStats(videoIds) {
+        return {
+          ok: true,
+          value: new Map(videoIds.map((videoId) => [videoId, {
+            videoId,
+            thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+            viewCount: currentViewCount,
+          }])),
+        };
+      },
+    };
+    const ondraftService = serviceWithYoutubeStats(statsService);
+
+    const created = await ondraftService.createYoutubeVideo({
+      youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      title: "Quarterback Film",
+      description: "A look at QB processing.",
+      tags: ["Film Room", "QB"],
+    });
+
+    expect(created.ok).toBe(true);
+    if (created.ok === false) {
+      return;
+    }
+
+    currentViewCount = 99;
+    const staleWrite = await ondraftService.updateYoutubeVideoStats("dQw4w9WgXcQ", {
+      thumbnailUrl: created.value.thumbnailUrl,
+      viewCount: 25,
+      youtubeStatsFetchedAt: new Date(Date.now() - (25 * 60 * 60 * 1000)),
+    });
+    expect(staleWrite.ok).toBe(true);
+
+    const refreshed = await ondraftService.refreshYoutubeVideoCatalog();
+    expect(refreshed).toEqual({ ok: true, value: 1 });
+
+    const video = await ondraftService.getYoutubeVideo("dQw4w9WgXcQ");
+    expect(video.ok).toBe(true);
+    if (video.ok === true) {
+      expect(video.value.viewCount).toBe(99);
+    }
+  });
+
+  it("returns cached youtube stats immediately while refreshing stale data in the background", async () => {
+    let fetchCount = 0;
+    let releaseBackgroundRefresh: (() => void) | null = null;
+    let backgroundRefreshStartedResolve: (() => void) | null = null;
+    const backgroundRefreshStarted = new Promise<void>((resolve) => {
+      backgroundRefreshStartedResolve = resolve;
+    });
+
+    const statsService: IYoutubeVideoStatsService = {
+      async fetchVideoStats(videoIds) {
+        fetchCount += 1;
+        if (fetchCount === 1) {
+          return {
+            ok: true,
+            value: new Map(videoIds.map((videoId) => [videoId, {
+              videoId,
+              thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+              viewCount: 25,
+            }])),
+          };
+        }
+
+        backgroundRefreshStartedResolve?.();
+        return await new Promise((resolve) => {
+          releaseBackgroundRefresh = () => resolve({
+            ok: true,
+            value: new Map(videoIds.map((videoId) => [videoId, {
+              videoId,
+              thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+              viewCount: 99,
+            }])),
+          });
+        });
+      },
+    };
+    const ondraftService = serviceWithYoutubeStats(statsService);
+
+    const created = await ondraftService.createYoutubeVideo({
+      youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      title: "Quarterback Film",
+      description: "A look at QB processing.",
+      tags: ["Film Room", "QB"],
+    });
+    expect(created.ok).toBe(true);
+    if (created.ok === false) {
+      return;
+    }
+
+    const staleWrite = await ondraftService.updateYoutubeVideoStats("dQw4w9WgXcQ", {
+      thumbnailUrl: created.value.thumbnailUrl,
+      viewCount: 25,
+      youtubeStatsFetchedAt: new Date(Date.now() - (25 * 60 * 60 * 1000)),
+    });
+    expect(staleWrite.ok).toBe(true);
+
+    const listed = await ondraftService.getYoutubeVideos();
+    expect(listed.ok).toBe(true);
+    if (listed.ok === true) {
+      expect(listed.value[0].viewCount).toBe(25);
+    }
+
+    await backgroundRefreshStarted;
+
+    const stillCached = await ondraftService.getYoutubeVideo("dQw4w9WgXcQ");
+    expect(stillCached.ok).toBe(true);
+    if (stillCached.ok === true) {
+      expect(stillCached.value.viewCount).toBe(25);
+    }
+
+    releaseBackgroundRefresh?.();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const refreshed = await ondraftService.getYoutubeVideo("dQw4w9WgXcQ");
+    expect(refreshed.ok).toBe(true);
+    if (refreshed.ok === true) {
+      expect(refreshed.value.viewCount).toBe(99);
     }
   });
 });

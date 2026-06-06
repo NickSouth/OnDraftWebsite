@@ -11,6 +11,10 @@
   let modal = null;
 
   const focusableSelector = "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])";
+  const markDirty = () => {
+    dirty = true;
+    form.dataset.unsavedDirty = "true";
+  };
 
   const buildModal = () => {
     const wrapper = document.createElement("div");
@@ -84,13 +88,14 @@
   }
 
   form.addEventListener("input", () => {
-    dirty = true;
+    markDirty();
   });
   form.addEventListener("change", () => {
-    dirty = true;
+    markDirty();
   });
   form.addEventListener("submit", () => {
     submitted = true;
+    form.dataset.unsavedDirty = "false";
   });
 
   document.addEventListener("click", (event) => {
@@ -109,6 +114,7 @@
       return;
     }
     event.preventDefault();
+    event.stopImmediatePropagation();
     openModal(link.href);
   });
 

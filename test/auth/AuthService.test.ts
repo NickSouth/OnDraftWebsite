@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import type {
   IEmailService,
   SendEmailVerificationEmailInput,
+  SendNewsletterEmailInput,
   SendPasswordResetEmailInput,
 } from "../../src/email/EmailService";
 import type { IUserRepository } from "../../src/auth/UserRepository";
@@ -12,6 +13,7 @@ import type { IEmailConfig } from "../../src/config/AppConfig";
 class CapturingEmailService implements IEmailService {
   sent: SendEmailVerificationEmailInput[] = [];
   passwordResets: SendPasswordResetEmailInput[] = [];
+  newsletters: SendNewsletterEmailInput[] = [];
 
   async sendEmailVerificationEmail(input: SendEmailVerificationEmailInput): Promise<void> {
     this.sent.push(input);
@@ -19,6 +21,10 @@ class CapturingEmailService implements IEmailService {
 
   async sendPasswordResetEmail(input: SendPasswordResetEmailInput): Promise<void> {
     this.passwordResets.push(input);
+  }
+
+  async sendNewsletterEmail(input: SendNewsletterEmailInput): Promise<void> {
+    this.newsletters.push(input);
   }
 }
 

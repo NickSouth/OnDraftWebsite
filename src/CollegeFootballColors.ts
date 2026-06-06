@@ -24,7 +24,7 @@ export const collegeTeam = {
   'California': { primaryColor: '#031522', secondaryColor: '#FFC423' },
   'Central Michigan': { primaryColor: '#6A0032', secondaryColor: '#FFFFFF' },
   'Charlotte': { primaryColor: '#0C562D', secondaryColor: '#CFAB7A' },
-  'Cincinnati': { primaryColor: '#000000', secondaryColor: '#717073' },
+  'Cincinnati': { primaryColor: '#000000', secondaryColor: '#e00122' },
   'Clemson': { primaryColor: '#F66733', secondaryColor: '#522D80' },
   'Coastal Carolina': { primaryColor: '#006F71', secondaryColor: '#A27752' },
   'Colorado': { primaryColor: '#D1C57E', secondaryColor: '#FFD200' },

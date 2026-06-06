@@ -1,0 +1,1 @@
+ALTER TABLE "newsletters" ALTER COLUMN "date" DROP NOT NULL;

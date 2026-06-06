@@ -1,0 +1,24 @@
+{
+  "name": "OnDraft Football",
+  "short_name": "OnDraft",
+  "description": "NFL and NFL Draft analysis, opinions, predictions, videos, draft boards, and community football discussion.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
+  "icons": [
+    {
+      "src": "/images/brand/OnDraftLogo-favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/images/brand/OnDraftLogo-cropped.png",
+      "sizes": "1145x888",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

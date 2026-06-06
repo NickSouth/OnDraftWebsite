@@ -1,17 +1,494 @@
 import { Err, Ok, Result } from "../lib/result";
-import { Article, ArticleFilter, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, Comment, ConsensusBigBoard, DraftBoardFilter, ForumPost, ForumPostFilter, Video, VideoQuery } from "../model/OnDraftContent";
-import { ArticleNotFound, BigBoardNotFound, CommentNotFound, DuplicateBigBoardYear, DuplicatePlayer, DuplicateArticle, DuplicateForumPost, ForumPostCommentNotFound, type ArticleError, type BigBoardError, type IOnDraftRepository, PlayerNotFound, ForumPostError, ForumPostNotFound } from "./OnDraftRepository";
+import { Article, ArticleFilter, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, Comment, ConsensusBigBoard, ConsensusDiscrepancyWriteup, DraftBoardFilter, ForumPost, ForumPostFilter, Newsletter, Video, VideoQuery } from "../model/OnDraftContent";
+import { calculateDraftGrade, defaultDraftGrade } from "../model/DraftGrades";
+import { ArticleNotFound, BigBoardNotFound, CommentNotFound, DuplicateBigBoardYear, DuplicatePlayer, DuplicateArticle, DuplicateForumPost, DuplicateNewsletter, ForumPostCommentNotFound, type ArticleError, type BigBoardError, type IOnDraftRepository, type NewsletterError, NewsletterNotFound, PlayerNotFound, ForumPostError, ForumPostNotFound } from "./OnDraftRepository";
 
+const MEMORY_LOAD_TEST_SCHOOLS = [
+  "Air Force",
+  "Akron",
+  "Alabama",
+  "Appalachian State",
+  "Arizona",
+  "Arizona State",
+  "Arkansas",
+  "Arkansas State",
+  "Army",
+  "Auburn",
+  "Ball State",
+  "Baylor",
+  "Boise State",
+  "Boston College",
+  "Bowling Green",
+  "Buffalo",
+  "BYU",
+  "California",
+  "Central Michigan",
+  "Charlotte",
+  "Cincinnati",
+  "Clemson",
+  "Coastal Carolina",
+  "Colorado",
+  "Colorado State",
+  "Delaware",
+  "Duke",
+  "East Carolina",
+  "Eastern Michigan",
+  "FIU",
+  "Florida",
+  "Florida Atlantic",
+  "Florida State",
+  "Fresno State",
+  "Georgia",
+  "Georgia Southern",
+  "Georgia State",
+  "Georgia Tech",
+  "Hawaii",
+  "Houston",
+  "Illinois",
+  "Indiana",
+  "Iowa",
+  "Iowa State",
+  "Jacksonville State",
+  "James Madison",
+  "Kansas",
+  "Kansas State",
+  "Kennesaw State",
+  "Kent State",
+];
+const MEMORY_LOAD_TEST_POSITIONS = ["QB", "RB", "WR", "TE", "OT", "IOL", "EDGE", "IDL", "LB", "CB", "S"] as const;
+
+type InMemoryRepositoryOptions = {
+  seedContent?: boolean;
+  seedLoadTestBigBoards?: boolean;
+};
 
 class InMemoryOnDraftRepository implements IOnDraftRepository {
   private bigBoards: BigBoard[] = [];
   private articles: Article[] = [];
   private forumPosts: ForumPost[] = [];
   private videos: Video[] = [];
+  private newsletters: Newsletter[] = [];
+  private consensusDiscrepancyWriteups: Array<{ year: number; playerName: string; writeup: ConsensusDiscrepancyWriteup }> = [];
   private tagList: Set<string> = new Set();
 
-  constructor() {
-    this.createBigBoardYearSync(new Date().getFullYear());
+  constructor(options: InMemoryRepositoryOptions = {}) {
+    const currentYear = new Date().getFullYear();
+    this.createBigBoardYearSync(currentYear);
+
+    if (options.seedContent !== false) {
+      this.seedSampleContent();
+    }
+
+    const seedLoadTestBigBoards = options.seedLoadTestBigBoards ?? process.env.ONDRAFT_MEMORY_LOAD_TEST === "true";
+    if (seedLoadTestBigBoards) {
+      this.seedMemoryLoadTestBigBoards(currentYear);
+    }
+  }
+
+  private seedMemoryLoadTestBigBoards(year: number): void {
+    const ryanBoard = this.findBigBoard(year, "Ryan");
+    const aleksBoard = this.findBigBoard(year, "Aleks");
+    if (!ryanBoard || !aleksBoard) {
+      return;
+    }
+    ryanBoard.entries = this.createMemoryLoadTestEntries("Ryan");
+    aleksBoard.entries = this.createMemoryLoadTestEntries("Aleks");
+  }
+
+  private createMemoryLoadTestEntries(creator: "Ryan" | "Aleks"): BigBoardEntry[] {
+    const loadTestWriteups = [
+      {
+        strengths: "Easy early acceleration and enough arm strength to stress a defense vertically.",
+        weaknesses: "Can drift into pressure when the first answer is covered.",
+        rundown: "A clean quick-view test case with a short rundown. He gives the card enough real scouting texture without stretching the left column.",
+      },
+      {
+        strengths: "Good contact balance, urgent feet, and a compact release point. Shows the patience to let blocks declare before attacking daylight.",
+        weaknesses: "Needs to keep his pads down through traffic and avoid trying to win every rep with the first burst.",
+        rundown: "This profile uses a medium-length rundown so the right column can be compared against a left box with a little more body. The traits are intentionally solid across the board, and the paragraph should show how the rundown card breathes when it is longer than the strengths and weaknesses boxes but not long enough to dominate the row.",
+      },
+      {
+        strengths: "Natural separator with reliable hands.",
+        weaknesses: "Play strength is still catching up.",
+        rundown: "Short and tidy. This one is mostly here to make sure compact profiles do not leave the grade stack feeling detached.",
+      },
+      {
+        strengths: "Plays with excellent leverage, absorbs power well, and has enough recovery ability to stay attached after losing the first half-step. The hands are active and he rarely lets rushers dictate the rep cleanly.",
+        weaknesses: "The movement skills are functional rather than explosive, so wide alignments can force him to overset. He also needs to clean up the late latch penalties that show up when he is stressed by speed.",
+        rundown: "This is the intentionally long load-test profile. The rundown should extend below the top of the grades box on wide screens while the strengths and weaknesses remain aligned in the right column. He is a sturdy, assignment-sound prospect whose best reps come when he can win with angles, strike timing, and core strength. The profile gives the UI a realistic wall of copy to prove the stripe, column width, and grade card stay composed when the scouting report has more editorial weight.",
+      },
+      {
+        strengths: "Explosive first step with closing burst.",
+        weaknesses: "Counters are still developing.",
+        rundown: "A shorter pass-rush note for testing asymmetry between a narrow strengths box and the full grade grid beneath it.",
+      },
+    ];
+    const positionCounts = new Map<string, number>();
+    return MEMORY_LOAD_TEST_SCHOOLS.map((school, index) => {
+      const position = MEMORY_LOAD_TEST_POSITIONS[index % MEMORY_LOAD_TEST_POSITIONS.length];
+      const nextPosRank = (positionCounts.get(position) ?? 0) + 1;
+      positionCounts.set(position, nextPosRank);
+      const rank = creator === "Aleks" ? MEMORY_LOAD_TEST_SCHOOLS.length - index : index + 1;
+      const inches = Number(((index % 12) + (index % 4 === 0 ? 0.5 : 0)).toFixed(3));
+      const sampleWriteup = loadTestWriteups[index % loadTestWriteups.length];
+      const grade = index < 12 ? this.createMemoryLoadTestGrade(position, index, creator) : null;
+      const hasPublishedProfile = index < 12;
+      return {
+        id: `memory-load-${creator.toLowerCase()}-${String(index + 1).padStart(2, "0")}`,
+        playerName: `Load Test Player ${String(index + 1).padStart(2, "0")}`,
+        position,
+        school,
+        rank,
+        posRank: nextPosRank,
+        height: { feet: 6, inches },
+        weight: 185 + index,
+        playerInfoPublished: true,
+        grade,
+        gradePublished: hasPublishedProfile && grade !== null,
+        writeup: {
+          strengths: hasPublishedProfile ? sampleWriteup.strengths : "",
+          weaknesses: hasPublishedProfile ? sampleWriteup.weaknesses : "",
+          rundown: hasPublishedProfile ? sampleWriteup.rundown : "",
+        },
+        writeupPublished: hasPublishedProfile,
+        notes: `Generated memory load-test entry for ${creator}.`,
+      };
+    });
+  }
+
+  private createMemoryLoadTestGrade(position: BigBoardEntry["position"], index: number, creator: "Ryan" | "Aleks"): BigBoardEntry["grade"] {
+    const grade = defaultDraftGrade(position);
+    if (!grade) {
+      return null;
+    }
+    const baseScore = Math.min(7, 4 + (index % 4) + (creator === "Aleks" ? 0.25 : 0));
+    grade.potential = Math.min(8, Math.max(1, Math.round(baseScore + 1)));
+    grade.physicalTraits = Object.fromEntries(Object.keys(grade.physicalTraits).map((trait, traitIndex) => [
+      trait,
+      Math.min(8, Number((baseScore + (traitIndex % 3) * 0.25).toFixed(2))),
+    ]));
+    grade.filmTraits = Object.fromEntries(Object.keys(grade.filmTraits).map((trait, traitIndex) => [
+      trait,
+      Math.min(8, Number((baseScore + ((traitIndex + 1) % 4) * 0.2).toFixed(2))),
+    ]));
+    return grade;
+  }
+
+  private seedSampleContent(): void {
+    const now = new Date();
+    const atNoonDaysAgo = (daysAgo: number): Date => {
+      const value = new Date(now);
+      value.setDate(value.getDate() - daysAgo);
+      value.setHours(12, 0, 0, 0);
+      return value;
+    };
+    const createComment = (
+      id: string,
+      userId: string,
+      userName: string,
+      text: string,
+      daysAgo: number,
+      likedByUserIds: string[] = [],
+      replies: Comment[] = [],
+    ): Comment => ({
+      id,
+      userId,
+      userName,
+      text,
+      createdAt: atNoonDaysAgo(daysAgo),
+      likes: likedByUserIds.length,
+      likedByUserIds,
+      replies,
+    });
+
+    this.articles = [
+      {
+        id: "A1001",
+        published: true,
+        title: "The league is starving for pressure, and this EDGE class knows it",
+        author: "Ryan McWalter",
+        writeup: "Why the most explosive rushers in the next cycle are winning before the tackle can settle the set point.",
+        tags: ["EDGE", "Film Room", "Pass Rush"],
+        publicationDate: atNoonDaysAgo(3),
+        imageUrl: "/images/article-defaults/uprights.png",
+        content: {
+          type: "html",
+          body: `
+            <p>The first thing that jumps off this class is how often the top rushers win cleanly with urgency, not gimmicks.</p>
+            <p>That matters because NFL boards are built on traits that survive when the picture gets muddy. Burst, bend, and counters still travel.</p>
+            <p>Once the season gets moving, expect this group to force difficult conversations at the top of early big boards.</p>
+          `,
+        },
+        comments: [
+          createComment(
+            "c-a1001-1",
+            "sample-reader-1",
+            "Scout Sam",
+            "The hand usage note here feels right. This class has more finish than people are giving it credit for.",
+            2,
+            ["sample-reader-2", "sample-reader-3"],
+            [
+              createComment(
+                "c-a1001-1-r1",
+                "sample-reader-4",
+                "Nina Numbers",
+                "The finish is real, but I still want to see how many of these wins come against NFL-caliber tackles.",
+                1,
+                ["sample-reader-1"],
+              ),
+            ],
+          ),
+          createComment(
+            "c-a1001-2",
+            "sample-reader-5",
+            "Draft Dan",
+            "This is exactly why I keep circling back to the second tier of edge defenders.",
+            1,
+            ["sample-reader-1"],
+          ),
+        ],
+        likes: 5,
+        likedByUserIds: [
+          "sample-reader-1",
+          "sample-reader-2",
+          "sample-reader-3",
+          "sample-reader-4",
+          "sample-reader-5",
+        ],
+      },
+      {
+        id: "A1002",
+        published: true,
+        title: "Five quarterback traits that keep showing up on third-and-medium",
+        author: "Aleks Ryabinkin",
+        writeup: "A quarterback room built on calm feet, layered timing, and answers once the first read disappears.",
+        tags: ["QB", "Scouting", "Traits"],
+        publicationDate: atNoonDaysAgo(18),
+        imageUrl: "/images/article-defaults/football.png",
+        content: {
+          type: "plainText",
+          text: [
+            "Quarterback evaluation gets noisy when the game script is friendly.",
+            "Third-and-medium strips away some of that comfort and leaves you with timing, discipline, and processing speed.",
+            "The passers who keep drives alive in those moments usually carry cleaner translatable habits into Sundays.",
+          ].join("\n\n"),
+        },
+        comments: [
+          createComment(
+            "c-a1002-1",
+            "sample-reader-2",
+            "Pocket Pete",
+            "The footwork point is the one that usually decides whether I stay in or drop out on a guy.",
+            16,
+            ["sample-reader-1", "sample-reader-3"],
+          ),
+        ],
+        likes: 4,
+        likedByUserIds: ["sample-reader-1", "sample-reader-2", "sample-reader-3", "sample-reader-4"],
+      },
+      {
+        id: "A1003",
+        published: true,
+        title: "The slot separators keeping this receiver class honest",
+        author: "Ryan McWalter",
+        writeup: "These are the route runners who give an offense easier throws and force defenses to squeeze the middle of the field.",
+        tags: ["WR", "Big Board", "Route Running"],
+        publicationDate: atNoonDaysAgo(46),
+        imageUrl: "/images/article-defaults/helmet.png",
+        content: {
+          type: "plainText",
+          text: [
+            "Not every receiver has to win on the outside to matter at the top of a board.",
+            "The middle of the field still belongs to pass catchers who understand leverage and finish through contact.",
+            "This group has more of those players than last year did.",
+          ].join("\n\n"),
+        },
+        comments: [],
+        likes: 3,
+        likedByUserIds: ["sample-reader-1", "sample-reader-2", "sample-reader-3"],
+      },
+      {
+        id: "A1004",
+        published: true,
+        title: "Running backs who still create their own yards after the chalk breaks",
+        author: "Aleks Ryabinkin",
+        writeup: "A look at the runners whose contact balance and pacing keep the position valuable when blocking falls apart.",
+        tags: ["RB", "Scouting", "Offense"],
+        publicationDate: atNoonDaysAgo(190),
+        imageUrl: "/images/article-defaults/football.png",
+        content: {
+          type: "html",
+          body: `
+            <p>The easiest rushing yards are usually blocked. The meaningful ones rarely are.</p>
+            <p>This class still has a few backs who understand tempo, can absorb contact, and stay on schedule anyway.</p>
+          `,
+        },
+        comments: [
+          createComment(
+            "c-a1004-1",
+            "sample-reader-6",
+            "Tape Grinder",
+            "Love the pacing callout here. A lot of backs have speed but not enough pacing to unlock it.",
+            184,
+            ["sample-reader-2"],
+          ),
+        ],
+        likes: 4,
+        likedByUserIds: ["sample-reader-1", "sample-reader-2", "sample-reader-3", "sample-reader-4"],
+      },
+      {
+        id: "A1005",
+        published: true,
+        title: "What last year taught us about overreacting to spring draft boards",
+        author: "Ryan McWalter",
+        writeup: "A reset on patience, projection, and why the loudest March board is rarely the one that ages the best.",
+        tags: ["Draft History", "Process", "Board Building"],
+        publicationDate: atNoonDaysAgo(430),
+        imageUrl: "/images/article-defaults/uprights.png",
+        content: {
+          type: "plainText",
+          text: [
+            "Draft boards should move. They just should not panic.",
+            "The best spring work usually narrows the real questions instead of pretending everything is already solved.",
+            "That lesson holds up every single cycle.",
+          ].join("\n\n"),
+        },
+        comments: [],
+        likes: 6,
+        likedByUserIds: [
+          "sample-reader-1",
+          "sample-reader-2",
+          "sample-reader-3",
+          "sample-reader-4",
+          "sample-reader-5",
+          "sample-reader-6",
+        ],
+      },
+    ];
+
+    this.videos = [
+      {
+        youtubeUrl: "https://www.youtube.com/watch?v=BH3X-llq1M4&pp=ugUEEgJlbg%3D%3D",
+        title: "Quarterback room check-in: what still translates on Sundays",
+        description: "A sample Bar TV entry focused on pocket movement, timing windows, and how to separate traits from college comfort.",
+        videoId: "BH3X-llq1M4",
+        tags: ["QB", "Film Room", "Bar TV"],
+        createdAt: atNoonDaysAgo(2),
+        updatedAt: atNoonDaysAgo(2),
+        thumbnailUrl: "https://img.youtube.com/vi/BH3X-llq1M4/hqdefault.jpg",
+        viewCount: 12840,
+        youtubeStatsFetchedAt: atNoonDaysAgo(1),
+      },
+      {
+        youtubeUrl: "https://www.youtube.com/watch?v=uza2KtmxZ9g",
+        title: "Building pressure without panic: edge and interior notes",
+        description: "A sample video on pass-rush translation, coverage marriage, and why the best fronts create bad quarterback decisions early.",
+        videoId: "uza2KtmxZ9g",
+        tags: ["EDGE", "Defense", "Pressure"],
+        createdAt: atNoonDaysAgo(11),
+        updatedAt: atNoonDaysAgo(11),
+        thumbnailUrl: "https://img.youtube.com/vi/uza2KtmxZ9g/hqdefault.jpg",
+        viewCount: 9420,
+        youtubeStatsFetchedAt: atNoonDaysAgo(1),
+      },
+      {
+        youtubeUrl: "https://www.youtube.com/watch?v=5Lqtx40NloQ&pp=ugUEEgJlbg%3D%3D",
+        title: "Late-round bets worth making before the board catches up",
+        description: "A sample Bar TV entry highlighting developmental traits, role projection, and the kinds of depth bets smart teams keep making.",
+        videoId: "5Lqtx40NloQ",
+        tags: ["Sleepers", "Big Board", "Traits"],
+        createdAt: atNoonDaysAgo(54),
+        updatedAt: atNoonDaysAgo(54),
+        thumbnailUrl: "https://img.youtube.com/vi/5Lqtx40NloQ/hqdefault.jpg",
+        viewCount: 6840,
+        youtubeStatsFetchedAt: atNoonDaysAgo(1),
+      },
+    ];
+
+    this.forumPosts = [
+      {
+        id: "post-1",
+        userId: "sample-forum-1",
+        userName: "Scout Sam",
+        content: "Hot take: the safest offensive linemen in this class are the ones who already look boring on Saturdays. Quiet feet age well.",
+        createdAt: atNoonDaysAgo(1),
+        likes: 3,
+        likedByUserIds: ["sample-reader-1", "sample-reader-2", "sample-reader-3"],
+        comments: [
+          createComment(
+            "c-post-1-1",
+            "sample-forum-2",
+            "Nina Numbers",
+            "Boring is good when it means the quarterback never has to think about his blind side.",
+            1,
+            ["sample-reader-1"],
+          ),
+        ],
+      },
+      {
+        id: "post-2",
+        userId: "sample-forum-3",
+        userName: "Pocket Pete",
+        content: "I still think the deepest value pocket on this board is day-two receiver, not running back.",
+        createdAt: atNoonDaysAgo(4),
+        likes: 2,
+        likedByUserIds: ["sample-reader-2", "sample-reader-3"],
+        comments: [
+          createComment(
+            "c-post-2-1",
+            "sample-forum-4",
+            "Draft Dan",
+            "Depends on how many teams decide they need role players versus alpha traits.",
+            3,
+          ),
+          createComment(
+            "c-post-2-2",
+            "sample-forum-1",
+            "Scout Sam",
+            "The receiver pool is just easier to project into useful snaps right now.",
+            2,
+            ["sample-reader-4"],
+          ),
+        ],
+      },
+      {
+        id: "post-3",
+        userId: "sample-forum-5",
+        userName: "Tape Grinder",
+        content: "Quarterback rankings should start with pressure answers, not highlight throws. If the pocket gets loud, I need proof.",
+        createdAt: atNoonDaysAgo(9),
+        likes: 4,
+        likedByUserIds: ["sample-reader-1", "sample-reader-2", "sample-reader-3", "sample-reader-4"],
+        comments: [],
+      },
+      {
+        id: "post-4",
+        userId: "sample-forum-6",
+        userName: "Maya Matchups",
+        content: "The next big board riser is going to be a corner who already survives with route recognition instead of just raw speed.",
+        createdAt: atNoonDaysAgo(16),
+        likes: 1,
+        likedByUserIds: ["sample-reader-2"],
+        comments: [
+          createComment(
+            "c-post-4-1",
+            "sample-forum-3",
+            "Pocket Pete",
+            "That archetype always gets louder once teams start comparing third-down tape.",
+            14,
+          ),
+        ],
+      },
+    ];
+
+    this.syncTagList();
+  }
+
+  private syncTagList(): void {
+    this.tagList = new Set([
+      ...this.articles.flatMap((article) => article.tags ?? []),
+      ...this.videos.flatMap((video) => video.tags ?? []),
+    ]);
   }
 
   private findBigBoard(year: number, creator: BigBoardCreator): BigBoard | undefined {
@@ -83,6 +560,14 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
     return Ok({ ...bigBoard, entries });
   }
 
+  private cloneConsensusDiscrepancyWriteup(writeup: ConsensusDiscrepancyWriteup): ConsensusDiscrepancyWriteup {
+    return { ...writeup };
+  }
+
+  private findConsensusDiscrepancyWriteup(year: number, playerName: string): ConsensusDiscrepancyWriteup | undefined {
+    return this.consensusDiscrepancyWriteups.find((record) => record.year === year && record.playerName === playerName)?.writeup;
+  }
+
   private generateConsensusBigBoard(year: number): BigBoard {
     const ryanBoard = this.findBigBoard(year, "Ryan");
     const aleksBoard = this.findBigBoard(year, "Aleks");
@@ -118,6 +603,14 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
       return rankedValues.reduce((sum, value) => sum + value, 0) / rankedValues.length;
     };
 
+    const nullableAverage = (values: Array<number | null | undefined>): number | null => {
+      const numericValues = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+      if (numericValues.length === 0) {
+        return null;
+      }
+      return numericValues.reduce((sum, value) => sum + value, 0) / numericValues.length;
+    };
+
     const compareOverall = (first: ConsensusEntryDraft, second: ConsensusEntryDraft): number => (
       first.averageRank - second.averageRank ||
       first.ryanRank - second.ryanRank ||
@@ -144,6 +637,10 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
       const rankDiscrepency = typeof Ryan?.rank === "number" && typeof Aleks?.rank === "number"
         ? Math.abs(Ryan.rank - Aleks.rank)
         : 0;
+      const averageFinalGrade = nullableAverage([
+        Ryan?.gradePublished ? calculateDraftGrade(Ryan.grade)?.displayGrade : null,
+        Aleks?.gradePublished ? calculateDraftGrade(Aleks.grade)?.displayGrade : null,
+      ]);
 
       return {
         entry: {
@@ -151,7 +648,19 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
           id: `consensus-${sourceOfTruth.id}`,
           rank: null,
           posRank: null,
+          grade: null,
+          writeup: { strengths: "", weaknesses: "", rundown: "" },
+          writeupPublished: false,
+          gradePublished: averageFinalGrade !== null,
+          gradeSummary: averageFinalGrade !== null ? { finalGrade: averageFinalGrade } : undefined,
           bigDiscrepency: rankDiscrepency > 10,
+          discWriteup: rankDiscrepency > 10
+            ? this.cloneConsensusDiscrepancyWriteup(this.findConsensusDiscrepancyWriteup(year, sourceOfTruth.playerName) ?? { ryanWriteup: "", aleksWriteup: "", published: false })
+            : undefined,
+          consensusRankingContext: {
+            Ryan: Ryan ? { rank: Ryan.rank, posRank: Ryan.posRank } : undefined,
+            Aleks: Aleks ? { rank: Aleks.rank, posRank: Aleks.posRank } : undefined,
+          },
         },
         averageRank,
         averagePosRank,
@@ -580,6 +1089,15 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
     return Ok([...this.videos].sort((first, second) => second.createdAt.getTime() - first.createdAt.getTime()));
   }
 
+  async getVideoTags(): Promise<Result<string[], ArticleError>> {
+    const tags = new Set<string>();
+    this.videos.forEach((video) => {
+      video.tags.forEach((tag) => tags.add(tag));
+    });
+
+    return Ok([...tags].sort((a, b) => a.localeCompare(b)));
+  }
+
   async filterYoutubeVideos(query: VideoQuery): Promise<Result<Video[], ArticleError>> {
     const filtered = this.videos.filter((video) => {
       if (query.keyword) {
@@ -594,6 +1112,13 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
         const videoTags = video.tags.map((tag) => tag.toLowerCase());
         const requiredTags = query.tags.map((tag) => tag.toLowerCase());
         if (!requiredTags.every((tag) => videoTags.includes(tag))) {
+          return false;
+        }
+      }
+
+      if (query.dateRange) {
+        const createdAt = video.createdAt.getTime();
+        if (createdAt < query.dateRange.from.getTime() || createdAt > query.dateRange.to.getTime()) {
           return false;
         }
       }
@@ -674,12 +1199,85 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
         height: entry.height,
         weight: entry.weight,
         bigDiscrepency: entry.bigDiscrepency ?? false,
+        discWriteup: entry.discWriteup ? this.cloneConsensusDiscrepancyWriteup(entry.discWriteup) : undefined,
+        consensusRankingContext: entry.consensusRankingContext,
       })),
     };
     return Ok(consensusBigBoard);
   }
+
+  async getConsensusDiscrepancyWriteup(year: number, playerName: string): Promise<Result<ConsensusDiscrepancyWriteup, BigBoardError>> {
+    const writeup = this.findConsensusDiscrepancyWriteup(year, playerName);
+    return writeup
+      ? Ok(this.cloneConsensusDiscrepancyWriteup(writeup))
+      : Err(PlayerNotFound(`Consensus discrepancy writeup for ${playerName} in ${year} was not found.`));
+  }
+
+  async saveConsensusDiscrepancyWriteup(year: number, playerName: string, writeup: ConsensusDiscrepancyWriteup): Promise<Result<ConsensusDiscrepancyWriteup, BigBoardError>> {
+    const next = this.cloneConsensusDiscrepancyWriteup(writeup);
+    const index = this.consensusDiscrepancyWriteups.findIndex((record) => record.year === year && record.playerName === playerName);
+    if (index === -1) {
+      this.consensusDiscrepancyWriteups.push({ year, playerName, writeup: next });
+    } else {
+      this.consensusDiscrepancyWriteups[index] = { year, playerName, writeup: next };
+    }
+    return Ok(this.cloneConsensusDiscrepancyWriteup(next));
+  }
+
+  async publishConsensusDiscrepancyWriteup(year: number, playerName: string): Promise<Result<ConsensusDiscrepancyWriteup, BigBoardError>> {
+    const existing = this.findConsensusDiscrepancyWriteup(year, playerName);
+    if (!existing) {
+      return Err(PlayerNotFound(`Consensus discrepancy writeup for ${playerName} in ${year} was not found.`));
+    }
+    const next = { ...existing, published: true };
+    return this.saveConsensusDiscrepancyWriteup(year, playerName, next);
+  }
+
+  private cloneNewsletter(newsletter: Newsletter): Newsletter {
+    return {
+      ...newsletter,
+      date: newsletter.date ? new Date(newsletter.date) : null,
+      articleIds: [...newsletter.articleIds],
+      videoIds: [...newsletter.videoIds],
+      createdAt: new Date(newsletter.createdAt),
+      updatedAt: new Date(newsletter.updatedAt),
+      sentAt: newsletter.sentAt ? new Date(newsletter.sentAt) : undefined,
+    };
+  }
+
+  async createNewsletter(newsletter: Newsletter): Promise<Result<Newsletter, NewsletterError>> {
+    if (this.newsletters.some((existing) => existing.id === newsletter.id)) {
+      return Err(DuplicateNewsletter(`Newsletter with id "${newsletter.id}" already exists.`));
+    }
+
+    this.newsletters.push(this.cloneNewsletter(newsletter));
+    return Ok(this.cloneNewsletter(newsletter));
+  }
+
+  async updateNewsletter(newsletter: Newsletter): Promise<Result<Newsletter, NewsletterError>> {
+    const index = this.newsletters.findIndex((existing) => existing.id === newsletter.id);
+    if (index === -1) {
+      return Err(NewsletterNotFound(`Newsletter with id "${newsletter.id}" not found.`));
+    }
+
+    this.newsletters[index] = this.cloneNewsletter(newsletter);
+    return Ok(this.cloneNewsletter(newsletter));
+  }
+
+  async getNewsletter(id: string): Promise<Result<Newsletter, NewsletterError>> {
+    const newsletter = this.newsletters.find((existing) => existing.id === id);
+    return newsletter
+      ? Ok(this.cloneNewsletter(newsletter))
+      : Err(NewsletterNotFound(`Newsletter with id "${id}" not found.`));
+  }
+
+  async listNewsletters(): Promise<Result<Newsletter[], NewsletterError>> {
+    return Ok([...this.newsletters]
+      .sort((first, second) => second.updatedAt.getTime() - first.updatedAt.getTime())
+      .map((newsletter) => this.cloneNewsletter(newsletter)));
+  }
 }
 
-export function CreateInMemoryOnDraftRepository(): IOnDraftRepository {
-  return new InMemoryOnDraftRepository();
+export function CreateInMemoryOnDraftRepository(options?: InMemoryRepositoryOptions): IOnDraftRepository {
+  return new InMemoryOnDraftRepository(options);
 }

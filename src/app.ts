@@ -5,7 +5,7 @@ import Layouts from "express-ejs-layouts";
 import { IAuthController } from "./auth/AuthController";
 import { VerificationResendRateLimiter } from "./auth/VerificationResendRateLimiter";
 import { IApp } from "./contracts";
-import { IOnDraftController } from "./controller/OnDraftController";
+import { IOnDraftController, type AdminDashboardTab } from "./controller/OnDraftController";
 import {
   clientIp,
   compositeRateLimitKey,
@@ -14,7 +14,7 @@ import {
   RateLimiter,
 } from "./security/RateLimiter";
 import { TurnstileVerifier } from "./security/Turnstile";
-import { ARTICLE_PDF_MAX_BYTES, articleUpload } from "./uploads/articlePdfUpload";
+import { ARTICLE_HTML_IMAGE_MAX_BYTES, ARTICLE_PDF_MAX_BYTES, articleHtmlImageUpload, articleUpload } from "./uploads/articlePdfUpload";
 import { formatRelativeTime } from "./view/formatRelativeTime";
 import {
   getAuthenticatedUser,
@@ -24,8 +24,15 @@ import {
   OnDraftSessionStore,
   STANDARD_SESSION_MAX_AGE_MS,
 } from "./session/OnDraftSession";
+import { CreateHelmetAssetService, InvalidHelmetKeyError, type IHelmetAssetService } from "./service/HelmetAssetService";
+import {
+  CreateArticleHtmlImageAssetService,
+  InvalidArticleHtmlImageKeyError,
+  type IArticleHtmlImageAssetService,
+} from "./service/ArticleHtmlImageAssetService";
 import { ILoggingService } from "./service/LoggingService";
-import type { ITurnstileConfig } from "./config/AppConfig";
+import type { AnalyticsCategory, AnalyticsPeriod } from "./service/UmamiAnalyticsService";
+import type { IAnalyticsConfig, ITurnstileConfig } from "./config/AppConfig";
 
 type AsyncRequestHandler = RequestHandler;
 
@@ -50,6 +57,19 @@ function sessionSecret(): string {
   }
 
   return "ondraft-template-secret";
+}
+
+function xmlEscape(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function cdata(value: string): string {
+  return `<![CDATA[${value.replace(/\]\]>/g, "]]]]><![CDATA[>")}]]>`;
 }
 
 class ExpressApp implements IApp {
@@ -104,6 +124,9 @@ class ExpressApp implements IApp {
     private readonly sessionStore?: session.Store,
     private readonly turnstileConfig: ITurnstileConfig = { siteKey: null, secretKey: null, verificationDisabled: false },
     private readonly siteBaseUrl = "http://localhost:3000",
+    private readonly helmetAssets: IHelmetAssetService = CreateHelmetAssetService(),
+    private readonly articleHtmlImages: IArticleHtmlImageAssetService = CreateArticleHtmlImageAssetService(),
+    private readonly analyticsConfig: IAnalyticsConfig = { umamiWebsiteId: null, umamiApiKey: null, umamiApiBaseUrl: "https://api.umami.is/v1" },
   ) {
     this.app = express();
     this.turnstileVerifier = new TurnstileVerifier(this.turnstileConfig, this.logger);
@@ -117,6 +140,41 @@ class ExpressApp implements IApp {
     this.app.set("trust proxy", process.env.NODE_ENV === "production" ? 1 : false);
     this.app.use((req, res, next) => this.setSecurityHeaders(req, res, next));
     this.app.use((req, res, next) => this.blockCrossOriginStateChanges(req, res, next));
+    this.app.get(
+      "/generated/helmets/v1/:helmetKey.png",
+      asyncHandler(async (req, res) => {
+        const helmetKey = typeof req.params.helmetKey === "string" ? req.params.helmetKey : "";
+        try {
+          const helmetPath = await this.helmetAssets.generatedHelmetPath(helmetKey);
+          res.setHeader("Cache-Control", this.helmetAssets.cacheControlHeader());
+          res.type("png");
+          res.sendFile(helmetPath);
+        } catch (error) {
+          if (error instanceof InvalidHelmetKeyError) {
+            res.status(404).send("Helmet not found.");
+            return;
+          }
+          throw error;
+        }
+      }),
+    );
+    this.app.get(
+      "/generated/article-images/v1/:imageKey",
+      asyncHandler(async (req, res) => {
+        const imageKey = typeof req.params.imageKey === "string" ? req.params.imageKey : "";
+        try {
+          const imagePath = await this.articleHtmlImages.generatedImagePath(imageKey);
+          res.setHeader("Cache-Control", this.articleHtmlImages.cacheControlHeader());
+          res.sendFile(imagePath);
+        } catch (error) {
+          if (error instanceof InvalidArticleHtmlImageKeyError || (error as NodeJS.ErrnoException).code === "ENOENT") {
+            res.status(404).send("Article image not found.");
+            return;
+          }
+          throw error;
+        }
+      }),
+    );
     this.app.use(express.static(path.join(process.cwd(), "src/static")));
     this.app.use("/vendor/htmx", express.static(path.join(process.cwd(), "node_modules", "htmx.org", "dist")));
     this.app.use("/vendor/alpinejs", express.static(path.join(process.cwd(), "node_modules", "alpinejs", "dist")));
@@ -152,6 +210,23 @@ class ExpressApp implements IApp {
   }
 
   private setSecurityHeaders(_req: Request, res: Response, next: NextFunction): void {
+    res.setHeader(
+      "Content-Security-Policy",
+      [
+        "default-src 'self'",
+        "base-uri 'self'",
+        "object-src 'none'",
+        "frame-ancestors 'none'",
+        "form-action 'self'",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://cloud.umami.is",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: https://img.youtube.com https://i.ytimg.com",
+        "font-src 'self' data:",
+        "connect-src 'self' https://challenges.cloudflare.com https://www.googleapis.com https://cloud.umami.is https://api.umami.is",
+        "frame-src https://challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com",
+        "upgrade-insecure-requests",
+      ].join("; "),
+    );
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("X-Frame-Options", "DENY");
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
@@ -173,6 +248,14 @@ class ExpressApp implements IApp {
 
     const source = req.get("origin") ?? req.get("referer");
     if (!source) {
+      if (process.env.NODE_ENV === "production") {
+        this.logger.warn("Blocked state-changing request without origin or referrer");
+        res.status(403).render("ondraft/partials/error", {
+          message: "Request blocked.",
+          layout: false,
+        });
+        return;
+      }
       next();
       return;
     }
@@ -251,6 +334,23 @@ class ExpressApp implements IApp {
     });
   }
 
+  private handleArticleHtmlImageUpload(req: Request, res: Response, next: NextFunction): void {
+    articleHtmlImageUpload.single("htmlImage")(req, res, (err: unknown) => {
+      if (!err) {
+        next();
+        return;
+      }
+
+      const message = err instanceof Error && err.name === "MulterError" && err.message === "File too large"
+        ? `HTML article images must be ${Math.floor(ARTICLE_HTML_IMAGE_MAX_BYTES / 1024 / 1024)} MB or smaller.`
+        : err instanceof Error
+          ? err.message
+          : "Unable to upload the HTML article image.";
+
+      res.status(400).json({ error: message });
+    });
+  }
+
   private limitVerificationResend(req: Request, res: Response, next: NextFunction): void {
     const result = this.verificationResendRateLimiter.check(req);
     if (!result.limited) {
@@ -270,21 +370,61 @@ class ExpressApp implements IApp {
   private exposeSessionLocals(req: Request, res: Response, next: NextFunction): void {
     const browserSession = touchOnDraftSession(sessionStore(req));
     const currentAbsoluteUrl = new URL(req.originalUrl || req.path, this.siteBaseUrl).toString();
-    const defaultPreviewImageUrl = new URL("/images/brand/ondraft-logo.png", this.siteBaseUrl).toString();
+    const defaultPreviewImageUrl = new URL("/images/brand/OnDraftLogo-cropped.png", this.siteBaseUrl).toString();
     res.locals.isAdmin = isAdminSession(browserSession);
     res.locals.currentPath = req.path;
     res.locals.currentAbsoluteUrl = currentAbsoluteUrl;
     res.locals.defaultPreviewImageUrl = defaultPreviewImageUrl;
     res.locals.relativeTime = formatRelativeTime;
     res.locals.turnstileSiteKey = this.turnstileConfig.verificationDisabled ? null : this.turnstileConfig.siteKey;
+    res.locals.umamiWebsiteId = this.analyticsConfig.umamiWebsiteId;
     next();
   }
 
-  private renderInfoModal(res: Response, modal: "about" | "privacy" | "contact"): void {
+  private renderInfoModal(res: Response, modal: "about" | "privacy" | "contact" | "terms"): void {
     res.render("ondraft/partials/infoModal", {
       layout: false,
       modal,
     });
+  }
+
+  private renderInfoPage(req: Request, res: Response, modal: "privacy" | "contact" | "terms"): void {
+    if (req.get("HX-Request") === "true") {
+      this.renderInfoModal(res, modal);
+      return;
+    }
+
+    const browserSession = recordPageView(sessionStore(req));
+    const title = modal === "privacy"
+      ? "Privacy Policy"
+      : modal === "terms"
+        ? "Terms and Community Guidelines"
+        : "Contact";
+    const description = modal === "privacy"
+      ? "How OnDraft Football collects, uses, and protects user information."
+      : modal === "terms"
+        ? "The terms and community expectations for using OnDraft Football."
+        : "Contact OnDraft Football for support, feedback, and business inquiries.";
+    res.render("ondraft/infoPage", {
+      session: browserSession,
+      modal,
+      metaTitle: `${title} | OnDraft Football`,
+      metaDescription: description,
+    });
+  }
+
+  private adminDashboardTab(value: unknown): AdminDashboardTab {
+    return value === "content" || value === "newsletter" || value === "analytics" ? value : "users";
+  }
+
+  private analyticsCategory(value: unknown): AnalyticsCategory {
+    return value === "articles" || value === "videos" || value === "home" || value === "draft-board" || value === "taproom"
+      ? value
+      : "all";
+  }
+
+  private analyticsPeriod(value: unknown): AnalyticsPeriod {
+    return value === "week" || value === "month" || value === "all" ? value : "month";
   }
 
   private registerRoutes(): void {
@@ -301,11 +441,17 @@ class ExpressApp implements IApp {
       "/about",
       asyncHandler(async (req, res) => {
         const browserSession = recordPageView(sessionStore(req));
-        res.render("ondraft/about", { session: browserSession });
+        res.render("ondraft/about", {
+          session: browserSession,
+          metaTitle: "About OnDraft Football",
+          metaDescription: "Learn about OnDraft Football, a student-led NFL and NFL Draft media project with articles, videos, scouting work, and community discussion.",
+          metaKeywords: ["OnDraft Football", "NFL Draft media", "football analysts", "NFL scouting", "sports media"],
+        });
       }),
     );
-    this.app.get("/privacy", (_req, res) => this.renderInfoModal(res, "privacy"));
-    this.app.get("/contact", (_req, res) => this.renderInfoModal(res, "contact"));
+    this.app.get("/privacy", (req, res) => this.renderInfoPage(req, res, "privacy"));
+    this.app.get("/contact", (req, res) => this.renderInfoPage(req, res, "contact"));
+    this.app.get("/terms", (req, res) => this.renderInfoPage(req, res, "terms"));
 
     this.app.get(
       "/settings",
@@ -520,6 +666,78 @@ class ExpressApp implements IApp {
       asyncHandler(async (req, res) => {
         const token = typeof req.body.token === "string" ? req.body.token : "";
         await this.authController.unsubscribeMailingListFromRequest(res, token, sessionStore(req));
+      }),
+    );
+
+    this.app.get(
+      "/admin",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.showAdminDashboard(
+          res,
+          browserSession,
+          this.adminDashboardTab(req.query.tab),
+          this.analyticsCategory(req.query.category),
+          this.analyticsPeriod(req.query.period),
+        );
+      }),
+    );
+
+    this.app.get(
+      "/admin/tabs/:tab",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = touchOnDraftSession(sessionStore(req));
+        const tab = this.adminDashboardTab(req.params.tab);
+        if (tab === "users") {
+          await this.authController.showAdminUsers(res, sessionStore(req), false);
+          return;
+        }
+
+        await this.controller.showAdminDashboardTab(res, browserSession, tab, this.analyticsCategory(req.query.category), this.analyticsPeriod(req.query.period));
+      }),
+    );
+
+    this.app.post(
+      "/admin/newsletters/drafts",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = touchOnDraftSession(sessionStore(req));
+        await this.controller.saveNewsletterDraft(req, res, browserSession);
+      }),
+    );
+
+    this.app.get(
+      "/admin/newsletters/:id/edit",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = touchOnDraftSession(sessionStore(req));
+        await this.controller.showNewsletterDraftEditor(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/admin/newsletters/send",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = touchOnDraftSession(sessionStore(req));
+        await this.controller.sendNewsletter(req, res, browserSession);
       }),
     );
 
@@ -802,6 +1020,90 @@ class ExpressApp implements IApp {
       }),
     );
 
+    this.app.post(
+      "/settings/delete-account",
+      asyncHandler(async (req, res) => {
+        await this.authController.deleteAccountFromSettings(req, res, sessionStore(req));
+      }),
+    );
+
+    this.app.get("/robots.txt", (_req, res) => {
+      res.type("text/plain");
+      res.send([
+        "User-agent: *",
+        "Allow: /",
+        "Disallow: /admin",
+        "Disallow: /settings",
+        "Disallow: /login",
+        "Disallow: /register",
+        "Disallow: /forgot-password",
+        "Disallow: /reset-password",
+        "Disallow: /bookmarks",
+        "Disallow: /articles/new",
+        "Disallow: /articles/filter",
+        "Disallow: /videos/new",
+        "Disallow: /hottakes/filter",
+        "Disallow: /bigboard/edit",
+        "Sitemap: " + new URL("/sitemap.xml", this.siteBaseUrl).toString(),
+        "",
+      ].join("\n"));
+    });
+
+    this.app.get("/sitemap.xml", asyncHandler(async (_req, res) => {
+      const staticUrls = ["/", "/articles", "/videos", "/bigboard", "/hottakes", "/about", "/privacy", "/terms", "/contact"];
+      const dynamicUrls = await this.controller.publicSitemapEntries();
+      const entries: Array<{ href: string; updatedAt?: Date }> = [
+        ...staticUrls.map((href) => ({ href })),
+        ...dynamicUrls,
+      ];
+      res.type("application/xml");
+      res.send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${entries
+        .map((entry) => {
+          const loc = xmlEscape(new URL(entry.href, this.siteBaseUrl).toString());
+          const lastmod = entry.updatedAt ? `<lastmod>${xmlEscape(entry.updatedAt.toISOString())}</lastmod>` : "";
+          return `  <url><loc>${loc}</loc>${lastmod}</url>`;
+        })
+        .join("\n")}\n</urlset>\n`);
+    }));
+
+    this.app.get("/feed.xml", asyncHandler(async (_req, res) => {
+      const items = await this.controller.publicFeedItems();
+      res.type("application/rss+xml");
+      res.send(`<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0"><channel><title>OnDraft Football</title><link>${this.siteBaseUrl}</link><description>NFL and NFL Draft analysis from OnDraft Football.</description>${items
+        .map((item) => `<item><title>${cdata(item.title)}</title><link>${xmlEscape(new URL(item.href, this.siteBaseUrl).toString())}</link><guid>${xmlEscape(new URL(item.href, this.siteBaseUrl).toString())}</guid><description>${cdata(item.description)}</description><pubDate>${item.date.toUTCString()}</pubDate></item>`)
+        .join("")}</channel></rss>`);
+    }));
+
+    this.app.get("/.well-known/security.txt", (_req, res) => {
+      res.type("text/plain");
+      res.send([
+        "Contact: mailto:support@ondraftfootball.com",
+        "Preferred-Languages: en",
+        "Canonical: " + new URL("/.well-known/security.txt", this.siteBaseUrl).toString(),
+        "",
+      ].join("\n"));
+    });
+
+    this.app.post(
+      "/articles/html-images",
+      (req, res, next) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        this.handleArticleHtmlImageUpload(req, res, next);
+      },
+      asyncHandler(async (req, res) => {
+        if (!req.file) {
+          res.status(400).json({ error: "Choose an image before uploading." });
+          return;
+        }
+
+        const storedImage = await this.articleHtmlImages.storeUploadedImage(req.file);
+        res.json(storedImage);
+      }),
+    );
+
     this.app.get(
       "/articles/:id/edit",
       asyncHandler(async (req, res) => {
@@ -1020,6 +1322,18 @@ class ExpressApp implements IApp {
     );
 
     this.app.post(
+      "/bigboard/edit/player",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.saveBigBoardEntry(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
       "/bigboard/edit/autosave",
       asyncHandler(async (req, res) => {
         if (!this.requireAdmin(req, res)) {
@@ -1052,6 +1366,54 @@ class ExpressApp implements IApp {
 
         const browserSession = recordPageView(sessionStore(req));
         await this.controller.publishBigBoardWriteup(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/bigboard/edit/publish-grade",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.publishBigBoardGrade(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/bigboard/consensus/discrepancy-writeup",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.saveConsensusDiscrepancyWriteup(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/bigboard/consensus/discrepancy-writeup/publish",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.publishConsensusDiscrepancyWriteup(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/bigboard/edit/delete-entry",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.deleteBigBoardEntryFromEditor(req, res, browserSession);
       }),
     );
 
@@ -1123,7 +1485,7 @@ class ExpressApp implements IApp {
           isAdmin: isAdminSession(browserSession),
           currentPath: req.path,
           currentAbsoluteUrl,
-          defaultPreviewImageUrl: new URL("/images/brand/ondraft-logo.png", this.siteBaseUrl).toString(),
+          defaultPreviewImageUrl: new URL("/images/brand/OnDraftLogo-cropped.png", this.siteBaseUrl).toString(),
           relativeTime: formatRelativeTime,
           turnstileSiteKey: this.turnstileConfig.verificationDisabled ? null : this.turnstileConfig.siteKey,
           metaTitle: "Save too large | OnDraft Football",
@@ -1152,6 +1514,7 @@ export function CreateApp(
   sessionStore?: session.Store,
   turnstileConfig?: ITurnstileConfig,
   siteBaseUrl?: string,
+  analyticsConfig?: IAnalyticsConfig,
 ): IApp {
-  return new ExpressApp(controller, authController, logger, sessionStore, turnstileConfig, siteBaseUrl);
+  return new ExpressApp(controller, authController, logger, sessionStore, turnstileConfig, siteBaseUrl, undefined, undefined, analyticsConfig);
 }

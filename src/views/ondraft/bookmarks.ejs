@@ -45,17 +45,18 @@
             <li class="od-card grid overflow-hidden transition hover:-translate-y-0.5 hover:border-draft-gold hover:shadow-editorial sm:grid-cols-[14rem_minmax(0,1fr)]">
               <a class="group block overflow-hidden bg-draft-ink" href="/articles/<%= article.id %>">
                 <% if (article.imageUrl) { %>
-                  <img class="article-list-thumb aspect-[16/10]" src="<%= article.imageUrl %>" alt="" />
+                  <img class="article-list-thumb aspect-[16/10]" src="<%= article.imageUrl %>" alt="" loading="lazy" decoding="async" />
                 <% } else { %>
                   <span class="article-list-thumb article-list-thumb-empty aspect-[16/10]">
-                    <span class="grid size-14 place-items-center overflow-hidden rounded-lg bg-white/90 ring-1 ring-slate-200 dark:bg-white/10 dark:ring-white/10" aria-hidden="true">
-                      <img class="h-12 w-14 object-contain" src="/images/brand/ondraft-logo.png" alt="" />
-                    </span>
+                    <img class="h-16 w-20 object-contain drop-shadow-sm" src="/images/brand/OnDraftLogo-cropped.png" alt="" loading="lazy" decoding="async" />
                   </span>
                 <% } %>
               </a>
               <div class="grid content-start gap-3 p-5">
-                <p class="m-0 text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Article</p>
+                <div class="flex items-start justify-between gap-3">
+                  <p class="m-0 text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Article</p>
+                  <%- include("partials/bookmarkButton", { bookmark: { type: "article", articleId: article.id }, bookmarked: true }) %>
+                </div>
                 <a class="font-display text-2xl font-black leading-tight text-slate-950 no-underline transition hover:text-draft-amber dark:text-white dark:hover:text-draft-gold" href="/articles/<%= article.id %>"><%= article.title %></a>
                 <p class="m-0 text-sm font-bold text-slate-600 dark:text-slate-300">by <%= article.author %></p>
                 <% if (article.writeup) { %>
@@ -83,7 +84,10 @@
             <li class="od-card grid gap-3 p-5 transition hover:-translate-y-0.5 hover:border-draft-gold hover:shadow-editorial">
               <div class="flex flex-wrap items-center justify-between gap-3">
                 <p class="m-0 text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Hot Take</p>
-                <span class="text-sm font-bold text-slate-600 dark:text-slate-300">by <%= post.userName %> · <%= formatRelative(post.createdAt) %></span>
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-bold text-slate-600 dark:text-slate-300">by <%= post.userName %> &middot; <%= formatRelative(post.createdAt) %></span>
+                  <%- include("partials/bookmarkButton", { bookmark: { type: "forumPost", forumPostId: post.id }, bookmarked: true }) %>
+                </div>
               </div>
               <a class="font-display text-2xl font-bold leading-snug text-slate-950 no-underline transition hover:text-draft-amber dark:text-white dark:hover:text-draft-gold" href="/hottakes#hot-take-<%= post.id %>"><%= post.content %></a>
             </li>
