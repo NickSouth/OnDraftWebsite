@@ -77,11 +77,11 @@
     <% if (currentIsAdmin) { %>
       <div class="mt-2 border-t border-slate-200 pt-2 dark:border-white/10">
         <p class="mb-1 px-2 text-[0.62rem] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Admin</p>
-        <% const adminUsersActive = activePath === "/admin/users" || activePath.startsWith("/admin/users/"); %>
+        <% const adminDashboardActive = activePath === "/admin" || activePath.startsWith("/admin/"); %>
         <% const newArticleActive = activePath === "/articles/new"; %>
         <% const editBoardActive = activePath === "/bigboard/edit"; %>
         <div class="grid gap-1">
-          <a href="/admin/users" class="od-shell-link flex px-2 py-1.5 text-xs leading-tight <%= adminUsersActive ? "is-active" : "" %>" <%= adminUsersActive ? 'aria-current="page"' : "" %>>Manage users</a>
+          <a href="/admin" class="od-shell-link flex px-2 py-1.5 text-xs leading-tight <%= adminDashboardActive ? "is-active" : "" %>" <%= adminDashboardActive ? 'aria-current="page"' : "" %>>Admin Dashboard</a>
           <a href="/articles/new" class="od-shell-link flex px-2 py-1.5 text-xs leading-tight <%= newArticleActive ? "is-active" : "" %>" <%= newArticleActive ? 'aria-current="page"' : "" %>>Create article</a>
           <a href="/bigboard/edit" class="od-shell-link flex px-2 py-1.5 text-xs leading-tight <%= editBoardActive ? "is-active" : "" %>" <%= editBoardActive ? 'aria-current="page"' : "" %>>Edit draft board</a>
         </div>

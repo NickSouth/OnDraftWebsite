@@ -111,6 +111,11 @@ export interface AdminUserListItem {
   registeredAt: string;
 }
 
+export interface MailingListNewsletterRecipient {
+  email: string;
+  unsubscribeUrl: string;
+}
+
 export interface IAuthService {
   authenticate(input: LoginInput): Promise<Result<IAuthenticatedUser, AuthError>>;
   register(input: RegisterInput): Promise<Result<IAuthenticatedUser, AuthError>>;
@@ -127,6 +132,7 @@ export interface IAuthService {
   createMailingListUnsubscribeUrl(input: CreateMailingListUnsubscribeUrlInput): Promise<Result<string | null, AuthError>>;
   unsubscribeMailingList(input: UnsubscribeMailingListInput): Promise<Result<void, AuthError>>;
   exportSubscribedMailingListCsv(): Promise<Result<string, AuthError>>;
+  listNewsletterRecipients(): Promise<Result<MailingListNewsletterRecipient[], AuthError>>;
   listAdminUsers(): Promise<Result<AdminUserListItem[], AuthError>>;
   banUser(input: BanUserInput): Promise<Result<IAuthenticatedUser, AuthError>>;
   unbanUser(input: UnbanUserInput): Promise<Result<IAuthenticatedUser, AuthError>>;
@@ -143,6 +149,10 @@ class NullEmailService implements IEmailService {
   }
 
   async sendPasswordResetEmail(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  async sendNewsletterEmail(): Promise<void> {
     return Promise.resolve();
   }
 }
@@ -757,6 +767,21 @@ class AuthService implements IAuthService {
     return Ok([header, ...rows]
       .map((row) => row.map((value) => this.escapeCsvCell(value)).join(","))
       .join("\n"));
+  }
+
+  async listNewsletterRecipients(): Promise<Result<MailingListNewsletterRecipient[], AuthError>> {
+    const subscriptionsResult = await this.users.listMailingListSubscriptionsByStatus("subscribed");
+    if (subscriptionsResult.ok === false) {
+      return Err(UnexpectedDependencyError(subscriptionsResult.value.message));
+    }
+
+    return Ok(subscriptionsResult.value.map((subscription) => ({
+      email: subscription.email,
+      unsubscribeUrl: new URL(
+        `/mailing-list/unsubscribe?token=${encodeURIComponent(this.createMailingListUnsubscribeToken(subscription))}`,
+        this.emailConfig.appBaseUrl,
+      ).toString(),
+    })));
   }
 
   async listAdminUsers(): Promise<Result<AdminUserListItem[], AuthError>> {

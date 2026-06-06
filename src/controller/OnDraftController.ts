@@ -2,9 +2,10 @@ import type { Request, Response } from "express";
 import type { IOnDraftBrowserSession } from "../session/OnDraftSession";
 import { isAdminSession, isVerifiedUserSession } from "../session/OnDraftSession";
 import type { AdminUserListItem, IAuthService } from "../auth/AuthService";
-import type { BigBoardEditableEntryInput, CreateArticleInput, CreateYoutubeVideoInput, IOnDraftService, SaveBigBoardEntriesInput } from "../service/OnDraftService";
+import type { BigBoardEditableEntryInput, CreateArticleInput, CreateYoutubeVideoInput, IOnDraftService, NewsletterInput, SaveBigBoardEntriesInput } from "../service/OnDraftService";
 import type { IUserPreferenceService, UserPreferenceError } from "../service/UserPreferenceService";
 import type { ILoggingService } from "../service/LoggingService";
+import type { AnalyticsCategory, IAnalyticsService } from "../service/UmamiAnalyticsService";
 import { ArticleError, BigBoardError, ForumPostError } from "../repository/OnDraftRepository";
 import { publicArticleUploadUrl } from "../uploads/articlePdfUpload";
 import { BIG_BOARD_CREATORS, POSITIONS, type Article, type ArticleContent, type ArticleFilter, type BigBoard, type BigBoardCreator, type BigBoardEntry, type ForumPost, type ForumPostFilter, type Video, type VideoQuery } from "../model/OnDraftContent";
@@ -79,6 +80,11 @@ type BigBoardEditorValidationIssue = {
 
 export interface IOnDraftController {
   publicFeedItems(): Promise<Array<{ title: string; description: string; href: string; date: Date }>>;
+  showAdminDashboard(res: Response, session: IOnDraftBrowserSession, activeTab?: AdminDashboardTab): Promise<void>;
+  showAdminDashboardTab(res: Response, session: IOnDraftBrowserSession, tab: AdminDashboardTab, category?: AnalyticsCategory): Promise<void>;
+  showNewsletterDraftEditor(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  saveNewsletterDraft(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  sendNewsletter(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showHome(res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showPopularArticles(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   showArticles(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
@@ -131,12 +137,15 @@ export interface IOnDraftController {
   getSavedSchools(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
 }
 
+export type AdminDashboardTab = "users" | "content" | "newsletter" | "analytics";
+
 class OnDraftController implements IOnDraftController {
   constructor(
     private readonly service: IOnDraftService,
     private readonly userPreferences: IUserPreferenceService,
     private readonly logger: ILoggingService,
     private readonly authService: IAuthService,
+    private readonly analytics?: IAnalyticsService,
   ) {}
 
   private mapArticleErrorToStatusCode(error: ArticleError): number {
@@ -227,6 +236,13 @@ class OnDraftController implements IOnDraftController {
 
   private formString(value: unknown): string {
     return typeof value === "string" ? value : "";
+  }
+
+  private formStrings(value: unknown): string[] {
+    if (Array.isArray(value)) {
+      return value.filter((entry): entry is string => typeof entry === "string");
+    }
+    return typeof value === "string" && value.trim() ? [value] : [];
   }
 
   private formBoolean(value: unknown): boolean {
@@ -817,6 +833,137 @@ class OnDraftController implements IOnDraftController {
     }
 
     return [];
+  }
+
+  private adminDashboardTabs(activeTab: AdminDashboardTab) {
+    return [
+      { id: "users", label: "Manage Users", href: "/admin/tabs/users" },
+      { id: "content", label: "Create Content", href: "/admin/tabs/content" },
+      { id: "newsletter", label: "Newsletter", href: "/admin/tabs/newsletter" },
+      { id: "analytics", label: "Analytics", href: "/admin/tabs/analytics" },
+    ].map((tab) => ({ ...tab, active: tab.id === activeTab }));
+  }
+
+  async showAdminDashboard(res: Response, session: IOnDraftBrowserSession, activeTab: AdminDashboardTab = "users"): Promise<void> {
+    res.render("ondraft/adminDashboard", {
+      session,
+      isAdmin: isAdminSession(session),
+      activeTab,
+      tabs: this.adminDashboardTabs(activeTab),
+    });
+  }
+
+  async showAdminDashboardTab(res: Response, _session: IOnDraftBrowserSession, tab: AdminDashboardTab, category: AnalyticsCategory = "all"): Promise<void> {
+    if (tab === "content") {
+      res.render("ondraft/partials/adminCreateContent", { layout: false });
+      return;
+    }
+
+    if (tab === "newsletter") {
+      await this.renderAdminNewsletter(res);
+      return;
+    }
+
+    await this.renderAdminAnalytics(res, category);
+  }
+
+  private async renderAdminAnalytics(res: Response, category: AnalyticsCategory = "all"): Promise<void> {
+    const summary = this.analytics ? await this.analytics.getSummary(category) : null;
+    res.render("ondraft/partials/adminAnalytics", {
+      layout: false,
+      category,
+      summary: summary?.ok === true ? summary.value : null,
+      errorMessage: summary?.ok === false ? summary.value.message : null,
+    });
+  }
+
+  private parseNewsletterDate(value: unknown): Date | undefined {
+    const raw = this.formString(value);
+    if (!raw) {
+      return undefined;
+    }
+    const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) {
+      return new Date(raw);
+    }
+    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12);
+  }
+
+  private buildNewsletterInput(req: Request): NewsletterInput {
+    return {
+      id: this.formString(req.body.id) || undefined,
+      date: this.parseNewsletterDate(req.body.date),
+      writeup: this.formString(req.body.writeup),
+      articleIds: this.formStrings(req.body.articleIds),
+      videoIds: this.formStrings(req.body.videoIds),
+      changelog: this.formString(req.body.changelog),
+    };
+  }
+
+  private async renderAdminNewsletter(
+    res: Response,
+    options: { flashMessage?: string | null; errorMessage?: string | null; values?: Partial<NewsletterInput> } = {},
+  ): Promise<void> {
+    const articlesResult = await this.service.getFilteredArticles({ published: true, sortBy: "date", sortDirection: "desc" });
+    const videosResult = await this.service.filterYoutubeVideos({ sortBy: "date", sortDirection: "desc" });
+    const newslettersResult = await this.service.listNewsletters();
+    res.render("ondraft/partials/adminNewsletter", {
+      layout: false,
+      articles: articlesResult.ok === true ? articlesResult.value.slice(0, 30) : [],
+      videos: videosResult.ok === true ? videosResult.value.slice(0, 30) : [],
+      newsletters: newslettersResult.ok === true ? newslettersResult.value.slice(0, 6) : [],
+      flashMessage: options.flashMessage ?? null,
+      errorMessage: options.errorMessage ?? null,
+      values: options.values ?? {},
+    });
+  }
+
+  async showNewsletterDraftEditor(req: Request, res: Response, _session: IOnDraftBrowserSession): Promise<void> {
+    const newsletterId = this.formString(req.params.id);
+    const newsletter = await this.service.getNewsletter(newsletterId);
+    if (newsletter.ok === false || newsletter.value.status !== "draft") {
+      res.status(404);
+      await this.renderAdminNewsletter(res, { errorMessage: "Newsletter draft not found." });
+      return;
+    }
+
+    await this.renderAdminNewsletter(res, { values: newsletter.value });
+  }
+
+  async saveNewsletterDraft(req: Request, res: Response, _session: IOnDraftBrowserSession): Promise<void> {
+    const input = this.buildNewsletterInput(req);
+    const result = await this.service.saveNewsletterDraft(input);
+    if (result.ok === false) {
+      res.status(400);
+      await this.renderAdminNewsletter(res, { errorMessage: result.value.message, values: input });
+      return;
+    }
+
+    await this.renderAdminNewsletter(res, {
+      flashMessage: "Newsletter draft saved.",
+      values: { ...input, id: result.value.id },
+    });
+  }
+
+  async sendNewsletter(req: Request, res: Response, _session: IOnDraftBrowserSession): Promise<void> {
+    const input = this.buildNewsletterInput(req);
+    const recipients = await this.authService.listNewsletterRecipients();
+    if (recipients.ok === false) {
+      res.status(500);
+      await this.renderAdminNewsletter(res, { errorMessage: "Unable to load newsletter recipients.", values: input });
+      return;
+    }
+
+    const result = await this.service.sendNewsletter(input, recipients.value);
+    if (result.ok === false) {
+      res.status(400);
+      await this.renderAdminNewsletter(res, { errorMessage: result.value.message, values: input });
+      return;
+    }
+
+    await this.renderAdminNewsletter(res, {
+      flashMessage: `Newsletter sent to ${result.value.recipientCount} subscriber${result.value.recipientCount === 1 ? "" : "s"}.`,
+    });
   }
 
   private buildArticleContent(req: Request): ArticleContent {
@@ -2647,6 +2794,7 @@ export function CreateOnDraftController(
   userPreferences: IUserPreferenceService,
   logger: ILoggingService,
   authService: IAuthService,
+  analytics?: IAnalyticsService,
 ): IOnDraftController {
-  return new OnDraftController(service, userPreferences, logger, authService);
+  return new OnDraftController(service, userPreferences, logger, authService, analytics);
 }

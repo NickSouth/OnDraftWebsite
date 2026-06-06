@@ -277,6 +277,25 @@ model Video {
   @@map("videos")
 }
 
+model Newsletter {
+  id             String    @id
+  date           DateTime
+  writeup        String
+  articleIds     String[]  @default([]) @map("article_ids")
+  videoIds       String[]  @default([]) @map("video_ids")
+  changelog      String
+  status         String
+  recipientCount Int       @default(0) @map("recipient_count")
+  sentAt         DateTime? @map("sent_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([date])
+  @@index([updatedAt])
+  @@map("newsletters")
+}
+
 model VideoTag {
   videoId String @map("video_id")
   tagId   String @map("tag_id")

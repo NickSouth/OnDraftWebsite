@@ -5,7 +5,7 @@ import Layouts from "express-ejs-layouts";
 import { IAuthController } from "./auth/AuthController";
 import { VerificationResendRateLimiter } from "./auth/VerificationResendRateLimiter";
 import { IApp } from "./contracts";
-import { IOnDraftController } from "./controller/OnDraftController";
+import { IOnDraftController, type AdminDashboardTab } from "./controller/OnDraftController";
 import {
   clientIp,
   compositeRateLimitKey,
@@ -31,7 +31,8 @@ import {
   type IArticleHtmlImageAssetService,
 } from "./service/ArticleHtmlImageAssetService";
 import { ILoggingService } from "./service/LoggingService";
-import type { ITurnstileConfig } from "./config/AppConfig";
+import type { AnalyticsCategory } from "./service/UmamiAnalyticsService";
+import type { IAnalyticsConfig, ITurnstileConfig } from "./config/AppConfig";
 
 type AsyncRequestHandler = RequestHandler;
 
@@ -112,6 +113,7 @@ class ExpressApp implements IApp {
     private readonly siteBaseUrl = "http://localhost:3000",
     private readonly helmetAssets: IHelmetAssetService = CreateHelmetAssetService(),
     private readonly articleHtmlImages: IArticleHtmlImageAssetService = CreateArticleHtmlImageAssetService(),
+    private readonly analyticsConfig: IAnalyticsConfig = { umamiWebsiteId: null, umamiApiKey: null, umamiApiBaseUrl: "https://api.umami.is/v1" },
   ) {
     this.app = express();
     this.turnstileVerifier = new TurnstileVerifier(this.turnstileConfig, this.logger);
@@ -203,11 +205,11 @@ class ExpressApp implements IApp {
         "object-src 'none'",
         "frame-ancestors 'none'",
         "form-action 'self'",
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://cloud.umami.is",
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: https://img.youtube.com https://i.ytimg.com",
         "font-src 'self' data:",
-        "connect-src 'self' https://challenges.cloudflare.com https://www.googleapis.com",
+        "connect-src 'self' https://challenges.cloudflare.com https://www.googleapis.com https://cloud.umami.is https://api.umami.is",
         "frame-src https://challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com",
         "upgrade-insecure-requests",
       ].join("; "),
@@ -362,6 +364,7 @@ class ExpressApp implements IApp {
     res.locals.defaultPreviewImageUrl = defaultPreviewImageUrl;
     res.locals.relativeTime = formatRelativeTime;
     res.locals.turnstileSiteKey = this.turnstileConfig.verificationDisabled ? null : this.turnstileConfig.siteKey;
+    res.locals.umamiWebsiteId = this.analyticsConfig.umamiWebsiteId;
     next();
   }
 
@@ -395,6 +398,16 @@ class ExpressApp implements IApp {
       metaTitle: `${title} | OnDraft Football`,
       metaDescription: description,
     });
+  }
+
+  private adminDashboardTab(value: unknown): AdminDashboardTab {
+    return value === "content" || value === "newsletter" || value === "analytics" ? value : "users";
+  }
+
+  private analyticsCategory(value: unknown): AnalyticsCategory {
+    return value === "articles" || value === "videos" || value === "home" || value === "draft-board" || value === "taproom"
+      ? value
+      : "all";
   }
 
   private registerRoutes(): void {
@@ -631,6 +644,72 @@ class ExpressApp implements IApp {
       asyncHandler(async (req, res) => {
         const token = typeof req.body.token === "string" ? req.body.token : "";
         await this.authController.unsubscribeMailingListFromRequest(res, token, sessionStore(req));
+      }),
+    );
+
+    this.app.get(
+      "/admin",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.showAdminDashboard(res, browserSession, this.adminDashboardTab(req.query.tab));
+      }),
+    );
+
+    this.app.get(
+      "/admin/tabs/:tab",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = touchOnDraftSession(sessionStore(req));
+        const tab = this.adminDashboardTab(req.params.tab);
+        if (tab === "users") {
+          await this.authController.showAdminUsers(res, sessionStore(req), false);
+          return;
+        }
+
+        await this.controller.showAdminDashboardTab(res, browserSession, tab, this.analyticsCategory(req.query.category));
+      }),
+    );
+
+    this.app.post(
+      "/admin/newsletters/drafts",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = touchOnDraftSession(sessionStore(req));
+        await this.controller.saveNewsletterDraft(req, res, browserSession);
+      }),
+    );
+
+    this.app.get(
+      "/admin/newsletters/:id/edit",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = touchOnDraftSession(sessionStore(req));
+        await this.controller.showNewsletterDraftEditor(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/admin/newsletters/send",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = touchOnDraftSession(sessionStore(req));
+        await this.controller.sendNewsletter(req, res, browserSession);
       }),
     );
 
@@ -1352,6 +1431,7 @@ export function CreateApp(
   sessionStore?: session.Store,
   turnstileConfig?: ITurnstileConfig,
   siteBaseUrl?: string,
+  analyticsConfig?: IAnalyticsConfig,
 ): IApp {
-  return new ExpressApp(controller, authController, logger, sessionStore, turnstileConfig, siteBaseUrl);
+  return new ExpressApp(controller, authController, logger, sessionStore, turnstileConfig, siteBaseUrl, undefined, undefined, analyticsConfig);
 }

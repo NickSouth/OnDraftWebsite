@@ -2,7 +2,7 @@ import request from "supertest";
 import fs from "node:fs";
 import path from "node:path";
 import { createComposedApp } from "../../src/composition";
-import type { IEmailService, SendEmailVerificationEmailInput, SendPasswordResetEmailInput } from "../../src/email/EmailService";
+import type { IEmailService, SendEmailVerificationEmailInput, SendNewsletterEmailInput, SendPasswordResetEmailInput } from "../../src/email/EmailService";
 
 function testConfig(turnstile = { siteKey: null as string | null, secretKey: null as string | null, verificationDisabled: false }) {
   return {
@@ -18,12 +18,18 @@ function testConfig(turnstile = { siteKey: null as string | null, secretKey: nul
       mailingListUnsubscribeSecret: "test-mailing-secret",
     },
     turnstile,
+    analytics: {
+      umamiWebsiteId: null,
+      umamiApiKey: null,
+      umamiApiBaseUrl: "https://api.umami.is/v1",
+    },
   };
 }
 
 class CapturingEmailService implements IEmailService {
   verificationEmails: SendEmailVerificationEmailInput[] = [];
   passwordResetEmails: SendPasswordResetEmailInput[] = [];
+  newsletterEmails: SendNewsletterEmailInput[] = [];
 
   async sendEmailVerificationEmail(input: SendEmailVerificationEmailInput): Promise<void> {
     this.verificationEmails.push(input);
@@ -31,6 +37,10 @@ class CapturingEmailService implements IEmailService {
 
   async sendPasswordResetEmail(input: SendPasswordResetEmailInput): Promise<void> {
     this.passwordResetEmails.push(input);
+  }
+
+  async sendNewsletterEmail(input: SendNewsletterEmailInput): Promise<void> {
+    this.newsletterEmails.push(input);
   }
 }
 
@@ -803,6 +813,116 @@ describe("OnDraft HTTP contracts", () => {
     expect(exportResponse.headers["content-type"]).toContain("text/csv");
     expect(exportResponse.headers["content-disposition"]).toContain("ondraft-mailing-list-subscribers.csv");
     expect(exportResponse.text).toContain('"email","status","consentSource","consentTextVersion"');
+  });
+
+  it("renders the admin dashboard with HTMX tabs for admin workflows", async () => {
+    const ondraft = app();
+
+    const anonymous = await request(ondraft).get("/admin");
+    expect(anonymous.status).toBe(403);
+
+    const admin = await loginAdminAgent(ondraft);
+    const dashboard = await admin.get("/admin");
+
+    expect(dashboard.status).toBe(200);
+    expect(dashboard.text).toContain("Admin Dashboard");
+    expect(dashboard.text).toContain('hx-get="/admin/tabs/users"');
+    expect(dashboard.text).toContain('hx-get="/admin/tabs/content"');
+    expect(dashboard.text).toContain('hx-get="/admin/tabs/newsletter"');
+    expect(dashboard.text).toContain('hx-get="/admin/tabs/analytics"');
+    expect(dashboard.text).toContain('href="/admin"');
+    expect(dashboard.text).toContain("Admin Dashboard</a>");
+
+    const contentTab = await admin.get("/admin/tabs/content").set("HX-Request", "true");
+    expect(contentTab.status).toBe(200);
+    expect(contentTab.text).toContain('href="/articles/new"');
+    expect(contentTab.text).toContain('href="/bigboard/edit"');
+    expect(contentTab.text).toContain('href="/videos/new"');
+    expect(contentTab.text).not.toContain("<!doctype html>");
+
+    const newsletterTab = await admin.get("/admin/tabs/newsletter").set("HX-Request", "true");
+    expect(newsletterTab.status).toBe(200);
+    expect(newsletterTab.text).toContain("Newsletter Desk");
+    expect(newsletterTab.text).toContain("Build newsletter");
+    expect(newsletterTab.text).toContain('name="articleIds"');
+    expect(newsletterTab.text).toContain('name="videoIds"');
+    expect(newsletterTab.text).toContain("<summary");
+    expect(newsletterTab.text).toContain("Past newsletters");
+    expect(newsletterTab.text).toContain("Resend");
+    expect(newsletterTab.text).not.toContain("<!doctype html>");
+
+    const analyticsTab = await admin.get("/admin/tabs/analytics").set("HX-Request", "true");
+    expect(analyticsTab.status).toBe(200);
+    expect(analyticsTab.text).toContain("Umami");
+    expect(analyticsTab.text).toContain("Articles");
+    expect(analyticsTab.text).toContain("Draft board");
+    expect(analyticsTab.text).not.toContain("<!doctype html>");
+
+    const usersTab = await admin.get("/admin/tabs/users").set("HX-Request", "true");
+    expect(usersTab.status).toBe(200);
+    expect(usersTab.text).toContain("Manage Users");
+    expect(usersTab.text).toContain("ryan@ondraftfootball.com");
+    expect(usersTab.text).not.toContain("<!doctype html>");
+  });
+
+  it("lets admins save, edit, and send newsletters through the admin dashboard", async () => {
+    const { ondraft, emailService } = appWithEmailCapture();
+    const admin = await loginAdminAgent(ondraft);
+
+    await admin
+      .post("/settings/mailing-list")
+      .type("form")
+      .send({ preference: "subscribe" });
+
+    const draft = await admin
+      .post("/admin/newsletters/drafts")
+      .type("form")
+      .send({
+        date: "2026-06-05",
+        writeup: "This week on OnDraft.",
+        articleIds: ["A1001"],
+        videoIds: ["BH3X-llq1M4"],
+        changelog: "Added the admin newsletter workflow.",
+      });
+
+    expect(draft.status).toBe(200);
+    expect(draft.text).toContain("Newsletter draft saved.");
+    expect(draft.text).toContain("Past newsletters");
+    expect(draft.text).toContain(">Edit</button>");
+    expect(draft.text).toContain('hx-get="/admin/newsletters/');
+    const draftId = draft.text.match(/hx-get="\/admin\/newsletters\/([^"]+)\/edit"/)?.[1];
+    expect(draftId).toBeDefined();
+
+    const edit = await admin.get(`/admin/newsletters/${draftId}/edit`).set("HX-Request", "true");
+    expect(edit.status).toBe(200);
+    expect(edit.text).toContain('value="A1001" checked');
+    expect(edit.text).toContain('value="BH3X-llq1M4" checked');
+
+    const sent = await admin
+      .post("/admin/newsletters/send")
+      .type("form")
+      .send({
+        id: draftId,
+        date: "2026-06-05",
+        writeup: "This week on OnDraft.",
+        articleIds: ["A1001"],
+        videoIds: ["BH3X-llq1M4"],
+        changelog: "Added the admin newsletter workflow.",
+      });
+
+    expect(sent.status).toBe(200);
+    expect(sent.text).toContain("Newsletter sent to 1 subscriber.");
+    expect(sent.text).toContain("Sent");
+    expect(emailService.newsletterEmails).toHaveLength(1);
+    expect(emailService.newsletterEmails[0].articles[0]).toMatchObject({
+      title: "The league is starving for pressure, and this EDGE class knows it",
+      imageUrl: "http://localhost:3000/images/article-defaults/uprights.png",
+    });
+    expect(emailService.newsletterEmails[0].videos[0]).toMatchObject({
+      title: "Quarterback room check-in: what still translates on Sundays",
+      imageUrl: "https://img.youtube.com/vi/BH3X-llq1M4/hqdefault.jpg",
+    });
+    expect(emailService.newsletterEmails[0].logoUrl).toBe("http://localhost:3000/images/brand/OnDraftLogo-cropped.png");
   });
 
   it("lets admins manage users with verification and mailing list status", async () => {

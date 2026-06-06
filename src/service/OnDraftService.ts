@@ -1,12 +1,14 @@
-import { randomInt } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import { Err, Ok, Result } from "../lib/result";
 import sanitizeHtml from "sanitize-html";
-import { Article, ArticleContent, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, BigBoardWriteup, Height, POSITIONS, Position, ArticleFilter, Comment, ForumPost, ForumPostFilter, DraftBoardFilter, Video, VideoQuery } from "../model/OnDraftContent";
-import { UnknownArticleError, UnknownForumPostError, ArticleError,  BigBoardError, IOnDraftRepository, ArticleValidationError, BigBoardValidationError, ForumPostError, ForumPostValidationError } from "../repository/OnDraftRepository";
+import { Article, ArticleContent, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, BigBoardWriteup, Height, POSITIONS, Position, ArticleFilter, Comment, ForumPost, ForumPostFilter, DraftBoardFilter, Newsletter, Video, VideoQuery } from "../model/OnDraftContent";
+import { UnknownArticleError, UnknownForumPostError, ArticleError,  BigBoardError, IOnDraftRepository, ArticleValidationError, BigBoardValidationError, ForumPostError, ForumPostValidationError, NewsletterError, NewsletterValidationError } from "../repository/OnDraftRepository";
 import { DraftBoardFilterInput } from "../controller/OnDraftController";
 import { IYoutubeVideoStatsService } from "./YoutubeVideoStatsService";
 import { BANNED_PHRASES } from "./bannedPhrases";
 import { toDraftGrade, validateDraftGradeForPublication, type DraftGrade } from "../model/DraftGrades";
+import type { IEmailConfig } from "../config/AppConfig";
+import type { IEmailService, NewsletterEmailItem } from "../email/EmailService";
 
 const ARTICLE_PDF_MAX_BYTES = 5 * 1024 * 1024;
 const ARTICLE_ID_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -28,6 +30,9 @@ const COMMENT_TEXT_MAX_LENGTH = 2000;
 const DEFAULT_BIG_BOARD_CREATOR: BigBoardCreator = "Ryan";
 const HOT_TAKE_MAX_LENGTH = 300;
 const VIDEO_DESCRIPTION_MAX_LENGTH = 500;
+const NEWSLETTER_WRITEUP_MAX_LENGTH = 5000;
+const NEWSLETTER_CHANGELOG_MAX_LENGTH = 4000;
+const NEWSLETTER_MAX_LINKED_ITEMS = 20;
 const YOUTUBE_STATS_TTL_MS = 24 * 60 * 60 * 1000;
 const PROFANITY_VALIDATION_MESSAGE = "The comment/post contains profanity. Please edit it and try again.";
 const BANNED_PHRASE_PATTERNS = [...new Set(BANNED_PHRASES.map((phrase) => phrase.trim().toLowerCase()).filter(Boolean))]
@@ -158,6 +163,20 @@ export interface CreateYoutubeVideoInput {
   tags?: string[];
 }
 
+export interface NewsletterInput {
+  id?: string;
+  date?: Date;
+  writeup: string;
+  articleIds?: string[];
+  videoIds?: string[];
+  changelog: string;
+}
+
+export interface NewsletterRecipientInput {
+  email: string;
+  unsubscribeUrl: string;
+}
+
 type YoutubeCatalogRefreshOptions = {
   force?: boolean;
 };
@@ -202,6 +221,10 @@ export interface IOnDraftService {
   getYoutubeVideo(videoId: string): Promise<Result<Video, ArticleError>>;
   getYoutubeVideos(): Promise<Result<Video[], ArticleError>>;
   getVideoTags(): Promise<Result<string[], ArticleError>>;
+  saveNewsletterDraft(input: NewsletterInput): Promise<Result<Newsletter, NewsletterError>>;
+  sendNewsletter(input: NewsletterInput, recipients: NewsletterRecipientInput[]): Promise<Result<Newsletter, NewsletterError>>;
+  getNewsletter(id: string): Promise<Result<Newsletter, NewsletterError>>;
+  listNewsletters(): Promise<Result<Newsletter[], NewsletterError>>;
   filterYoutubeVideos(query: VideoQuery): Promise<Result<Video[], ArticleError>>;
   updateYoutubeVideo(videoId: string, input: CreateYoutubeVideoInput): Promise<Result<Video, ArticleError>>;
   updateYoutubeVideoStats(videoId: string, stats: { thumbnailUrl?: string; viewCount?: number; youtubeStatsFetchedAt: Date }): Promise<Result<Video, ArticleError>>;
@@ -216,6 +239,8 @@ class OnDraftService implements IOnDraftService {
   constructor(
     private readonly repository: IOnDraftRepository,
     private readonly youtubeStats?: IYoutubeVideoStatsService,
+    private readonly email?: IEmailService,
+    private readonly emailConfig: Pick<IEmailConfig, "appBaseUrl"> = { appBaseUrl: "http://localhost:3000" },
   ) {}
 
   private defaultBigBoardYear(): number {
@@ -1324,6 +1349,186 @@ class OnDraftService implements IOnDraftService {
     return await this.repository.getVideoTags();
   }
 
+  private normalizedLinkedIds(values: string[] | undefined): string[] {
+    return [...new Set((values ?? []).map((value) => value.trim()).filter(Boolean))];
+  }
+
+  private async prepareNewsletter(input: NewsletterInput): Promise<Result<Newsletter, NewsletterError>> {
+    const writeup = input.writeup.trim();
+    const changelog = input.changelog.trim();
+    const articleIds = this.normalizedLinkedIds(input.articleIds);
+    const videoIds = this.normalizedLinkedIds(input.videoIds);
+    const date = input.date instanceof Date ? input.date : new Date("");
+
+    if (isNaN(date.getTime())) {
+      return Err(NewsletterValidationError("Newsletter date is required."));
+    }
+    if (!writeup) {
+      return Err(NewsletterValidationError("Newsletter writeup is required."));
+    }
+    if (writeup.length > NEWSLETTER_WRITEUP_MAX_LENGTH) {
+      return Err(NewsletterValidationError("Newsletter writeup is too long."));
+    }
+    if (changelog.length > NEWSLETTER_CHANGELOG_MAX_LENGTH) {
+      return Err(NewsletterValidationError("Newsletter changelog is too long."));
+    }
+    if (articleIds.length + videoIds.length === 0) {
+      return Err(NewsletterValidationError("Choose at least one article or video."));
+    }
+    if (articleIds.length > NEWSLETTER_MAX_LINKED_ITEMS || videoIds.length > NEWSLETTER_MAX_LINKED_ITEMS) {
+      return Err(NewsletterValidationError("Newsletters can link up to 20 articles and 20 videos."));
+    }
+
+    for (const articleId of articleIds) {
+      const article = await this.repository.getArticle(articleId);
+      if (article.ok === false || !article.value.published) {
+        return Err(NewsletterValidationError("One or more selected articles are unavailable."));
+      }
+    }
+    for (const videoId of videoIds) {
+      const video = await this.repository.getYoutubeVideo(videoId);
+      if (video.ok === false) {
+        return Err(NewsletterValidationError("One or more selected videos are unavailable."));
+      }
+    }
+
+    const now = new Date();
+    if (input.id) {
+      const existing = await this.repository.getNewsletter(input.id);
+      if (existing.ok === true) {
+        return Ok({
+          ...existing.value,
+          date,
+          writeup,
+          articleIds,
+          videoIds,
+          changelog,
+          updatedAt: now,
+        });
+      }
+    }
+
+    return Ok({
+      id: input.id?.trim() || randomUUID(),
+      date,
+      writeup,
+      articleIds,
+      videoIds,
+      changelog,
+      status: "draft",
+      createdAt: now,
+      updatedAt: now,
+      recipientCount: 0,
+    });
+  }
+
+  async saveNewsletterDraft(input: NewsletterInput): Promise<Result<Newsletter, NewsletterError>> {
+    const prepared = await this.prepareNewsletter(input);
+    if (prepared.ok === false) {
+      return prepared;
+    }
+
+    return input.id
+      ? this.repository.updateNewsletter({ ...prepared.value, status: "draft", sentAt: undefined, recipientCount: 0 })
+      : this.repository.createNewsletter(prepared.value);
+  }
+
+  private newsletterDateLabel(date: Date): string {
+    return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  }
+
+  private absoluteContentUrl(pathOrUrl: string | undefined): string | undefined {
+    if (!pathOrUrl) {
+      return undefined;
+    }
+    try {
+      return new URL(pathOrUrl, this.emailConfig.appBaseUrl).toString();
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async newsletterEmailItems(newsletter: Newsletter) {
+    const articles: NewsletterEmailItem[] = [];
+    const videos: NewsletterEmailItem[] = [];
+    for (const articleId of newsletter.articleIds) {
+      const article = await this.repository.getArticle(articleId);
+      if (article.ok === true) {
+        articles.push({
+          title: article.value.title,
+          url: new URL(`/articles/${article.value.id}`, this.emailConfig.appBaseUrl).toString(),
+          description: article.value.writeup,
+          imageUrl: this.absoluteContentUrl(article.value.imageUrl),
+        });
+      }
+    }
+    for (const videoId of newsletter.videoIds) {
+      const video = await this.repository.getYoutubeVideo(videoId);
+      if (video.ok === true) {
+        videos.push({
+          title: video.value.title,
+          url: new URL(`/videos/${video.value.videoId}`, this.emailConfig.appBaseUrl).toString(),
+          description: video.value.description,
+          imageUrl: this.absoluteContentUrl(video.value.thumbnailUrl),
+        });
+      }
+    }
+    return { articles, videos };
+  }
+
+  async sendNewsletter(input: NewsletterInput, recipients: NewsletterRecipientInput[]): Promise<Result<Newsletter, NewsletterError>> {
+    const prepared = await this.prepareNewsletter(input);
+    if (prepared.ok === false) {
+      return prepared;
+    }
+    if (!this.email) {
+      return Err(NewsletterValidationError("Newsletter email service is not configured."));
+    }
+    if (recipients.length === 0) {
+      return Err(NewsletterValidationError("There are no subscribed recipients."));
+    }
+
+    const newsletter = {
+      ...prepared.value,
+      status: "sent" as const,
+      sentAt: new Date(),
+      updatedAt: new Date(),
+      recipientCount: recipients.length,
+    };
+    const emailItems = await this.newsletterEmailItems(newsletter);
+    const subject = `OnDraft Newsletter - ${this.newsletterDateLabel(newsletter.date)}`;
+
+    try {
+      for (const recipient of recipients) {
+        await this.email.sendNewsletterEmail({
+          to: recipient.email,
+          subject,
+          dateLabel: this.newsletterDateLabel(newsletter.date),
+          writeup: newsletter.writeup,
+          changelog: newsletter.changelog,
+          articles: emailItems.articles,
+          videos: emailItems.videos,
+          unsubscribeUrl: recipient.unsubscribeUrl,
+          logoUrl: new URL("/images/brand/OnDraftLogo-cropped.png", this.emailConfig.appBaseUrl).toString(),
+        });
+      }
+    } catch {
+      return Err(NewsletterValidationError("Unable to send the newsletter."));
+    }
+
+    return input.id
+      ? this.repository.updateNewsletter(newsletter)
+      : this.repository.createNewsletter(newsletter);
+  }
+
+  async listNewsletters(): Promise<Result<Newsletter[], NewsletterError>> {
+    return this.repository.listNewsletters();
+  }
+
+  async getNewsletter(id: string): Promise<Result<Newsletter, NewsletterError>> {
+    return this.repository.getNewsletter(id);
+  }
+
   async filterYoutubeVideos(query: VideoQuery): Promise<Result<Video[], ArticleError>> {
     const result = await this.repository.filterYoutubeVideos(query);
     if (result.ok === false) {
@@ -1393,6 +1598,11 @@ class OnDraftService implements IOnDraftService {
   }
 }
 
-export function CreateOnDraftService(repository: IOnDraftRepository, youtubeStats?: IYoutubeVideoStatsService): IOnDraftService {
-  return new OnDraftService(repository, youtubeStats);
+export function CreateOnDraftService(
+  repository: IOnDraftRepository,
+  youtubeStats?: IYoutubeVideoStatsService,
+  email?: IEmailService,
+  emailConfig?: Pick<IEmailConfig, "appBaseUrl">,
+): IOnDraftService {
+  return new OnDraftService(repository, youtubeStats, email, emailConfig);
 }

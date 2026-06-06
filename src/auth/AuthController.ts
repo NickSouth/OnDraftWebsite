@@ -102,7 +102,7 @@ export interface IAuthController {
     store: OnDraftSessionStore,
   ): Promise<void>;
   exportSubscribedMailingListCsv(res: Response): Promise<void>;
-  showAdminUsers(res: Response, store: OnDraftSessionStore): Promise<void>;
+  showAdminUsers(res: Response, store: OnDraftSessionStore, layout?: boolean): Promise<void>;
   showUserModerationMenu(res: Response, store: OnDraftSessionStore, userId: string, contextId: string): Promise<void>;
   banUserFromForm(res: Response, store: OnDraftSessionStore, userId: string, contextId: string, message: string, duration: string): Promise<void>;
   unbanUserFromForm(res: Response, store: OnDraftSessionStore, userId: string, contextId: string): Promise<void>;
@@ -593,7 +593,7 @@ class AuthController implements IAuthController {
     res.send(result.value);
   }
 
-  async showAdminUsers(res: Response, store: OnDraftSessionStore): Promise<void> {
+  async showAdminUsers(res: Response, store: OnDraftSessionStore, layout = true): Promise<void> {
     const session = touchOnDraftSession(store);
     const result = await this.service.listAdminUsers();
 
@@ -606,6 +606,7 @@ class AuthController implements IAuthController {
     }
 
     res.render("auth/adminUsers", {
+      ...(layout ? {} : { layout: false }),
       session,
       users: result.value,
     });

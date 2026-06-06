@@ -147,6 +147,22 @@ export type VideoQuery = {
   sortDirection?: "asc" | "desc";
 }
 
+export type NewsletterStatus = "draft" | "sent";
+
+export type Newsletter = {
+  id: string;
+  date: Date;
+  writeup: string;
+  articleIds: string[];
+  videoIds: string[];
+  changelog: string;
+  status: NewsletterStatus;
+  createdAt: Date;
+  updatedAt: Date;
+  sentAt?: Date;
+  recipientCount: number;
+};
+
 export type ConsensusBigBoard = {
   year: number;
   entries: ConsensusBigBoardEntry[];

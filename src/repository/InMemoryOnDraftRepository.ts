@@ -1,7 +1,7 @@
 import { Err, Ok, Result } from "../lib/result";
-import { Article, ArticleFilter, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, Comment, ConsensusBigBoard, DraftBoardFilter, ForumPost, ForumPostFilter, Video, VideoQuery } from "../model/OnDraftContent";
+import { Article, ArticleFilter, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, Comment, ConsensusBigBoard, DraftBoardFilter, ForumPost, ForumPostFilter, Newsletter, Video, VideoQuery } from "../model/OnDraftContent";
 import { calculateDraftGrade } from "../model/DraftGrades";
-import { ArticleNotFound, BigBoardNotFound, CommentNotFound, DuplicateBigBoardYear, DuplicatePlayer, DuplicateArticle, DuplicateForumPost, ForumPostCommentNotFound, type ArticleError, type BigBoardError, type IOnDraftRepository, PlayerNotFound, ForumPostError, ForumPostNotFound } from "./OnDraftRepository";
+import { ArticleNotFound, BigBoardNotFound, CommentNotFound, DuplicateBigBoardYear, DuplicatePlayer, DuplicateArticle, DuplicateForumPost, DuplicateNewsletter, ForumPostCommentNotFound, type ArticleError, type BigBoardError, type IOnDraftRepository, type NewsletterError, NewsletterNotFound, PlayerNotFound, ForumPostError, ForumPostNotFound } from "./OnDraftRepository";
 
 const MEMORY_LOAD_TEST_SCHOOLS = [
   "Air Force",
@@ -67,6 +67,7 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
   private articles: Article[] = [];
   private forumPosts: ForumPost[] = [];
   private videos: Video[] = [];
+  private newsletters: Newsletter[] = [];
   private tagList: Set<string> = new Set();
 
   constructor(options: InMemoryRepositoryOptions = {}) {
@@ -1135,6 +1136,50 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
       })),
     };
     return Ok(consensusBigBoard);
+  }
+
+  private cloneNewsletter(newsletter: Newsletter): Newsletter {
+    return {
+      ...newsletter,
+      date: new Date(newsletter.date),
+      articleIds: [...newsletter.articleIds],
+      videoIds: [...newsletter.videoIds],
+      createdAt: new Date(newsletter.createdAt),
+      updatedAt: new Date(newsletter.updatedAt),
+      sentAt: newsletter.sentAt ? new Date(newsletter.sentAt) : undefined,
+    };
+  }
+
+  async createNewsletter(newsletter: Newsletter): Promise<Result<Newsletter, NewsletterError>> {
+    if (this.newsletters.some((existing) => existing.id === newsletter.id)) {
+      return Err(DuplicateNewsletter(`Newsletter with id "${newsletter.id}" already exists.`));
+    }
+
+    this.newsletters.push(this.cloneNewsletter(newsletter));
+    return Ok(this.cloneNewsletter(newsletter));
+  }
+
+  async updateNewsletter(newsletter: Newsletter): Promise<Result<Newsletter, NewsletterError>> {
+    const index = this.newsletters.findIndex((existing) => existing.id === newsletter.id);
+    if (index === -1) {
+      return Err(NewsletterNotFound(`Newsletter with id "${newsletter.id}" not found.`));
+    }
+
+    this.newsletters[index] = this.cloneNewsletter(newsletter);
+    return Ok(this.cloneNewsletter(newsletter));
+  }
+
+  async getNewsletter(id: string): Promise<Result<Newsletter, NewsletterError>> {
+    const newsletter = this.newsletters.find((existing) => existing.id === id);
+    return newsletter
+      ? Ok(this.cloneNewsletter(newsletter))
+      : Err(NewsletterNotFound(`Newsletter with id "${id}" not found.`));
+  }
+
+  async listNewsletters(): Promise<Result<Newsletter[], NewsletterError>> {
+    return Ok([...this.newsletters]
+      .sort((first, second) => second.updatedAt.getTime() - first.updatedAt.getTime())
+      .map((newsletter) => this.cloneNewsletter(newsletter)));
   }
 }
 

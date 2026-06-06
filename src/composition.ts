@@ -14,6 +14,7 @@ import { CreateOnDraftService } from "./service/OnDraftService";
 import { CreateUserPreferenceService } from "./service/UserPreferenceService";
 import { CreateYoutubeVideoStatsService } from "./service/YoutubeVideoStatsService";
 import { CreateYoutubeVideoStatsRefreshScheduler } from "./service/YoutubeVideoStatsRefreshScheduler";
+import { CreateUmamiAnalyticsService } from "./service/UmamiAnalyticsService";
 import { CreateLoggingService } from "./service/LoggingService";
 import type { ILoggingService } from "./service/LoggingService";
 import { getPrismaClient } from "./prisma/client";
@@ -32,7 +33,7 @@ export function createComposedApp(
   const emailService = overrides.emailService ?? CreateEmailService(config.email, resolvedLogger);
 
   const youtubeStats = CreateYoutubeVideoStatsService();
-  const service = CreateOnDraftService(repository, youtubeStats);
+  const service = CreateOnDraftService(repository, youtubeStats, emailService, config.email);
   if (process.env.NODE_ENV !== "test") {
     CreateYoutubeVideoStatsRefreshScheduler(service, resolvedLogger).start();
   }
@@ -40,7 +41,8 @@ export function createComposedApp(
   const userPreferences = CreateUserPreferenceService(authUsers);
   const authService = CreateAuthService(authUsers, emailService, config.email);
   const authController = CreateAuthController(authService, resolvedLogger);
-  const controller = CreateOnDraftController(service, userPreferences, resolvedLogger, authService);
+  const analytics = CreateUmamiAnalyticsService(config.analytics);
+  const controller = CreateOnDraftController(service, userPreferences, resolvedLogger, authService, analytics);
   return CreateApp(
     controller,
     authController,
@@ -48,5 +50,6 @@ export function createComposedApp(
     prisma ? CreatePrismaSessionStore(prisma) : undefined,
     config.turnstile,
     config.email.appBaseUrl,
+    config.analytics,
   );
 }

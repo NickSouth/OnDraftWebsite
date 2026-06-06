@@ -37,6 +37,9 @@
     <script src="/ondraftShell.js" defer></script>
     <script src="/articleShare.js" defer></script>
     <script src="/teamHelmetRecolor.js" defer></script>
+    <% if (typeof umamiWebsiteId !== "undefined" && umamiWebsiteId) { %>
+      <script defer src="https://cloud.umami.is/script.js" data-website-id="<%= umamiWebsiteId %>"></script>
+    <% } %>
   </head>
   <body class="min-h-screen bg-slate-50 p-0 text-slate-950 antialiased dark:bg-draft-ink dark:text-slate-100">
     <% const currentSession = typeof session !== "undefined" ? session : null; %>

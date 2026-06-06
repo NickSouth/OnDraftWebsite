@@ -11,6 +11,7 @@ import {
   DraftBoardFilter,
   ForumPost,
   ForumPostFilter,
+  Newsletter,
   Position,
   Video,
   VideoQuery,
@@ -24,6 +25,7 @@ import {
   DuplicateArticle,
   DuplicateBigBoardYear,
   DuplicateForumPost,
+  DuplicateNewsletter,
   DuplicatePlayer,
   ForumPostCommentNotFound,
   ForumPostNotFound,
@@ -32,12 +34,15 @@ import {
   type BigBoardError,
   type ForumPostError,
   type IOnDraftRepository,
+  type NewsletterError,
+  NewsletterNotFound,
 } from "./OnDraftRepository";
 
 type ArticleRecord = Awaited<ReturnType<OnDraftPrismaClient["article"]["findUnique"]>>;
 type BigBoardRecord = Awaited<ReturnType<OnDraftPrismaClient["bigBoard"]["findUnique"]>>;
 type ForumPostRecord = Awaited<ReturnType<OnDraftPrismaClient["forumPost"]["findUnique"]>>;
 type VideoRecord = Awaited<ReturnType<OnDraftPrismaClient["video"]["findUnique"]>>;
+type NewsletterRecord = Awaited<ReturnType<OnDraftPrismaClient["newsletter"]["findUnique"]>>;
 
 class PrismaOnDraftRepository implements IOnDraftRepository {
   constructor(private readonly prisma: OnDraftPrismaClient = getPrismaClient()) {}
@@ -1022,6 +1027,77 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
         bigDiscrepency: entry.bigDiscrepency ?? false,
       })),
     });
+  }
+
+  private mapNewsletter(record: NonNullable<NewsletterRecord>): Newsletter {
+    return {
+      id: record.id,
+      date: record.date,
+      writeup: record.writeup,
+      articleIds: [...record.articleIds],
+      videoIds: [...record.videoIds],
+      changelog: record.changelog,
+      status: record.status === "sent" ? "sent" : "draft",
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+      sentAt: record.sentAt ?? undefined,
+      recipientCount: record.recipientCount,
+    };
+  }
+
+  private newsletterData(newsletter: Newsletter) {
+    return {
+      date: newsletter.date,
+      writeup: newsletter.writeup,
+      articleIds: newsletter.articleIds,
+      videoIds: newsletter.videoIds,
+      changelog: newsletter.changelog,
+      status: newsletter.status,
+      recipientCount: newsletter.recipientCount,
+      sentAt: newsletter.sentAt ?? null,
+      createdAt: newsletter.createdAt,
+      updatedAt: newsletter.updatedAt,
+    };
+  }
+
+  async createNewsletter(newsletter: Newsletter): Promise<Result<Newsletter, NewsletterError>> {
+    try {
+      const created = await this.prisma.newsletter.create({
+        data: {
+          id: newsletter.id,
+          ...this.newsletterData(newsletter),
+        },
+      });
+      return Ok(this.mapNewsletter(created));
+    } catch {
+      return Err(DuplicateNewsletter(`Newsletter with id "${newsletter.id}" already exists.`));
+    }
+  }
+
+  async updateNewsletter(newsletter: Newsletter): Promise<Result<Newsletter, NewsletterError>> {
+    try {
+      const updated = await this.prisma.newsletter.update({
+        where: { id: newsletter.id },
+        data: this.newsletterData(newsletter),
+      });
+      return Ok(this.mapNewsletter(updated));
+    } catch {
+      return Err(NewsletterNotFound(`Newsletter with id "${newsletter.id}" not found.`));
+    }
+  }
+
+  async getNewsletter(id: string): Promise<Result<Newsletter, NewsletterError>> {
+    const newsletter = await this.prisma.newsletter.findUnique({ where: { id } });
+    return newsletter
+      ? Ok(this.mapNewsletter(newsletter))
+      : Err(NewsletterNotFound(`Newsletter with id "${id}" not found.`));
+  }
+
+  async listNewsletters(): Promise<Result<Newsletter[], NewsletterError>> {
+    const newsletters = await this.prisma.newsletter.findMany({
+      orderBy: { updatedAt: "desc" },
+    });
+    return Ok(newsletters.map((newsletter) => this.mapNewsletter(newsletter)));
   }
 }
 
