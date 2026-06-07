@@ -222,7 +222,7 @@ class ExpressApp implements IApp {
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: https://img.youtube.com https://i.ytimg.com",
         "font-src 'self' data:",
-        "connect-src 'self' https://challenges.cloudflare.com https://www.googleapis.com https://cloud.umami.is https://api.umami.is",
+        "connect-src 'self' https://challenges.cloudflare.com https://www.googleapis.com https://cloud.umami.is https://api.umami.is https://gateway.umami.is",
         "frame-src https://challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com",
         "upgrade-insecure-requests",
       ].join("; "),
