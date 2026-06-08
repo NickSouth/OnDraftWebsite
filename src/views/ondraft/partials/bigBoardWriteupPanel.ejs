@@ -14,6 +14,14 @@
       ? { category: publicFilmGradeCategory, widthClass: "grid-cols-[repeat(2,3.85rem)] sm:grid-cols-[repeat(3,3.85rem)] lg:grid-cols-[repeat(5,3.85rem)]", alignClass: "lg:ml-auto" }
       : null,
   ].filter(Boolean);
+  const publicMobileGradeLayoutCategories = [
+    publicPhysicalGradeCategory
+      ? { category: publicPhysicalGradeCategory, widthClass: "grid-cols-[repeat(6,3rem)]" }
+      : null,
+    publicFilmGradeCategory
+      ? { category: publicFilmGradeCategory, widthClass: "grid-cols-[repeat(6,3rem)]" }
+      : null,
+  ].filter(Boolean);
   const publicGradeTraitValue = (categoryKey, trait) => {
     if (!entry.grade) {
       return "";
@@ -35,7 +43,54 @@
     : trait;
 %>
 
-<div class="relative z-10 overflow-visible rounded-md pb-2 pt-3 sm:ml-[7.5rem]">
+<div class="relative z-10 overflow-visible rounded-md pb-1.5 pt-2 sm:hidden">
+  <div class="relative z-10 grid min-w-0 gap-2 px-2.5">
+    <% if (entry.writeupPublished) { %>
+      <section class="min-w-0 rounded-md border border-slate-200 bg-white p-3 text-left dark:border-white/10 dark:bg-draft-ink">
+        <h3 class="text-[0.68rem] font-black uppercase tracking-[0.14em] text-draft-amber dark:text-draft-gold">Rundown</h3>
+        <p class="mt-2 whitespace-pre-wrap break-words text-[0.92rem] leading-6 text-slate-800 [overflow-wrap:anywhere] dark:text-slate-100"><%= hasText(entry.writeup.rundown) ? entry.writeup.rundown : "No rundown published." %></p>
+      </section>
+      <section class="min-w-0 rounded-md border border-slate-200 bg-white p-3 text-left dark:border-white/10 dark:bg-draft-ink">
+        <h3 class="text-[0.68rem] font-black uppercase tracking-[0.14em] text-draft-amber dark:text-draft-gold">Strengths</h3>
+        <p class="mt-2 whitespace-pre-wrap break-words text-[0.82rem] leading-5 text-slate-700 [overflow-wrap:anywhere] dark:text-slate-200"><%= hasText(entry.writeup.strengths) ? entry.writeup.strengths : "No strengths published." %></p>
+      </section>
+      <section class="min-w-0 rounded-md border border-slate-200 bg-white p-3 text-left dark:border-white/10 dark:bg-draft-ink">
+        <h3 class="text-[0.68rem] font-black uppercase tracking-[0.14em] text-draft-amber dark:text-draft-gold">Weaknesses</h3>
+        <p class="mt-2 whitespace-pre-wrap break-words text-[0.82rem] leading-5 text-slate-700 [overflow-wrap:anywhere] dark:text-slate-200"><%= hasText(entry.writeup.weaknesses) ? entry.writeup.weaknesses : "No weaknesses published." %></p>
+      </section>
+    <% } %>
+    <% if (entry.gradePublished && publicBoardGradeValue !== null) { %>
+      <section class="min-w-0 rounded-md border border-slate-200 bg-white p-2.5 text-center dark:border-white/10 dark:bg-draft-ink">
+        <div class="grid items-center justify-items-center gap-2">
+          <h3 class="mt-0 text-[0.68rem] font-black uppercase tracking-[0.14em] text-draft-amber dark:text-draft-gold">Grades</h3>
+          <div class="inline-flex min-h-8 items-center gap-2 rounded-md border border-draft-gold/45 bg-draft-gold/10 px-2.5 shadow-sm">
+            <span class="text-[0.58rem] font-black uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Overall:</span>
+            <strong class="font-display text-xl font-black leading-none text-slate-950 dark:text-white"><%= publicBoardGradeLabel %></strong>
+          </div>
+        </div>
+        <% if (publicMobileGradeLayoutCategories.length > 0) { %>
+          <div class="mt-2 grid justify-items-center gap-2 overflow-visible">
+            <% publicMobileGradeLayoutCategories.forEach(({ category, widthClass }) => { %>
+              <div class="grid justify-items-center gap-1 overflow-visible">
+                <span class="text-[0.58rem] font-black uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400"><%= category.label %></span>
+                <div class="grid <%= widthClass %> justify-center gap-1 overflow-visible">
+                  <% category.traits.forEach((trait) => { %>
+                    <span class="draft-grade-trait-tile relative z-0 grid h-[1.85rem] w-[3rem] place-items-center gap-0 overflow-visible rounded bg-slate-100 px-0.5 py-0.5 text-center transition duration-150 hover:z-20 hover:scale-[1.04] hover:bg-slate-200 hover:shadow-lg hover:ring-1 hover:ring-draft-gold/60 dark:bg-white/10 dark:hover:bg-white/20" title="<%= trait %>">
+                      <span class="draft-grade-trait-abbr text-[0.5rem] font-black uppercase leading-none text-slate-600 transition dark:text-slate-300"><%= publicGradeTraitAbbreviation(trait) %></span>
+                      <strong class="font-display text-[0.76rem] font-black leading-none text-draft-amber dark:text-draft-gold"><%= publicGradeTraitLabel(category.key, trait) %></strong>
+                    </span>
+                  <% }) %>
+                </div>
+              </div>
+            <% }) %>
+          </div>
+        <% } %>
+      </section>
+    <% } %>
+  </div>
+</div>
+
+<div class="relative z-10 hidden overflow-visible rounded-md pb-2 pt-3 sm:ml-[7.5rem] sm:block">
   <span class="pointer-events-none absolute inset-y-0 right-0 left-0 hidden bg-slate-200/45 [clip-path:polygon(9rem_0,100%_0,100%_100%,3rem_100%)] dark:bg-white/[0.05] lg:block" aria-hidden="true"></span>
   <div class="relative z-10 grid min-w-0 gap-3 px-3 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:items-start lg:pl-16">
     <% if (entry.writeupPublished) { %>

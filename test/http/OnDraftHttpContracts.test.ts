@@ -2816,6 +2816,21 @@ describe("OnDraft HTTP contracts", () => {
     expect(yearPopular.text).toContain("Current Favorite Article");
   });
 
+  it("defaults articles to list view for mobile visitors without changing desktop", async () => {
+    const ondraft = app();
+    const mobileUserAgent =
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148";
+
+    const desktop = await request(ondraft).get("/articles");
+    const mobile = await request(ondraft).get("/articles").set("User-Agent", mobileUserAgent);
+    const explicitMobileCard = await request(ondraft).get("/articles?view=card").set("User-Agent", mobileUserAgent);
+
+    expect(desktop.text).toContain("articleView: 'card'");
+    expect(mobile.text).toContain("articleView: 'list'");
+    expect(mobile.text).toContain("article-list-row od-card");
+    expect(explicitMobileCard.text).toContain("articleView: 'card'");
+  });
+
   it("renders sanitized HTML article content unescaped", async () => {
     const agent = await adminAgent();
 

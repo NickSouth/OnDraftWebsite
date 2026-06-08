@@ -458,7 +458,7 @@
   }
 
   .od-home-carousel-media {
-    @apply absolute inset-0 h-full w-full object-contain opacity-75;
+    @apply absolute inset-0 h-full w-full object-cover opacity-75 sm:object-contain;
   }
 
   .od-inline-loader {
@@ -2413,11 +2413,11 @@
     }
 
     .od-filter-popover {
-      @apply left-0 right-0 top-[calc(100%+0.5rem)] w-[calc(100vw-2rem)] gap-2 rounded-md p-3;
+      @apply fixed left-3 right-3 top-28 max-h-[calc(100vh-8rem)] w-auto gap-2 overflow-y-auto rounded-md p-3;
     }
 
     .od-filter-popover::before {
-      @apply right-3 size-3;
+      @apply hidden;
     }
 
     .od-filter-popover-grid {
@@ -2491,7 +2491,7 @@
     }
 
     .article-list-row {
-      @apply gap-3 p-3;
+      @apply gap-2 p-2.5;
     }
 
     .od-article-page {
@@ -2581,7 +2581,7 @@
     }
 
     .hot-take-item .article-actions {
-      @apply gap-1.5;
+      @apply flex-nowrap gap-1.5;
     }
 
     .hot-take-item .icon-button,
@@ -2592,7 +2592,7 @@
     }
 
     .hot-take-item .article-action-icon {
-      @apply size-4;
+      @apply size-3.5;
     }
 
     .video-card:hover .video-card-meta,

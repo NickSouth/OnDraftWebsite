@@ -30,6 +30,7 @@
     data-loading-skeleton-target="#articles-results"
     x-data="{
       articleView: '<%= viewMode === "list" ? "list" : "card" %>',
+      explicitView: new URLSearchParams(window.location.search).has('view'),
       searchOpen: false,
       filtersOpen: false,
       keyword: $el.dataset.keyword || '',
@@ -38,6 +39,12 @@
       searchTimer: null,
       filterTimer: null,
       get hasKeyword() { return this.keyword.trim().length > 0 },
+      init() {
+        if (!this.explicitView && window.matchMedia('(max-width: 639px)').matches && this.articleView !== 'list') {
+          this.articleView = 'list';
+          this.$nextTick(() => this.requestSubmit());
+        }
+      },
       openSearch() {
         this.searchOpen = true;
         this.$nextTick(() => this.$refs.articleSearch?.focus());
@@ -375,7 +382,7 @@
                   :aria-pressed="String(articleView === 'card')"
                   aria-label="Card view"
                   title="Card view"
-                  @click="articleView = 'card'; $nextTick(() => htmx.trigger($el.form, 'submit'))"
+                  @click="explicitView = true; articleView = 'card'; $nextTick(() => htmx.trigger($el.form, 'submit'))"
                 >
                   <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <rect x="4" y="5" width="16" height="4" rx="1" />
@@ -390,7 +397,7 @@
                   :aria-pressed="String(articleView === 'list')"
                   aria-label="List view"
                   title="List view"
-                  @click="articleView = 'list'; $nextTick(() => htmx.trigger($el.form, 'submit'))"
+                  @click="explicitView = true; articleView = 'list'; $nextTick(() => htmx.trigger($el.form, 'submit'))"
                 >
                   <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <path d="M7 6h14" />

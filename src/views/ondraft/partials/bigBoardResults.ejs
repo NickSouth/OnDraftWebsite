@@ -81,7 +81,7 @@
     <div class="mb-2 flex flex-row items-center justify-between gap-2 sm:mb-3 sm:gap-3">
       <% if (bylineAuthors.length > 0) { %>
         <div class="grid min-w-0 gap-0.5 sm:gap-1">
-          <p class="m-0 line-clamp-1 text-xs font-bold text-slate-700 dark:text-slate-200 sm:text-sm">
+          <p class="m-0 text-xs font-bold leading-tight text-slate-700 dark:text-slate-200 sm:line-clamp-1 sm:text-sm">
             Player analysis and opinions by
             <% bylineAuthors.forEach((author, index) => { %>
               <%- include("profileAuthorLink", { name: author, showBadge: false, className: "text-draft-amber no-underline transition hover:text-draft-gold dark:text-draft-gold" }) %><%= index < bylineAuthors.length - 1 ? "/" : "" %>
@@ -160,16 +160,16 @@
         <li class="border-b border-slate-200 py-3 last:border-b-0 dark:border-white/10">
           <% if (hasPublishedDetails || hasConsensusDisclosure) { %>
             <details class="group">
-              <summary class="od-focus-ring relative grid cursor-pointer list-none gap-3 overflow-hidden rounded-md p-2 transition hover:bg-white/70 dark:hover:bg-white/[0.04] sm:min-h-32 sm:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)] sm:items-center sm:pb-11 [&::-webkit-details-marker]:hidden">
+              <summary class="od-focus-ring relative grid cursor-pointer list-none grid-cols-[3.25rem_minmax(0,1fr)] items-start gap-x-2 gap-y-2 overflow-hidden rounded-md p-2 transition hover:bg-white/70 dark:hover:bg-white/[0.04] sm:min-h-32 sm:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)] sm:items-center sm:gap-3 sm:pb-11 [&::-webkit-details-marker]:hidden">
                 <span class="pointer-events-none absolute inset-y-0 right-0 left-[31rem] hidden bg-slate-200/55 [clip-path:polygon(3rem_0,100%_0,100%_100%,0_100%)] dark:bg-white/[0.06] lg:block" aria-hidden="true"></span>
                 <span class="sr-only"><%= accessibleSummary %></span>
-                <span class="relative z-10 flex items-center gap-2">
-                  <span class="w-10 font-display text-3xl font-black leading-none text-draft-amber dark:text-draft-gold sm:w-auto sm:text-5xl"><%= rankLabel %></span>
-                  <span class="h-9 w-px bg-slate-300 dark:bg-white/20 sm:h-14" aria-hidden="true"></span>
+                <span class="relative z-10 flex items-center justify-center gap-2 sm:justify-start">
+                  <span class="w-auto font-display text-2xl font-black leading-none text-draft-amber dark:text-draft-gold sm:w-auto sm:text-5xl"><%= rankLabel %></span>
+                  <span class="hidden h-9 w-px bg-slate-300 dark:bg-white/20 sm:block sm:h-14" aria-hidden="true"></span>
                 </span>
-                <span class="relative z-10 grid justify-items-center text-center">
+                <span class="relative z-10 col-start-1 row-start-2 grid justify-items-center text-center sm:col-start-auto sm:row-start-auto">
                   <img
-                    class="h-14 w-20 shrink-0 object-contain opacity-0 transition-opacity duration-150 sm:h-28 sm:w-32"
+                    class="h-10 w-12 shrink-0 object-contain opacity-0 transition-opacity duration-150 sm:h-28 sm:w-32"
                     src="/teamHelmetTemplate.png"
                     alt="<%= entry.school %> football helmet"
                     loading="lazy"
@@ -178,16 +178,16 @@
                     data-generated-helmet-src="<%= generatedHelmetSrc %>"
                   />
                 </span>
-                <span class="relative z-10 grid gap-3">
-                  <span class="grid gap-3 lg:grid-cols-[minmax(0,18rem)_minmax(12rem,1fr)] lg:items-start">
+                <span class="relative z-10 col-start-2 row-span-2 row-start-1 grid gap-1.5 sm:col-start-auto sm:row-span-1 sm:row-start-auto sm:gap-3">
+                  <span class="grid gap-1.5 sm:gap-3 lg:grid-cols-[minmax(0,18rem)_minmax(12rem,1fr)] lg:items-start">
                     <span>
-                      <span class="block font-display text-xl font-black leading-tight text-slate-950 dark:text-white sm:text-3xl"><%= entry.playerName %></span>
-                      <span class="mt-1.5 flex flex-wrap items-center gap-1.5 sm:mt-2 sm:gap-2">
-                        <span class="inline-flex rounded bg-draft-gold px-2 py-0.5 text-xs font-black uppercase tracking-wide text-draft-ink sm:px-3 sm:py-1 sm:text-sm"><%= posRankLabel %></span>
+                      <span class="block font-display text-[1.12rem] font-black leading-tight text-slate-950 dark:text-white sm:text-3xl"><%= entry.playerName %></span>
+                      <span class="mt-1 flex flex-wrap items-center gap-1.5 sm:mt-2 sm:gap-2">
+                        <span class="inline-flex rounded bg-draft-gold px-1.5 py-0.5 text-[0.68rem] font-black uppercase tracking-wide text-draft-ink sm:px-3 sm:py-1 sm:text-sm"><%= posRankLabel %></span>
                         <span class="text-xs font-black leading-tight text-slate-500 dark:text-slate-300 sm:text-sm"><%= entry.school %></span>
                       </span>
                     </span>
-                    <span class="flex flex-wrap items-start gap-1.5 pt-0.5 text-slate-500 dark:text-slate-300 sm:gap-2 sm:pt-1 lg:justify-end">
+                    <span class="flex flex-wrap items-start gap-1 pt-0.5 text-slate-500 dark:text-slate-300 sm:gap-2 sm:pt-1 lg:justify-end">
                       <% if (sourceRanks.length > 0) { %>
                         <span class="consensus-source-ranks">
                           <% if (entry.bigDiscrepency && isConsensusBoard) { %>
@@ -217,7 +217,7 @@
                     </span>
                   </span>
                 </span>
-                <span class="relative z-10 flex justify-center sm:absolute sm:bottom-3 sm:left-1/2 sm:-translate-x-1/2">
+                <span class="relative z-10 col-span-2 flex justify-center sm:absolute sm:bottom-3 sm:left-1/2 sm:col-span-1 sm:-translate-x-1/2">
                   <% if (isConsensusBoard) { %>
                     <% if (entry.bigDiscrepency) { %>
                       <%- include("consensusDiscrepancyControls", { board, entry, isAdmin, variant: "card" }) %>
@@ -240,16 +240,16 @@
               <% } %>
             </details>
           <% } else { %>
-            <div class="relative grid gap-3 overflow-hidden rounded-md p-2 sm:min-h-32 sm:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)] sm:items-center">
+            <div class="relative grid grid-cols-[3.25rem_minmax(0,1fr)] items-start gap-x-2 gap-y-2 overflow-hidden rounded-md p-2 sm:min-h-32 sm:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)] sm:items-center sm:gap-3">
               <span class="pointer-events-none absolute inset-y-0 right-0 left-[31rem] hidden bg-slate-200/55 [clip-path:polygon(3rem_0,100%_0,100%_100%,0_100%)] dark:bg-white/[0.06] lg:block" aria-hidden="true"></span>
               <span class="sr-only"><%= accessibleSummary %></span>
-              <span class="relative z-10 flex items-center gap-2">
-                <span class="w-10 font-display text-3xl font-black leading-none text-draft-amber dark:text-draft-gold sm:w-auto sm:text-5xl"><%= rankLabel %></span>
-                <span class="h-9 w-px bg-slate-300 dark:bg-white/20 sm:h-14" aria-hidden="true"></span>
+              <span class="relative z-10 flex items-center justify-center gap-2 sm:justify-start">
+                <span class="w-auto font-display text-2xl font-black leading-none text-draft-amber dark:text-draft-gold sm:w-auto sm:text-5xl"><%= rankLabel %></span>
+                <span class="hidden h-9 w-px bg-slate-300 dark:bg-white/20 sm:block sm:h-14" aria-hidden="true"></span>
               </span>
-              <span class="relative z-10 grid justify-items-center text-center">
+              <span class="relative z-10 col-start-1 row-start-2 grid justify-items-center text-center sm:col-start-auto sm:row-start-auto">
                 <img
-                  class="h-14 w-20 shrink-0 object-contain opacity-0 transition-opacity duration-150 sm:h-28 sm:w-32"
+                  class="h-10 w-12 shrink-0 object-contain opacity-0 transition-opacity duration-150 sm:h-28 sm:w-32"
                   src="/teamHelmetTemplate.png"
                   alt="<%= entry.school %> football helmet"
                   loading="lazy"
@@ -258,16 +258,16 @@
                   data-generated-helmet-src="<%= generatedHelmetSrc %>"
                 />
               </span>
-              <div class="relative z-10 grid gap-3">
-                <div class="grid gap-3 lg:grid-cols-[minmax(0,18rem)_minmax(12rem,1fr)] lg:items-start">
+              <div class="relative z-10 col-start-2 row-span-2 row-start-1 grid gap-1.5 sm:col-start-auto sm:row-span-1 sm:row-start-auto sm:gap-3">
+                <div class="grid gap-1.5 sm:gap-3 lg:grid-cols-[minmax(0,18rem)_minmax(12rem,1fr)] lg:items-start">
                   <div>
-                    <span class="block font-display text-xl font-black leading-tight text-slate-950 dark:text-white sm:text-3xl"><%= entry.playerName %></span>
-                    <span class="mt-1.5 flex flex-wrap items-center gap-1.5 sm:mt-2 sm:gap-2">
-                      <span class="inline-flex rounded bg-draft-gold px-2 py-0.5 text-xs font-black uppercase tracking-wide text-draft-ink sm:px-3 sm:py-1 sm:text-sm"><%= posRankLabel %></span>
+                    <span class="block font-display text-[1.12rem] font-black leading-tight text-slate-950 dark:text-white sm:text-3xl"><%= entry.playerName %></span>
+                    <span class="mt-1 flex flex-wrap items-center gap-1.5 sm:mt-2 sm:gap-2">
+                      <span class="inline-flex rounded bg-draft-gold px-1.5 py-0.5 text-[0.68rem] font-black uppercase tracking-wide text-draft-ink sm:px-3 sm:py-1 sm:text-sm"><%= posRankLabel %></span>
                       <span class="text-xs font-black leading-tight text-slate-500 dark:text-slate-300 sm:text-sm"><%= entry.school %></span>
                     </span>
                   </div>
-                  <div class="flex flex-wrap items-start gap-1.5 pt-0.5 text-slate-500 dark:text-slate-300 sm:gap-2 sm:pt-1 lg:justify-end">
+                  <div class="flex flex-wrap items-start gap-1 pt-0.5 text-slate-500 dark:text-slate-300 sm:gap-2 sm:pt-1 lg:justify-end">
                     <% if (sourceRanks.length > 0) { %>
                       <span class="consensus-source-ranks">
                         <% if (entry.bigDiscrepency && isConsensusBoard) { %>
@@ -328,12 +328,12 @@
         <li>
           <% if (hasPublishedDetails || hasConsensusDisclosure) { %>
             <details class="group">
-              <summary class="od-focus-ring grid cursor-pointer list-none grid-cols-[2.5rem_minmax(0,1fr)] gap-x-2 gap-y-2 px-2.5 py-2.5 transition hover:bg-slate-50 dark:hover:bg-white/[0.04] sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:items-center sm:gap-3 sm:px-3 sm:py-3 [&::-webkit-details-marker]:hidden">
+              <summary class="od-focus-ring grid cursor-pointer list-none grid-cols-[2.15rem_minmax(0,1fr)] gap-x-1.5 gap-y-1.5 px-2 py-2 transition hover:bg-slate-50 dark:hover:bg-white/[0.04] sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:items-center sm:gap-3 sm:px-3 sm:py-3 [&::-webkit-details-marker]:hidden">
                 <span class="sr-only"><%= accessibleSummary %></span>
                 <span class="flex items-center gap-2">
-                  <span class="w-7 font-display text-xl font-black leading-none text-draft-amber dark:text-draft-gold sm:w-8 sm:text-2xl"><%= rankLabel %></span>
-                  <span class="inline-grid size-5 place-items-center rounded border border-slate-300/70 text-slate-500 transition group-open:bg-draft-gold group-open:text-draft-ink dark:border-white/15 dark:text-slate-300 sm:size-6" aria-hidden="true">
-                    <svg class="size-3 transition group-open:rotate-180 sm:size-3.5" viewBox="0 0 20 20" fill="currentColor">
+                  <span class="w-5 font-display text-lg font-black leading-none text-draft-amber dark:text-draft-gold sm:w-8 sm:text-2xl"><%= rankLabel %></span>
+                  <span class="inline-grid size-4 place-items-center rounded border border-slate-300/70 text-slate-500 transition group-open:bg-draft-gold group-open:text-draft-ink dark:border-white/15 dark:text-slate-300 sm:size-6" aria-hidden="true">
+                    <svg class="size-2.5 transition group-open:rotate-180 sm:size-3.5" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" />
                     </svg>
                   </span>
@@ -349,14 +349,26 @@
                     data-generated-helmet-src="<%= generatedHelmetSrc %>"
                   />
                   <span class="min-w-0">
-                    <span class="block truncate font-display text-lg font-black leading-tight text-slate-950 dark:text-white sm:text-xl"><%= entry.playerName %></span>
-                    <span class="mt-0.5 flex min-w-0 flex-nowrap items-center gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 sm:mt-1 sm:flex-wrap sm:gap-x-2 sm:gap-y-1 sm:text-sm">
-                      <span class="text-draft-amber dark:text-draft-gold"><%= posRankLabel %></span>
-                      <span class="truncate"><%= entry.school %></span>
+                    <span class="block truncate font-display text-base font-black leading-tight text-slate-950 dark:text-white sm:text-xl"><%= entry.playerName %></span>
+                    <span class="mt-0.5 flex min-w-0 flex-nowrap items-center gap-1 text-[0.7rem] font-bold leading-none text-slate-600 dark:text-slate-300 sm:mt-1 sm:flex-wrap sm:gap-x-2 sm:gap-y-1 sm:text-sm">
+                      <span class="shrink-0 text-draft-amber dark:text-draft-gold"><%= posRankLabel %></span>
+                      <span class="min-w-0 flex-1 truncate"><%= entry.school %></span>
+                      <% if (sourceRanks.length > 0) { %>
+                        <span class="inline-flex h-5 shrink-0 items-center rounded border border-slate-300/50 bg-draft-slate px-1 text-[0.55rem] font-black leading-none text-slate-300 dark:border-white/10 dark:bg-draft-ink sm:hidden">
+                          <% sourceRanks.forEach(([creator, sourceRank], sourceIndex) => { %>
+                            <span><%= creator.slice(0, 1) %> <%= formatBoardNumber(sourceRank) %></span><%- sourceIndex < sourceRanks.length - 1 ? "&nbsp;/&nbsp;" : "" %>
+                          <% }) %>
+                        </span>
+                      <% } %>
+                      <% if (hasPublishedGrade) { %>
+                        <span class="inline-flex h-5 shrink-0 items-center rounded border border-draft-gold/50 px-1.5 font-display text-[0.72rem] font-black leading-none text-draft-amber dark:text-draft-gold sm:hidden"><%= boardGradeLabel %></span>
+                      <% } %>
+                      <span class="inline-flex h-5 shrink-0 items-center rounded border border-white/10 bg-draft-slate px-1 text-[0.62rem] font-black leading-none text-slate-300 dark:bg-draft-ink sm:hidden"><%= heightLabel %></span>
+                      <span class="inline-flex h-5 shrink-0 items-center rounded border border-white/10 bg-draft-slate px-1 text-[0.62rem] font-black leading-none text-slate-300 dark:bg-draft-ink sm:hidden"><%= weightLabel %></span>
                     </span>
                   </span>
                 </span>
-                <span class="col-span-2 flex flex-nowrap items-start gap-1.5 overflow-x-auto pb-0.5 sm:col-span-1 sm:flex-wrap sm:gap-2 sm:overflow-visible sm:pb-0 sm:justify-end">
+                <span class="col-span-2 hidden flex-nowrap items-start gap-1.5 overflow-x-auto pb-0.5 sm:col-span-1 sm:flex sm:flex-wrap sm:gap-2 sm:overflow-visible sm:pb-0 sm:justify-end">
                   <% if (sourceRanks.length > 0) { %>
                     <span class="consensus-source-ranks">
                       <% if (entry.bigDiscrepency && isConsensusBoard) { %>
@@ -392,8 +404,8 @@
               <% } %>
             </details>
           <% } else { %>
-            <div class="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-2 gap-y-2 px-2.5 py-2.5 sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:items-center sm:gap-3 sm:px-3 sm:py-3">
-              <span class="font-display text-xl font-black leading-none text-draft-amber dark:text-draft-gold sm:text-2xl"><%= rankLabel %></span>
+            <div class="grid grid-cols-[2.15rem_minmax(0,1fr)] gap-x-1.5 gap-y-1.5 px-2 py-2 sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:items-center sm:gap-3 sm:px-3 sm:py-3">
+              <span class="font-display text-lg font-black leading-none text-draft-amber dark:text-draft-gold sm:text-2xl"><%= rankLabel %></span>
               <span class="grid min-w-0 gap-2 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:items-center">
                 <img
                   class="hidden h-14 w-16 shrink-0 object-contain opacity-0 transition-opacity duration-150 sm:block"
@@ -405,14 +417,26 @@
                   data-generated-helmet-src="<%= generatedHelmetSrc %>"
                 />
                 <span class="min-w-0">
-                  <span class="block truncate font-display text-lg font-black leading-tight text-slate-950 dark:text-white sm:text-xl"><%= entry.playerName %></span>
-                  <span class="mt-0.5 flex min-w-0 flex-nowrap items-center gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 sm:mt-1 sm:flex-wrap sm:gap-x-2 sm:gap-y-1 sm:text-sm">
-                    <span class="text-draft-amber dark:text-draft-gold"><%= posRankLabel %></span>
-                    <span class="truncate"><%= entry.school %></span>
+                  <span class="block truncate font-display text-base font-black leading-tight text-slate-950 dark:text-white sm:text-xl"><%= entry.playerName %></span>
+                  <span class="mt-0.5 flex min-w-0 flex-nowrap items-center gap-1 text-[0.7rem] font-bold leading-none text-slate-600 dark:text-slate-300 sm:mt-1 sm:flex-wrap sm:gap-x-2 sm:gap-y-1 sm:text-sm">
+                    <span class="shrink-0 text-draft-amber dark:text-draft-gold"><%= posRankLabel %></span>
+                    <span class="min-w-0 flex-1 truncate"><%= entry.school %></span>
+                    <% if (sourceRanks.length > 0) { %>
+                      <span class="inline-flex h-5 shrink-0 items-center rounded border border-slate-300/50 bg-draft-slate px-1 text-[0.55rem] font-black leading-none text-slate-300 dark:border-white/10 dark:bg-draft-ink sm:hidden">
+                        <% sourceRanks.forEach(([creator, sourceRank], sourceIndex) => { %>
+                          <span><%= creator.slice(0, 1) %> <%= formatBoardNumber(sourceRank) %></span><%- sourceIndex < sourceRanks.length - 1 ? "&nbsp;/&nbsp;" : "" %>
+                        <% }) %>
+                      </span>
+                    <% } %>
+                    <% if (hasPublishedGrade) { %>
+                      <span class="inline-flex h-5 shrink-0 items-center rounded border border-draft-gold/50 px-1.5 font-display text-[0.72rem] font-black leading-none text-draft-amber dark:text-draft-gold sm:hidden"><%= boardGradeLabel %></span>
+                    <% } %>
+                    <span class="inline-flex h-5 shrink-0 items-center rounded border border-white/10 bg-draft-slate px-1 text-[0.62rem] font-black leading-none text-slate-300 dark:bg-draft-ink sm:hidden"><%= heightLabel %></span>
+                    <span class="inline-flex h-5 shrink-0 items-center rounded border border-white/10 bg-draft-slate px-1 text-[0.62rem] font-black leading-none text-slate-300 dark:bg-draft-ink sm:hidden"><%= weightLabel %></span>
                   </span>
                 </span>
               </span>
-              <span class="col-span-2 flex flex-nowrap items-start gap-1.5 overflow-x-auto pb-0.5 sm:col-span-1 sm:flex-wrap sm:gap-2 sm:overflow-visible sm:pb-0 sm:justify-end">
+              <span class="col-span-2 hidden flex-nowrap items-start gap-1.5 overflow-x-auto pb-0.5 sm:col-span-1 sm:flex sm:flex-wrap sm:gap-2 sm:overflow-visible sm:pb-0 sm:justify-end">
                 <% if (sourceRanks.length > 0) { %>
                   <span class="consensus-source-ranks">
                     <% if (entry.bigDiscrepency && isConsensusBoard) { %>
@@ -482,6 +506,13 @@
         </div>
 
         <div class="grid gap-4 p-3 sm:gap-5 sm:p-4">
+          <section class="grid gap-2 rounded-md border border-draft-gold/35 bg-draft-gold/10 p-3 text-sm font-bold leading-6 text-slate-700 dark:bg-draft-gold/10 dark:text-slate-200">
+            <h3 class="text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">About Grading</h3>
+            <p>Every position is graded on six physical traits, in addition to 9-14 film traits specific to that position. Using each of these traits graded 1-8, a raw grade is calculated, with additional modifiers added, adjusting for potential and positional value, providing the final grades seen on the Big Board.</p>
+            <p>Each player is also assigned an &lsquo;Archetype&rsquo;. Each position has anywhere from 2-4 archetypes. These archetypes are not necessarily role projections into the league; they are a reflection of current playstyle. Archetypes are only used for the internal grading structure. True role projection and scheme fit are presented separately.</p>
+            <p>Each archetype is crafted to adjust for different styles of players within each position (ex. A &lsquo;Physical&rsquo; styled WR vs. a &lsquo;Slot&rsquo; styled WR, where traits such as Size / Frame, Contested Catching, and Body Control will be weighed higher for a &lsquo;Physical&rsquo; WR than a &lsquo;Slot&rsquo; WR). The purpose of these archetypes is to account for these differences in strengths / weaknesses without unfairly punishing players for lacking in certain skills when it may simply not be as important to their style of play.</p>
+          </section>
+
           <section class="grid gap-2">
             <h3 class="text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Final Grades</h3>
             <div class="overflow-hidden rounded-md border border-slate-200 dark:border-white/10">
@@ -553,12 +584,6 @@
               </div>
             </section>
           </div>
-
-          <section class="grid gap-2 rounded-md bg-slate-100 p-3 text-sm font-bold text-slate-700 dark:bg-white/10 dark:text-slate-200">
-            <h3 class="text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Archetype Explanation</h3>
-            <p>Each position has anywhere from 2-4 archetypes. These archetypes are not necessarily role projections into the league; they are a reflection of current playstyle.</p>
-            <p>Archetypes are only used for the internal grading structure. True role projection and scheme fit are presented separately.</p>
-          </section>
 
           <% if (gradeGuidePositions.length > 0) { %>
             <section class="grid gap-3">

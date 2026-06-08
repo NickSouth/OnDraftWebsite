@@ -42,25 +42,25 @@
 
         <ul class="grid list-none gap-3 p-0 sm:gap-5">
           <% bookmarkedArticles.forEach((article) => { %>
-            <li class="od-card grid overflow-hidden transition hover:-translate-y-0.5 hover:border-draft-gold hover:shadow-editorial sm:grid-cols-[14rem_minmax(0,1fr)]">
+            <li class="od-card grid grid-cols-[4.25rem_minmax(0,1fr)] overflow-hidden transition hover:-translate-y-0.5 hover:border-draft-gold hover:shadow-editorial sm:grid-cols-[14rem_minmax(0,1fr)]">
               <a class="group block overflow-hidden bg-draft-ink" href="/articles/<%= article.id %>">
                 <% if (article.imageUrl) { %>
-                  <img class="article-list-thumb aspect-[16/10]" src="<%= article.imageUrl %>" alt="" loading="lazy" decoding="async" />
+                  <img class="article-list-thumb aspect-square sm:aspect-[16/10]" src="<%= article.imageUrl %>" alt="" loading="lazy" decoding="async" />
                 <% } else { %>
-                  <span class="article-list-thumb article-list-thumb-empty aspect-[16/10]">
-                    <img class="h-16 w-20 object-contain drop-shadow-sm" src="/images/brand/OnDraftLogo-cropped.png" alt="" loading="lazy" decoding="async" />
+                  <span class="article-list-thumb article-list-thumb-empty aspect-square sm:aspect-[16/10]">
+                    <img class="h-9 w-11 object-contain drop-shadow-sm sm:h-16 sm:w-20" src="/images/brand/OnDraftLogo-cropped.png" alt="" loading="lazy" decoding="async" />
                   </span>
                 <% } %>
               </a>
-              <div class="grid content-start gap-2.5 p-3.5 sm:gap-3 sm:p-5">
-                <div class="flex items-start justify-between gap-3">
-                  <p class="m-0 text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Article</p>
+              <div class="grid min-w-0 content-start gap-1.5 p-2.5 sm:gap-3 sm:p-5">
+                <div class="flex min-w-0 items-start justify-between gap-2 sm:gap-3">
+                  <p class="m-0 text-[0.62rem] font-black uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400 sm:text-xs sm:tracking-[0.16em] sm:text-draft-amber sm:dark:text-draft-gold">Article</p>
                   <%- include("partials/bookmarkButton", { bookmark: { type: "article", articleId: article.id }, bookmarked: true }) %>
                 </div>
-                <a class="font-display text-xl font-black leading-tight text-slate-950 no-underline transition hover:text-draft-amber dark:text-white dark:hover:text-draft-gold sm:text-2xl" href="/articles/<%= article.id %>"><%= article.title %></a>
-                <p class="m-0 text-sm font-bold text-slate-600 dark:text-slate-300">by <%= article.author %></p>
+                <a class="line-clamp-2 font-display text-base font-black leading-tight text-slate-950 no-underline transition hover:text-draft-amber dark:text-white dark:hover:text-draft-gold sm:text-2xl" href="/articles/<%= article.id %>"><%= article.title %></a>
+                <p class="m-0 truncate text-xs font-bold text-slate-600 dark:text-slate-300 sm:text-sm">by <%= article.author %></p>
                 <% if (article.writeup) { %>
-                  <p class="m-0 line-clamp-2 text-sm leading-6 text-slate-700 dark:text-slate-200 sm:text-base sm:leading-7"><%= article.writeup %></p>
+                  <p class="m-0 hidden text-sm leading-6 text-slate-700 dark:text-slate-200 sm:line-clamp-2 sm:text-base sm:leading-7"><%= article.writeup %></p>
                 <% } %>
               </div>
             </li>
@@ -81,15 +81,15 @@
 
         <ul class="grid list-none gap-3 p-0 sm:gap-4">
           <% bookmarkedForumPosts.forEach((post) => { %>
-            <li class="od-card grid gap-2.5 p-3.5 transition hover:-translate-y-0.5 hover:border-draft-gold hover:shadow-editorial sm:gap-3 sm:p-5">
-              <div class="flex flex-wrap items-center justify-between gap-3">
-                <p class="m-0 text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Hot Take</p>
+            <li class="od-card grid gap-1.5 p-2.5 transition hover:-translate-y-0.5 hover:border-draft-gold hover:shadow-editorial sm:gap-3 sm:p-5">
+              <div class="flex flex-nowrap items-center justify-between gap-2 sm:flex-wrap sm:gap-3">
+                <p class="m-0 shrink-0 text-[0.62rem] font-black uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400 sm:text-xs sm:tracking-[0.16em] sm:text-draft-amber sm:dark:text-draft-gold">Hot Take</p>
                 <div class="flex items-center gap-2">
-                  <span class="text-xs font-bold text-slate-600 dark:text-slate-300 sm:text-sm">by <%= post.userName %> &middot; <%= formatRelative(post.createdAt) %></span>
+                  <span class="truncate text-xs font-bold text-slate-600 dark:text-slate-300 sm:text-sm">by <%= post.userName %> &middot; <%= formatRelative(post.createdAt) %></span>
                   <%- include("partials/bookmarkButton", { bookmark: { type: "forumPost", forumPostId: post.id }, bookmarked: true }) %>
                 </div>
               </div>
-              <a class="font-display text-lg font-bold leading-snug text-slate-950 no-underline transition hover:text-draft-amber dark:text-white dark:hover:text-draft-gold sm:text-2xl" href="/hottakes#hot-take-<%= post.id %>"><%= post.content %></a>
+              <a class="line-clamp-3 font-display text-base font-bold leading-snug text-slate-950 no-underline transition hover:text-draft-amber dark:text-white dark:hover:text-draft-gold sm:text-2xl" href="/hottakes#hot-take-<%= post.id %>"><%= post.content %></a>
             </li>
           <% }) %>
         </ul>

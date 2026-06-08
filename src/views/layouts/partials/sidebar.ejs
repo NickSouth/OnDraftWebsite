@@ -60,7 +60,7 @@
     </div>
   </div>
 
-  <nav class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4 lg:overflow-visible" aria-label="Primary">
+  <nav class="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-3 sm:p-4 lg:overflow-visible" aria-label="Primary">
     <div class="grid gap-2">
     <% navItems.forEach((item) => { %>
       <% const isActive = item.href === "/" ? activePath === "/" : activePath === item.href || activePath.startsWith(`${item.href}/`); %>
@@ -77,12 +77,9 @@
     </div>
 
     <% if (currentIsAdmin) { %>
-      <div class="mt-5 border-t border-slate-200 pt-4 dark:border-white/10">
-        <p class="mb-1 px-2 text-[0.62rem] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Admin</p>
+      <div class="mt-auto border-t border-slate-200 pt-4 dark:border-white/10">
         <% const adminDashboardActive = activePath === "/admin" || activePath.startsWith("/admin/"); %>
-        <div class="grid gap-2">
-          <a href="/admin" class="od-shell-link flex min-h-10 px-3 py-2 text-xs leading-tight <%= adminDashboardActive ? "is-active" : "" %>" <%= adminDashboardActive ? 'aria-current="page"' : "" %>>Admin Dashboard</a>
-        </div>
+        <a href="/admin" class="od-primary-link w-full <%= adminDashboardActive ? "ring-2 ring-draft-gold/45 ring-offset-2 ring-offset-white dark:ring-offset-draft-slate" : "" %>" <%= adminDashboardActive ? 'aria-current="page"' : "" %>>Admin Dashboard</a>
       </div>
     <% } %>
   </nav>
