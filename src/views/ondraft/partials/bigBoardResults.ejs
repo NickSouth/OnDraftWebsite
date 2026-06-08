@@ -2,18 +2,21 @@
   id="big-board-results"
   class="big-board-results od-swap-surface od-swap-active"
   x-data="{
-    boardView: 'card',
+    boardView: window.matchMedia('(max-width: 639px)').matches ? 'list' : 'card',
     gradeGuideOpen: false,
     gradeGuidePosition: '<%= typeof positions !== "undefined" && positions.length > 0 ? positions[0] : "QB" %>',
+    get storageKey() {
+      return window.matchMedia('(max-width: 639px)').matches ? 'bigBoardMobileView' : 'bigBoardView';
+    },
     init() {
-      const savedView = window.localStorage.getItem('bigBoardView');
+      const savedView = window.localStorage.getItem(this.storageKey);
       if (savedView === 'card' || savedView === 'list') {
         this.boardView = savedView;
       }
     },
     setBoardView(view) {
       this.boardView = view;
-      window.localStorage.setItem('bigBoardView', view);
+      window.localStorage.setItem(this.storageKey, view);
     }
   }"
 >
@@ -75,10 +78,10 @@
       </div>
     </div>
   <% } else { %>
-    <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div class="mb-2 flex flex-row items-center justify-between gap-2 sm:mb-3 sm:gap-3">
       <% if (bylineAuthors.length > 0) { %>
-        <div class="grid gap-1">
-          <p class="m-0 text-sm font-bold text-slate-700 dark:text-slate-200">
+        <div class="grid min-w-0 gap-0.5 sm:gap-1">
+          <p class="m-0 line-clamp-1 text-xs font-bold text-slate-700 dark:text-slate-200 sm:text-sm">
             Player analysis and opinions by
             <% bylineAuthors.forEach((author, index) => { %>
               <%- include("profileAuthorLink", { name: author, showBadge: false, className: "text-draft-amber no-underline transition hover:text-draft-gold dark:text-draft-gold" }) %><%= index < bylineAuthors.length - 1 ? "/" : "" %>
@@ -86,7 +89,7 @@
           </p>
           <button
             type="button"
-            class="w-fit text-left text-xs font-black uppercase tracking-[0.14em] text-draft-amber underline decoration-draft-gold/40 underline-offset-4 transition hover:text-draft-gold hover:decoration-draft-gold dark:text-draft-gold"
+            class="w-fit text-left text-[0.68rem] font-black uppercase tracking-[0.1em] text-draft-amber underline decoration-draft-gold/40 underline-offset-4 transition hover:text-draft-gold hover:decoration-draft-gold dark:text-draft-gold sm:text-xs sm:tracking-[0.14em]"
             @click="gradeGuideOpen = true"
           >
             How we grade players
@@ -95,17 +98,17 @@
       <% } else { %>
         <span aria-hidden="true"></span>
       <% } %>
-      <div class="od-view-toggle-group shadow-sm" aria-label="Draft board view">
+      <div class="od-view-toggle-group shrink-0 shadow-sm" aria-label="Draft board view">
         <button
           type="button"
-          class="od-view-toggle size-10"
+          class="od-view-toggle size-8 sm:size-10"
           :class="boardView === 'card' ? 'is-active' : 'text-slate-500 dark:text-slate-300'"
           :aria-pressed="boardView === 'card'"
           aria-label="Card view"
           title="Card view"
           @click="setBoardView('card')"
         >
-          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <svg class="size-4 sm:size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <rect x="4" y="5" width="16" height="4" rx="1" />
             <rect x="4" y="10" width="16" height="4" rx="1" />
             <rect x="4" y="15" width="16" height="4" rx="1" />
@@ -113,14 +116,14 @@
         </button>
         <button
           type="button"
-          class="od-view-toggle size-10"
+          class="od-view-toggle size-8 sm:size-10"
           :class="boardView === 'list' ? 'is-active' : 'text-slate-500 dark:text-slate-300'"
           :aria-pressed="boardView === 'list'"
           aria-label="List view"
           title="List view"
           @click="setBoardView('list')"
         >
-          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <svg class="size-4 sm:size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <path d="M7 6h14" />
             <path d="M7 12h14" />
             <path d="M7 18h14" />
@@ -161,12 +164,12 @@
                 <span class="pointer-events-none absolute inset-y-0 right-0 left-[31rem] hidden bg-slate-200/55 [clip-path:polygon(3rem_0,100%_0,100%_100%,0_100%)] dark:bg-white/[0.06] lg:block" aria-hidden="true"></span>
                 <span class="sr-only"><%= accessibleSummary %></span>
                 <span class="relative z-10 flex items-center gap-2">
-                  <span class="font-display text-5xl font-black leading-none text-draft-amber dark:text-draft-gold"><%= rankLabel %></span>
-                  <span class="h-14 w-px bg-slate-300 dark:bg-white/20" aria-hidden="true"></span>
+                  <span class="w-10 font-display text-3xl font-black leading-none text-draft-amber dark:text-draft-gold sm:w-auto sm:text-5xl"><%= rankLabel %></span>
+                  <span class="h-9 w-px bg-slate-300 dark:bg-white/20 sm:h-14" aria-hidden="true"></span>
                 </span>
                 <span class="relative z-10 grid justify-items-center text-center">
                   <img
-                    class="h-24 w-32 shrink-0 object-contain opacity-0 transition-opacity duration-150 sm:h-28 sm:w-32"
+                    class="h-14 w-20 shrink-0 object-contain opacity-0 transition-opacity duration-150 sm:h-28 sm:w-32"
                     src="/teamHelmetTemplate.png"
                     alt="<%= entry.school %> football helmet"
                     loading="lazy"
@@ -178,13 +181,13 @@
                 <span class="relative z-10 grid gap-3">
                   <span class="grid gap-3 lg:grid-cols-[minmax(0,18rem)_minmax(12rem,1fr)] lg:items-start">
                     <span>
-                      <span class="block font-display text-3xl font-black leading-tight text-slate-950 dark:text-white"><%= entry.playerName %></span>
-                      <span class="mt-2 flex flex-wrap items-center gap-2">
-                        <span class="inline-flex rounded bg-draft-gold px-3 py-1 text-sm font-black uppercase tracking-wide text-draft-ink"><%= posRankLabel %></span>
-                        <span class="text-sm font-black leading-tight text-slate-500 dark:text-slate-300"><%= entry.school %></span>
+                      <span class="block font-display text-xl font-black leading-tight text-slate-950 dark:text-white sm:text-3xl"><%= entry.playerName %></span>
+                      <span class="mt-1.5 flex flex-wrap items-center gap-1.5 sm:mt-2 sm:gap-2">
+                        <span class="inline-flex rounded bg-draft-gold px-2 py-0.5 text-xs font-black uppercase tracking-wide text-draft-ink sm:px-3 sm:py-1 sm:text-sm"><%= posRankLabel %></span>
+                        <span class="text-xs font-black leading-tight text-slate-500 dark:text-slate-300 sm:text-sm"><%= entry.school %></span>
                       </span>
                     </span>
-                    <span class="flex flex-wrap items-start gap-2 pt-1 text-slate-500 dark:text-slate-300 lg:justify-end">
+                    <span class="flex flex-wrap items-start gap-1.5 pt-0.5 text-slate-500 dark:text-slate-300 sm:gap-2 sm:pt-1 lg:justify-end">
                       <% if (sourceRanks.length > 0) { %>
                         <span class="consensus-source-ranks">
                           <% if (entry.bigDiscrepency && isConsensusBoard) { %>
@@ -198,18 +201,18 @@
                         </span>
                       <% } %>
                       <% if (hasPublishedGrade) { %>
-                        <span class="grid min-h-16 min-w-32 place-content-center gap-1 rounded-md border border-draft-gold/50 bg-white px-4 py-3 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink">
+                        <span class="grid min-h-11 min-w-20 place-content-center gap-0.5 rounded-md border border-draft-gold/50 bg-white px-2.5 py-2 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink sm:min-h-16 sm:min-w-32 sm:gap-1 sm:px-4 sm:py-3">
                           <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Grade</span>
-                          <span class="font-display text-xl font-black leading-none text-draft-amber dark:text-draft-gold"><%= boardGradeLabel %></span>
+                          <span class="font-display text-base font-black leading-none text-draft-amber dark:text-draft-gold sm:text-xl"><%= boardGradeLabel %></span>
                         </span>
                       <% } %>
-                      <span class="grid min-w-20 gap-0.5 rounded bg-draft-slate px-3 py-2 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink">
+                      <span class="grid min-w-16 gap-0.5 rounded bg-draft-slate px-2 py-1.5 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink sm:min-w-20 sm:px-3 sm:py-2">
                         <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Height</span>
-                        <span class="text-sm font-black leading-none text-slate-500 dark:text-slate-300"><%= heightLabel %></span>
+                        <span class="text-xs font-black leading-none text-slate-500 dark:text-slate-300 sm:text-sm"><%= heightLabel %></span>
                       </span>
-                      <span class="grid min-w-20 gap-0.5 rounded bg-draft-slate px-3 py-2 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink">
+                      <span class="grid min-w-16 gap-0.5 rounded bg-draft-slate px-2 py-1.5 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink sm:min-w-20 sm:px-3 sm:py-2">
                         <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Weight</span>
-                        <span class="text-sm font-black leading-none text-slate-500 dark:text-slate-300"><%= weightLabel %></span>
+                        <span class="text-xs font-black leading-none text-slate-500 dark:text-slate-300 sm:text-sm"><%= weightLabel %></span>
                       </span>
                     </span>
                   </span>
@@ -220,11 +223,12 @@
                       <%- include("consensusDiscrepancyControls", { board, entry, isAdmin, variant: "card" }) %>
                     <% } %>
                   <% } else { %>
-                    <span class="inline-flex items-center gap-2 rounded-full border border-draft-gold/50 bg-white/90 px-3 py-1.5 text-xs font-black uppercase tracking-[0.12em] text-draft-amber shadow-sm transition group-open:bg-draft-gold group-open:text-draft-ink dark:bg-draft-ink/95 dark:text-draft-gold dark:group-open:bg-draft-gold dark:group-open:text-draft-ink">
-                      <svg class="size-4 transition group-open:rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <span class="inline-flex items-center gap-1.5 rounded-full border border-draft-gold/50 bg-white/90 px-2.5 py-1 text-[0.68rem] font-black uppercase tracking-[0.08em] text-draft-amber shadow-sm transition group-open:bg-draft-gold group-open:text-draft-ink dark:bg-draft-ink/95 dark:text-draft-gold dark:group-open:bg-draft-gold dark:group-open:text-draft-ink sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs sm:tracking-[0.12em]">
+                      <svg class="size-3.5 transition group-open:rotate-180 sm:size-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" />
                       </svg>
-                      <span>read player profile</span>
+                      <span class="sm:hidden">Profile</span>
+                      <span class="hidden sm:inline">read player profile</span>
                     </span>
                   <% } %>
                 </span>
@@ -240,12 +244,12 @@
               <span class="pointer-events-none absolute inset-y-0 right-0 left-[31rem] hidden bg-slate-200/55 [clip-path:polygon(3rem_0,100%_0,100%_100%,0_100%)] dark:bg-white/[0.06] lg:block" aria-hidden="true"></span>
               <span class="sr-only"><%= accessibleSummary %></span>
               <span class="relative z-10 flex items-center gap-2">
-                <span class="font-display text-5xl font-black leading-none text-draft-amber dark:text-draft-gold"><%= rankLabel %></span>
-                <span class="h-14 w-px bg-slate-300 dark:bg-white/20" aria-hidden="true"></span>
+                <span class="w-10 font-display text-3xl font-black leading-none text-draft-amber dark:text-draft-gold sm:w-auto sm:text-5xl"><%= rankLabel %></span>
+                <span class="h-9 w-px bg-slate-300 dark:bg-white/20 sm:h-14" aria-hidden="true"></span>
               </span>
               <span class="relative z-10 grid justify-items-center text-center">
                 <img
-                  class="h-24 w-32 shrink-0 object-contain opacity-0 transition-opacity duration-150 sm:h-28 sm:w-32"
+                  class="h-14 w-20 shrink-0 object-contain opacity-0 transition-opacity duration-150 sm:h-28 sm:w-32"
                   src="/teamHelmetTemplate.png"
                   alt="<%= entry.school %> football helmet"
                   loading="lazy"
@@ -257,13 +261,13 @@
               <div class="relative z-10 grid gap-3">
                 <div class="grid gap-3 lg:grid-cols-[minmax(0,18rem)_minmax(12rem,1fr)] lg:items-start">
                   <div>
-                    <span class="block font-display text-3xl font-black leading-tight text-slate-950 dark:text-white"><%= entry.playerName %></span>
-                    <span class="mt-2 flex flex-wrap items-center gap-2">
-                      <span class="inline-flex rounded bg-draft-gold px-3 py-1 text-sm font-black uppercase tracking-wide text-draft-ink"><%= posRankLabel %></span>
-                      <span class="text-sm font-black leading-tight text-slate-500 dark:text-slate-300"><%= entry.school %></span>
+                    <span class="block font-display text-xl font-black leading-tight text-slate-950 dark:text-white sm:text-3xl"><%= entry.playerName %></span>
+                    <span class="mt-1.5 flex flex-wrap items-center gap-1.5 sm:mt-2 sm:gap-2">
+                      <span class="inline-flex rounded bg-draft-gold px-2 py-0.5 text-xs font-black uppercase tracking-wide text-draft-ink sm:px-3 sm:py-1 sm:text-sm"><%= posRankLabel %></span>
+                      <span class="text-xs font-black leading-tight text-slate-500 dark:text-slate-300 sm:text-sm"><%= entry.school %></span>
                     </span>
                   </div>
-                  <div class="flex flex-wrap items-start gap-2 pt-1 text-slate-500 dark:text-slate-300 lg:justify-end">
+                  <div class="flex flex-wrap items-start gap-1.5 pt-0.5 text-slate-500 dark:text-slate-300 sm:gap-2 sm:pt-1 lg:justify-end">
                     <% if (sourceRanks.length > 0) { %>
                       <span class="consensus-source-ranks">
                         <% if (entry.bigDiscrepency && isConsensusBoard) { %>
@@ -277,18 +281,18 @@
                       </span>
                     <% } %>
                     <% if (hasPublishedGrade) { %>
-                      <span class="grid min-h-16 min-w-32 place-content-center gap-1 rounded-md border border-draft-gold/50 bg-white px-4 py-3 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink">
+                      <span class="grid min-h-11 min-w-20 place-content-center gap-0.5 rounded-md border border-draft-gold/50 bg-white px-2.5 py-2 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink sm:min-h-16 sm:min-w-32 sm:gap-1 sm:px-4 sm:py-3">
                         <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Grade</span>
-                        <span class="font-display text-xl font-black leading-none text-draft-amber dark:text-draft-gold"><%= boardGradeLabel %></span>
+                        <span class="font-display text-base font-black leading-none text-draft-amber dark:text-draft-gold sm:text-xl"><%= boardGradeLabel %></span>
                       </span>
                     <% } %>
-                    <span class="grid min-w-20 gap-0.5 rounded bg-draft-slate px-3 py-2 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink">
+                    <span class="grid min-w-16 gap-0.5 rounded bg-draft-slate px-2 py-1.5 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink sm:min-w-20 sm:px-3 sm:py-2">
                       <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Height</span>
-                      <span class="text-sm font-black leading-none text-slate-500 dark:text-slate-300"><%= heightLabel %></span>
+                      <span class="text-xs font-black leading-none text-slate-500 dark:text-slate-300 sm:text-sm"><%= heightLabel %></span>
                     </span>
-                    <span class="grid min-w-20 gap-0.5 rounded bg-draft-slate px-3 py-2 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink">
+                    <span class="grid min-w-16 gap-0.5 rounded bg-draft-slate px-2 py-1.5 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink sm:min-w-20 sm:px-3 sm:py-2">
                       <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Weight</span>
-                      <span class="text-sm font-black leading-none text-slate-500 dark:text-slate-300"><%= weightLabel %></span>
+                      <span class="text-xs font-black leading-none text-slate-500 dark:text-slate-300 sm:text-sm"><%= weightLabel %></span>
                     </span>
                   </div>
                 </div>
@@ -324,12 +328,12 @@
         <li>
           <% if (hasPublishedDetails || hasConsensusDisclosure) { %>
             <details class="group">
-              <summary class="od-focus-ring grid cursor-pointer list-none gap-3 px-3 py-3 transition hover:bg-slate-50 dark:hover:bg-white/[0.04] sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:items-center [&::-webkit-details-marker]:hidden">
+              <summary class="od-focus-ring grid cursor-pointer list-none grid-cols-[2.5rem_minmax(0,1fr)] gap-x-2 gap-y-2 px-2.5 py-2.5 transition hover:bg-slate-50 dark:hover:bg-white/[0.04] sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:items-center sm:gap-3 sm:px-3 sm:py-3 [&::-webkit-details-marker]:hidden">
                 <span class="sr-only"><%= accessibleSummary %></span>
                 <span class="flex items-center gap-2">
-                  <span class="w-8 font-display text-2xl font-black leading-none text-draft-amber dark:text-draft-gold"><%= rankLabel %></span>
-                  <span class="inline-grid size-6 place-items-center rounded border border-slate-300/70 text-slate-500 transition group-open:bg-draft-gold group-open:text-draft-ink dark:border-white/15 dark:text-slate-300" aria-hidden="true">
-                    <svg class="size-3.5 transition group-open:rotate-180" viewBox="0 0 20 20" fill="currentColor">
+                  <span class="w-7 font-display text-xl font-black leading-none text-draft-amber dark:text-draft-gold sm:w-8 sm:text-2xl"><%= rankLabel %></span>
+                  <span class="inline-grid size-5 place-items-center rounded border border-slate-300/70 text-slate-500 transition group-open:bg-draft-gold group-open:text-draft-ink dark:border-white/15 dark:text-slate-300 sm:size-6" aria-hidden="true">
+                    <svg class="size-3 transition group-open:rotate-180 sm:size-3.5" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" />
                     </svg>
                   </span>
@@ -345,14 +349,14 @@
                     data-generated-helmet-src="<%= generatedHelmetSrc %>"
                   />
                   <span class="min-w-0">
-                    <span class="block truncate font-display text-xl font-black leading-tight text-slate-950 dark:text-white"><%= entry.playerName %></span>
-                    <span class="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm font-bold text-slate-600 dark:text-slate-300">
+                    <span class="block truncate font-display text-lg font-black leading-tight text-slate-950 dark:text-white sm:text-xl"><%= entry.playerName %></span>
+                    <span class="mt-0.5 flex min-w-0 flex-nowrap items-center gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 sm:mt-1 sm:flex-wrap sm:gap-x-2 sm:gap-y-1 sm:text-sm">
                       <span class="text-draft-amber dark:text-draft-gold"><%= posRankLabel %></span>
                       <span class="truncate"><%= entry.school %></span>
                     </span>
                   </span>
                 </span>
-                <span class="flex flex-wrap items-start gap-2 sm:justify-end">
+                <span class="col-span-2 flex flex-nowrap items-start gap-1.5 overflow-x-auto pb-0.5 sm:col-span-1 sm:flex-wrap sm:gap-2 sm:overflow-visible sm:pb-0 sm:justify-end">
                   <% if (sourceRanks.length > 0) { %>
                     <span class="consensus-source-ranks">
                       <% if (entry.bigDiscrepency && isConsensusBoard) { %>
@@ -366,18 +370,18 @@
                     </span>
                   <% } %>
                   <% if (hasPublishedGrade) { %>
-                    <span class="grid min-h-16 min-w-32 place-content-center gap-1 rounded-md border border-draft-gold/50 bg-white px-4 py-3 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink">
+                    <span class="grid min-h-10 min-w-20 place-content-center gap-0.5 rounded-md border border-draft-gold/50 bg-white px-2 py-1.5 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink sm:min-h-16 sm:min-w-32 sm:gap-1 sm:px-4 sm:py-3">
                       <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Grade</span>
-                      <span class="font-display text-xl font-black leading-none text-draft-amber dark:text-draft-gold"><%= boardGradeLabel %></span>
+                      <span class="font-display text-base font-black leading-none text-draft-amber dark:text-draft-gold sm:text-xl"><%= boardGradeLabel %></span>
                     </span>
                   <% } %>
-                  <span class="grid min-w-20 gap-0.5 rounded bg-draft-slate px-3 py-2 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink">
+                  <span class="grid min-w-16 gap-0.5 rounded bg-draft-slate px-2 py-1.5 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink sm:min-w-20 sm:px-3 sm:py-2">
                     <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Height</span>
-                    <span class="text-sm font-black leading-none text-slate-500 dark:text-slate-300"><%= heightLabel %></span>
+                    <span class="text-xs font-black leading-none text-slate-500 dark:text-slate-300 sm:text-sm"><%= heightLabel %></span>
                   </span>
-                  <span class="grid min-w-20 gap-0.5 rounded bg-draft-slate px-3 py-2 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink">
+                  <span class="grid min-w-16 gap-0.5 rounded bg-draft-slate px-2 py-1.5 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink sm:min-w-20 sm:px-3 sm:py-2">
                     <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Weight</span>
-                    <span class="text-sm font-black leading-none text-slate-500 dark:text-slate-300"><%= weightLabel %></span>
+                    <span class="text-xs font-black leading-none text-slate-500 dark:text-slate-300 sm:text-sm"><%= weightLabel %></span>
                   </span>
                 </span>
               </summary>
@@ -388,8 +392,8 @@
               <% } %>
             </details>
           <% } else { %>
-            <div class="grid gap-3 px-3 py-3 sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:items-center">
-              <span class="font-display text-2xl font-black leading-none text-draft-amber dark:text-draft-gold"><%= rankLabel %></span>
+            <div class="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-2 gap-y-2 px-2.5 py-2.5 sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:items-center sm:gap-3 sm:px-3 sm:py-3">
+              <span class="font-display text-xl font-black leading-none text-draft-amber dark:text-draft-gold sm:text-2xl"><%= rankLabel %></span>
               <span class="grid min-w-0 gap-2 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:items-center">
                 <img
                   class="hidden h-14 w-16 shrink-0 object-contain opacity-0 transition-opacity duration-150 sm:block"
@@ -401,14 +405,14 @@
                   data-generated-helmet-src="<%= generatedHelmetSrc %>"
                 />
                 <span class="min-w-0">
-                  <span class="block truncate font-display text-xl font-black leading-tight text-slate-950 dark:text-white"><%= entry.playerName %></span>
-                  <span class="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm font-bold text-slate-600 dark:text-slate-300">
+                  <span class="block truncate font-display text-lg font-black leading-tight text-slate-950 dark:text-white sm:text-xl"><%= entry.playerName %></span>
+                  <span class="mt-0.5 flex min-w-0 flex-nowrap items-center gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 sm:mt-1 sm:flex-wrap sm:gap-x-2 sm:gap-y-1 sm:text-sm">
                     <span class="text-draft-amber dark:text-draft-gold"><%= posRankLabel %></span>
                     <span class="truncate"><%= entry.school %></span>
                   </span>
                 </span>
               </span>
-              <span class="flex flex-wrap items-start gap-2 sm:justify-end">
+              <span class="col-span-2 flex flex-nowrap items-start gap-1.5 overflow-x-auto pb-0.5 sm:col-span-1 sm:flex-wrap sm:gap-2 sm:overflow-visible sm:pb-0 sm:justify-end">
                 <% if (sourceRanks.length > 0) { %>
                   <span class="consensus-source-ranks">
                     <% if (entry.bigDiscrepency && isConsensusBoard) { %>
@@ -422,18 +426,18 @@
                   </span>
                 <% } %>
                 <% if (hasPublishedGrade) { %>
-                  <span class="grid min-h-16 min-w-32 place-content-center gap-1 rounded-md border border-draft-gold/50 bg-white px-4 py-3 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink">
+                  <span class="grid min-h-10 min-w-20 place-content-center gap-0.5 rounded-md border border-draft-gold/50 bg-white px-2 py-1.5 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink sm:min-h-16 sm:min-w-32 sm:gap-1 sm:px-4 sm:py-3">
                     <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Grade</span>
-                    <span class="font-display text-xl font-black leading-none text-draft-amber dark:text-draft-gold"><%= boardGradeLabel %></span>
+                    <span class="font-display text-base font-black leading-none text-draft-amber dark:text-draft-gold sm:text-xl"><%= boardGradeLabel %></span>
                   </span>
                 <% } %>
-                <span class="grid min-w-20 gap-0.5 rounded bg-draft-slate px-3 py-2 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink">
+                <span class="grid min-w-16 gap-0.5 rounded bg-draft-slate px-2 py-1.5 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink sm:min-w-20 sm:px-3 sm:py-2">
                   <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Height</span>
-                  <span class="text-sm font-black leading-none text-slate-500 dark:text-slate-300"><%= heightLabel %></span>
+                  <span class="text-xs font-black leading-none text-slate-500 dark:text-slate-300 sm:text-sm"><%= heightLabel %></span>
                 </span>
-                <span class="grid min-w-20 gap-0.5 rounded bg-draft-slate px-3 py-2 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink">
+                <span class="grid min-w-16 gap-0.5 rounded bg-draft-slate px-2 py-1.5 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink sm:min-w-20 sm:px-3 sm:py-2">
                   <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Weight</span>
-                  <span class="text-sm font-black leading-none text-slate-500 dark:text-slate-300"><%= weightLabel %></span>
+                  <span class="text-xs font-black leading-none text-slate-500 dark:text-slate-300 sm:text-sm"><%= weightLabel %></span>
                 </span>
               </span>
             </div>
@@ -443,7 +447,7 @@
     </ol>
     <template x-teleport="body">
       <div
-        class="fixed inset-0 z-[70] grid place-items-center bg-slate-950/70 p-4 backdrop-blur-sm"
+        class="fixed inset-0 z-[70] grid place-items-center bg-slate-950/70 p-2.5 backdrop-blur-sm sm:p-4"
         x-cloak
         x-show="gradeGuideOpen"
         x-transition.opacity.duration.150ms
@@ -452,36 +456,36 @@
         role="presentation"
       >
       <section
-        class="max-h-[88vh] w-full max-w-5xl overflow-y-auto rounded-lg border border-slate-200 bg-white text-slate-950 shadow-editorial dark:border-white/10 dark:bg-draft-slate dark:text-white"
+        class="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-lg border border-slate-200 bg-white text-slate-950 shadow-editorial dark:border-white/10 dark:bg-draft-slate dark:text-white sm:max-h-[88vh]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="grade-guide-title"
         tabindex="-1"
         x-trap.noscroll="gradeGuideOpen"
       >
-        <div class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white/95 p-4 backdrop-blur dark:border-white/10 dark:bg-draft-slate/95">
+        <div class="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-slate-200 bg-white/95 p-3 backdrop-blur dark:border-white/10 dark:bg-draft-slate/95 sm:gap-4 sm:p-4">
           <div>
-            <p class="text-xs font-black uppercase tracking-[0.18em] text-draft-amber dark:text-draft-gold">Draft grades</p>
-            <h2 id="grade-guide-title" class="font-display text-2xl font-black leading-tight">How we grade players</h2>
+            <p class="text-[0.68rem] font-black uppercase tracking-[0.14em] text-draft-amber dark:text-draft-gold sm:text-xs sm:tracking-[0.18em]">Draft grades</p>
+            <h2 id="grade-guide-title" class="font-display text-xl font-black leading-tight sm:text-2xl">How we grade players</h2>
           </div>
           <button
             type="button"
-            class="od-focus-ring inline-grid size-9 shrink-0 place-items-center rounded-md border border-slate-300 text-slate-500 transition hover:bg-draft-foam hover:text-draft-amber dark:border-white/15 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-draft-gold"
+            class="od-focus-ring inline-grid size-8 shrink-0 place-items-center rounded-md border border-slate-300 text-slate-500 transition hover:bg-draft-foam hover:text-draft-amber dark:border-white/15 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-draft-gold sm:size-9"
             @click="gradeGuideOpen = false"
             aria-label="Close grading guide"
           >
-            <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" aria-hidden="true">
+            <svg class="size-4 sm:size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" aria-hidden="true">
               <path d="M18 6 6 18" />
               <path d="m6 6 12 12" />
             </svg>
           </button>
         </div>
 
-        <div class="grid gap-5 p-4">
+        <div class="grid gap-4 p-3 sm:gap-5 sm:p-4">
           <section class="grid gap-2">
             <h3 class="text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Final Grades</h3>
             <div class="overflow-hidden rounded-md border border-slate-200 dark:border-white/10">
-              <div class="grid grid-cols-[minmax(6rem,0.75fr)_minmax(0,1.5fr)_minmax(6rem,0.75fr)] bg-slate-100 px-3 py-2 text-[0.68rem] font-black uppercase tracking-wide text-slate-500 dark:bg-white/10 dark:text-slate-300">
+              <div class="grid grid-cols-[minmax(4rem,0.7fr)_minmax(0,1.45fr)_minmax(4.5rem,0.75fr)] bg-slate-100 px-2 py-1.5 text-[0.6rem] font-black uppercase tracking-wide text-slate-500 dark:bg-white/10 dark:text-slate-300 sm:grid-cols-[minmax(6rem,0.75fr)_minmax(0,1.5fr)_minmax(6rem,0.75fr)] sm:px-3 sm:py-2 sm:text-[0.68rem]">
                 <span>Grade</span>
                 <span>Meaning</span>
                 <span>Projection</span>
@@ -499,7 +503,7 @@
                 ["3.00 - 3.80", "Roster Longshot / Practice Squad Contributor", "PFA"],
                 ["< 3.0", "Training Camp Body", "UDFA"],
               ].forEach((row) => { %>
-                <div class="grid grid-cols-[minmax(6rem,0.75fr)_minmax(0,1.5fr)_minmax(6rem,0.75fr)] gap-2 border-t border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 dark:border-white/10 dark:text-slate-200">
+                <div class="grid grid-cols-[minmax(4rem,0.7fr)_minmax(0,1.45fr)_minmax(4.5rem,0.75fr)] gap-1.5 border-t border-slate-200 px-2 py-1.5 text-[0.68rem] font-bold leading-4 text-slate-700 dark:border-white/10 dark:text-slate-200 sm:grid-cols-[minmax(6rem,0.75fr)_minmax(0,1.5fr)_minmax(6rem,0.75fr)] sm:gap-2 sm:px-3 sm:py-2 sm:text-xs sm:leading-normal">
                   <strong class="text-draft-amber dark:text-draft-gold"><%= row[0] %></strong>
                   <span><%= row[1] %></span>
                   <span><%= row[2] %></span>

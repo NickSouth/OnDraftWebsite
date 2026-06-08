@@ -10,6 +10,7 @@ export type DraftGrade = {
   potential: DraftGradePotentialScore;
   physicalTraits: Record<string, DraftGradeTraitScore>;
   filmTraits: Record<string, DraftGradeTraitScore>;
+  overrideDisplayGrade?: number | null;
 };
 
 export type DraftGradeCategory = {
@@ -278,6 +279,16 @@ export function normalizePotential(value: unknown): DraftGradePotentialScore {
   return isDraftGradePotentialScore(normalized) ? normalized : null;
 }
 
+export function normalizeDraftGradeOverride(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  const normalized = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(normalized) && normalized >= 1 && normalized <= 8
+    ? Math.round(normalized * 100) / 100
+    : null;
+}
+
 function normalizeTraitMap(value: unknown): Record<string, DraftGradeTraitScore> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {};
@@ -323,6 +334,7 @@ export function toDraftGrade(value: unknown, fallbackPosition: Position | "" = "
     potential: normalizePotential(input.potential ?? input.Potential),
     physicalTraits: normalizeTraitMap(rawPhysicalTraits),
     filmTraits: normalizeTraitMap(rawFilmTraits),
+    overrideDisplayGrade: normalizeDraftGradeOverride(input.overrideDisplayGrade ?? input.OverrideDisplayGrade),
   };
 }
 
@@ -386,7 +398,12 @@ export function calculateDraftGrade(grade: DraftGrade | null): DraftGradeCalcula
 }
 
 export function draftGradeBoardScore(grade: DraftGrade | null): number | null {
-  return calculateDraftGrade(grade)?.displayGrade ?? null;
+  return effectiveDraftBoardGrade(grade);
+}
+
+export function effectiveDraftBoardGrade(grade: DraftGrade | null): number | null {
+  const override = normalizeDraftGradeOverride(grade?.overrideDisplayGrade);
+  return override ?? calculateDraftGrade(grade)?.displayGrade ?? null;
 }
 
 export function formatDraftBoardGrade(value: number | null | undefined): string {

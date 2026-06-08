@@ -417,6 +417,60 @@
       }
     }
 
+    function numericGradeValue(value) {
+      if (value === null || value === undefined || String(value).trim() === "") {
+        return null;
+      }
+      const parsed = Number(value);
+      return Number.isFinite(parsed) && parsed >= 1 && parsed <= 8 ? Math.round(parsed * 100) / 100 : null;
+    }
+
+    function formatGradeLabel(value) {
+      return typeof value === "number" && Number.isFinite(value) ? `${value.toFixed(2)}/8` : "-/8";
+    }
+
+    function syncGradeOverride(form) {
+      const input = form.querySelector("[data-grade-final-input]");
+      const overrideField = form.querySelector("[data-grade-override]");
+      if (!input || !overrideField) {
+        return;
+      }
+      const formula = numericGradeValue(input.dataset.gradeFormula);
+      const entered = numericGradeValue(input.value);
+      const hasOverride = entered !== null && (formula === null || Math.abs(entered - formula) > 0.004);
+      overrideField.value = hasOverride ? entered.toFixed(2) : "";
+
+      const summaryValue = entered ?? formula;
+      const summaryLabel = formatGradeLabel(summaryValue);
+      const summary = form.querySelector("[data-grade-summary]");
+      const panelSummary = form.querySelector("[data-grade-panel-summary]");
+      if (summary) {
+        summary.textContent = summaryLabel;
+      }
+      if (panelSummary) {
+        panelSummary.textContent = summaryLabel;
+      }
+
+      const revertButton = form.querySelector("[data-revert-grade-override]");
+      if (revertButton) {
+        revertButton.hidden = !hasOverride;
+      }
+    }
+
+    function revertGradeOverride(form) {
+      const input = form.querySelector("[data-grade-final-input]");
+      const publishState = form.querySelector("[data-grade-publish]");
+      if (!input) {
+        return;
+      }
+      input.value = input.dataset.gradeFormula || "";
+      if (publishState) {
+        publishState.value = "false";
+      }
+      syncGradeOverride(form);
+      updateFormState(form);
+    }
+
     function syncHelmet(form) {
       const school = fieldValue(form, "school");
       const helmet = form.querySelector("[data-team-helmet]");
@@ -545,6 +599,7 @@
     function updateFormState(form) {
       form.querySelectorAll("[data-editable-field]").forEach(syncEditableDisplay);
       form.querySelectorAll("[data-height-picker]").forEach(syncHeightPicker);
+      syncGradeOverride(form);
       syncHelmet(form);
       syncDeleteLabel(form);
       syncPublishChips(form);
@@ -710,6 +765,7 @@
       form.querySelectorAll("[data-editable-field]").forEach((editable) => wireEditableField(editable, form));
       form.querySelector("[data-expand-entry]")?.addEventListener("click", () => toggleProfilePanel(form));
       form.querySelector("[data-expand-grade]")?.addEventListener("click", () => toggleGradePanel(form));
+      form.querySelector("[data-revert-grade-override]")?.addEventListener("click", () => revertGradeOverride(form));
       form.querySelector("[data-delete-board-entry]")?.addEventListener("click", () => openDeleteModal(form));
       form.addEventListener("input", (event) => {
         clearPublishState(event, form);

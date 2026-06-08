@@ -1,6 +1,6 @@
 import { Err, Ok, Result } from "../lib/result";
 import { Article, ArticleFilter, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, Comment, ConsensusBigBoard, ConsensusDiscrepancyWriteup, DraftBoardFilter, ForumPost, ForumPostFilter, Newsletter, Video, VideoQuery } from "../model/OnDraftContent";
-import { calculateDraftGrade, defaultDraftGrade } from "../model/DraftGrades";
+import { defaultDraftGrade, effectiveDraftBoardGrade } from "../model/DraftGrades";
 import { ArticleNotFound, BigBoardNotFound, CommentNotFound, DuplicateBigBoardYear, DuplicatePlayer, DuplicateArticle, DuplicateForumPost, DuplicateNewsletter, ForumPostCommentNotFound, type ArticleError, type BigBoardError, type IOnDraftRepository, type NewsletterError, NewsletterNotFound, PlayerNotFound, ForumPostError, ForumPostNotFound } from "./OnDraftRepository";
 
 const MEMORY_LOAD_TEST_SCHOOLS = [
@@ -626,8 +626,8 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
         ? Math.abs(Ryan.rank - Aleks.rank)
         : 0;
       const averageFinalGrade = nullableAverage([
-        Ryan?.gradePublished ? calculateDraftGrade(Ryan.grade)?.displayGrade : null,
-        Aleks?.gradePublished ? calculateDraftGrade(Aleks.grade)?.displayGrade : null,
+        Ryan?.gradePublished ? effectiveDraftBoardGrade(Ryan.grade) : null,
+        Aleks?.gradePublished ? effectiveDraftBoardGrade(Aleks.grade) : null,
       ]);
 
       return {

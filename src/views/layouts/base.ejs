@@ -102,7 +102,7 @@
       <%- include("partials/sidebar", { currentSession, currentIsAdmin, forceOverlaySidebar: currentForceOverlaySidebar, currentPath: shellCurrentPath }) %>
       <%- include("partials/beerLoader") %>
       <div id="site-modal-outlet"></div>
-      <main id="page-content" class="mx-0 min-h-[calc(100vh-9rem)] max-w-none px-4 pb-10 pt-20 lg:px-8 <%= currentForceOverlaySidebar ? "" : "lg:mr-80" %>">
+      <main id="page-content" class="mx-0 min-h-[calc(100vh-9rem)] max-w-none px-3 pb-8 pt-16 sm:px-4 sm:pb-10 sm:pt-20 lg:px-8 <%= currentForceOverlaySidebar ? "" : "lg:mr-80" %>">
         <div class="w-full od-page-stage is-ready">
           <%- body %>
         </div>

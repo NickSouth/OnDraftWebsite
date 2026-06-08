@@ -17,7 +17,7 @@ import {
   Video,
   VideoQuery,
 } from "../model/OnDraftContent";
-import { calculateDraftGrade, toDraftGrade } from "../model/DraftGrades";
+import { effectiveDraftBoardGrade, toDraftGrade } from "../model/DraftGrades";
 import { getPrismaClient, type OnDraftPrismaClient } from "../prisma/client";
 import {
   ArticleNotFound,
@@ -310,8 +310,8 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
         ? Math.abs(Ryan.rank - Aleks.rank)
         : 0;
       const averageFinalGrade = nullableAverage([
-        Ryan?.gradePublished ? calculateDraftGrade(Ryan.grade)?.displayGrade : null,
-        Aleks?.gradePublished ? calculateDraftGrade(Aleks.grade)?.displayGrade : null,
+        Ryan?.gradePublished ? effectiveDraftBoardGrade(Ryan.grade) : null,
+        Aleks?.gradePublished ? effectiveDraftBoardGrade(Aleks.grade) : null,
       ]);
       return {
         entry: {

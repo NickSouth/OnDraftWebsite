@@ -3,7 +3,7 @@ import { CreateInMemoryUserRepository } from "../../src/auth/InMemoryUserReposit
 import { CreateOnDraftService, parseYoutubeVideoId, type IOnDraftService } from "../../src/service/OnDraftService";
 import { CreateUserPreferenceService } from "../../src/service/UserPreferenceService";
 import { IYoutubeVideoStatsService } from "../../src/service/YoutubeVideoStatsService";
-import { calculateDraftGrade, defaultDraftGrade, formatDraftBoardGrade, gradeTraitCategoriesForGrade, toDraftGrade, type DraftGrade } from "../../src/model/DraftGrades";
+import { calculateDraftGrade, defaultDraftGrade, effectiveDraftBoardGrade, formatDraftBoardGrade, gradeTraitCategoriesForGrade, toDraftGrade, type DraftGrade } from "../../src/model/DraftGrades";
 import type { Position } from "../../src/model/OnDraftContent";
 import type { IEmailService, SendEmailVerificationEmailInput, SendNewsletterEmailInput, SendPasswordResetEmailInput } from "../../src/email/EmailService";
 
@@ -139,6 +139,16 @@ describe("Draft grade calculations", () => {
     expect(calculateDraftGrade(maxGrade)?.finalGrade).toBeCloseTo(8.3, 4);
     expect(calculateDraftGrade(maxGrade)?.boardGrade).toBeCloseTo(9.0, 4);
     expect(formatDraftBoardGrade(calculateDraftGrade(maxGrade)?.displayGrade)).toBe("8.00/8");
+  });
+
+  it("uses an editable final grade override without changing the formula calculation", () => {
+    const grade = filledGrade("EDGE", 6, 6);
+    grade.overrideDisplayGrade = 7.12;
+
+    expect(formatDraftBoardGrade(calculateDraftGrade(grade)?.displayGrade)).toBe("6.85/8");
+    expect(formatDraftBoardGrade(effectiveDraftBoardGrade(grade))).toBe("7.12/8");
+    expect(toDraftGrade({ ...grade, overrideDisplayGrade: "7.35" })?.overrideDisplayGrade).toBe(7.35);
+    expect(toDraftGrade({ ...grade, overrideDisplayGrade: "9" })?.overrideDisplayGrade).toBeNull();
   });
 
   it("normalizes Python-style grade fixtures and draft NA potential values", () => {
@@ -1258,6 +1268,7 @@ describe("OnDraftService big board editing", () => {
 
     const validGrade = filledGrade("EDGE", 6, 6);
     validGrade.physicalTraits.Speed = "NA";
+    validGrade.overrideDisplayGrade = 7.12;
     const corrected = await ondraftService.saveBigBoardEntry({
       year: 2026,
       creator: "Ryan",
@@ -1274,6 +1285,7 @@ describe("OnDraftService big board editing", () => {
     if (published.ok === true) {
       expect(published.value.gradePublished).toBe(true);
       expect(formatDraftBoardGrade(calculateDraftGrade(published.value.grade)?.displayGrade)).toBe("6.85/8");
+      expect(formatDraftBoardGrade(effectiveDraftBoardGrade(published.value.grade))).toBe("7.12/8");
     }
   });
 
@@ -1341,7 +1353,7 @@ describe("OnDraftService big board editing", () => {
       posRank: 1,
       height: { feet: 6, inches: 1 },
       weight: 205,
-      grade: filledGrade("WR", 6, 6),
+      grade: { ...filledGrade("WR", 6, 6), overrideDisplayGrade: 7.8 },
       gradePublished: true,
     });
     await ondraftService.createBigBoardEntry({
@@ -1363,7 +1375,7 @@ describe("OnDraftService big board editing", () => {
     expect(consensus.ok).toBe(true);
     if (consensus.ok === true) {
       expect(consensus.value.entries[0].gradePublished).toBe(true);
-      expect(formatDraftBoardGrade(consensus.value.entries[0].gradeSummary?.finalGrade)).toBe("7.43/8");
+      expect(formatDraftBoardGrade(consensus.value.entries[0].gradeSummary?.finalGrade)).toBe("7.90/8");
     }
   });
 });

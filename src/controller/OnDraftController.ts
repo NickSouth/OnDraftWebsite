@@ -13,10 +13,12 @@ import {
   abbreviateDraftGradeTrait,
   calculateDraftGrade,
   defaultDraftGrade,
+  effectiveDraftBoardGrade,
   draftGradeArchetypeNames,
   draftGradePositionConfig,
   formatDraftBoardGrade,
   gradeTraitCategoriesForGrade,
+  normalizeDraftGradeOverride,
   normalizeDraftGradeTraitScore,
   normalizePotential,
   validateDraftGradeForPublication,
@@ -283,6 +285,7 @@ class OnDraftController implements IOnDraftController {
       potential: normalizePotential(rawGrade.potential),
       physicalTraits: this.formTraitScores(physicalTraits),
       filmTraits: this.formTraitScores(filmTraits),
+      overrideDisplayGrade: normalizeDraftGradeOverride(rawGrade.overrideDisplayGrade),
     };
   }
 
@@ -1515,7 +1518,7 @@ class OnDraftController implements IOnDraftController {
     if (!entry.gradePublished) {
       return null;
     }
-    return entry.gradeSummary?.finalGrade ?? calculateDraftGrade(entry.grade)?.displayGrade ?? null;
+    return entry.gradeSummary?.finalGrade ?? effectiveDraftBoardGrade(entry.grade);
   }
 
   async showBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
@@ -1580,6 +1583,7 @@ class OnDraftController implements IOnDraftController {
       calculateDraftGrade,
       defaultDraftGrade,
       draftGradePositionConfig,
+      effectiveDraftBoardGrade,
       formatDraftBoardGrade,
       gradeTraitCategoriesForGrade,
       publishedBoardGrade: (entry: BigBoardEntry) => this.publishedBoardGrade(entry),

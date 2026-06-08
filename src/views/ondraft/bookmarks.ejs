@@ -1,12 +1,12 @@
-<section class="mx-auto grid w-full max-w-6xl gap-8">
+<section class="mx-auto grid w-full max-w-6xl gap-5 sm:gap-8">
   <% const formatRelative = typeof relativeTime === "function" ? relativeTime : (value) => new Date(value).toLocaleString(); %>
-  <div class="grid gap-4 border-b border-slate-200 pb-6 dark:border-white/10">
+  <div class="grid gap-3 border-b border-slate-200 pb-4 dark:border-white/10 sm:gap-4 sm:pb-6">
     <div class="max-w-3xl">
       <p class="text-xs font-black uppercase tracking-[0.2em] text-draft-amber dark:text-draft-gold">Saved Pints</p>
-      <h1 class="mt-2 font-display text-4xl font-black leading-tight text-slate-950 dark:text-white sm:text-5xl">
+      <h1 class="mt-1.5 font-display text-3xl font-black leading-tight text-slate-950 dark:text-white sm:mt-2 sm:text-5xl">
         Bookmarks
       </h1>
-      <p class="mt-3 text-base leading-7 text-slate-600 dark:text-slate-300">
+      <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300 sm:mt-3 sm:text-base sm:leading-7">
         Your saved articles and Taproom posts.
       </p>
     </div>
@@ -31,16 +31,16 @@
     </div>
   <% } else { %>
     <% if (bookmarkedArticles.length > 0) { %>
-      <section class="grid gap-4">
+      <section class="grid gap-3 sm:gap-4">
         <div class="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p class="text-xs font-black uppercase tracking-[0.18em] text-draft-amber dark:text-draft-gold">Articles On Tap</p>
-            <h2 class="mt-1 font-display text-3xl font-black text-slate-950 dark:text-white">Saved Articles</h2>
+            <h2 class="mt-1 font-display text-2xl font-black text-slate-950 dark:text-white sm:text-3xl">Saved Articles</h2>
           </div>
-          <span class="rounded bg-draft-foam px-3 py-1 text-sm font-black text-draft-amber dark:bg-white/10 dark:text-draft-gold"><%= bookmarkedArticles.length %> saved</span>
+          <span class="rounded bg-draft-foam px-2.5 py-0.5 text-xs font-black text-draft-amber dark:bg-white/10 dark:text-draft-gold sm:px-3 sm:py-1 sm:text-sm"><%= bookmarkedArticles.length %> saved</span>
         </div>
 
-        <ul class="grid list-none gap-5 p-0">
+        <ul class="grid list-none gap-3 p-0 sm:gap-5">
           <% bookmarkedArticles.forEach((article) => { %>
             <li class="od-card grid overflow-hidden transition hover:-translate-y-0.5 hover:border-draft-gold hover:shadow-editorial sm:grid-cols-[14rem_minmax(0,1fr)]">
               <a class="group block overflow-hidden bg-draft-ink" href="/articles/<%= article.id %>">
@@ -52,15 +52,15 @@
                   </span>
                 <% } %>
               </a>
-              <div class="grid content-start gap-3 p-5">
+              <div class="grid content-start gap-2.5 p-3.5 sm:gap-3 sm:p-5">
                 <div class="flex items-start justify-between gap-3">
                   <p class="m-0 text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Article</p>
                   <%- include("partials/bookmarkButton", { bookmark: { type: "article", articleId: article.id }, bookmarked: true }) %>
                 </div>
-                <a class="font-display text-2xl font-black leading-tight text-slate-950 no-underline transition hover:text-draft-amber dark:text-white dark:hover:text-draft-gold" href="/articles/<%= article.id %>"><%= article.title %></a>
+                <a class="font-display text-xl font-black leading-tight text-slate-950 no-underline transition hover:text-draft-amber dark:text-white dark:hover:text-draft-gold sm:text-2xl" href="/articles/<%= article.id %>"><%= article.title %></a>
                 <p class="m-0 text-sm font-bold text-slate-600 dark:text-slate-300">by <%= article.author %></p>
                 <% if (article.writeup) { %>
-                  <p class="m-0 line-clamp-2 text-base leading-7 text-slate-700 dark:text-slate-200"><%= article.writeup %></p>
+                  <p class="m-0 line-clamp-2 text-sm leading-6 text-slate-700 dark:text-slate-200 sm:text-base sm:leading-7"><%= article.writeup %></p>
                 <% } %>
               </div>
             </li>
@@ -70,26 +70,26 @@
     <% } %>
 
     <% if (bookmarkedForumPosts.length > 0) { %>
-      <section class="grid gap-4">
+      <section class="grid gap-3 sm:gap-4">
         <div class="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p class="text-xs font-black uppercase tracking-[0.18em] text-draft-amber dark:text-draft-gold">The Taproom</p>
-            <h2 class="mt-1 font-display text-3xl font-black text-slate-950 dark:text-white">Saved Hot Takes</h2>
+            <h2 class="mt-1 font-display text-2xl font-black text-slate-950 dark:text-white sm:text-3xl">Saved Hot Takes</h2>
           </div>
-          <span class="rounded bg-draft-foam px-3 py-1 text-sm font-black text-draft-amber dark:bg-white/10 dark:text-draft-gold"><%= bookmarkedForumPosts.length %> saved</span>
+          <span class="rounded bg-draft-foam px-2.5 py-0.5 text-xs font-black text-draft-amber dark:bg-white/10 dark:text-draft-gold sm:px-3 sm:py-1 sm:text-sm"><%= bookmarkedForumPosts.length %> saved</span>
         </div>
 
-        <ul class="grid list-none gap-4 p-0">
+        <ul class="grid list-none gap-3 p-0 sm:gap-4">
           <% bookmarkedForumPosts.forEach((post) => { %>
-            <li class="od-card grid gap-3 p-5 transition hover:-translate-y-0.5 hover:border-draft-gold hover:shadow-editorial">
+            <li class="od-card grid gap-2.5 p-3.5 transition hover:-translate-y-0.5 hover:border-draft-gold hover:shadow-editorial sm:gap-3 sm:p-5">
               <div class="flex flex-wrap items-center justify-between gap-3">
                 <p class="m-0 text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Hot Take</p>
                 <div class="flex items-center gap-2">
-                  <span class="text-sm font-bold text-slate-600 dark:text-slate-300">by <%= post.userName %> &middot; <%= formatRelative(post.createdAt) %></span>
+                  <span class="text-xs font-bold text-slate-600 dark:text-slate-300 sm:text-sm">by <%= post.userName %> &middot; <%= formatRelative(post.createdAt) %></span>
                   <%- include("partials/bookmarkButton", { bookmark: { type: "forumPost", forumPostId: post.id }, bookmarked: true }) %>
                 </div>
               </div>
-              <a class="font-display text-2xl font-bold leading-snug text-slate-950 no-underline transition hover:text-draft-amber dark:text-white dark:hover:text-draft-gold" href="/hottakes#hot-take-<%= post.id %>"><%= post.content %></a>
+              <a class="font-display text-lg font-bold leading-snug text-slate-950 no-underline transition hover:text-draft-amber dark:text-white dark:hover:text-draft-gold sm:text-2xl" href="/hottakes#hot-take-<%= post.id %>"><%= post.content %></a>
             </li>
           <% }) %>
         </ul>

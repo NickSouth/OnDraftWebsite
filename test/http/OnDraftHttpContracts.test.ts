@@ -1635,6 +1635,7 @@ describe("OnDraft HTTP contracts", () => {
         "entries[0][gradePublished]": "false",
         "entries[0][writeupPublished]": "false",
         ...edgeGradePayload("entries[0]", "6", "6"),
+        "entries[0][grade][overrideDisplayGrade]": "7.25",
       });
 
     expect(publishGrade.status).toBe(200);
@@ -1642,13 +1643,15 @@ describe("OnDraft HTTP contracts", () => {
     expect(publishGrade.text).toContain('name="entries[0][gradePublished]" value="true"');
     expect(publishGrade.text).toContain("Publish Grade");
     expect(publishGrade.text).toContain("Speed");
+    expect(publishGrade.text).toContain("Final grade");
+    expect(publishGrade.text).toContain("Revert to formula");
     expect(publishGrade.text).not.toContain("Edit Big Board");
 
     const publicBoard = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
 
     expect(publicBoard.status).toBe(200);
     expect(publicBoard.text).toContain("Published Grade Edge");
-    expect(publicBoard.text).toContain("6.85/8");
+    expect(publicBoard.text).toContain("7.25/8");
     expect(publicBoard.text).toContain("How we grade players");
     expect(publicBoard.text).toContain('title="Pass Rush Plan"');
     expect(publicBoard.text).toContain("PRP");

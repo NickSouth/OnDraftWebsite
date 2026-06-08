@@ -1,79 +1,79 @@
 <% const featured = latestItems[0]; %>
 <% const carouselItems = latestItems.length > 0 ? latestItems : []; %>
 
-<section class="grid gap-8">
+<section class="grid gap-5 sm:gap-8">
   <div class="relative overflow-hidden rounded-lg border border-slate-200 bg-white shadow-editorial dark:border-white/10 dark:bg-draft-slate">
     <div class="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(217,152,34,0.22),transparent_34%),linear-gradient(135deg,rgba(7,17,31,0.02),rgba(7,17,31,0.1))] dark:bg-[radial-gradient(circle_at_20%_0%,rgba(217,152,34,0.2),transparent_32%),linear-gradient(135deg,rgba(255,255,255,0.06),rgba(7,17,31,0.1))]" aria-hidden="true"></div>
-    <div class="relative grid items-center gap-8 p-5 md:p-8 xl:grid-cols-[0.9fr_1.1fr]">
-      <div class="relative flex min-h-[360px] flex-col justify-between gap-8">
+    <div class="relative grid items-center gap-5 p-4 sm:p-5 md:gap-8 md:p-8 xl:grid-cols-[0.9fr_1.1fr]">
+      <div class="relative flex min-h-0 flex-col justify-between gap-5 md:min-h-[360px] md:gap-8">
         <div class="max-w-none">
-          <p class="mb-3 text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Fresh from the tap</p>
+          <p class="mb-2 text-[0.68rem] font-black uppercase tracking-[0.12em] text-draft-amber dark:text-draft-gold sm:text-xs sm:tracking-[0.16em] md:mb-3">Fresh from the tap</p>
           <div class="relative md:pr-44 xl:pr-52">
             <img class="pointer-events-none absolute right-0 -top-7 hidden h-32 w-44 object-contain drop-shadow-sm md:block xl:h-36 xl:w-52" src="/images/brand/OnDraftLogo-cropped.png" alt="" aria-hidden="true" />
-            <h1 class="font-display text-4xl font-black leading-tight text-slate-950 dark:text-white md:text-6xl">
+            <h1 class="font-display text-3xl font-black leading-tight text-slate-950 dark:text-white sm:text-4xl md:text-6xl">
               OnDraft Football
             </h1>
           </div>
-          <img class="mt-3 h-32 w-40 object-contain drop-shadow-sm md:hidden" src="/images/brand/OnDraftLogo-cropped.png" alt="" aria-hidden="true" />
-          <p class="mt-6 max-w-3xl text-base leading-7 text-slate-700 dark:text-slate-200 md:text-lg">
+          <img class="mt-2 h-24 w-32 object-contain drop-shadow-sm sm:h-32 sm:w-40 md:hidden" src="/images/brand/OnDraftLogo-cropped.png" alt="" aria-hidden="true" />
+          <p class="mt-4 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200 sm:text-base sm:leading-7 md:mt-6 md:text-lg">
             A collection of NFL and NFL Draft analysis, opinions, and predictions from a small team of college students. Enjoy articles, videos, and our draft board. Feel free to post your own takes in The Taproom, our community forum.
           </p>
 
-          <a class="od-primary-link mt-4" href="/about">Learn More</a>
+          <a class="od-primary-link mt-3 md:mt-4" href="/about">Learn More</a>
 
         </div>
 
-        <div class="grid gap-2 border-l-4 border-draft-gold pl-4 text-sm font-semibold text-slate-600 dark:text-slate-300">
+        <div class="grid gap-2 border-l-2 border-draft-gold pl-3 text-xs font-semibold text-slate-600 dark:text-slate-300 sm:border-l-4 sm:pl-4 sm:text-sm">
           <p class="m-0">Like our work? Follow our other socials below, or consider supporting us with a donation to our Venmo linked below as well.</p>
           <div class="grid gap-3 pt-2" aria-label="OnDraft social media links">
             <a
-              class="od-focus-ring group flex min-h-11 w-fit items-center gap-3 rounded-md px-0 py-0 text-sm font-black text-slate-700 transition hover:text-draft-amber dark:text-slate-200 dark:hover:text-draft-gold"
+              class="od-focus-ring group flex min-h-9 w-fit items-center gap-2 rounded-md px-0 py-0 text-xs font-black text-slate-700 transition hover:text-draft-amber dark:text-slate-200 dark:hover:text-draft-gold sm:min-h-11 sm:gap-3 sm:text-sm"
               href="https://www.youtube.com/channel/UCX7Py3t2L1pUYF6JxzzP4fA"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="OnDraft Football on YouTube"
             >
-              <span class="grid size-11 shrink-0 place-items-center rounded-md bg-white p-2 shadow-sm ring-1 ring-slate-200 dark:ring-white/10">
-                <img class="h-7 w-10 object-contain" src="/images/social/youtube-icon.svg" alt="YouTube" />
+              <span class="grid size-9 shrink-0 place-items-center rounded-md bg-white p-1.5 shadow-sm ring-1 ring-slate-200 dark:ring-white/10 sm:size-11 sm:p-2">
+                <img class="h-5 w-8 object-contain sm:h-7 sm:w-10" src="/images/social/youtube-icon.svg" alt="YouTube" />
               </span>
               <span>/ @OnDraftFootball</span>
             </a>
 
             <a
-              class="od-focus-ring group flex min-h-11 w-fit items-center gap-3 rounded-md px-0 py-0 text-sm font-black text-slate-700 transition hover:text-draft-amber dark:text-slate-200 dark:hover:text-draft-gold"
+              class="od-focus-ring group flex min-h-9 w-fit items-center gap-2 rounded-md px-0 py-0 text-xs font-black text-slate-700 transition hover:text-draft-amber dark:text-slate-200 dark:hover:text-draft-gold sm:min-h-11 sm:gap-3 sm:text-sm"
               href="https://x.com/OnDraftFootball"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="OnDraft Football on X"
             >
-              <span class="grid size-11 shrink-0 place-items-center rounded-md bg-white p-2 shadow-sm ring-1 ring-slate-200 dark:ring-white/10">
-                <img class="size-8 object-contain" src="/images/social/x-icon.svg" alt="X" />
+              <span class="grid size-9 shrink-0 place-items-center rounded-md bg-white p-1.5 shadow-sm ring-1 ring-slate-200 dark:ring-white/10 sm:size-11 sm:p-2">
+                <img class="size-6 object-contain sm:size-8" src="/images/social/x-icon.svg" alt="X" />
               </span>
               <span>/ @OnDraftFootball</span>
             </a>
 
             <a
-              class="od-focus-ring group flex min-h-11 w-fit items-center gap-3 rounded-md px-0 py-0 text-sm font-black text-slate-700 transition hover:text-draft-amber dark:text-slate-200 dark:hover:text-draft-gold"
+              class="od-focus-ring group flex min-h-9 w-fit items-center gap-2 rounded-md px-0 py-0 text-xs font-black text-slate-700 transition hover:text-draft-amber dark:text-slate-200 dark:hover:text-draft-gold sm:min-h-11 sm:gap-3 sm:text-sm"
               href="https://www.tiktok.com/@ondraftfootball"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="OnDraft Football on TikTok"
             >
-              <span class="grid size-11 shrink-0 place-items-center rounded-md bg-white p-2 shadow-sm ring-1 ring-slate-200 dark:ring-white/10">
-                <img class="size-8 object-contain" src="/images/social/tiktok-icon.svg" alt="TikTok" />
+              <span class="grid size-9 shrink-0 place-items-center rounded-md bg-white p-1.5 shadow-sm ring-1 ring-slate-200 dark:ring-white/10 sm:size-11 sm:p-2">
+                <img class="size-6 object-contain sm:size-8" src="/images/social/tiktok-icon.svg" alt="TikTok" />
               </span>
               <span>/ @ondraftfootball</span>
             </a>
 
             <a
-              class="od-focus-ring group flex min-h-11 w-fit items-center gap-3 rounded-md px-0 py-0 text-sm font-black text-slate-700 transition hover:text-draft-amber dark:text-slate-200 dark:hover:text-draft-gold"
+              class="od-focus-ring group flex min-h-9 w-fit items-center gap-2 rounded-md px-0 py-0 text-xs font-black text-slate-700 transition hover:text-draft-amber dark:text-slate-200 dark:hover:text-draft-gold sm:min-h-11 sm:gap-3 sm:text-sm"
               href="https://www.venmo.com/u/OnDraft-Football"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Support OnDraft Football on Venmo"
             >
-              <span class="grid h-11 w-24 shrink-0 place-items-center rounded-md bg-white px-2 py-1.5 shadow-sm ring-1 ring-slate-200 transition group-hover:ring-draft-gold dark:ring-white/10">
-                <img class="h-7 w-full object-contain" src="/images/social/venmo-logo-blue.png" alt="Venmo" />
+              <span class="grid h-9 w-20 shrink-0 place-items-center rounded-md bg-white px-2 py-1 shadow-sm ring-1 ring-slate-200 transition group-hover:ring-draft-gold dark:ring-white/10 sm:h-11 sm:w-24 sm:py-1.5">
+                <img class="h-5 w-full object-contain sm:h-7" src="/images/social/venmo-logo-blue.png" alt="Venmo" />
               </span>
               <span>/ @OnDraft-Football</span>
             </a>
@@ -178,8 +178,8 @@
         @focusin="pause()"
         @focusout="if (!$el.contains($event.relatedTarget)) resume()"
       >
-        <div class="border-b border-slate-200 px-4 py-3 dark:border-white/10">
-          <p class="m-0 text-xs font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-300">Latest pour</p>
+        <div class="border-b border-slate-200 px-3 py-2.5 dark:border-white/10 sm:px-4 sm:py-3">
+          <p class="m-0 text-[0.68rem] font-black uppercase tracking-[0.1em] text-slate-500 dark:text-slate-300 sm:text-xs sm:tracking-[0.14em]">Latest pour</p>
         </div>
 
         <% if (carouselItems.length === 0) { %>
@@ -191,7 +191,7 @@
             </div>
           </div>
         <% } else { %>
-          <div class="relative min-h-[430px] overflow-hidden bg-slate-900 md:min-h-[520px]">
+          <div class="relative min-h-[310px] overflow-hidden bg-slate-900 sm:min-h-[430px] md:min-h-[520px]">
             <% carouselItems.forEach((item, index) => { %>
               <% const slideFallbackImageUrl = item.type === "video" ? item.fallbackImageUrl : undefined; %>
               <article
@@ -214,19 +214,19 @@
                   <div class="absolute inset-0 bg-[linear-gradient(135deg,#07111f,#263247_54%,#a75f12)]" aria-hidden="true"></div>
                 <% } %>
                 <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent" aria-hidden="true"></div>
-                <div class="group relative p-5 md:p-8">
-                  <div class="mb-3 flex flex-wrap items-center gap-2">
-                    <span class="rounded bg-draft-gold px-2 py-1 text-xs font-black uppercase tracking-wide text-draft-ink"><%= item.type === "article" ? "Article" : "Video" %></span>
+                <div class="group relative p-4 sm:p-5 md:p-8">
+                  <div class="mb-2 flex flex-wrap items-center gap-1.5 sm:mb-3 sm:gap-2">
+                    <span class="rounded bg-draft-gold px-2 py-0.5 text-[0.68rem] font-black uppercase tracking-wide text-draft-ink sm:py-1 sm:text-xs"><%= item.type === "article" ? "Article" : "Video" %></span>
                     <% item.tags.slice(0, 3).forEach((tag) => { %>
-                      <span class="rounded bg-draft-foam px-2 py-1 text-xs font-black text-draft-gold dark:bg-white/10"><%= tag.toLowerCase() %></span>
+                      <span class="rounded bg-draft-foam px-2 py-0.5 text-[0.68rem] font-black text-draft-gold dark:bg-white/10 sm:py-1 sm:text-xs"><%= tag.toLowerCase() %></span>
                     <% }) %>
                   </div>
-                  <h2 class="font-display text-4xl font-black leading-tight text-white md:text-5xl"><%= item.title %></h2>
+                  <h2 class="font-display text-2xl font-black leading-tight text-white sm:text-4xl md:text-5xl"><%= item.title %></h2>
                   <p class="mt-4 max-h-0 overflow-hidden text-base leading-7 text-slate-200 opacity-0 transition-all duration-200 group-hover:max-h-32 group-hover:opacity-100 group-focus-within:max-h-32 group-focus-within:opacity-100">
                     <%= item.description %>
                   </p>
-                  <div class="mt-5 flex items-center justify-between gap-4">
-                    <span class="text-xs font-bold uppercase tracking-[0.16em] text-slate-300">
+                  <div class="mt-4 flex items-center justify-between gap-3 sm:mt-5 sm:gap-4">
+                    <span class="text-[0.68rem] font-bold uppercase tracking-[0.12em] text-slate-300 sm:text-xs sm:tracking-[0.16em]">
                       <%= item.date.toLocaleDateString() %>
                     </span>
                     <a class="od-primary-link" href="<%= item.href %>" <%= item.type === "video" ? 'target="_blank" rel="noopener noreferrer"' : "" %>>Open</a>
@@ -243,9 +243,9 @@
             ></div>
           </div>
 
-          <div class="flex items-center justify-between gap-3 border-t border-slate-200 p-4 dark:border-white/10">
-            <button type="button" class="od-icon-button size-9" @click="prev()" aria-label="Previous slide" title="Previous slide">
-              <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <div class="flex items-center justify-between gap-2 border-t border-slate-200 p-3 dark:border-white/10 sm:gap-3 sm:p-4">
+            <button type="button" class="od-icon-button size-8 sm:size-9" @click="prev()" aria-label="Previous slide" title="Previous slide">
+              <svg class="size-4 sm:size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M19 12H5" />
                 <path d="m11 18-6-6 6-6" />
               </svg>
@@ -254,15 +254,15 @@
               <% carouselItems.forEach((_item, index) => { %>
                 <button
                   type="button"
-                  class="size-2.5 rounded-full p-0"
+                  class="size-2 rounded-full p-0 sm:size-2.5"
                   :class="active === <%= index %> ? 'bg-draft-gold' : 'bg-slate-300 dark:bg-white/30'"
                   aria-label="Show slide <%= index + 1 %>"
                   @click="go(<%= index %>)"
                 ></button>
               <% }) %>
             </div>
-            <button type="button" class="od-icon-button size-9" @click="next()" aria-label="Next slide" title="Next slide">
-              <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <button type="button" class="od-icon-button size-8 sm:size-9" @click="next()" aria-label="Next slide" title="Next slide">
+              <svg class="size-4 sm:size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M5 12h14" />
                 <path d="m13 6 6 6-6 6" />
               </svg>
@@ -273,18 +273,18 @@
     </div>
   </div>
 
-  <section class="relative isolate overflow-hidden rounded-lg border border-draft-gold/30 bg-draft-ink px-5 py-7 shadow-editorial dark:border-draft-gold/40 sm:px-7 md:px-8">
+  <section class="relative isolate overflow-hidden rounded-lg border border-draft-gold/30 bg-draft-ink px-4 py-5 shadow-editorial dark:border-draft-gold/40 sm:px-7 sm:py-7 md:px-8">
     <div class="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_10%_0%,rgba(217,152,34,0.32),transparent_30%),linear-gradient(135deg,rgba(11,18,32,0.98),rgba(18,28,43,0.94)_58%,rgba(167,95,18,0.26))]" aria-hidden="true"></div>
     <div class="absolute inset-y-0 right-0 -z-10 hidden w-1/2 bg-draft-gold/10 [clip-path:polygon(9rem_0,100%_0,100%_100%,0_100%)] lg:block" aria-hidden="true"></div>
     <div class="grid gap-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
       <div class="max-w-3xl">
-        <p class="mb-3 text-xs font-black uppercase tracking-[0.18em] text-draft-gold">Big board pulse</p>
-        <h2 class="font-display text-3xl font-black leading-tight text-white sm:text-4xl">The NFL draft changes lives.</h2>
-        <p class="mt-3 text-lg font-semibold leading-8 text-slate-200">
+        <p class="mb-2 text-[0.68rem] font-black uppercase tracking-[0.14em] text-draft-gold sm:mb-3 sm:text-xs sm:tracking-[0.18em]">Big board pulse</p>
+        <h2 class="font-display text-2xl font-black leading-tight text-white sm:text-4xl">The NFL draft changes lives.</h2>
+        <p class="mt-2 text-sm font-semibold leading-6 text-slate-200 sm:mt-3 sm:text-lg sm:leading-8">
           See our rankings of upcoming prospects.
         </p>
       </div>
-      <a class="od-primary-link min-h-12 px-5 text-base shadow-sm" href="/bigboard">View draft board</a>
+      <a class="od-primary-link w-full shadow-sm sm:min-h-12 sm:w-auto sm:px-5 sm:text-base" href="/bigboard">View draft board</a>
     </div>
   </section>
 
