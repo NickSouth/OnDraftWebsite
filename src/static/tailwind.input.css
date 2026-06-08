@@ -424,13 +424,10 @@
     animation: od-swap-enter 260ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
-  .od-stagger-list > * {
-    opacity: 0;
-    transform: translateY(0.4rem);
-  }
-
   .od-swap-active .od-stagger-list > *,
   .od-stagger-list.od-swap-active > * {
+    opacity: 0;
+    transform: translateY(0.4rem);
     animation: od-stagger-enter 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 

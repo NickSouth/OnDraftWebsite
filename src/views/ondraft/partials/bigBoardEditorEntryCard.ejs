@@ -40,6 +40,7 @@
   const gradeConfig = typeof draftGradePositionConfig === "function" ? draftGradePositionConfig(entry.position) : null;
   const fallbackGrade = typeof defaultDraftGrade === "function" ? defaultDraftGrade(entry.position) : null;
   const grade = entry.grade || fallbackGrade;
+  const gradeScoreOptionsId = `draft-grade-score-options-${entry.id}`;
   const gradeCalculation = typeof calculateDraftGrade === "function" ? calculateDraftGrade(entry.grade) : null;
   const gradeDisplayValue = typeof publishedBoardGrade === "function" ? publishedBoardGrade(entry) : gradeCalculation?.displayGrade;
   const gradeDisplayLabel = typeof formatDraftBoardGrade === "function" ? formatDraftBoardGrade(gradeDisplayValue) : "-/8";
@@ -432,6 +433,7 @@
               <span>Potential</span>
               <select name="<%= fieldPrefix %>[grade][potential]" data-publish-section="grade" aria-label="Potential">
                 <option value="">--</option>
+                <option value="NA" <%= grade.potential === "NA" ? "selected" : "" %>>NA</option>
                 <% [1, 2, 3, 4, 5, 6, 7, 8].forEach((value) => { %>
                   <option value="<%= value %>" <%= grade.potential === value ? "selected" : "" %>><%= value %></option>
                 <% }) %>
@@ -451,10 +453,9 @@
                     <label class="board-editor-grade-trait">
                       <span><%= trait %></span>
                       <input
-                        type="number"
-                        min="1"
-                        max="8"
-                        step="any"
+                        type="text"
+                        inputmode="decimal"
+                        list="<%= gradeScoreOptionsId %>"
                         name="<%= fieldPrefix %>[grade][<%= category.key %>][<%= trait %>]"
                         value="<%= gradeTraitValue(category.key, trait) %>"
                         data-publish-section="grade"
@@ -466,6 +467,12 @@
               </div>
             <% }) %>
           </div>
+          <datalist id="<%= gradeScoreOptionsId %>">
+            <option value="NA"></option>
+            <% [1, 2, 3, 4, 5, 6, 7, 8].forEach((value) => { %>
+              <option value="<%= value %>"></option>
+            <% }) %>
+          </datalist>
           <%- fieldErrorMarkup("grade") %>
         <% } else { %>
           <div class="board-editor-grade-empty <%= hasGradeValidationError ? "is-validation-error" : "" %>">

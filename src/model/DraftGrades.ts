@@ -2,11 +2,12 @@ import type { Position } from "./OnDraftContent";
 import { DRAFT_GRADE_FORMULAS } from "./DraftGradeFormulas.generated";
 
 export type DraftGradeTraitScore = number | "NA" | null;
+export type DraftGradePotentialScore = number | "NA" | null;
 
 export type DraftGrade = {
   position: Position;
   archetype: string;
-  potential: number | null;
+  potential: DraftGradePotentialScore;
   physicalTraits: Record<string, DraftGradeTraitScore>;
   filmTraits: Record<string, DraftGradeTraitScore>;
 };
@@ -32,6 +33,7 @@ export type DraftGradeCalculation = {
   filmGrade: number;
   rawGrade: number;
   finalGrade: number;
+  boardGrade: number;
   displayGrade: number;
 };
 
@@ -265,7 +267,13 @@ export function normalizeDraftGradeTraitScore(value: unknown): DraftGradeTraitSc
   return isDraftGradeNumericScore(normalized) ? normalized : null;
 }
 
-export function normalizePotential(value: unknown): number | null {
+export function normalizePotential(value: unknown): DraftGradePotentialScore {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  if (typeof value === "string" && value.trim().toUpperCase() === "NA") {
+    return "NA";
+  }
   const normalized = typeof value === "number" ? value : Number(value);
   return isDraftGradePotentialScore(normalized) ? normalized : null;
 }
@@ -283,15 +291,24 @@ export function toDraftGrade(value: unknown, fallbackPosition: Position | "" = "
   }
 
   const input = value as Record<string, unknown>;
-  const rawPosition = typeof input.position === "string" ? input.position : fallbackPosition;
+  const rawPosition = typeof input.position === "string"
+    ? input.position
+    : typeof input.Position === "string"
+      ? input.Position
+      : fallbackPosition;
   const position = formulaPositionFor(rawPosition as Position | "") ? rawPosition as Position : fallbackPosition;
   if (!position || !formulaPositionFor(position)) {
     return null;
   }
 
   const archetypes = draftGradeArchetypeNames(position);
-  const archetype = typeof input.archetype === "string" && archetypes.includes(input.archetype)
+  const rawArchetype = typeof input.archetype === "string"
     ? input.archetype
+    : typeof input.Archetype === "string"
+      ? input.Archetype
+      : "";
+  const archetype = archetypes.includes(rawArchetype)
+    ? rawArchetype
     : archetypes[0] ?? "";
   if (!archetype) {
     return null;
@@ -303,7 +320,7 @@ export function toDraftGrade(value: unknown, fallbackPosition: Position | "" = "
   return {
     position,
     archetype,
-    potential: normalizePotential(input.potential),
+    potential: normalizePotential(input.potential ?? input.Potential),
     physicalTraits: normalizeTraitMap(rawPhysicalTraits),
     filmTraits: normalizeTraitMap(rawFilmTraits),
   };
@@ -355,13 +372,15 @@ export function calculateDraftGrade(grade: DraftGrade | null): DraftGradeCalcula
     + filmGrade * categoryWeight(grade.position, archetype, "Film");
   const potentialFactor = FORMULAS.Potential[String(grade.potential)] ?? 0;
   const finalGrade = rawGrade + potentialFactor;
-  const displayGrade = Math.min(finalGrade, 8);
+  const boardGrade = finalGrade + (grade.position === "QB" ? 1 : 0.7);
+  const displayGrade = Math.min(boardGrade, 8);
 
   return {
     physicalGrade,
     filmGrade,
     rawGrade,
     finalGrade,
+    boardGrade,
     displayGrade,
   };
 }
@@ -408,8 +427,8 @@ export function validateDraftGradeForPublication(position: Position | "", grade:
   for (const category of gradeTraitCategoriesForGrade(grade, position)) {
     const scores = category.key === "physicalTraits" ? grade.physicalTraits : grade.filmTraits;
     for (const trait of category.traits) {
-      if (!isDraftGradeNumericScore(scores[trait])) {
-        issues.push(`${trait} must be a number from 1 to 8 before publishing a grade.`);
+      if (scores[trait] !== "NA" && !isDraftGradeNumericScore(scores[trait])) {
+        issues.push(`${trait} must be a number from 1 to 8 or NA before publishing a grade.`);
       }
     }
   }

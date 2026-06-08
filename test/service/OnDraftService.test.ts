@@ -3,7 +3,7 @@ import { CreateInMemoryUserRepository } from "../../src/auth/InMemoryUserReposit
 import { CreateOnDraftService, parseYoutubeVideoId, type IOnDraftService } from "../../src/service/OnDraftService";
 import { CreateUserPreferenceService } from "../../src/service/UserPreferenceService";
 import { IYoutubeVideoStatsService } from "../../src/service/YoutubeVideoStatsService";
-import { calculateDraftGrade, defaultDraftGrade, formatDraftBoardGrade, gradeTraitCategoriesForGrade, type DraftGrade } from "../../src/model/DraftGrades";
+import { calculateDraftGrade, defaultDraftGrade, formatDraftBoardGrade, gradeTraitCategoriesForGrade, toDraftGrade, type DraftGrade } from "../../src/model/DraftGrades";
 import type { Position } from "../../src/model/OnDraftContent";
 import type { IEmailService, SendEmailVerificationEmailInput, SendNewsletterEmailInput, SendPasswordResetEmailInput } from "../../src/email/EmailService";
 
@@ -82,7 +82,7 @@ function filledGrade(position: Position, score = 6, potential = 6): DraftGrade {
 }
 
 describe("Draft grade calculations", () => {
-  it("matches Ryan's weighted WR final grade math to two decimals", () => {
+  it("matches Ryan's weighted WR board grade math to two decimals", () => {
     const grade: DraftGrade = {
       position: "WR",
       archetype: "Balanced",
@@ -115,7 +115,10 @@ describe("Draft grade calculations", () => {
     expect(result).not.toBeNull();
     expect(result?.physicalGrade).toBeCloseTo(6.14, 4);
     expect(result?.filmGrade).toBeCloseTo(6.08, 4);
-    expect(formatDraftBoardGrade(result?.displayGrade)).toBe("6.26/8");
+    expect(result?.rawGrade).toBeCloseTo(6.107, 4);
+    expect(result?.finalGrade).toBeCloseTo(6.257, 4);
+    expect(result?.boardGrade).toBeCloseTo(6.957, 4);
+    expect(formatDraftBoardGrade(result?.displayGrade)).toBe("6.96/8");
   });
 
   it("maps OnDraft EDGE to Ryan's ED formula and supports NA in calculations", () => {
@@ -125,16 +128,57 @@ describe("Draft grade calculations", () => {
     const result = calculateDraftGrade(edgeGrade);
 
     expect(result).not.toBeNull();
-    expect(formatDraftBoardGrade(result?.displayGrade)).toBe("6.15/8");
+    expect(formatDraftBoardGrade(result?.displayGrade)).toBe("6.85/8");
   });
 
   it("accepts decimal trait grades and keeps displayed grades within the eight point scale", () => {
     const decimalGrade = filledGrade("WR", 6.5, 6);
     const maxGrade = filledGrade("WR", 8, 8);
 
-    expect(formatDraftBoardGrade(calculateDraftGrade(decimalGrade)?.displayGrade)).toBe("6.65/8");
+    expect(formatDraftBoardGrade(calculateDraftGrade(decimalGrade)?.displayGrade)).toBe("7.35/8");
     expect(calculateDraftGrade(maxGrade)?.finalGrade).toBeCloseTo(8.3, 4);
+    expect(calculateDraftGrade(maxGrade)?.boardGrade).toBeCloseTo(9.0, 4);
     expect(formatDraftBoardGrade(calculateDraftGrade(maxGrade)?.displayGrade)).toBe("8.00/8");
+  });
+
+  it("normalizes Python-style grade fixtures and draft NA potential values", () => {
+    const grade = toDraftGrade({
+      Position: "WR",
+      Archetype: "Balanced",
+      Potential: 6,
+      Physicals: {
+        Speed: 6,
+        Acceleration: 6,
+        Agility: 7,
+        "Change of Direction": 7,
+        Strength: 5,
+        "Size / Frame": 5,
+      },
+      "Film Traits": {
+        "Blocking / Toughness": 4,
+        "Route Tree": 7,
+        "Short Route Running": 7,
+        "Intermediate Route Running": 7,
+        "Deep Route Running": 6,
+        Release: 7,
+        Catching: 6,
+        "Catch In Traffic": 6,
+        "Contested Catching": 5,
+        "Body Control": 7,
+        "Run After Catch": 4,
+      },
+    });
+    const draftGrade = toDraftGrade({
+      position: "WR",
+      archetype: "Balanced",
+      potential: "NA",
+      physicalTraits: { Speed: "NA" },
+      filmTraits: {},
+    });
+
+    expect(formatDraftBoardGrade(calculateDraftGrade(grade)?.displayGrade)).toBe("6.96/8");
+    expect(draftGrade?.potential).toBe("NA");
+    expect(calculateDraftGrade(draftGrade)).toBeNull();
   });
 });
 
@@ -1177,10 +1221,10 @@ describe("OnDraftService big board editing", () => {
     }
   });
 
-  it("saves draft grades and only publishes fully numeric grade entries", async () => {
+  it("saves draft grades and publishes grades with numeric or NA trait entries", async () => {
     const ondraftService = service();
     const invalidGrade = filledGrade("EDGE", 6, 6);
-    invalidGrade.physicalTraits.Speed = "NA";
+    invalidGrade.physicalTraits.Speed = null;
 
     const saved = await ondraftService.saveBigBoardEntries({
       year: 2026,
@@ -1209,10 +1253,11 @@ describe("OnDraftService big board editing", () => {
     const rejected = await ondraftService.publishBigBoardEntryGrade(2026, "Ryan", "edge-grade-draft");
     expect(rejected.ok).toBe(false);
     if (rejected.ok === false) {
-      expect(rejected.value.message).toContain("Speed must be a number from 1 to 8");
+      expect(rejected.value.message).toContain("Speed must be a number from 1 to 8 or NA");
     }
 
     const validGrade = filledGrade("EDGE", 6, 6);
+    validGrade.physicalTraits.Speed = "NA";
     const corrected = await ondraftService.saveBigBoardEntry({
       year: 2026,
       creator: "Ryan",
@@ -1228,7 +1273,7 @@ describe("OnDraftService big board editing", () => {
     expect(published.ok).toBe(true);
     if (published.ok === true) {
       expect(published.value.gradePublished).toBe(true);
-      expect(formatDraftBoardGrade(calculateDraftGrade(published.value.grade)?.displayGrade)).toBe("6.15/8");
+      expect(formatDraftBoardGrade(calculateDraftGrade(published.value.grade)?.displayGrade)).toBe("6.85/8");
     }
   });
 
@@ -1279,7 +1324,7 @@ describe("OnDraftService big board editing", () => {
       });
       expect(saved.value.writeupPublished).toBe(true);
       expect(saved.value.gradePublished).toBe(true);
-      expect(formatDraftBoardGrade(calculateDraftGrade(saved.value.grade)?.displayGrade)).toBe("6.65/8");
+      expect(formatDraftBoardGrade(calculateDraftGrade(saved.value.grade)?.displayGrade)).toBe("7.35/8");
     }
   });
 
@@ -1318,7 +1363,7 @@ describe("OnDraftService big board editing", () => {
     expect(consensus.ok).toBe(true);
     if (consensus.ok === true) {
       expect(consensus.value.entries[0].gradePublished).toBe(true);
-      expect(formatDraftBoardGrade(consensus.value.entries[0].gradeSummary?.finalGrade)).toBe("7.08/8");
+      expect(formatDraftBoardGrade(consensus.value.entries[0].gradeSummary?.finalGrade)).toBe("7.43/8");
     }
   });
 });

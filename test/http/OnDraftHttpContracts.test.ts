@@ -153,6 +153,8 @@ describe("OnDraft HTTP contracts", () => {
     expect(response.text).toContain("/images/social/tiktok-icon.svg");
     expect(response.text).toContain("https://www.venmo.com/u/OnDraft-Football");
     expect(response.text).toContain('id="site-loader"');
+    expect(response.text).toContain('aria-label="Loading page" hidden');
+    expect(response.text).toContain('class="w-full od-page-stage is-ready"');
     expect(response.text).toContain('id="loading-skeleton-templates"');
     expect(response.text).toContain('data-page-skeleton="articles"');
     expect(response.text).toContain('data-result-skeleton="article-results-card"');
@@ -1646,7 +1648,7 @@ describe("OnDraft HTTP contracts", () => {
 
     expect(publicBoard.status).toBe(200);
     expect(publicBoard.text).toContain("Published Grade Edge");
-    expect(publicBoard.text).toContain("6.15/8");
+    expect(publicBoard.text).toContain("6.85/8");
     expect(publicBoard.text).toContain("How we grade players");
     expect(publicBoard.text).toContain('title="Pass Rush Plan"');
     expect(publicBoard.text).toContain("PRP");
