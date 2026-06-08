@@ -298,11 +298,8 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
     type ConsensusEntryDraft = {
       entry: BigBoardEntry;
       averageRank: number;
-      averagePosRank: number;
       ryanRank: number;
-      ryanPosRank: number;
       aleksRank: number;
-      aleksPosRank: number;
     };
     const drafts: ConsensusEntryDraft[] = [...entriesByPlayer.values()].map(({ Ryan, Aleks }) => {
       const source = Ryan ?? Aleks;
@@ -337,11 +334,8 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
           },
         },
         averageRank: average([Ryan?.rank, Aleks?.rank]),
-        averagePosRank: average([Ryan?.posRank, Aleks?.posRank]),
         ryanRank: Ryan?.rank ?? Number.MAX_SAFE_INTEGER,
-        ryanPosRank: Ryan?.posRank ?? Number.MAX_SAFE_INTEGER,
         aleksRank: Aleks?.rank ?? Number.MAX_SAFE_INTEGER,
-        aleksPosRank: Aleks?.posRank ?? Number.MAX_SAFE_INTEGER,
       };
     });
     drafts.sort((first, second) => (
@@ -358,13 +352,6 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
       byPosition.set(draft.entry.position, [...(byPosition.get(draft.entry.position) ?? []), draft]);
     });
     byPosition.forEach((positionDrafts) => {
-      positionDrafts.sort((first, second) => (
-        first.averagePosRank - second.averagePosRank ||
-        first.ryanPosRank - second.ryanPosRank ||
-        first.aleksPosRank - second.aleksPosRank ||
-        (first.entry.rank ?? Number.MAX_SAFE_INTEGER) - (second.entry.rank ?? Number.MAX_SAFE_INTEGER) ||
-        first.entry.playerName.localeCompare(second.entry.playerName)
-      ));
       positionDrafts.forEach((draft, index) => {
         draft.entry.posRank = index + 1;
       });

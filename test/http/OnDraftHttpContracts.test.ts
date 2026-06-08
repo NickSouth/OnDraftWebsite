@@ -1956,6 +1956,15 @@ describe("OnDraft HTTP contracts", () => {
         "entries[2][heightLabel]": "6-6",
         "entries[2][weight]": "315",
         "entries[2][playerInfoPublished]": "true",
+        "entries[3][id]": "ryan-one-board-edge",
+        "entries[3][playerName]": "One Board Edge",
+        "entries[3][school]": "Solo State",
+        "entries[3][position]": "EDGE",
+        "entries[3][rank]": "2",
+        "entries[3][posRank]": "5",
+        "entries[3][heightLabel]": "6-5",
+        "entries[3][weight]": "260",
+        "entries[3][playerInfoPublished]": "true",
       });
     expect(saveRyan.status).toBe(200);
 
@@ -2002,14 +2011,15 @@ describe("OnDraft HTTP contracts", () => {
     expect(consensus.text).not.toContain("/bigboard/edit?year=2026&amp;creator=Consensus");
     expect(consensus.text).toContain('href="/about#ryan-mcwalter"');
     expect(consensus.text).toContain('href="/about#aleks-ryabinkin"');
-    expect(consensus.text).toMatch(/1\. Edge Prospect[\s\S]*EDGE1/);
-    expect(consensus.text).toMatch(/2\. Quarterback Prospect[\s\S]*QB1/);
+    expect(consensus.text).toMatch(/1\. One Board Edge[\s\S]*EDGE1/);
+    expect(consensus.text).toMatch(/2\. Edge Prospect[\s\S]*EDGE2/);
+    expect(consensus.text).toMatch(/3\. Quarterback Prospect[\s\S]*QB1/);
     expect(consensus.text).toMatch(/Ryan(?:&#39;|')s Rank:\s*<strong>4<\/strong>[\s\S]*Aleks(?:&#39;|')s Rank:\s*<strong>6<\/strong>/);
     expect(consensus.text).toMatch(/Ryan(?:&#39;|')s Rank:\s*<strong>1<\/strong>[\s\S]*Aleks(?:&#39;|')s Rank:\s*<strong>13<\/strong>/);
     expect(consensus.text).toContain("Ryan State");
     expect(consensus.text).not.toContain("Aleks Tech");
     expect(consensus.text).toContain("Big discrepancy");
-    expect(consensus.text).toMatch(/3\. Tackle Prospect[\s\S]*Published U/);
+    expect(consensus.text).toMatch(/4\. Tackle Prospect[\s\S]*Published U/);
     expect(consensus.text).toMatch(/Tackle Prospect[\s\S]*Ryan(?:&#39;|')s Rank:\s*<strong>10<\/strong>/);
     expect(consensus.text).not.toMatch(/Tackle Prospect[\s\S]*Aleks(?:&#39;|')s Rank:\s*<strong>30<\/strong>/);
     expect(consensus.text).not.toContain("Private U");

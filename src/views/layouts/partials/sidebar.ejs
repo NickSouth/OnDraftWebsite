@@ -80,12 +80,8 @@
       <div class="mt-5 border-t border-slate-200 pt-4 dark:border-white/10">
         <p class="mb-1 px-2 text-[0.62rem] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Admin</p>
         <% const adminDashboardActive = activePath === "/admin" || activePath.startsWith("/admin/"); %>
-        <% const newArticleActive = activePath === "/articles/new"; %>
-        <% const editBoardActive = activePath === "/bigboard/edit"; %>
         <div class="grid gap-2">
           <a href="/admin" class="od-shell-link flex min-h-10 px-3 py-2 text-xs leading-tight <%= adminDashboardActive ? "is-active" : "" %>" <%= adminDashboardActive ? 'aria-current="page"' : "" %>>Admin Dashboard</a>
-          <a href="/articles/new" class="od-shell-link flex min-h-10 px-3 py-2 text-xs leading-tight <%= newArticleActive ? "is-active" : "" %>" <%= newArticleActive ? 'aria-current="page"' : "" %>>Create article</a>
-          <a href="/bigboard/edit" class="od-shell-link flex min-h-10 px-3 py-2 text-xs leading-tight <%= editBoardActive ? "is-active" : "" %>" <%= editBoardActive ? 'aria-current="page"' : "" %>>Edit draft board</a>
         </div>
       </div>
     <% } %>
