@@ -1,3 +1,13 @@
-- Discrepencys
 
 - Google discoverability
+    - www version patch
+
+- Mobile Views:
+    - Draft board centering
+    - Logo centering
+    - Draft board author name
+    - Filter off screen
+    - Why does draft board shove height and weight to next line??
+
+- Can Umami not fetch based on time? Fix this
+- Hamburger broken on draft board edit screen
