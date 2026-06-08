@@ -98,7 +98,7 @@
       x-data="{ sidebarOpen: false }"
       x-init="$watch('sidebarOpen', value => { if (!value) $nextTick(() => document.body.focus?.()) })"
     >
-      <%- include("partials/topBar", { currentSession, currentIsAdmin, forceOverlaySidebar: currentForceOverlaySidebar }) %>
+      <%- include("partials/topBar", { currentSession, currentIsAdmin, forceOverlaySidebar: currentForceOverlaySidebar, currentPath: shellCurrentPath }) %>
       <%- include("partials/sidebar", { currentSession, currentIsAdmin, forceOverlaySidebar: currentForceOverlaySidebar, currentPath: shellCurrentPath }) %>
       <%- include("partials/beerLoader") %>
       <div id="site-modal-outlet"></div>

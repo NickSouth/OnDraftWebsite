@@ -506,6 +506,13 @@
         </div>
 
         <div class="grid gap-4 p-3 sm:gap-5 sm:p-4">
+          <section class="grid gap-2 rounded-md border border-draft-gold/35 bg-draft-gold/10 p-3 text-sm font-bold leading-6 text-slate-700 dark:bg-draft-gold/10 dark:text-slate-200">
+            <h3 class="text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">About Grading</h3>
+            <p>Every position is graded on six physical traits, in addition to 9-14 film traits specific to that position. Using each of these traits graded 1-8, a raw grade is calculated, with additional modifiers added, adjusting for potential and positional value, providing the final grades seen on the Big Board.</p>
+            <p>Each player is also assigned an &lsquo;Archetype&rsquo;. Each position has anywhere from 2-4 archetypes. These archetypes are not necessarily role projections into the league; they are a reflection of current playstyle. Archetypes are only used for the internal grading structure. True role projection and scheme fit are presented separately.</p>
+            <p>Each archetype is crafted to adjust for different styles of players within each position (ex. A &lsquo;Physical&rsquo; styled WR vs. a &lsquo;Slot&rsquo; styled WR, where traits such as Size / Frame, Contested Catching, and Body Control will be weighed higher for a &lsquo;Physical&rsquo; WR than a &lsquo;Slot&rsquo; WR). The purpose of these archetypes is to account for these differences in strengths / weaknesses without unfairly punishing players for lacking in certain skills when it may simply not be as important to their style of play.</p>
+          </section>
+
           <section class="grid gap-2">
             <h3 class="text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Final Grades</h3>
             <div class="overflow-hidden rounded-md border border-slate-200 dark:border-white/10">
@@ -577,12 +584,6 @@
               </div>
             </section>
           </div>
-
-          <section class="grid gap-2 rounded-md bg-slate-100 p-3 text-sm font-bold text-slate-700 dark:bg-white/10 dark:text-slate-200">
-            <h3 class="text-xs font-black uppercase tracking-[0.16em] text-draft-amber dark:text-draft-gold">Archetype Explanation</h3>
-            <p>Each position has anywhere from 2-4 archetypes. These archetypes are not necessarily role projections into the league; they are a reflection of current playstyle.</p>
-            <p>Archetypes are only used for the internal grading structure. True role projection and scheme fit are presented separately.</p>
-          </section>
 
           <% if (gradeGuidePositions.length > 0) { %>
             <section class="grid gap-3">

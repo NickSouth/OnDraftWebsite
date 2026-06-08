@@ -1649,6 +1649,7 @@ class OnDraftController implements IOnDraftController {
       errorMessage,
       statusMessage,
       validationIssues,
+      currentPath: "/bigboard/edit",
       forceOverlaySidebar: true,
       layout: fragment ? false : undefined,
     });

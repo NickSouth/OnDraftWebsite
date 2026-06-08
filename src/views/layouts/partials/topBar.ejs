@@ -1,3 +1,5 @@
+<% const activePath = typeof currentPath !== "undefined" ? currentPath : ""; %>
+<% const isBigBoardEditor = activePath === "/bigboard/edit" || activePath.startsWith("/bigboard/edit/"); %>
 <header class="fixed inset-x-0 top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur dark:border-white/10 dark:bg-draft-ink/95">
   <div class="flex min-h-12 items-center justify-between gap-2 px-2.5 sm:min-h-14 sm:px-4 md:px-6 <%= forceOverlaySidebar ? "" : "lg:mr-80" %>">
     <a href="/" class="od-focus-ring inline-flex min-w-0 items-center gap-2 rounded-md text-sm font-black tracking-normal text-slate-950 dark:text-white">
@@ -27,7 +29,7 @@
 
       <button
         type="button"
-        class="od-focus-ring inline-flex size-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-900 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-draft-gold hover:bg-slate-50 active:scale-95 dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/15 sm:size-10 <%= forceOverlaySidebar ? "" : "lg:hidden" %>"
+        class="od-focus-ring inline-flex <%= isBigBoardEditor ? "h-12 w-10" : "size-9" %> items-center justify-center rounded-md border border-slate-200 bg-white text-slate-900 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-draft-gold hover:bg-slate-50 active:scale-95 dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/15 sm:size-10 <%= forceOverlaySidebar ? "" : "lg:hidden" %>"
         aria-label="Open navigation"
         aria-controls="site-sidebar"
         :aria-expanded="sidebarOpen.toString()"
