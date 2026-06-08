@@ -17,7 +17,7 @@ import {
   Video,
   VideoQuery,
 } from "../model/OnDraftContent";
-import { calculateDraftGrade, toDraftGrade } from "../model/DraftGrades";
+import { effectiveDraftBoardGrade, toDraftGrade } from "../model/DraftGrades";
 import { getPrismaClient, type OnDraftPrismaClient } from "../prisma/client";
 import {
   ArticleNotFound,
@@ -298,11 +298,8 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
     type ConsensusEntryDraft = {
       entry: BigBoardEntry;
       averageRank: number;
-      averagePosRank: number;
       ryanRank: number;
-      ryanPosRank: number;
       aleksRank: number;
-      aleksPosRank: number;
     };
     const drafts: ConsensusEntryDraft[] = [...entriesByPlayer.values()].map(({ Ryan, Aleks }) => {
       const source = Ryan ?? Aleks;
@@ -313,8 +310,8 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
         ? Math.abs(Ryan.rank - Aleks.rank)
         : 0;
       const averageFinalGrade = nullableAverage([
-        Ryan?.gradePublished ? calculateDraftGrade(Ryan.grade)?.displayGrade : null,
-        Aleks?.gradePublished ? calculateDraftGrade(Aleks.grade)?.displayGrade : null,
+        Ryan?.gradePublished ? effectiveDraftBoardGrade(Ryan.grade) : null,
+        Aleks?.gradePublished ? effectiveDraftBoardGrade(Aleks.grade) : null,
       ]);
       return {
         entry: {
@@ -337,11 +334,8 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
           },
         },
         averageRank: average([Ryan?.rank, Aleks?.rank]),
-        averagePosRank: average([Ryan?.posRank, Aleks?.posRank]),
         ryanRank: Ryan?.rank ?? Number.MAX_SAFE_INTEGER,
-        ryanPosRank: Ryan?.posRank ?? Number.MAX_SAFE_INTEGER,
         aleksRank: Aleks?.rank ?? Number.MAX_SAFE_INTEGER,
-        aleksPosRank: Aleks?.posRank ?? Number.MAX_SAFE_INTEGER,
       };
     });
     drafts.sort((first, second) => (
@@ -358,13 +352,6 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
       byPosition.set(draft.entry.position, [...(byPosition.get(draft.entry.position) ?? []), draft]);
     });
     byPosition.forEach((positionDrafts) => {
-      positionDrafts.sort((first, second) => (
-        first.averagePosRank - second.averagePosRank ||
-        first.ryanPosRank - second.ryanPosRank ||
-        first.aleksPosRank - second.aleksPosRank ||
-        (first.entry.rank ?? Number.MAX_SAFE_INTEGER) - (second.entry.rank ?? Number.MAX_SAFE_INTEGER) ||
-        first.entry.playerName.localeCompare(second.entry.playerName)
-      ));
       positionDrafts.forEach((draft, index) => {
         draft.entry.posRank = index + 1;
       });

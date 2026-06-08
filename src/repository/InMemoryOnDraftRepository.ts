@@ -1,6 +1,6 @@
 import { Err, Ok, Result } from "../lib/result";
 import { Article, ArticleFilter, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, Comment, ConsensusBigBoard, ConsensusDiscrepancyWriteup, DraftBoardFilter, ForumPost, ForumPostFilter, Newsletter, Video, VideoQuery } from "../model/OnDraftContent";
-import { calculateDraftGrade, defaultDraftGrade } from "../model/DraftGrades";
+import { defaultDraftGrade, effectiveDraftBoardGrade } from "../model/DraftGrades";
 import { ArticleNotFound, BigBoardNotFound, CommentNotFound, DuplicateBigBoardYear, DuplicatePlayer, DuplicateArticle, DuplicateForumPost, DuplicateNewsletter, ForumPostCommentNotFound, type ArticleError, type BigBoardError, type IOnDraftRepository, type NewsletterError, NewsletterNotFound, PlayerNotFound, ForumPostError, ForumPostNotFound } from "./OnDraftRepository";
 
 const MEMORY_LOAD_TEST_SCHOOLS = [
@@ -575,11 +575,8 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
     type ConsensusEntryDraft = {
       entry: BigBoardEntry;
       averageRank: number;
-      averagePosRank: number;
       ryanRank: number;
-      ryanPosRank: number;
       aleksRank: number;
-      aleksPosRank: number;
     };
 
     ryanBoard?.entries.filter((entry) => entry.playerInfoPublished).forEach((entry) => {
@@ -618,14 +615,6 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
       first.entry.playerName.localeCompare(second.entry.playerName)
     );
 
-    const comparePosition = (first: ConsensusEntryDraft, second: ConsensusEntryDraft): number => (
-      first.averagePosRank - second.averagePosRank ||
-      first.ryanPosRank - second.ryanPosRank ||
-      first.aleksPosRank - second.aleksPosRank ||
-      (first.entry.rank ?? Number.MAX_SAFE_INTEGER) - (second.entry.rank ?? Number.MAX_SAFE_INTEGER) ||
-      first.entry.playerName.localeCompare(second.entry.playerName)
-    );
-
     const consensusDrafts: ConsensusEntryDraft[] = [...entriesByPlayer.values()].map(({ Ryan, Aleks }) => {
       const sourceOfTruth = Ryan ?? Aleks;
       if (!sourceOfTruth) {
@@ -633,13 +622,12 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
       }
 
       const averageRank = average([Ryan?.rank, Aleks?.rank]);
-      const averagePosRank = average([Ryan?.posRank, Aleks?.posRank]);
       const rankDiscrepency = typeof Ryan?.rank === "number" && typeof Aleks?.rank === "number"
         ? Math.abs(Ryan.rank - Aleks.rank)
         : 0;
       const averageFinalGrade = nullableAverage([
-        Ryan?.gradePublished ? calculateDraftGrade(Ryan.grade)?.displayGrade : null,
-        Aleks?.gradePublished ? calculateDraftGrade(Aleks.grade)?.displayGrade : null,
+        Ryan?.gradePublished ? effectiveDraftBoardGrade(Ryan.grade) : null,
+        Aleks?.gradePublished ? effectiveDraftBoardGrade(Aleks.grade) : null,
       ]);
 
       return {
@@ -663,11 +651,8 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
           },
         },
         averageRank,
-        averagePosRank,
         ryanRank: Ryan?.rank ?? Number.MAX_SAFE_INTEGER,
-        ryanPosRank: Ryan?.posRank ?? Number.MAX_SAFE_INTEGER,
         aleksRank: Aleks?.rank ?? Number.MAX_SAFE_INTEGER,
-        aleksPosRank: Aleks?.posRank ?? Number.MAX_SAFE_INTEGER,
       };
     });
 
@@ -683,7 +668,6 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
       draftsByPosition.set(draft.entry.position, positionDrafts);
     });
     draftsByPosition.forEach((positionDrafts) => {
-      positionDrafts.sort(comparePosition);
       positionDrafts.forEach((draft, index) => {
         draft.entry.posRank = index + 1;
       });

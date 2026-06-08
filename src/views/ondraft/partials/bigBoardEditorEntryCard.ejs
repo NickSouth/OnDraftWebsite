@@ -40,9 +40,19 @@
   const gradeConfig = typeof draftGradePositionConfig === "function" ? draftGradePositionConfig(entry.position) : null;
   const fallbackGrade = typeof defaultDraftGrade === "function" ? defaultDraftGrade(entry.position) : null;
   const grade = entry.grade || fallbackGrade;
+  const gradeScoreOptionsId = `draft-grade-score-options-${entry.id}`;
   const gradeCalculation = typeof calculateDraftGrade === "function" ? calculateDraftGrade(entry.grade) : null;
-  const gradeDisplayValue = typeof publishedBoardGrade === "function" ? publishedBoardGrade(entry) : gradeCalculation?.displayGrade;
+  const gradeFormulaValue = gradeCalculation?.displayGrade ?? null;
+  const gradeOverrideValue = typeof entry.grade?.overrideDisplayGrade === "number" && Number.isFinite(entry.grade.overrideDisplayGrade)
+    ? entry.grade.overrideDisplayGrade
+    : null;
+  const gradeEffectiveValue = typeof effectiveDraftBoardGrade === "function"
+    ? effectiveDraftBoardGrade(entry.grade)
+    : gradeOverrideValue ?? gradeFormulaValue;
+  const gradeDisplayValue = entry.gradePublished && typeof publishedBoardGrade === "function" ? publishedBoardGrade(entry) : gradeEffectiveValue;
   const gradeDisplayLabel = typeof formatDraftBoardGrade === "function" ? formatDraftBoardGrade(gradeDisplayValue) : "-/8";
+  const gradeFormulaLabel = typeof formatDraftBoardGrade === "function" ? formatDraftBoardGrade(gradeFormulaValue) : "-/8";
+  const hasGradeOverride = gradeOverrideValue !== null && (gradeFormulaValue === null || Math.abs(gradeOverrideValue - gradeFormulaValue) > 0.004);
   const gradeArchetypeNames = gradeConfig ? gradeConfig.archetypes.map((archetype) => archetype.name) : [];
   const gradeCategories = grade && typeof gradeTraitCategoriesForGrade === "function" ? gradeTraitCategoriesForGrade(grade, entry.position) : [];
   const gradeTraitValue = (categoryKey, trait) => {
@@ -70,6 +80,7 @@
     entry.grade.potential !== null
       || Object.values(entry.grade.physicalTraits ?? {}).some((value) => value !== null && value !== undefined)
       || Object.values(entry.grade.filmTraits ?? {}).some((value) => value !== null && value !== undefined)
+      || gradeOverrideValue !== null
   ));
   const hasGradeContent = Boolean(hasStoredGradeScores);
   const showPlayerPublish = !entry.playerInfoPublished && hasPlayerContent;
@@ -419,6 +430,7 @@
       <div class="board-editor-grade-panel <%= hasGradeValidationError ? "is-validation-error" : "" %>" data-grade-panel <%= expandGrade ? "" : "hidden" %>>
         <% if (gradeConfig && grade) { %>
           <input type="hidden" name="<%= fieldPrefix %>[grade][position]" value="<%= entry.position %>" data-grade-position />
+          <input type="hidden" name="<%= fieldPrefix %>[grade][overrideDisplayGrade]" value="<%= hasGradeOverride ? gradeOverrideValue.toFixed(2) : "" %>" data-grade-override />
           <div class="board-editor-grade-head">
             <label>
               <span>Archetype</span>
@@ -432,14 +444,30 @@
               <span>Potential</span>
               <select name="<%= fieldPrefix %>[grade][potential]" data-publish-section="grade" aria-label="Potential">
                 <option value="">--</option>
+                <option value="NA" <%= grade.potential === "NA" ? "selected" : "" %>>NA</option>
                 <% [1, 2, 3, 4, 5, 6, 7, 8].forEach((value) => { %>
                   <option value="<%= value %>" <%= grade.potential === value ? "selected" : "" %>><%= value %></option>
                 <% }) %>
               </select>
             </label>
-            <div class="board-editor-grade-current">
-              <span>Overall:</span>
-              <strong data-grade-panel-summary><%= gradeCalculation ? formatDraftBoardGrade(gradeCalculation.displayGrade) : "-/8" %></strong>
+            <div class="board-editor-grade-final">
+              <label>
+                <span>Final grade</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="8"
+                  step="0.01"
+                  value="<%= gradeEffectiveValue !== null ? gradeEffectiveValue.toFixed(2) : "" %>"
+                  data-grade-final-input
+                  data-grade-formula="<%= gradeFormulaValue !== null ? gradeFormulaValue.toFixed(2) : "" %>"
+                  data-publish-section="grade"
+                  aria-label="Final grade"
+                  @keydown.enter.prevent="$el.blur()"
+                />
+              </label>
+              <span data-grade-formula-label>Formula: <%= gradeFormulaLabel %></span>
+              <button type="button" class="board-editor-grade-revert" data-revert-grade-override <%= hasGradeOverride ? "" : "hidden" %>>Revert to formula</button>
             </div>
           </div>
           <div class="board-editor-grade-rows">
@@ -451,14 +479,14 @@
                     <label class="board-editor-grade-trait">
                       <span><%= trait %></span>
                       <input
-                        type="number"
-                        min="1"
-                        max="8"
-                        step="any"
+                        type="text"
+                        inputmode="decimal"
+                        list="<%= gradeScoreOptionsId %>"
                         name="<%= fieldPrefix %>[grade][<%= category.key %>][<%= trait %>]"
                         value="<%= gradeTraitValue(category.key, trait) %>"
                         data-publish-section="grade"
                         aria-label="<%= trait %>"
+                        @keydown.enter.prevent="$el.blur()"
                       />
                     </label>
                   <% }) %>
@@ -466,6 +494,12 @@
               </div>
             <% }) %>
           </div>
+          <datalist id="<%= gradeScoreOptionsId %>">
+            <option value="NA"></option>
+            <% [1, 2, 3, 4, 5, 6, 7, 8].forEach((value) => { %>
+              <option value="<%= value %>"></option>
+            <% }) %>
+          </datalist>
           <%- fieldErrorMarkup("grade") %>
         <% } else { %>
           <div class="board-editor-grade-empty <%= hasGradeValidationError ? "is-validation-error" : "" %>">

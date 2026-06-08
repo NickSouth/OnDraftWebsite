@@ -19,17 +19,17 @@
 
 <aside
   id="site-sidebar"
-  class="fixed right-0 top-14 z-50 flex h-[calc(100vh-3.5rem)] w-80 max-w-[calc(100vw-1rem)] flex-col border-l border-slate-200 bg-white shadow-editorial transition-transform duration-300 ease-out dark:border-white/10 dark:bg-draft-slate <%= forceOverlaySidebar ? "" : "lg:top-0 lg:h-screen lg:translate-x-0" %>"
+  class="fixed right-0 top-12 z-50 flex h-[calc(100vh-3rem)] w-80 max-w-[calc(100vw-1rem)] flex-col border-l border-slate-200 bg-white shadow-editorial transition-transform duration-300 ease-out dark:border-white/10 dark:bg-draft-slate sm:top-14 sm:h-[calc(100vh-3.5rem)] <%= forceOverlaySidebar ? "" : "lg:top-0 lg:h-screen lg:translate-x-0" %>"
   :class="sidebarOpen ? 'translate-x-0' : 'translate-x-[calc(100%+1rem)] <%= forceOverlaySidebar ? "" : "lg:translate-x-0" %>'"
   x-trap.noscroll="sidebarOpen <%= forceOverlaySidebar ? "" : "&& window.innerWidth < 1024" %>"
   @keydown.escape.window="sidebarOpen = false"
 >
-  <div class="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4 dark:border-white/10">
-    <div class="flex min-w-0 items-center gap-3">
-      <img class="h-16 w-20 shrink-0 object-contain drop-shadow-sm" src="/images/brand/OnDraftLogo-cropped.png" alt="" aria-hidden="true" />
+  <div class="flex items-start justify-between gap-2 border-b border-slate-200 px-4 py-3 dark:border-white/10 sm:gap-3 sm:px-5 sm:py-4">
+    <div class="flex min-w-0 items-center gap-2 sm:gap-3">
+      <img class="h-12 w-16 shrink-0 object-contain drop-shadow-sm sm:h-16 sm:w-20" src="/images/brand/OnDraftLogo-cropped.png" alt="" aria-hidden="true" />
       <div class="min-w-0 pt-1">
-        <p class="text-xs font-black uppercase tracking-[0.14em] text-draft-amber dark:text-draft-gold">Navigate</p>
-        <h2 class="truncate text-lg font-black tracking-normal text-slate-950 dark:text-white">OnDraft Menu</h2>
+        <p class="text-[0.68rem] font-black uppercase tracking-[0.12em] text-draft-amber dark:text-draft-gold sm:text-xs sm:tracking-[0.14em]">Navigate</p>
+        <h2 class="truncate text-base font-black tracking-normal text-slate-950 dark:text-white sm:text-lg">OnDraft Menu</h2>
       </div>
     </div>
     <div class="flex shrink-0 items-center gap-2">
@@ -60,7 +60,7 @@
     </div>
   </div>
 
-  <nav class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 lg:overflow-visible" aria-label="Primary">
+  <nav class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4 lg:overflow-visible" aria-label="Primary">
     <div class="grid gap-2">
     <% navItems.forEach((item) => { %>
       <% const isActive = item.href === "/" ? activePath === "/" : activePath === item.href || activePath.startsWith(`${item.href}/`); %>
@@ -80,12 +80,8 @@
       <div class="mt-5 border-t border-slate-200 pt-4 dark:border-white/10">
         <p class="mb-1 px-2 text-[0.62rem] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Admin</p>
         <% const adminDashboardActive = activePath === "/admin" || activePath.startsWith("/admin/"); %>
-        <% const newArticleActive = activePath === "/articles/new"; %>
-        <% const editBoardActive = activePath === "/bigboard/edit"; %>
         <div class="grid gap-2">
           <a href="/admin" class="od-shell-link flex min-h-10 px-3 py-2 text-xs leading-tight <%= adminDashboardActive ? "is-active" : "" %>" <%= adminDashboardActive ? 'aria-current="page"' : "" %>>Admin Dashboard</a>
-          <a href="/articles/new" class="od-shell-link flex min-h-10 px-3 py-2 text-xs leading-tight <%= newArticleActive ? "is-active" : "" %>" <%= newArticleActive ? 'aria-current="page"' : "" %>>Create article</a>
-          <a href="/bigboard/edit" class="od-shell-link flex min-h-10 px-3 py-2 text-xs leading-tight <%= editBoardActive ? "is-active" : "" %>" <%= editBoardActive ? 'aria-current="page"' : "" %>>Edit draft board</a>
         </div>
       </div>
     <% } %>
