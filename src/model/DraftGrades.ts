@@ -42,6 +42,8 @@ export type DraftGradeSummary = {
   finalGrade: number;
 };
 
+const DRAFT_GRADE_OVERRIDE_EPSILON = 0.025;
+
 type FormulaPosition = "QB" | "RB" | "WR" | "TE" | "OT" | "IOL" | "IDL" | "ED" | "LB" | "CB" | "S";
 type FormulaArchetypeData = {
   "Physical Weight"?: number;
@@ -402,8 +404,11 @@ export function draftGradeBoardScore(grade: DraftGrade | null): number | null {
 }
 
 export function effectiveDraftBoardGrade(grade: DraftGrade | null): number | null {
+  const calculatedGrade = calculateDraftGrade(grade)?.displayGrade ?? null;
   const override = normalizeDraftGradeOverride(grade?.overrideDisplayGrade);
-  return override ?? calculateDraftGrade(grade)?.displayGrade ?? null;
+  return override !== null && (calculatedGrade === null || Math.abs(override - calculatedGrade) >= DRAFT_GRADE_OVERRIDE_EPSILON)
+    ? override
+    : calculatedGrade;
 }
 
 export function formatDraftBoardGrade(value: number | null | undefined): string {

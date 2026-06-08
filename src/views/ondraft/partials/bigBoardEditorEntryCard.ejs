@@ -52,7 +52,7 @@
   const gradeDisplayValue = entry.gradePublished && typeof publishedBoardGrade === "function" ? publishedBoardGrade(entry) : gradeEffectiveValue;
   const gradeDisplayLabel = typeof formatDraftBoardGrade === "function" ? formatDraftBoardGrade(gradeDisplayValue) : "-/8";
   const gradeFormulaLabel = typeof formatDraftBoardGrade === "function" ? formatDraftBoardGrade(gradeFormulaValue) : "-/8";
-  const hasGradeOverride = gradeOverrideValue !== null && (gradeFormulaValue === null || Math.abs(gradeOverrideValue - gradeFormulaValue) > 0.004);
+  const hasGradeOverride = gradeOverrideValue !== null && (gradeFormulaValue === null || Math.abs(gradeOverrideValue - gradeFormulaValue) >= 0.025);
   const gradeArchetypeNames = gradeConfig ? gradeConfig.archetypes.map((archetype) => archetype.name) : [];
   const gradeCategories = grade && typeof gradeTraitCategoriesForGrade === "function" ? gradeTraitCategoriesForGrade(grade, entry.position) : [];
   const gradeTraitValue = (categoryKey, trait) => {

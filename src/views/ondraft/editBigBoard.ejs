@@ -437,7 +437,7 @@
       }
       const formula = numericGradeValue(input.dataset.gradeFormula);
       const entered = numericGradeValue(input.value);
-      const hasOverride = entered !== null && (formula === null || Math.abs(entered - formula) > 0.004);
+      const hasOverride = entered !== null && (formula === null || Math.abs(entered - formula) >= 0.025);
       overrideField.value = hasOverride ? entered.toFixed(2) : "";
 
       const summaryValue = entered ?? formula;

@@ -121,6 +121,38 @@ describe("Draft grade calculations", () => {
     expect(formatDraftBoardGrade(result?.displayGrade)).toBe("6.96/8");
   });
 
+  it("ignores tiny stale overrides caused by formula rounding drift", () => {
+    const grade: DraftGrade = {
+      position: "WR",
+      archetype: "Balanced",
+      potential: 6,
+      physicalTraits: {
+        Speed: 6,
+        Acceleration: 6,
+        Agility: 7,
+        "Change of Direction": 7,
+        Strength: 5,
+        "Size / Frame": 5,
+      },
+      filmTraits: {
+        "Blocking / Toughness": 4,
+        "Route Tree": 7,
+        "Short Route Running": 7,
+        "Intermediate Route Running": 7,
+        "Deep Route Running": 6,
+        Release: 7,
+        Catching: 6,
+        "Catch In Traffic": 6,
+        "Contested Catching": 5,
+        "Body Control": 7,
+        "Run After Catch": 4,
+      },
+      overrideDisplayGrade: 6.94,
+    };
+
+    expect(formatDraftBoardGrade(effectiveDraftBoardGrade(grade))).toBe("6.96/8");
+  });
+
   it("maps OnDraft EDGE to Ryan's ED formula and supports NA in calculations", () => {
     const edgeGrade = filledGrade("EDGE", 6, 6);
     edgeGrade.physicalTraits.Speed = "NA";
