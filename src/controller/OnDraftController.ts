@@ -432,8 +432,17 @@ class OnDraftController implements IOnDraftController {
     return this.queryString(req, "sortDirection") === "asc" ? "asc" : "desc";
   }
 
+  private isLikelyMobileRequest(req: Request): boolean {
+    const userAgent = req.get("user-agent") ?? "";
+    return /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(userAgent);
+  }
+
   private articleViewMode(req: Request): "card" | "list" {
-    return this.queryString(req, "view") === "list" ? "list" : "card";
+    const requestedView = this.queryString(req, "view");
+    if (requestedView === "list" || requestedView === "card") {
+      return requestedView;
+    }
+    return this.isLikelyMobileRequest(req) ? "list" : "card";
   }
 
   private hasArticleFilters(req: Request): boolean {
