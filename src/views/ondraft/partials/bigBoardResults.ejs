@@ -212,7 +212,7 @@
                       <% if (hasPublishedGrade) { %>
                         <span class="<%= hasPublishedGradeValue ? "big-board-grade-badge-with-value " : "" %>grid min-h-11 min-w-20 place-content-center gap-0.5 rounded-md border border-draft-gold/50 bg-white px-2.5 py-2 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink sm:min-h-16 sm:min-w-32 sm:gap-1 sm:px-4 sm:py-3">
                           <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Grade</span>
-                          <span class="font-display text-base font-black leading-none text-draft-amber dark:text-draft-gold sm:text-xl"><%= boardGradeLabel %></span>
+                          <span class="big-board-card-grade-number font-display text-base font-black leading-none text-draft-amber dark:text-draft-gold sm:text-xl"><%= boardGradeLabel %></span>
                         </span>
                       <% } %>
                       <span class="<%= hasPublishedGradeValue ? "big-board-card-secondary-metrics" : "big-board-direct-metrics" %>">
@@ -259,7 +259,7 @@
               </div>
             </details>
           <% } else { %>
-            <div class="big-board-card-row relative grid grid-cols-[3.25rem_minmax(0,1fr)] items-start gap-x-2 gap-y-2 overflow-hidden rounded-md p-2 sm:min-h-32 sm:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)] sm:items-center sm:gap-3">
+            <div class="big-board-card-row big-board-card-row-no-profile relative grid grid-cols-[3.25rem_minmax(0,1fr)] items-start gap-x-2 gap-y-2 overflow-hidden rounded-md p-2 sm:min-h-32 sm:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)] sm:items-center sm:gap-3">
               <span class="pointer-events-none absolute inset-y-0 right-0 left-[31rem] hidden bg-slate-200/55 [clip-path:polygon(3rem_0,100%_0,100%_100%,0_100%)] dark:bg-white/[0.06] lg:block" aria-hidden="true"></span>
               <span class="sr-only"><%= accessibleSummary %></span>
               <span class="big-board-card-rank relative z-10 flex items-center justify-center gap-2 sm:justify-start">
@@ -308,7 +308,7 @@
                     <% if (hasPublishedGrade) { %>
                       <span class="<%= hasPublishedGradeValue ? "big-board-grade-badge-with-value " : "" %>grid min-h-11 min-w-20 place-content-center gap-0.5 rounded-md border border-draft-gold/50 bg-white px-2.5 py-2 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink sm:min-h-16 sm:min-w-32 sm:gap-1 sm:px-4 sm:py-3">
                         <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Grade</span>
-                        <span class="font-display text-base font-black leading-none text-draft-amber dark:text-draft-gold sm:text-xl"><%= boardGradeLabel %></span>
+                        <span class="big-board-card-grade-number font-display text-base font-black leading-none text-draft-amber dark:text-draft-gold sm:text-xl"><%= boardGradeLabel %></span>
                       </span>
                     <% } %>
                     <span class="<%= hasPublishedGradeValue ? "big-board-card-secondary-metrics" : "big-board-direct-metrics" %>">
