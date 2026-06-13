@@ -7,6 +7,7 @@ export type DraftGradePotentialScore = number | "NA" | null;
 export type DraftGrade = {
   position: Position;
   archetype: string;
+  value?: string;
   potential: DraftGradePotentialScore;
   physicalTraits: Record<string, DraftGradeTraitScore>;
   filmTraits: Record<string, DraftGradeTraitScore>;
@@ -291,6 +292,10 @@ export function normalizeDraftGradeOverride(value: unknown): number | null {
     : null;
 }
 
+export function normalizeDraftGradeValue(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 function normalizeTraitMap(value: unknown): Record<string, DraftGradeTraitScore> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {};
@@ -333,6 +338,7 @@ export function toDraftGrade(value: unknown, fallbackPosition: Position | "" = "
   return {
     position,
     archetype,
+    value: normalizeDraftGradeValue(input.value ?? input.Value),
     potential: normalizePotential(input.potential ?? input.Potential),
     physicalTraits: normalizeTraitMap(rawPhysicalTraits),
     filmTraits: normalizeTraitMap(rawFilmTraits),

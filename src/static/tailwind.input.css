@@ -1384,7 +1384,7 @@
   }
 
   .board-editor-grade-head {
-    @apply grid min-w-0 gap-3 sm:grid-cols-2 md:grid-cols-[minmax(10rem,14rem)_minmax(8rem,10rem)_minmax(10rem,auto)] md:items-end;
+    @apply grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(10rem,14rem)_minmax(8rem,10rem)_minmax(16rem,1fr)_minmax(10rem,12rem)] lg:items-end;
   }
 
   .board-editor-grade-head label,
@@ -1400,6 +1400,14 @@
 
   .board-editor-grade-head select {
     @apply od-focus-ring min-h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-black text-slate-950 dark:border-white/15 dark:bg-draft-slate dark:text-white;
+  }
+
+  .board-editor-grade-value-field {
+    @apply sm:col-span-2 lg:col-span-1;
+  }
+
+  .board-editor-grade-value-field input {
+    @apply od-focus-ring h-10 min-w-0 rounded-md border border-slate-300 bg-slate-50 px-3 text-sm font-semibold normal-case text-slate-950 placeholder:text-slate-400 dark:border-white/15 dark:bg-draft-slate dark:text-white dark:placeholder:text-slate-500;
   }
 
   .board-editor-grade-current strong {
@@ -2053,6 +2061,14 @@
   }
 
   .about-profile-card:target {
+    @apply border-draft-gold bg-draft-gold/10;
+  }
+
+  .about-anchor-section {
+    scroll-margin-top: 5.5rem;
+  }
+
+  .about-anchor-section:target {
     @apply border-draft-gold bg-draft-gold/10;
   }
 
