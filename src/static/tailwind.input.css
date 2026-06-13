@@ -1856,12 +1856,16 @@
 
   @media (max-width: 639px) {
     .ranking-list .big-board-card-row.big-board-card-row {
-      grid-template-columns: 1.35rem minmax(0, 1fr) !important;
-      column-gap: 0.2rem !important;
+      grid-template-columns: 2.05rem minmax(0, 1fr) !important;
+      column-gap: 0.18rem !important;
       row-gap: 0.45rem !important;
       min-height: 12.5rem;
       padding-left: 0 !important;
       padding-right: 0.25rem !important;
+    }
+
+    .ranking-list .big-board-card-row-no-profile.big-board-card-row {
+      min-height: 8.8rem;
     }
 
     .ranking-list .big-board-card-rank.big-board-card-rank {
@@ -1896,6 +1900,10 @@
       gap: 0.3rem !important;
     }
 
+    .ranking-list .big-board-card-grade-number {
+      font-size: 0.94rem !important;
+    }
+
     .ranking-list .big-board-value-badge-card-mobile {
       margin-left: 0 !important;
       max-width: 7.2rem;
@@ -1905,6 +1913,15 @@
   }
 
   @media (max-width: 420px) {
+    .ranking-list .big-board-card-row.big-board-card-row {
+      grid-template-columns: 2rem minmax(0, 1fr) !important;
+      column-gap: 0.14rem !important;
+    }
+
+    .ranking-list .big-board-card-row-no-profile.big-board-card-row {
+      min-height: 8rem;
+    }
+
     .ranking-list .big-board-card-main.big-board-card-main {
       padding-right: 6.35rem;
     }
