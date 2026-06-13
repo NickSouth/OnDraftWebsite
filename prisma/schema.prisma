@@ -347,6 +347,7 @@ model BigBoardEntry {
   rundown             String   @default("")
   notes               String   @default("")
   grade               Json?
+  gradeValue          String   @default("") @map("grade_value")
   playerInfoPublished Boolean  @default(false) @map("player_info_published")
   gradePublished      Boolean  @default(false) @map("grade_published")
   writeupPublished    Boolean  @default(false) @map("writeup_published")

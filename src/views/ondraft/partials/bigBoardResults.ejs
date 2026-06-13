@@ -68,6 +68,7 @@
       ["Ryan", entry.consensusRankingContext?.Ryan?.rank],
       ["Aleks", entry.consensusRankingContext?.Aleks?.rank],
     ].filter((sourceRank) => typeof sourceRank[1] === "number");
+    const possessiveRankLabel = (name) => `${name}${name.endsWith("s") ? "'" : "'s"} Rank`;
   %>
   <% if (bigBoard.length === 0) { %>
     <div class="od-card grid min-h-48 place-items-center p-8 text-center">
@@ -162,14 +163,14 @@
         <li class="border-b border-slate-200 py-3 last:border-b-0 dark:border-white/10">
           <% if (hasPublishedDetails || hasConsensusDisclosure) { %>
             <details class="group">
-              <summary class="od-focus-ring relative grid cursor-pointer list-none grid-cols-[3.25rem_minmax(0,1fr)] items-start gap-x-2 gap-y-2 overflow-hidden rounded-md p-2 transition hover:bg-white/70 dark:hover:bg-white/[0.04] sm:min-h-32 sm:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)] sm:items-center sm:gap-3 sm:pb-11 [&::-webkit-details-marker]:hidden">
+              <summary class="big-board-card-row od-focus-ring relative grid cursor-pointer list-none grid-cols-[3.25rem_minmax(0,1fr)] items-start gap-x-2 gap-y-2 overflow-hidden rounded-md p-2 transition hover:bg-white/70 dark:hover:bg-white/[0.04] sm:min-h-32 sm:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)] sm:items-center sm:gap-3 sm:pb-11 [&::-webkit-details-marker]:hidden">
                 <span class="pointer-events-none absolute inset-y-0 right-0 left-[31rem] hidden bg-slate-200/55 [clip-path:polygon(3rem_0,100%_0,100%_100%,0_100%)] dark:bg-white/[0.06] lg:block" aria-hidden="true"></span>
                 <span class="sr-only"><%= accessibleSummary %></span>
-                <span class="relative z-10 flex items-center justify-center gap-2 sm:justify-start">
+                <span class="big-board-card-rank relative z-10 flex items-center justify-center gap-2 sm:justify-start">
                   <span class="w-auto font-display text-2xl font-black leading-none text-draft-amber dark:text-draft-gold sm:w-auto sm:text-5xl"><%= rankLabel %></span>
                   <span class="hidden h-9 w-px bg-slate-300 dark:bg-white/20 sm:block sm:h-14" aria-hidden="true"></span>
                 </span>
-                <span class="relative z-10 col-start-1 row-start-2 grid justify-items-center text-center sm:col-start-auto sm:row-start-auto">
+                <span class="big-board-card-helmet relative z-10 col-start-1 row-start-2 grid justify-items-center text-center sm:col-start-auto sm:row-start-auto">
                   <img
                     class="h-10 w-12 shrink-0 object-contain opacity-0 transition-opacity duration-150 sm:h-28 sm:w-32"
                     src="/teamHelmetTemplate.png"
@@ -180,13 +181,19 @@
                     data-generated-helmet-src="<%= generatedHelmetSrc %>"
                   />
                 </span>
-                <span class="relative z-10 col-start-2 row-span-2 row-start-1 grid gap-1.5 sm:col-start-auto sm:row-span-1 sm:row-start-auto sm:gap-3">
-                  <span class="grid gap-1.5 sm:gap-3 lg:grid-cols-[minmax(0,18rem)_minmax(12rem,1fr)] lg:items-start">
+                <span class="big-board-card-main relative z-10 col-start-2 row-span-2 row-start-1 grid gap-1.5 sm:col-start-auto sm:row-span-1 sm:row-start-auto sm:gap-3">
+                  <span class="grid gap-1.5 sm:gap-3 <%= hasPublishedGradeValue ? "lg:grid-cols-[minmax(0,26rem)_minmax(12rem,1fr)]" : "lg:grid-cols-[minmax(0,18rem)_minmax(12rem,1fr)]" %> lg:items-start">
                     <span>
                       <span class="block font-display text-[1.12rem] font-black leading-tight text-slate-950 dark:text-white sm:text-3xl"><%= entry.playerName %></span>
-                      <span class="mt-1 flex flex-wrap items-center gap-1.5 sm:mt-2 sm:gap-2">
+                      <span class="big-board-card-meta mt-1 flex flex-wrap items-center gap-1.5 sm:mt-2 sm:gap-2">
                         <span class="inline-flex rounded bg-draft-gold px-1.5 py-0.5 text-[0.68rem] font-black uppercase tracking-wide text-draft-ink sm:px-3 sm:py-1 sm:text-sm"><%= posRankLabel %></span>
                         <span class="text-xs font-black leading-tight text-slate-500 dark:text-slate-300 sm:text-sm"><%= entry.school %></span>
+                        <% if (hasPublishedGradeValue) { %>
+                          <span class="big-board-value-badge big-board-value-badge-card-mobile">
+                            <span>Value:</span>
+                            <strong><%= gradeValueLabel %></strong>
+                          </span>
+                        <% } %>
                       </span>
                     </span>
                     <span class="flex flex-wrap items-start gap-1 pt-0.5 text-slate-500 dark:text-slate-300 sm:gap-2 sm:pt-1 lg:justify-end">
@@ -197,27 +204,32 @@
                           <% } %>
                           <span class="consensus-source-ranks-line">
                             <% sourceRanks.forEach(([creator, sourceRank]) => { %>
-                              <span><%= creator %>'s Rank: <strong><%= formatBoardNumber(sourceRank) %></strong></span>
+                              <span><%= possessiveRankLabel(creator) %>: <strong><%= formatBoardNumber(sourceRank) %></strong></span>
                             <% }) %>
                           </span>
                         </span>
                       <% } %>
                       <% if (hasPublishedGrade) { %>
-                        <span class="grid min-h-11 min-w-20 place-content-center gap-0.5 rounded-md border border-draft-gold/50 bg-white px-2.5 py-2 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink sm:min-h-16 sm:min-w-32 sm:gap-1 sm:px-4 sm:py-3">
+                        <span class="<%= hasPublishedGradeValue ? "big-board-grade-badge-with-value " : "" %>grid min-h-11 min-w-20 place-content-center gap-0.5 rounded-md border border-draft-gold/50 bg-white px-2.5 py-2 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink sm:min-h-16 sm:min-w-32 sm:gap-1 sm:px-4 sm:py-3">
                           <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Grade</span>
                           <span class="font-display text-base font-black leading-none text-draft-amber dark:text-draft-gold sm:text-xl"><%= boardGradeLabel %></span>
-                          <% if (hasPublishedGradeValue) { %>
-                            <span class="max-w-28 truncate text-[0.62rem] font-bold normal-case leading-tight text-slate-500 dark:text-slate-300 sm:max-w-32 sm:text-[0.68rem]"><%= gradeValueLabel %></span>
-                          <% } %>
                         </span>
                       <% } %>
-                      <span class="grid min-w-16 gap-0.5 rounded bg-draft-slate px-2 py-1.5 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink sm:min-w-20 sm:px-3 sm:py-2">
-                        <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Height</span>
-                        <span class="text-xs font-black leading-none text-slate-500 dark:text-slate-300 sm:text-sm"><%= heightLabel %></span>
-                      </span>
-                      <span class="grid min-w-16 gap-0.5 rounded bg-draft-slate px-2 py-1.5 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink sm:min-w-20 sm:px-3 sm:py-2">
-                        <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Weight</span>
-                        <span class="text-xs font-black leading-none text-slate-500 dark:text-slate-300 sm:text-sm"><%= weightLabel %></span>
+                      <span class="<%= hasPublishedGradeValue ? "big-board-card-secondary-metrics" : "big-board-direct-metrics" %>">
+                        <span class="grid min-w-16 gap-0.5 rounded bg-draft-slate px-2 py-1.5 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink sm:min-w-20 sm:px-3 sm:py-2">
+                          <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Height</span>
+                          <span class="text-xs font-black leading-none text-slate-500 dark:text-slate-300 sm:text-sm"><%= heightLabel %></span>
+                        </span>
+                        <span class="grid min-w-16 gap-0.5 rounded bg-draft-slate px-2 py-1.5 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink sm:min-w-20 sm:px-3 sm:py-2">
+                          <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Weight</span>
+                          <span class="text-xs font-black leading-none text-slate-500 dark:text-slate-300 sm:text-sm"><%= weightLabel %></span>
+                        </span>
+                        <% if (hasPublishedGradeValue) { %>
+                          <span class="big-board-value-badge big-board-value-badge-card">
+                            <span>Value:</span>
+                            <strong><%= gradeValueLabel %></strong>
+                          </span>
+                        <% } %>
                       </span>
                     </span>
                   </span>
@@ -247,14 +259,14 @@
               </div>
             </details>
           <% } else { %>
-            <div class="relative grid grid-cols-[3.25rem_minmax(0,1fr)] items-start gap-x-2 gap-y-2 overflow-hidden rounded-md p-2 sm:min-h-32 sm:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)] sm:items-center sm:gap-3">
+            <div class="big-board-card-row relative grid grid-cols-[3.25rem_minmax(0,1fr)] items-start gap-x-2 gap-y-2 overflow-hidden rounded-md p-2 sm:min-h-32 sm:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)] sm:items-center sm:gap-3">
               <span class="pointer-events-none absolute inset-y-0 right-0 left-[31rem] hidden bg-slate-200/55 [clip-path:polygon(3rem_0,100%_0,100%_100%,0_100%)] dark:bg-white/[0.06] lg:block" aria-hidden="true"></span>
               <span class="sr-only"><%= accessibleSummary %></span>
-              <span class="relative z-10 flex items-center justify-center gap-2 sm:justify-start">
+              <span class="big-board-card-rank relative z-10 flex items-center justify-center gap-2 sm:justify-start">
                 <span class="w-auto font-display text-2xl font-black leading-none text-draft-amber dark:text-draft-gold sm:w-auto sm:text-5xl"><%= rankLabel %></span>
                 <span class="hidden h-9 w-px bg-slate-300 dark:bg-white/20 sm:block sm:h-14" aria-hidden="true"></span>
               </span>
-              <span class="relative z-10 col-start-1 row-start-2 grid justify-items-center text-center sm:col-start-auto sm:row-start-auto">
+              <span class="big-board-card-helmet relative z-10 col-start-1 row-start-2 grid justify-items-center text-center sm:col-start-auto sm:row-start-auto">
                 <img
                   class="h-10 w-12 shrink-0 object-contain opacity-0 transition-opacity duration-150 sm:h-28 sm:w-32"
                   src="/teamHelmetTemplate.png"
@@ -265,13 +277,19 @@
                   data-generated-helmet-src="<%= generatedHelmetSrc %>"
                 />
               </span>
-              <div class="relative z-10 col-start-2 row-span-2 row-start-1 grid gap-1.5 sm:col-start-auto sm:row-span-1 sm:row-start-auto sm:gap-3">
-                <div class="grid gap-1.5 sm:gap-3 lg:grid-cols-[minmax(0,18rem)_minmax(12rem,1fr)] lg:items-start">
+              <div class="big-board-card-main relative z-10 col-start-2 row-span-2 row-start-1 grid gap-1.5 sm:col-start-auto sm:row-span-1 sm:row-start-auto sm:gap-3">
+                <div class="grid gap-1.5 sm:gap-3 <%= hasPublishedGradeValue ? "lg:grid-cols-[minmax(0,26rem)_minmax(12rem,1fr)]" : "lg:grid-cols-[minmax(0,18rem)_minmax(12rem,1fr)]" %> lg:items-start">
                   <div>
                     <span class="block font-display text-[1.12rem] font-black leading-tight text-slate-950 dark:text-white sm:text-3xl"><%= entry.playerName %></span>
-                    <span class="mt-1 flex flex-wrap items-center gap-1.5 sm:mt-2 sm:gap-2">
+                    <span class="big-board-card-meta mt-1 flex flex-wrap items-center gap-1.5 sm:mt-2 sm:gap-2">
                       <span class="inline-flex rounded bg-draft-gold px-1.5 py-0.5 text-[0.68rem] font-black uppercase tracking-wide text-draft-ink sm:px-3 sm:py-1 sm:text-sm"><%= posRankLabel %></span>
                       <span class="text-xs font-black leading-tight text-slate-500 dark:text-slate-300 sm:text-sm"><%= entry.school %></span>
+                      <% if (hasPublishedGradeValue) { %>
+                        <span class="big-board-value-badge big-board-value-badge-card-mobile">
+                          <span>Value:</span>
+                          <strong><%= gradeValueLabel %></strong>
+                        </span>
+                      <% } %>
                     </span>
                   </div>
                   <div class="flex flex-wrap items-start gap-1 pt-0.5 text-slate-500 dark:text-slate-300 sm:gap-2 sm:pt-1 lg:justify-end">
@@ -282,27 +300,32 @@
                         <% } %>
                         <span class="consensus-source-ranks-line">
                           <% sourceRanks.forEach(([creator, sourceRank]) => { %>
-                            <span><%= creator %>'s Rank: <strong><%= formatBoardNumber(sourceRank) %></strong></span>
+                            <span><%= possessiveRankLabel(creator) %>: <strong><%= formatBoardNumber(sourceRank) %></strong></span>
                           <% }) %>
                         </span>
                       </span>
                     <% } %>
                     <% if (hasPublishedGrade) { %>
-                      <span class="grid min-h-11 min-w-20 place-content-center gap-0.5 rounded-md border border-draft-gold/50 bg-white px-2.5 py-2 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink sm:min-h-16 sm:min-w-32 sm:gap-1 sm:px-4 sm:py-3">
+                      <span class="<%= hasPublishedGradeValue ? "big-board-grade-badge-with-value " : "" %>grid min-h-11 min-w-20 place-content-center gap-0.5 rounded-md border border-draft-gold/50 bg-white px-2.5 py-2 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink sm:min-h-16 sm:min-w-32 sm:gap-1 sm:px-4 sm:py-3">
                         <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Grade</span>
                         <span class="font-display text-base font-black leading-none text-draft-amber dark:text-draft-gold sm:text-xl"><%= boardGradeLabel %></span>
-                        <% if (hasPublishedGradeValue) { %>
-                          <span class="max-w-28 truncate text-[0.62rem] font-bold normal-case leading-tight text-slate-500 dark:text-slate-300 sm:max-w-32 sm:text-[0.68rem]"><%= gradeValueLabel %></span>
-                        <% } %>
                       </span>
                     <% } %>
-                    <span class="grid min-w-16 gap-0.5 rounded bg-draft-slate px-2 py-1.5 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink sm:min-w-20 sm:px-3 sm:py-2">
-                      <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Height</span>
-                      <span class="text-xs font-black leading-none text-slate-500 dark:text-slate-300 sm:text-sm"><%= heightLabel %></span>
-                    </span>
-                    <span class="grid min-w-16 gap-0.5 rounded bg-draft-slate px-2 py-1.5 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink sm:min-w-20 sm:px-3 sm:py-2">
-                      <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Weight</span>
-                      <span class="text-xs font-black leading-none text-slate-500 dark:text-slate-300 sm:text-sm"><%= weightLabel %></span>
+                    <span class="<%= hasPublishedGradeValue ? "big-board-card-secondary-metrics" : "big-board-direct-metrics" %>">
+                      <span class="grid min-w-16 gap-0.5 rounded bg-draft-slate px-2 py-1.5 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink sm:min-w-20 sm:px-3 sm:py-2">
+                        <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Height</span>
+                        <span class="text-xs font-black leading-none text-slate-500 dark:text-slate-300 sm:text-sm"><%= heightLabel %></span>
+                      </span>
+                      <span class="grid min-w-16 gap-0.5 rounded bg-draft-slate px-2 py-1.5 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink sm:min-w-20 sm:px-3 sm:py-2">
+                        <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Weight</span>
+                        <span class="text-xs font-black leading-none text-slate-500 dark:text-slate-300 sm:text-sm"><%= weightLabel %></span>
+                      </span>
+                      <% if (hasPublishedGradeValue) { %>
+                        <span class="big-board-value-badge big-board-value-badge-card">
+                          <span>Value:</span>
+                          <strong><%= gradeValueLabel %></strong>
+                        </span>
+                      <% } %>
                     </span>
                   </div>
                 </div>
@@ -340,7 +363,7 @@
         <li>
           <% if (hasPublishedDetails || hasConsensusDisclosure) { %>
             <details class="group">
-              <summary class="od-focus-ring grid cursor-pointer list-none grid-cols-[2.15rem_minmax(0,1fr)] gap-x-1.5 gap-y-1.5 px-2 py-2 transition hover:bg-slate-50 dark:hover:bg-white/[0.04] sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:items-center sm:gap-3 sm:px-3 sm:py-3 [&::-webkit-details-marker]:hidden">
+              <summary class="od-focus-ring relative grid cursor-pointer list-none grid-cols-[2.15rem_minmax(0,1fr)] gap-x-1.5 gap-y-1.5 px-2 py-2 transition hover:bg-slate-50 dark:hover:bg-white/[0.04] sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:items-center sm:gap-3 sm:px-3 sm:py-3 [&::-webkit-details-marker]:hidden">
                 <span class="sr-only"><%= accessibleSummary %></span>
                 <span class="flex items-center gap-2">
                   <span class="w-5 font-display text-lg font-black leading-none text-draft-amber dark:text-draft-gold sm:w-8 sm:text-2xl"><%= rankLabel %></span>
@@ -361,7 +384,15 @@
                     data-generated-helmet-src="<%= generatedHelmetSrc %>"
                   />
                   <span class="min-w-0">
-                    <span class="block truncate font-display text-base font-black leading-tight text-slate-950 dark:text-white sm:text-xl"><%= entry.playerName %></span>
+                    <span class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-1">
+                      <span class="block min-w-0 flex-1 truncate font-display text-base font-black leading-tight text-slate-950 dark:text-white sm:text-xl"><%= entry.playerName %></span>
+                      <% if (hasPublishedGradeValue) { %>
+                        <span class="big-board-value-badge big-board-value-badge-list-mobile">
+                          <span>Value:</span>
+                          <strong><%= gradeValueLabel %></strong>
+                        </span>
+                      <% } %>
+                    </span>
                     <span class="mt-0.5 flex min-w-0 flex-nowrap items-center gap-1 text-[0.7rem] font-bold leading-none text-slate-600 dark:text-slate-300 sm:mt-1 sm:flex-wrap sm:gap-x-2 sm:gap-y-1 sm:text-sm">
                       <span class="shrink-0 text-draft-amber dark:text-draft-gold"><%= posRankLabel %></span>
                       <span class="min-w-0 flex-1 truncate"><%= entry.school %></span>
@@ -372,14 +403,22 @@
                           <% }) %>
                         </span>
                       <% } %>
-                      <% if (hasPublishedGrade) { %>
-                        <span class="inline-flex h-5 shrink-0 items-center rounded border border-draft-gold/50 px-1.5 font-display text-[0.72rem] font-black leading-none text-draft-amber dark:text-draft-gold sm:hidden"><%= boardGradeLabel %></span>
-                      <% } %>
-                      <span class="inline-flex h-5 shrink-0 items-center rounded border border-white/10 bg-draft-slate px-1 text-[0.62rem] font-black leading-none text-slate-300 dark:bg-draft-ink sm:hidden"><%= heightLabel %></span>
-                      <span class="inline-flex h-5 shrink-0 items-center rounded border border-white/10 bg-draft-slate px-1 text-[0.62rem] font-black leading-none text-slate-300 dark:bg-draft-ink sm:hidden"><%= weightLabel %></span>
+                  <% if (hasPublishedGrade) { %>
+                    <span class="inline-flex h-5 shrink-0 items-center rounded border border-draft-gold/50 px-1.5 font-display text-[0.72rem] font-black leading-none text-draft-amber dark:text-draft-gold sm:hidden"><%= boardGradeLabel %></span>
+                  <% } %>
+                  <span class="inline-flex h-5 shrink-0 items-center rounded border border-white/10 bg-draft-slate px-1 text-[0.62rem] font-black leading-none text-slate-300 dark:bg-draft-ink sm:hidden"><%= heightLabel %></span>
+                  <span class="inline-flex h-5 shrink-0 items-center rounded border border-white/10 bg-draft-slate px-1 text-[0.62rem] font-black leading-none text-slate-300 dark:bg-draft-ink sm:hidden"><%= weightLabel %></span>
                     </span>
                   </span>
                 </span>
+                <% if (!isConsensusBoard) { %>
+                  <span class="big-board-list-profile-cue" aria-hidden="true">
+                    <svg class="size-3.5 transition group-open:rotate-180" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" />
+                    </svg>
+                    <span>read player profile</span>
+                  </span>
+                <% } %>
                 <span class="col-span-2 hidden flex-nowrap items-start gap-1.5 overflow-x-auto pb-0.5 sm:col-span-1 sm:flex sm:flex-wrap sm:gap-2 sm:overflow-visible sm:pb-0 sm:justify-end">
                   <% if (sourceRanks.length > 0) { %>
                     <span class="consensus-source-ranks">
@@ -388,27 +427,32 @@
                       <% } %>
                       <span class="consensus-source-ranks-line">
                         <% sourceRanks.forEach(([creator, sourceRank]) => { %>
-                          <span><%= creator %>'s Rank: <strong><%= formatBoardNumber(sourceRank) %></strong></span>
+                          <span><%= possessiveRankLabel(creator) %>: <strong><%= formatBoardNumber(sourceRank) %></strong></span>
                         <% }) %>
                       </span>
                     </span>
                   <% } %>
                   <% if (hasPublishedGrade) { %>
-                    <span class="grid min-h-10 min-w-20 place-content-center gap-0.5 rounded-md border border-draft-gold/50 bg-white px-2 py-1.5 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink sm:min-h-16 sm:min-w-32 sm:gap-1 sm:px-4 sm:py-3">
+                    <span class="<%= hasPublishedGradeValue ? "big-board-grade-badge-with-value " : "" %>grid min-h-10 min-w-20 place-content-center gap-0.5 rounded-md border border-draft-gold/50 bg-white px-2 py-1.5 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink sm:min-h-16 sm:min-w-32 sm:gap-1 sm:px-4 sm:py-3">
                       <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Grade</span>
                       <span class="font-display text-base font-black leading-none text-draft-amber dark:text-draft-gold sm:text-xl"><%= boardGradeLabel %></span>
-                      <% if (hasPublishedGradeValue) { %>
-                        <span class="hidden max-w-28 truncate text-[0.62rem] font-bold normal-case leading-tight text-slate-500 dark:text-slate-300 sm:block sm:max-w-32 sm:text-[0.68rem]"><%= gradeValueLabel %></span>
-                      <% } %>
                     </span>
                   <% } %>
-                  <span class="grid min-w-16 gap-0.5 rounded bg-draft-slate px-2 py-1.5 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink sm:min-w-20 sm:px-3 sm:py-2">
-                    <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Height</span>
-                    <span class="text-xs font-black leading-none text-slate-500 dark:text-slate-300 sm:text-sm"><%= heightLabel %></span>
-                  </span>
-                  <span class="grid min-w-16 gap-0.5 rounded bg-draft-slate px-2 py-1.5 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink sm:min-w-20 sm:px-3 sm:py-2">
-                    <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Weight</span>
-                    <span class="text-xs font-black leading-none text-slate-500 dark:text-slate-300 sm:text-sm"><%= weightLabel %></span>
+                  <span class="<%= hasPublishedGradeValue ? "big-board-card-secondary-metrics" : "big-board-direct-metrics" %>">
+                    <span class="grid min-w-16 gap-0.5 rounded bg-draft-slate px-2 py-1.5 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink sm:min-w-20 sm:px-3 sm:py-2">
+                      <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Height</span>
+                      <span class="text-xs font-black leading-none text-slate-500 dark:text-slate-300 sm:text-sm"><%= heightLabel %></span>
+                    </span>
+                    <span class="grid min-w-16 gap-0.5 rounded bg-draft-slate px-2 py-1.5 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink sm:min-w-20 sm:px-3 sm:py-2">
+                      <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Weight</span>
+                      <span class="text-xs font-black leading-none text-slate-500 dark:text-slate-300 sm:text-sm"><%= weightLabel %></span>
+                    </span>
+                    <% if (hasPublishedGradeValue) { %>
+                      <span class="big-board-value-badge big-board-value-badge-card">
+                        <span>Value:</span>
+                        <strong><%= gradeValueLabel %></strong>
+                      </span>
+                    <% } %>
                   </span>
                 </span>
               </summary>
@@ -434,7 +478,15 @@
                   data-generated-helmet-src="<%= generatedHelmetSrc %>"
                 />
                 <span class="min-w-0">
-                  <span class="block truncate font-display text-base font-black leading-tight text-slate-950 dark:text-white sm:text-xl"><%= entry.playerName %></span>
+                  <span class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-1">
+                    <span class="block min-w-0 flex-1 truncate font-display text-base font-black leading-tight text-slate-950 dark:text-white sm:text-xl"><%= entry.playerName %></span>
+                    <% if (hasPublishedGradeValue) { %>
+                      <span class="big-board-value-badge big-board-value-badge-list-mobile">
+                        <span>Value:</span>
+                        <strong><%= gradeValueLabel %></strong>
+                      </span>
+                    <% } %>
+                  </span>
                   <span class="mt-0.5 flex min-w-0 flex-nowrap items-center gap-1 text-[0.7rem] font-bold leading-none text-slate-600 dark:text-slate-300 sm:mt-1 sm:flex-wrap sm:gap-x-2 sm:gap-y-1 sm:text-sm">
                     <span class="shrink-0 text-draft-amber dark:text-draft-gold"><%= posRankLabel %></span>
                     <span class="min-w-0 flex-1 truncate"><%= entry.school %></span>
@@ -445,11 +497,11 @@
                         <% }) %>
                       </span>
                     <% } %>
-                    <% if (hasPublishedGrade) { %>
-                      <span class="inline-flex h-5 shrink-0 items-center rounded border border-draft-gold/50 px-1.5 font-display text-[0.72rem] font-black leading-none text-draft-amber dark:text-draft-gold sm:hidden"><%= boardGradeLabel %></span>
-                    <% } %>
-                    <span class="inline-flex h-5 shrink-0 items-center rounded border border-white/10 bg-draft-slate px-1 text-[0.62rem] font-black leading-none text-slate-300 dark:bg-draft-ink sm:hidden"><%= heightLabel %></span>
-                    <span class="inline-flex h-5 shrink-0 items-center rounded border border-white/10 bg-draft-slate px-1 text-[0.62rem] font-black leading-none text-slate-300 dark:bg-draft-ink sm:hidden"><%= weightLabel %></span>
+                  <% if (hasPublishedGrade) { %>
+                    <span class="inline-flex h-5 shrink-0 items-center rounded border border-draft-gold/50 px-1.5 font-display text-[0.72rem] font-black leading-none text-draft-amber dark:text-draft-gold sm:hidden"><%= boardGradeLabel %></span>
+                  <% } %>
+                  <span class="inline-flex h-5 shrink-0 items-center rounded border border-white/10 bg-draft-slate px-1 text-[0.62rem] font-black leading-none text-slate-300 dark:bg-draft-ink sm:hidden"><%= heightLabel %></span>
+                  <span class="inline-flex h-5 shrink-0 items-center rounded border border-white/10 bg-draft-slate px-1 text-[0.62rem] font-black leading-none text-slate-300 dark:bg-draft-ink sm:hidden"><%= weightLabel %></span>
                   </span>
                 </span>
               </span>
@@ -461,27 +513,32 @@
                     <% } %>
                     <span class="consensus-source-ranks-line">
                       <% sourceRanks.forEach(([creator, sourceRank]) => { %>
-                        <span><%= creator %>'s Rank: <strong><%= formatBoardNumber(sourceRank) %></strong></span>
+                        <span><%= possessiveRankLabel(creator) %>: <strong><%= formatBoardNumber(sourceRank) %></strong></span>
                       <% }) %>
                     </span>
                   </span>
                 <% } %>
                 <% if (hasPublishedGrade) { %>
-                  <span class="grid min-h-10 min-w-20 place-content-center gap-0.5 rounded-md border border-draft-gold/50 bg-white px-2 py-1.5 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink sm:min-h-16 sm:min-w-32 sm:gap-1 sm:px-4 sm:py-3">
+                  <span class="<%= hasPublishedGradeValue ? "big-board-grade-badge-with-value " : "" %>grid min-h-10 min-w-20 place-content-center gap-0.5 rounded-md border border-draft-gold/50 bg-white px-2 py-1.5 text-center shadow-sm ring-1 ring-draft-gold/35 dark:bg-draft-ink sm:min-h-16 sm:min-w-32 sm:gap-1 sm:px-4 sm:py-3">
                     <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Grade</span>
                     <span class="font-display text-base font-black leading-none text-draft-amber dark:text-draft-gold sm:text-xl"><%= boardGradeLabel %></span>
-                    <% if (hasPublishedGradeValue) { %>
-                      <span class="hidden max-w-28 truncate text-[0.62rem] font-bold normal-case leading-tight text-slate-500 dark:text-slate-300 sm:block sm:max-w-32 sm:text-[0.68rem]"><%= gradeValueLabel %></span>
-                    <% } %>
                   </span>
                 <% } %>
-                <span class="grid min-w-16 gap-0.5 rounded bg-draft-slate px-2 py-1.5 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink sm:min-w-20 sm:px-3 sm:py-2">
-                  <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Height</span>
-                  <span class="text-xs font-black leading-none text-slate-500 dark:text-slate-300 sm:text-sm"><%= heightLabel %></span>
-                </span>
-                <span class="grid min-w-16 gap-0.5 rounded bg-draft-slate px-2 py-1.5 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink sm:min-w-20 sm:px-3 sm:py-2">
-                  <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Weight</span>
-                  <span class="text-xs font-black leading-none text-slate-500 dark:text-slate-300 sm:text-sm"><%= weightLabel %></span>
+                <span class="<%= hasPublishedGradeValue ? "big-board-card-secondary-metrics" : "big-board-direct-metrics" %>">
+                  <span class="grid min-w-16 gap-0.5 rounded bg-draft-slate px-2 py-1.5 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink sm:min-w-20 sm:px-3 sm:py-2">
+                    <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Height</span>
+                    <span class="text-xs font-black leading-none text-slate-500 dark:text-slate-300 sm:text-sm"><%= heightLabel %></span>
+                  </span>
+                  <span class="grid min-w-16 gap-0.5 rounded bg-draft-slate px-2 py-1.5 text-center shadow-sm ring-1 ring-white/10 dark:bg-draft-ink sm:min-w-20 sm:px-3 sm:py-2">
+                    <span class="text-[0.62rem] font-black uppercase tracking-wide text-slate-400 dark:text-slate-400">Weight</span>
+                    <span class="text-xs font-black leading-none text-slate-500 dark:text-slate-300 sm:text-sm"><%= weightLabel %></span>
+                  </span>
+                  <% if (hasPublishedGradeValue) { %>
+                    <span class="big-board-value-badge big-board-value-badge-card">
+                      <span>Value:</span>
+                      <strong><%= gradeValueLabel %></strong>
+                    </span>
+                  <% } %>
                 </span>
               </span>
             </div>
