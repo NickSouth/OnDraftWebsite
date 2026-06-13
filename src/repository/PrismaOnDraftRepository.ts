@@ -17,7 +17,7 @@ import {
   Video,
   VideoQuery,
 } from "../model/OnDraftContent";
-import { effectiveDraftBoardGrade, toDraftGrade } from "../model/DraftGrades";
+import { effectiveDraftBoardGrade, toDraftGrade, type DraftGrade } from "../model/DraftGrades";
 import { getPrismaClient, type OnDraftPrismaClient } from "../prisma/client";
 import {
   ArticleNotFound,
@@ -189,10 +189,17 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
     rundown: string;
     notes: string;
     grade: unknown;
+    gradeValue: string;
     playerInfoPublished: boolean;
     gradePublished: boolean;
     writeupPublished: boolean;
   }): BigBoardEntry {
+    const grade = toDraftGrade(
+      record.grade && typeof record.grade === "object" && !Array.isArray(record.grade)
+        ? { ...record.grade, value: record.gradeValue }
+        : record.grade,
+      record.position as Position | ""
+    );
     return {
       id: record.id,
       playerName: record.playerName,
@@ -205,7 +212,7 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
         : { feet: record.heightFeet, inches: record.heightInches },
       weight: record.weight,
       playerInfoPublished: record.playerInfoPublished,
-      grade: toDraftGrade(record.grade, record.position as Position | ""),
+      grade: grade ? { ...grade, value: record.gradeValue } : null,
       gradePublished: record.gradePublished,
       writeup: {
         strengths: record.strengths,
@@ -521,7 +528,8 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
       heightFeet: entry.height?.feet ?? null,
       heightInches: entry.height?.inches ?? null,
       weight: entry.weight,
-      grade: entry.grade,
+      grade: this.gradeJsonData(entry.grade),
+      gradeValue: entry.grade?.value?.trim() ?? "",
       strengths: entry.writeup.strengths,
       weaknesses: entry.writeup.weaknesses,
       rundown: entry.writeup.rundown,
@@ -530,6 +538,14 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
       gradePublished: entry.gradePublished,
       writeupPublished: entry.writeupPublished,
     };
+  }
+
+  private gradeJsonData(grade: DraftGrade | null) {
+    if (!grade) {
+      return null;
+    }
+    const { value: _value, ...gradeData } = grade;
+    return gradeData;
   }
 
   private async nextBigBoardSortOrder(bigBoardId: string): Promise<number> {

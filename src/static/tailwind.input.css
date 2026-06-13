@@ -1266,7 +1266,7 @@
   }
 
   .consensus-source-ranks {
-    @apply grid min-h-14 w-fit min-w-44 content-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-left text-[0.52rem] font-black uppercase tracking-wide text-slate-500 shadow-sm dark:border-white/10 dark:bg-draft-ink dark:text-slate-300;
+    @apply grid min-h-14 w-fit min-w-32 content-center gap-1 rounded-md border border-slate-200 bg-white py-1.5 pl-2 pr-1.5 text-left text-xs font-bold normal-case tracking-normal text-slate-500 shadow-sm dark:border-white/10 dark:bg-draft-ink dark:text-slate-300;
   }
 
   .consensus-source-ranks-line {
@@ -1384,7 +1384,7 @@
   }
 
   .board-editor-grade-head {
-    @apply grid min-w-0 gap-3 sm:grid-cols-2 md:grid-cols-[minmax(10rem,14rem)_minmax(8rem,10rem)_minmax(10rem,auto)] md:items-end;
+    @apply grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(10rem,14rem)_minmax(8rem,10rem)_minmax(16rem,1fr)_minmax(10rem,12rem)] lg:items-end;
   }
 
   .board-editor-grade-head label,
@@ -1400,6 +1400,14 @@
 
   .board-editor-grade-head select {
     @apply od-focus-ring min-h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-black text-slate-950 dark:border-white/15 dark:bg-draft-slate dark:text-white;
+  }
+
+  .board-editor-grade-value-field {
+    @apply sm:col-span-2 lg:col-span-1;
+  }
+
+  .board-editor-grade-value-field input {
+    @apply od-focus-ring h-10 min-w-0 rounded-md border border-slate-300 bg-slate-50 px-3 text-sm font-semibold normal-case text-slate-950 placeholder:text-slate-400 dark:border-white/15 dark:bg-draft-slate dark:text-white dark:placeholder:text-slate-500;
   }
 
   .board-editor-grade-current strong {
@@ -1791,6 +1799,138 @@
     @apply od-focus-ring absolute right-2 top-2 inline-flex size-8 items-center justify-center rounded-md text-xl leading-none text-slate-500 transition hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white;
   }
 
+  .big-board-value-badge {
+    @apply min-w-0 items-center overflow-hidden rounded-md border border-slate-300/70 bg-white/90 text-slate-600 shadow-sm ring-1 ring-white/70 dark:border-white/10 dark:bg-draft-ink/90 dark:text-slate-300 dark:ring-white/5;
+  }
+
+  .big-board-value-badge span {
+    @apply shrink-0 font-black text-draft-amber dark:text-draft-gold;
+  }
+
+  .big-board-value-badge strong {
+    @apply min-w-0 truncate font-black normal-case text-slate-700 dark:text-slate-100;
+  }
+
+  .big-board-value-badge-card {
+    @apply relative z-20 hidden h-7 w-fit max-w-[13rem] shrink-0 gap-1 px-2 py-1 text-[0.64rem] leading-none sm:inline-flex xl:text-[0.68rem];
+  }
+
+  .big-board-value-badge-card span,
+  .big-board-value-badge-card strong {
+    @apply text-[0.64rem] leading-none xl:text-[0.68rem];
+  }
+
+  .big-board-card-secondary-metrics {
+    @apply inline-grid grid-cols-2 gap-1;
+  }
+
+  .big-board-direct-metrics {
+    display: contents;
+  }
+
+  .big-board-card-secondary-metrics .big-board-value-badge-card {
+    @apply col-span-2 w-full max-w-full justify-center;
+  }
+
+  .big-board-list-profile-cue {
+    @apply pointer-events-none absolute bottom-3 left-1/2 hidden -translate-x-1/2 items-center gap-1.5 rounded-full border border-draft-gold/50 bg-white/90 px-3 py-1.5 text-xs font-black uppercase tracking-[0.12em] text-draft-amber shadow-sm transition group-open:bg-draft-gold group-open:text-draft-ink dark:bg-draft-ink/95 dark:text-draft-gold dark:group-open:bg-draft-gold dark:group-open:text-draft-ink lg:inline-flex;
+  }
+
+  @media (min-width: 640px) {
+    .big-board-grade-badge-with-value {
+      min-height: 5.35rem !important;
+    }
+  }
+
+  .big-board-value-badge-card-mobile {
+    @apply ml-auto inline-flex h-6 max-w-[7.75rem] shrink items-center gap-0.5 rounded border-draft-gold/35 bg-draft-gold/10 px-1.5 py-0 text-[0.48rem] leading-none ring-0 sm:hidden;
+  }
+
+  .big-board-value-badge-card-mobile span {
+    @apply text-[0.46rem];
+  }
+
+  .big-board-value-badge-card-mobile strong {
+    @apply text-[0.5rem];
+  }
+
+  @media (max-width: 639px) {
+    .ranking-list .big-board-card-row.big-board-card-row {
+      grid-template-columns: 1.35rem minmax(0, 1fr) !important;
+      column-gap: 0.2rem !important;
+      row-gap: 0.45rem !important;
+      min-height: 12.5rem;
+      padding-left: 0 !important;
+      padding-right: 0.25rem !important;
+    }
+
+    .ranking-list .big-board-card-rank.big-board-card-rank {
+      grid-column: 1 !important;
+      grid-row: 1 !important;
+      justify-content: flex-start !important;
+      padding-left: 0 !important;
+    }
+
+    .ranking-list .big-board-card-main.big-board-card-main {
+      grid-column: 2 !important;
+      grid-row: 1 / span 2 !important;
+      padding-right: 8.4rem;
+    }
+
+    .ranking-list .big-board-card-helmet.big-board-card-helmet {
+      position: absolute !important;
+      right: 0.35rem;
+      top: 1.35rem;
+      z-index: 20;
+      grid-column: auto !important;
+      grid-row: auto !important;
+      justify-items: end;
+    }
+
+    .ranking-list .big-board-card-helmet.big-board-card-helmet img {
+      height: 6.25rem !important;
+      width: 7.9rem !important;
+    }
+
+    .ranking-list .big-board-card-meta {
+      gap: 0.3rem !important;
+    }
+
+    .ranking-list .big-board-value-badge-card-mobile {
+      margin-left: 0 !important;
+      max-width: 7.2rem;
+      padding-left: 0.25rem;
+      padding-right: 0.25rem;
+    }
+  }
+
+  @media (max-width: 420px) {
+    .ranking-list .big-board-card-main.big-board-card-main {
+      padding-right: 6.35rem;
+    }
+
+    .ranking-list .big-board-card-helmet.big-board-card-helmet {
+      top: 1.65rem;
+    }
+
+    .ranking-list .big-board-card-helmet.big-board-card-helmet img {
+      height: 5rem !important;
+      width: 6.35rem !important;
+    }
+  }
+
+  .big-board-value-badge-list-mobile {
+    @apply inline-flex h-4 w-[6.15rem] max-w-[6.15rem] shrink-0 gap-0.5 rounded border-draft-gold/30 bg-draft-gold/10 px-1 text-[0.42rem] leading-none text-draft-amber ring-0 sm:hidden;
+  }
+
+  .big-board-value-badge-list-mobile span {
+    @apply text-[0.4rem];
+  }
+
+  .big-board-value-badge-list-mobile strong {
+    @apply text-[0.43rem];
+  }
+
   .big-board-controls .big-board-year-select {
     @apply inline-flex w-auto min-w-0 shrink-0 rounded-md border-draft-gold bg-draft-foam px-2.5 py-0 font-display text-3xl font-black leading-tight text-draft-ink shadow-sm dark:bg-draft-gold dark:text-draft-ink sm:px-3 sm:text-5xl;
     min-height: 1.15em;
@@ -2053,6 +2193,14 @@
   }
 
   .about-profile-card:target {
+    @apply border-draft-gold bg-draft-gold/10;
+  }
+
+  .about-anchor-section {
+    scroll-margin-top: 5.5rem;
+  }
+
+  .about-anchor-section:target {
     @apply border-draft-gold bg-draft-gold/10;
   }
 

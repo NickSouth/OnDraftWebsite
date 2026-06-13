@@ -1197,7 +1197,8 @@ describe("OnDraft HTTP contracts", () => {
     expect(editor.text).toContain('id="big-board-editor-fragment"');
     expect(editor.text).toContain('hx-get="/bigboard/edit"');
     expect(editor.text).toContain('hx-target="#big-board-editor-fragment"');
-    expect(editor.text).toContain("data-use-global-loader");
+    expect(editor.text).toContain('data-loading-skeleton="big-board-editor"');
+    expect(editor.text).toContain('data-loading-skeleton-target="#big-board-editor-fragment"');
     expect(editor.text).toContain('action="/bigboard/edit/player"');
     expect(editor.text).toContain('hx-post="/bigboard/edit/player"');
     expect(editor.text).toContain('hx-post="/bigboard/edit/publish-player-info"');
@@ -1635,6 +1636,7 @@ describe("OnDraft HTTP contracts", () => {
         "entries[0][gradePublished]": "false",
         "entries[0][writeupPublished]": "false",
         ...edgeGradePayload("entries[0]", "6", "6"),
+        "entries[0][grade][value]": "Early 1st Round",
         "entries[0][grade][overrideDisplayGrade]": "7.25",
       });
 
@@ -1644,6 +1646,8 @@ describe("OnDraft HTTP contracts", () => {
     expect(publishGrade.text).toContain("Publish Grade");
     expect(publishGrade.text).toContain("Speed");
     expect(publishGrade.text).toContain("Final grade");
+    expect(publishGrade.text).toContain('name="entries[0][grade][value]"');
+    expect(publishGrade.text).toContain('value="Early 1st Round"');
     expect(publishGrade.text).toContain("Revert to formula");
     expect(publishGrade.text).not.toContain("Edit Big Board");
 
@@ -1652,6 +1656,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(publicBoard.status).toBe(200);
     expect(publicBoard.text).toContain("Published Grade Edge");
     expect(publicBoard.text).toContain("7.25/8");
+    expect(publicBoard.text).toContain("Early 1st Round");
     expect(publicBoard.text).toContain("How we grade players");
     expect(publicBoard.text).toContain('title="Pass Rush Plan"');
     expect(publicBoard.text).toContain("PRP");
@@ -2017,14 +2022,14 @@ describe("OnDraft HTTP contracts", () => {
     expect(consensus.text).toMatch(/1\. One Board Edge[\s\S]*EDGE1/);
     expect(consensus.text).toMatch(/2\. Edge Prospect[\s\S]*EDGE2/);
     expect(consensus.text).toMatch(/3\. Quarterback Prospect[\s\S]*QB1/);
-    expect(consensus.text).toMatch(/Ryan(?:&#39;|')s Rank:\s*<strong>4<\/strong>[\s\S]*Aleks(?:&#39;|')s Rank:\s*<strong>6<\/strong>/);
-    expect(consensus.text).toMatch(/Ryan(?:&#39;|')s Rank:\s*<strong>1<\/strong>[\s\S]*Aleks(?:&#39;|')s Rank:\s*<strong>13<\/strong>/);
+    expect(consensus.text).toMatch(/Ryan(?:&#39;|')s Rank:\s*<strong>4<\/strong>[\s\S]*Aleks(?:&#39;|') Rank:\s*<strong>6<\/strong>/);
+    expect(consensus.text).toMatch(/Ryan(?:&#39;|')s Rank:\s*<strong>1<\/strong>[\s\S]*Aleks(?:&#39;|') Rank:\s*<strong>13<\/strong>/);
     expect(consensus.text).toContain("Ryan State");
     expect(consensus.text).not.toContain("Aleks Tech");
     expect(consensus.text).toContain("Big discrepancy");
     expect(consensus.text).toMatch(/4\. Tackle Prospect[\s\S]*Published U/);
     expect(consensus.text).toMatch(/Tackle Prospect[\s\S]*Ryan(?:&#39;|')s Rank:\s*<strong>10<\/strong>/);
-    expect(consensus.text).not.toMatch(/Tackle Prospect[\s\S]*Aleks(?:&#39;|')s Rank:\s*<strong>30<\/strong>/);
+    expect(consensus.text).not.toMatch(/Tackle Prospect[\s\S]*Aleks(?:&#39;|') Rank:\s*<strong>30<\/strong>/);
     expect(consensus.text).not.toContain("Private U");
     expect(consensus.text).not.toContain("read player profile");
     expect(consensus.text).not.toContain("RUNDOWN");

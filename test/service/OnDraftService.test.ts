@@ -181,6 +181,7 @@ describe("Draft grade calculations", () => {
     expect(formatDraftBoardGrade(effectiveDraftBoardGrade(grade))).toBe("7.12/8");
     expect(toDraftGrade({ ...grade, overrideDisplayGrade: "7.35" })?.overrideDisplayGrade).toBe(7.35);
     expect(toDraftGrade({ ...grade, overrideDisplayGrade: "9" })?.overrideDisplayGrade).toBeNull();
+    expect(toDraftGrade({ ...grade, value: "  Early 1st Round  " })?.value).toBe("Early 1st Round");
   });
 
   it("normalizes Python-style grade fixtures and draft NA potential values", () => {
@@ -1301,6 +1302,7 @@ describe("OnDraftService big board editing", () => {
     const validGrade = filledGrade("EDGE", 6, 6);
     validGrade.physicalTraits.Speed = "NA";
     validGrade.overrideDisplayGrade = 7.12;
+    validGrade.value = "Early 1st Round";
     const corrected = await ondraftService.saveBigBoardEntry({
       year: 2026,
       creator: "Ryan",
@@ -1316,6 +1318,7 @@ describe("OnDraftService big board editing", () => {
     expect(published.ok).toBe(true);
     if (published.ok === true) {
       expect(published.value.gradePublished).toBe(true);
+      expect(published.value.grade?.value).toBe("Early 1st Round");
       expect(formatDraftBoardGrade(calculateDraftGrade(published.value.grade)?.displayGrade)).toBe("6.85/8");
       expect(formatDraftBoardGrade(effectiveDraftBoardGrade(published.value.grade))).toBe("7.12/8");
     }

@@ -19,7 +19,7 @@
 
 <aside
   id="site-sidebar"
-  class="fixed right-0 top-12 z-50 flex h-[calc(100vh-3rem)] w-80 max-w-[calc(100vw-1rem)] flex-col border-l border-slate-200 bg-white shadow-editorial transition-transform duration-300 ease-out dark:border-white/10 dark:bg-draft-slate sm:top-14 sm:h-[calc(100vh-3.5rem)] <%= forceOverlaySidebar ? "" : "lg:top-0 lg:h-screen lg:translate-x-0" %>"
+  class="fixed right-0 top-12 z-50 flex h-[calc(100vh-3rem)] w-80 max-w-[calc(100vw-1rem)] translate-x-[calc(100%+1rem)] flex-col border-l border-slate-200 bg-white shadow-editorial transition-transform duration-300 ease-out dark:border-white/10 dark:bg-draft-slate sm:top-14 sm:h-[calc(100vh-3.5rem)] <%= forceOverlaySidebar ? "" : "lg:top-0 lg:h-screen lg:translate-x-0" %>"
   :class="sidebarOpen ? 'translate-x-0' : 'translate-x-[calc(100%+1rem)] <%= forceOverlaySidebar ? "" : "lg:translate-x-0" %>'"
   x-trap.noscroll="sidebarOpen <%= forceOverlaySidebar ? "" : "&& window.innerWidth < 1024" %>"
   @keydown.escape.window="sidebarOpen = false"
@@ -64,7 +64,7 @@
     <div class="grid gap-2">
     <% navItems.forEach((item) => { %>
       <% const isActive = item.href === "/" ? activePath === "/" : activePath === item.href || activePath.startsWith(`${item.href}/`); %>
-      <a href="<%= item.href %>" class="od-bartop-nav group grid grid-cols-[3.25rem_minmax(0,1fr)] gap-3 <%= isActive ? "is-active" : "" %>" <%= isActive ? 'aria-current="page"' : "" %>>
+      <a href="<%= item.href %>" class="od-bartop-nav group grid grid-cols-[3.25rem_minmax(0,1fr)] gap-3 <%= isActive ? "is-active" : "" %>" <%= isActive ? 'aria-current="page"' : "" %> @click="sidebarOpen = false">
         <span class="grid size-12 place-items-center overflow-visible" aria-hidden="true">
           <img src="/images/brand/BeerSpout-menu.png" alt="" class="h-12 w-12 object-contain opacity-90 transition group-hover:scale-105 group-hover:opacity-100" />
         </span>

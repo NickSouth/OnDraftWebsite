@@ -63,8 +63,9 @@
             hx-get="/bigboard/edit"
             hx-target="#big-board-editor-fragment"
             hx-swap="outerHTML"
+            data-loading-skeleton="big-board-editor"
+            data-loading-skeleton-target="#big-board-editor-fragment"
             data-board-class-form
-            data-use-global-loader
           >
             <label class="big-board-year-control">
               <span>Draft Class</span>
@@ -374,7 +375,7 @@
         if (!(field instanceof HTMLInputElement || field instanceof HTMLSelectElement)) {
           return false;
         }
-        if (field.name.endsWith("[position]") || field.name.endsWith("[archetype]")) {
+        if (field.name.endsWith("[position]") || field.name.endsWith("[archetype]") || field.name.endsWith("[value]")) {
           return false;
         }
         return field.value.trim() !== "";
@@ -789,12 +790,79 @@
       }
     }
 
-    function initializeFormsIn(root) {
-      root.querySelectorAll("[data-board-entry-form]").forEach(initializeForm);
+    function formsIn(root) {
+      if (!(root instanceof Document || root instanceof Element || root instanceof DocumentFragment)) {
+        return [];
+      }
+      if (root.matches?.("[data-board-entry-form]")) {
+        return [root];
+      }
+      return Array.from(root.querySelectorAll("[data-board-entry-form]"));
     }
 
-    initializeFormsIn(document);
+    function initializeFormsIn(root) {
+      formsIn(root).forEach(initializeForm);
+    }
+
+    function initializeClosestEntry(target) {
+      const form = target instanceof Element ? target.closest("[data-board-entry-form]") : null;
+      if (form instanceof HTMLFormElement) {
+        initializeForm(form);
+      }
+    }
+
+    function scheduleIdleTask(callback, timeout = 600) {
+      if ("requestIdleCallback" in window) {
+        window.requestIdleCallback(callback, { timeout });
+        return;
+      }
+      window.setTimeout(() => callback({ timeRemaining: () => 8 }), 16);
+    }
+
+    function lazyInitializeForms(root = document) {
+      const forms = formsIn(root);
+      const eagerCount = 8;
+      forms.slice(0, eagerCount).forEach(initializeForm);
+
+      const lazyForms = forms.slice(eagerCount);
+      if ("IntersectionObserver" in window) {
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) {
+              return;
+            }
+            const form = entry.target;
+            if (form instanceof HTMLFormElement) {
+              initializeForm(form);
+            }
+            observer.unobserve(entry.target);
+          });
+        }, { rootMargin: "700px 0px" });
+        lazyForms.forEach((form) => observer.observe(form));
+      }
+
+      const queue = lazyForms.filter((form) => form.dataset.initialized !== "true");
+      const processQueue = (deadline) => {
+        let processed = 0;
+        while (queue.length > 0 && (processed < 3 || deadline.timeRemaining() > 6)) {
+          initializeForm(queue.shift());
+          processed += 1;
+        }
+        if (queue.length > 0) {
+          scheduleIdleTask(processQueue, 900);
+        }
+      };
+
+      if (queue.length > 0) {
+        scheduleIdleTask(processQueue);
+      }
+    }
+
+    lazyInitializeForms(document);
     updateEmptyState();
+
+    document.addEventListener("pointerdown", (event) => initializeClosestEntry(event.target), { capture: true, signal: editorAbortController.signal });
+    document.addEventListener("focusin", (event) => initializeClosestEntry(event.target), { capture: true, signal: editorAbortController.signal });
 
     addPlayerButton?.addEventListener("click", () => {
       if (!list || !template) {
@@ -860,12 +928,14 @@
     });
 
     document.body.addEventListener("htmx:afterSwap", (event) => {
-      initializeFormsIn(document);
       updateEmptyState();
       updateBoardDirtyState();
       const target = event.detail?.target;
       if (target instanceof Element && target.matches("#big-board-editor-fragment")) {
+        lazyInitializeForms(document.querySelector("#big-board-editor-fragment") || target);
         scrollToFirstValidationError();
+      } else {
+        initializeFormsIn(event.detail?.target || document);
       }
     }, editorListenerOptions);
 

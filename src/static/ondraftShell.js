@@ -138,6 +138,7 @@
     if (/^\/articles\/[^/]+$/.test(pathname)) return "article";
     if (pathname === "/videos") return "videos";
     if (pathname === "/bigboard") return "bigboard";
+    if (pathname === "/bigboard/edit") return "bigboard-edit";
     if (pathname === "/hottakes") return "hottakes";
     if (pathname === "/bookmarks") return "bookmarks";
     if (pathname === "/about" || pathname === "/login" || pathname === "/register" || pathname === "/reset-password") {

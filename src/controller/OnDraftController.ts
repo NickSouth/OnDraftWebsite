@@ -20,6 +20,7 @@ import {
   gradeTraitCategoriesForGrade,
   normalizeDraftGradeOverride,
   normalizeDraftGradeTraitScore,
+  normalizeDraftGradeValue,
   normalizePotential,
   validateDraftGradeForPublication,
   type DraftGrade,
@@ -282,6 +283,7 @@ class OnDraftController implements IOnDraftController {
       archetype: draftGradeArchetypeNames(position as typeof POSITIONS[number]).includes(archetype)
         ? archetype
         : draftGradeArchetypeNames(position as typeof POSITIONS[number])[0] ?? "",
+      value: normalizeDraftGradeValue(rawGrade.value),
       potential: normalizePotential(rawGrade.potential),
       physicalTraits: this.formTraitScores(physicalTraits),
       filmTraits: this.formTraitScores(filmTraits),
