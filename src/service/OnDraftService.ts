@@ -1,7 +1,7 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { Err, Ok, Result } from "../lib/result";
 import sanitizeHtml from "sanitize-html";
-import { Article, ArticleContent, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, BigBoardWriteup, ConsensusDiscrepancyWriteup, Height, POSITIONS, Position, ArticleFilter, Comment, ForumPost, ForumPostFilter, DraftBoardFilter, Newsletter, Video, VideoQuery } from "../model/OnDraftContent";
+import { Article, ArticleContent, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, BigBoardPlayerSearchHit, BigBoardWriteup, ConsensusDiscrepancyWriteup, Height, POSITIONS, Position, ArticleFilter, Comment, ForumPost, ForumPostFilter, DraftBoardFilter, Newsletter, Video, VideoQuery } from "../model/OnDraftContent";
 import { UnknownArticleError, UnknownForumPostError, ArticleError,  BigBoardError, IOnDraftRepository, ArticleValidationError, BigBoardValidationError, ForumPostError, ForumPostValidationError, NewsletterError, NewsletterValidationError } from "../repository/OnDraftRepository";
 import { DraftBoardFilterInput } from "../controller/OnDraftController";
 import { IYoutubeVideoStatsService } from "./YoutubeVideoStatsService";
@@ -33,6 +33,10 @@ const VIDEO_DESCRIPTION_MAX_LENGTH = 500;
 const NEWSLETTER_WRITEUP_MAX_LENGTH = 5000;
 const NEWSLETTER_CHANGELOG_MAX_LENGTH = 4000;
 const NEWSLETTER_MAX_LINKED_ITEMS = 20;
+// v2.1 c8-search
+const SEARCH_TERM_MIN_LENGTH = 2;
+const SEARCH_TERM_MAX_LENGTH = 100;
+const SEARCH_RESULTS_PER_TYPE = 10;
 const YOUTUBE_STATS_TTL_MS = 24 * 60 * 60 * 1000;
 const PROFANITY_VALIDATION_MESSAGE = "The comment/post contains profanity. Please edit it and try again.";
 const BANNED_PHRASE_PATTERNS = [...new Set(BANNED_PHRASES.map((phrase) => phrase.trim().toLowerCase()).filter(Boolean))]
@@ -42,6 +46,7 @@ const BANNED_PHRASE_PATTERNS = [...new Set(BANNED_PHRASES.map((phrase) => phrase
       .replace(/\s+/g, "\\s+");
     return new RegExp(`(^|[^a-z0-9])${escapedPhrase}([^a-z0-9]|$)`, "i");
   });
+const READ_TIME_WORDS_PER_MINUTE = 200;
 
 export function parseYoutubeVideoId(youtubeUrl: string): Result<string, ArticleError> {
   let parsed: URL;
@@ -82,6 +87,8 @@ export interface CreateArticleInput {
   content: ArticleContent;
   imageUrl?: string;
 }
+
+export const DEFAULT_BIG_BOARD_YEAR_SETTING_KEY = "defaultBigBoardYear";
 
 export interface BigBoardEntryInput {
   year?: number;
@@ -188,6 +195,16 @@ type YoutubeCatalogRefreshOptions = {
   force?: boolean;
 };
 
+// v2.1 c8-search
+export type SiteSearchResults = {
+  term: string;
+  articles: Article[];
+  videos: Video[];
+  hotTakes: ForumPost[];
+  players: BigBoardPlayerSearchHit[];
+  totalCount: number;
+};
+
 export interface IOnDraftService {
   previewArticle(input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
   createArticle(input: CreateArticleInput): Promise<Result<Article, ArticleError>>;
@@ -240,6 +257,14 @@ export interface IOnDraftService {
   refreshYoutubeVideoCatalog(options?: YoutubeCatalogRefreshOptions): Promise<Result<number, ArticleError>>;
   deleteYoutubeVideo(videoId: string): Promise<Result<void, ArticleError>>;
   getTags(): Promise<Result<string[], ArticleError>>;
+  countDistinctBigBoardPlayers(): Promise<Result<number, BigBoardError>>;
+  countPublishedArticles(): Promise<Result<number, ArticleError>>;
+  countForumPosts(): Promise<Result<number, ForumPostError>>;
+  articleReadMinutes(article: Pick<Article, "content">): number | null;
+  resolveDefaultBigBoardYear(): Promise<number>;
+  setDefaultBigBoardYear(year: number | undefined): Promise<Result<number, BigBoardError>>;
+  // v2.1 c8-search
+  searchSite(rawTerm: string, options?: { limitPerType?: number }): Promise<Result<SiteSearchResults, ArticleError>>;
 }
 
 class OnDraftService implements IOnDraftService {
@@ -986,7 +1011,7 @@ class OnDraftService implements IOnDraftService {
     }
 
     const existingById = new Map(existingBoard.value.entries.map((entry) => [entry.id, entry]));
-    const entries = input.entries.map((entryInput) => {
+    const normalizedEntries = input.entries.map((entryInput) => {
       const existing = entryInput.id ? existingById.get(entryInput.id) : undefined;
       const next = this.normalizeBigBoardEntry(entryInput, existing);
       next.playerInfoPublished = entryInput.playerInfoPublished ?? existing?.playerInfoPublished ?? false;
@@ -994,6 +1019,7 @@ class OnDraftService implements IOnDraftService {
       next.writeupPublished = entryInput.writeupPublished ?? existing?.writeupPublished ?? false;
       return next;
     });
+    const entries = this.recomputeBigBoardRankings(normalizedEntries);
 
     const validation = this.validatePublishedBigBoardEntries(entries);
     if (validation.ok === false) {
@@ -1186,7 +1212,15 @@ class OnDraftService implements IOnDraftService {
     if (normalizedYear.ok === false) {
       return Err(normalizedYear.value);
     }
-    return await this.repository.deleteBigBoardYear(normalizedYear.value);
+    const deleted = await this.repository.deleteBigBoardYear(normalizedYear.value);
+    if (deleted.ok === false) {
+      return deleted;
+    }
+    const currentDefault = await this.repository.getAppSetting(DEFAULT_BIG_BOARD_YEAR_SETTING_KEY);
+    if (currentDefault.ok === true && currentDefault.value === String(normalizedYear.value)) {
+      await this.repository.setAppSetting(DEFAULT_BIG_BOARD_YEAR_SETTING_KEY, "");
+    }
+    return deleted;
   }
 
   async getArticles(published = true): Promise<Result<Article[], ArticleError>> {
@@ -1686,6 +1720,128 @@ class OnDraftService implements IOnDraftService {
 
   async getTags(): Promise<Result<string[], ArticleError>> {
     return await this.repository.getTags();
+  }
+
+  async countDistinctBigBoardPlayers(): Promise<Result<number, BigBoardError>> {
+    return await this.repository.countDistinctBigBoardPlayers();
+  }
+
+  async countPublishedArticles(): Promise<Result<number, ArticleError>> {
+    return await this.repository.countPublishedArticles();
+  }
+
+  async countForumPosts(): Promise<Result<number, ForumPostError>> {
+    return await this.repository.countForumPosts();
+  }
+
+  articleReadMinutes(article: Pick<Article, "content">): number | null {
+    const text = this.articleBodyText(article.content);
+    if (text === null) {
+      return null;
+    }
+    const words = this.wordCount(text);
+    if (words === 0) {
+      return null;
+    }
+    return Math.max(1, Math.ceil(words / READ_TIME_WORDS_PER_MINUTE));
+  }
+
+  private articleBodyText(content: ArticleContent): string | null {
+    if (content.type === "plainText") {
+      return content.text;
+    }
+    if (content.type === "html") {
+      return content.body.replace(/<[^>]*>/g, " ");
+    }
+    return null;
+  }
+
+  async resolveDefaultBigBoardYear(): Promise<number> {
+    const stored = await this.repository.getAppSetting(DEFAULT_BIG_BOARD_YEAR_SETTING_KEY);
+    if (stored.ok === false || stored.value === null) {
+      return this.defaultBigBoardYear();
+    }
+    const parsed = Number.parseInt(stored.value, 10);
+    if (!Number.isInteger(parsed) || parsed < 1900 || parsed > 2100) {
+      return this.defaultBigBoardYear();
+    }
+    return parsed;
+  }
+
+  async setDefaultBigBoardYear(year: number | undefined): Promise<Result<number, BigBoardError>> {
+    const normalizedYear = this.normalizeBigBoardYear(year);
+    if (normalizedYear.ok === false) {
+      return Err(normalizedYear.value);
+    }
+    const saved = await this.repository.setAppSetting(DEFAULT_BIG_BOARD_YEAR_SETTING_KEY, String(normalizedYear.value));
+    if (saved.ok === false) {
+      return Err(saved.value);
+    }
+    return Ok(normalizedYear.value);
+  }
+
+  private recomputeBigBoardRankings(entries: BigBoardEntry[]): BigBoardEntry[] {
+    const rankedOrder = entries
+      .map((entry, index) => ({ entry, index }))
+      .filter(({ entry }) => entry.rank !== null)
+      .sort((a, b) => ((a.entry.rank as number) - (b.entry.rank as number)) || (a.index - b.index));
+    const rankById = new Map<string, number>();
+    const posRankById = new Map<string, number>();
+    const positionCounters = new Map<string, number>();
+    rankedOrder.forEach(({ entry }, orderIndex) => {
+      rankById.set(entry.id, orderIndex + 1);
+      if (entry.position) {
+        const nextPosRank = (positionCounters.get(entry.position) ?? 0) + 1;
+        positionCounters.set(entry.position, nextPosRank);
+        posRankById.set(entry.id, nextPosRank);
+      }
+    });
+    return entries.map((entry) => entry.rank === null
+      ? entry
+      : {
+        ...entry,
+        rank: rankById.get(entry.id) ?? entry.rank,
+        posRank: entry.position ? (posRankById.get(entry.id) ?? entry.posRank) : entry.posRank,
+      });
+  }
+
+  // v2.1 c8-search
+  async searchSite(rawTerm: string, options: { limitPerType?: number } = {}): Promise<Result<SiteSearchResults, ArticleError>> {
+    const term = (rawTerm ?? "")
+      .replace(/[\u0000-\u001f]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, SEARCH_TERM_MAX_LENGTH);
+    if (term.length < SEARCH_TERM_MIN_LENGTH) {
+      return Err(ArticleValidationError(`Search terms must be at least ${SEARCH_TERM_MIN_LENGTH} characters.`));
+    }
+    const limit = Math.min(Math.max(options.limitPerType ?? SEARCH_RESULTS_PER_TYPE, 1), SEARCH_RESULTS_PER_TYPE);
+    const [articles, videos, hotTakes, players] = await Promise.all([
+      this.repository.searchArticles(term, limit),
+      this.repository.searchYoutubeVideos(term, limit),
+      this.repository.searchForumPosts(term, limit),
+      this.repository.searchBigBoardPlayers(term, limit),
+    ]);
+    if (articles.ok === false) {
+      return Err(articles.value);
+    }
+    if (videos.ok === false) {
+      return Err(videos.value);
+    }
+    if (hotTakes.ok === false) {
+      return Err(UnknownArticleError(hotTakes.value.message));
+    }
+    if (players.ok === false) {
+      return Err(UnknownArticleError(players.value.message));
+    }
+    return Ok({
+      term,
+      articles: articles.value,
+      videos: videos.value,
+      hotTakes: hotTakes.value,
+      players: players.value,
+      totalCount: articles.value.length + videos.value.length + hotTakes.value.length + players.value.length,
+    });
   }
 }
 

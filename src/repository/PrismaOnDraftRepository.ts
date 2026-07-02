@@ -6,6 +6,7 @@ import {
   BigBoard,
   BigBoardCreator,
   BigBoardEntry,
+  BigBoardPlayerSearchHit,
   Comment,
   ConsensusBigBoard,
   ConsensusDiscrepancyWriteup,
@@ -23,6 +24,7 @@ import {
   ArticleNotFound,
   BigBoardNotFound,
   CommentNotFound,
+  DatabaseError,
   DuplicateArticle,
   DuplicateBigBoardYear,
   DuplicateForumPost,
@@ -1176,6 +1178,129 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
       orderBy: { updatedAt: "desc" },
     });
     return Ok(newsletters.map((newsletter) => this.mapNewsletter(newsletter)));
+  }
+
+  async countDistinctBigBoardPlayers(): Promise<Result<number, BigBoardError>> {
+    const groups = await this.prisma.bigBoardEntry.groupBy({ by: ["playerName"] });
+    return Ok(groups.length);
+  }
+
+  async countPublishedArticles(): Promise<Result<number, ArticleError>> {
+    return Ok(await this.prisma.article.count({ where: { published: true } }));
+  }
+
+  async countForumPosts(): Promise<Result<number, ForumPostError>> {
+    return Ok(await this.prisma.forumPost.count());
+  }
+
+  async getAppSetting(key: string): Promise<Result<string | null, BigBoardError>> {
+    const setting = await this.prisma.appSetting.findUnique({ where: { key } });
+    return Ok(setting?.value ?? null);
+  }
+
+  async setAppSetting(key: string, value: string): Promise<Result<void, BigBoardError>> {
+    await this.prisma.appSetting.upsert({ where: { key }, update: { value }, create: { key, value } });
+    return Ok(undefined);
+  }
+
+  // v2.1 c8-search
+  async searchArticles(term: string, limit: number): Promise<Result<Article[], ArticleError>> {
+    try {
+      const records = await this.prisma.article.findMany({
+        where: {
+          published: true,
+          OR: [
+            { title: { contains: term, mode: "insensitive" } },
+            { author: { contains: term, mode: "insensitive" } },
+            { writeup: { contains: term, mode: "insensitive" } },
+            { plainText: { contains: term, mode: "insensitive" } },
+          ],
+        },
+        include: this.articleInclude(),
+        orderBy: { publicationDate: "desc" },
+        take: limit,
+      });
+      return Ok(await Promise.all(records.map((record) => this.mapArticle(record))));
+    } catch {
+      return Err(DatabaseError("Failed to search articles.") as ArticleError);
+    }
+  }
+
+  async searchYoutubeVideos(term: string, limit: number): Promise<Result<Video[], ArticleError>> {
+    try {
+      const records = await this.prisma.video.findMany({
+        where: { title: { contains: term, mode: "insensitive" } },
+        include: this.videoInclude(),
+        orderBy: { createdAt: "desc" },
+        take: limit,
+      });
+      return Ok(records.map((record) => this.mapVideo(record)));
+    } catch {
+      return Err(DatabaseError("Failed to search videos.") as ArticleError);
+    }
+  }
+
+  async searchForumPosts(term: string, limit: number): Promise<Result<ForumPost[], ForumPostError>> {
+    try {
+      const records = await this.prisma.forumPost.findMany({
+        where: { content: { contains: term, mode: "insensitive" } },
+        include: this.forumPostInclude(),
+        orderBy: { createdAt: "desc" },
+        take: limit,
+      });
+      return Ok(await Promise.all(records.map((record) => this.mapForumPost(record))));
+    } catch {
+      return Err(DatabaseError("Failed to search hot takes.") as ForumPostError);
+    }
+  }
+
+  async searchBigBoardPlayers(term: string, limit: number): Promise<Result<BigBoardPlayerSearchHit[], BigBoardError>> {
+    try {
+      const records = await this.prisma.bigBoardEntry.findMany({
+        where: {
+          playerInfoPublished: true,
+          bigBoard: { creator: { in: ["Ryan", "Aleks"] } },
+          OR: [
+            { playerName: { contains: term, mode: "insensitive" } },
+            { position: { contains: term, mode: "insensitive" } },
+            { school: { contains: term, mode: "insensitive" } },
+          ],
+        },
+        select: {
+          playerName: true,
+          position: true,
+          school: true,
+          rank: true,
+          posRank: true,
+          bigBoard: { select: { year: true } },
+        },
+        orderBy: [
+          { bigBoard: { year: "desc" } },
+          { rank: { sort: "asc", nulls: "last" } },
+        ],
+        take: 200,
+      });
+      const seen = new Set<string>();
+      const hits: BigBoardPlayerSearchHit[] = [];
+      for (const record of records) {
+        const key = `${record.bigBoard.year}:${record.playerName.toLowerCase()}`;
+        if (seen.has(key)) {
+          continue;
+        }
+        seen.add(key);
+        hits.push({
+          playerName: record.playerName,
+          position: record.position as Position | "",
+          school: record.school,
+          year: record.bigBoard.year,
+          rank: record.rank,
+          posRank: record.posRank,
+        });
+      }
+      return Ok(hits.slice(0, limit));
+    } catch {
+      return Err(DatabaseError("Failed to search draft board players.") as BigBoardError);
+    }
   }
 }
 

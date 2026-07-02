@@ -14,7 +14,9 @@ import { CreateOnDraftService } from "./service/OnDraftService";
 import { CreateUserPreferenceService } from "./service/UserPreferenceService";
 import { CreateYoutubeVideoStatsService } from "./service/YoutubeVideoStatsService";
 import { CreateYoutubeVideoStatsRefreshScheduler } from "./service/YoutubeVideoStatsRefreshScheduler";
-import { CreateUmamiAnalyticsService } from "./service/UmamiAnalyticsService";
+import { CreateLocalAnalyticsService } from "./service/LocalAnalyticsService";
+import { CreatePrismaAnalyticsRepository } from "./repository/PrismaAnalyticsRepository";
+import { CreateInMemoryAnalyticsRepository } from "./repository/InMemoryAnalyticsRepository";
 import { CreateLoggingService } from "./service/LoggingService";
 import type { ILoggingService } from "./service/LoggingService";
 import { getPrismaClient } from "./prisma/client";
@@ -41,7 +43,8 @@ export function createComposedApp(
   const userPreferences = CreateUserPreferenceService(authUsers);
   const authService = CreateAuthService(authUsers, emailService, config.email);
   const authController = CreateAuthController(authService, resolvedLogger);
-  const analytics = CreateUmamiAnalyticsService(config.analytics);
+  const analyticsRepository = prisma ? CreatePrismaAnalyticsRepository(prisma) : CreateInMemoryAnalyticsRepository();
+  const analytics = CreateLocalAnalyticsService(analyticsRepository, resolvedLogger);
   const controller = CreateOnDraftController(service, userPreferences, resolvedLogger, authService, analytics);
   return CreateApp(
     controller,
@@ -50,6 +53,6 @@ export function createComposedApp(
     prisma ? CreatePrismaSessionStore(prisma) : undefined,
     config.turnstile,
     config.email.appBaseUrl,
-    config.analytics,
+    analytics,
   );
 }

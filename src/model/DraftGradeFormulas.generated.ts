@@ -1,11 +1,11 @@
-// Generated from C:/Users/nickr/Downloads/master_dictionary_functions.py. Do not edit weights by hand.
+// Generated from the analyst's master_dictionary_functions.py (external hand-off, not tracked in repo; last received 2026-07-01). Do not edit weights by hand.
 
 export const DRAFT_GRADE_FORMULAS = {
   "QB": {
     "Archetypes": {
       "Balanced": {
-        "Physical Weight": 0.34,
-        "Film Weight": 0.66,
+        "Physical Weight": 0.31,
+        "Film Weight": 0.69,
         "Physicals": {
           "Speed": 0.17,
           "Acceleration": 0.18,
@@ -60,8 +60,8 @@ export const DRAFT_GRADE_FORMULAS = {
         }
       },
       "Dual Threat": {
-        "Physical Weight": 0.42,
-        "Film Weight": 0.58,
+        "Physical Weight": 0.38,
+        "Film Weight": 0.62,
         "Physicals": {
           "Speed": 0.18,
           "Acceleration": 0.19,
@@ -71,25 +71,25 @@ export const DRAFT_GRADE_FORMULAS = {
           "Size / Frame": 0.21
         },
         "Film Traits": {
-          "Arm Talent": 0.07,
+          "Arm Talent": 0.08,
           "Mechanics / Footwork": 0.05,
           "Quick Accuracy": 0.06,
           "Intermediate Accuracy": 0.06,
           "Deep Accuracy": 0.05,
-          "Off Platform Accuracy": 0.07,
+          "Off Platform Accuracy": 0.06,
           "Ball Placement": 0.06,
-          "Pre-Snap Processing": 0.07,
-          "Processing": 0.07,
-          "Anticipation": 0.07,
-          "Play Extension": 0.1,
-          "Decision Making": 0.09,
+          "Pre-Snap Processing": 0.08,
+          "Processing": 0.08,
+          "Anticipation": 0.08,
+          "Play Extension": 0.09,
+          "Decision Making": 0.08,
           "Pressure Awareness": 0.08,
-          "Pocket Feel": 0.1
+          "Pocket Feel": 0.09
         }
       },
       "Project": {
-        "Physical Weight": 0.44,
-        "Film Weight": 0.56,
+        "Physical Weight": 0.43,
+        "Film Weight": 0.57,
         "Physicals": {
           "Speed": 0.18,
           "Acceleration": 0.19,
@@ -99,20 +99,20 @@ export const DRAFT_GRADE_FORMULAS = {
           "Size / Frame": 0.21
         },
         "Film Traits": {
-          "Arm Talent": 0.11,
+          "Arm Talent": 0.1,
           "Mechanics / Footwork": 0.06,
           "Quick Accuracy": 0.06,
           "Intermediate Accuracy": 0.05,
           "Deep Accuracy": 0.05,
           "Off Platform Accuracy": 0.06,
-          "Ball Placement": 0.04,
-          "Pre-Snap Processing": 0.07,
+          "Ball Placement": 0.05,
+          "Pre-Snap Processing": 0.08,
           "Processing": 0.07,
           "Anticipation": 0.08,
-          "Play Extension": 0.11,
-          "Decision Making": 0.06,
-          "Pressure Awareness": 0.08,
-          "Pocket Feel": 0.1
+          "Play Extension": 0.09,
+          "Decision Making": 0.07,
+          "Pressure Awareness": 0.09,
+          "Pocket Feel": 0.09
         }
       }
     }

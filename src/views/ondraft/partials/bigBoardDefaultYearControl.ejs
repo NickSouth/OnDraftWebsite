@@ -1,0 +1,14 @@
+<div id="big-board-default-year-control" class="board-default-year-control">
+  <% if (board.year === defaultBigBoardYear) { %>
+    <span class="board-default-year-chip" title="Shown by default on the public big board">Default year</span>
+  <% } else { %>
+    <form method="post" action="/bigboard/default-year" hx-post="/bigboard/default-year" hx-target="#big-board-default-year-control" hx-swap="outerHTML" data-skip-global-loader>
+      <input type="hidden" name="year" value="<%= board.year %>" />
+      <input type="hidden" name="creator" value="<%= board.creator %>" />
+      <button type="submit" class="secondary-button board-default-year-button">Set <%= board.year %> as default</button>
+    </form>
+  <% } %>
+  <% if (typeof errorMessage !== "undefined" && errorMessage) { %>
+    <span class="board-default-year-error" role="alert"><%= errorMessage %></span>
+  <% } %>
+</div>

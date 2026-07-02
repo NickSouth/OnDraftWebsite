@@ -20,7 +20,7 @@
 body {
   margin: 0;
   padding: 24px;
-  font-family: "Segoe UI", Arial, sans-serif;
+  font-family: "Source Sans 3", "Segoe UI", Arial, sans-serif;
   background: var(--bg);
   color: var(--text);
 }
@@ -145,7 +145,7 @@ main:has(.board-editor-page) {
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
-  border-radius: 4px;
+  border-radius: 6px;
   background: #ffffff;
   border: 1px solid var(--panel-border);
   box-shadow: var(--shadow);
@@ -163,6 +163,12 @@ h2,
 h3,
 p {
   margin-top: 0;
+}
+
+h1,
+h2,
+h3 {
+  font-family: "Newsreader", Georgia, Cambria, "Times New Roman", serif;
 }
 
 h1 {
@@ -197,7 +203,7 @@ textarea {
   margin-bottom: 18px;
   padding: 24px;
   border: 1px solid var(--panel-border);
-  border-radius: 18px;
+  border-radius: 27px;
   background: linear-gradient(180deg, #ffffff, #f8fbff);
   box-shadow: var(--shadow);
 }
@@ -263,7 +269,7 @@ textarea {
   gap: 0;
   padding: 4px;
   border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 6px;
+  border-radius: 9px;
   background: #0b1220;
 }
 
@@ -271,7 +277,7 @@ textarea {
   min-width: 88px;
   padding: 9px 12px;
   border: 0;
-  border-radius: 4px;
+  border-radius: 6px;
   background: transparent;
   color: #e2e8f0;
   font-weight: 900;
@@ -300,7 +306,7 @@ textarea {
   min-height: 42px;
   padding: 10px 14px;
   border: 1px solid var(--accent);
-  border-radius: 4px;
+  border-radius: 6px;
   background: var(--accent);
   color: #ffffff;
   text-decoration: none;
@@ -364,7 +370,7 @@ textarea {
   width: 108px;
   height: 81px;
   border: 1px solid var(--panel-border);
-  border-radius: 4px;
+  border-radius: 6px;
   object-fit: cover;
   background: #f6f6f6;
 }
@@ -406,7 +412,7 @@ textarea {
   align-items: center;
   min-height: 24px;
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: 6px;
   background: #eeeeee;
   color: var(--accent-strong);
   font-size: 0.88rem;
@@ -426,7 +432,7 @@ textarea {
   min-height: 48px;
   padding: 8px;
   border: 1px solid #cbd5e1;
-  border-radius: 4px;
+  border-radius: 6px;
   background: #ffffff;
 }
 
@@ -515,7 +521,7 @@ textarea {
   gap: 10px;
   padding: 12px;
   border: 1px solid var(--panel-border);
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 .article-filter-panel[hidden] {
@@ -557,7 +563,7 @@ textarea {
   min-height: 24px;
   padding: 2px 8px;
   border: 1px solid #f79009;
-  border-radius: 4px;
+  border-radius: 6px;
   background: #fffaeb;
   color: #93370d;
   font-size: 0.84rem;
@@ -614,7 +620,7 @@ textarea {
   width: clamp(96px, 18vw, 140px);
   aspect-ratio: 4 / 3;
   border: 1px solid var(--panel-border);
-  border-radius: 4px;
+  border-radius: 6px;
   object-fit: cover;
 }
 
@@ -639,7 +645,7 @@ textarea {
   min-height: 38px;
   padding: 8px 10px;
   border: 1px solid var(--panel-border);
-  border-radius: 4px;
+  border-radius: 6px;
   background: #ffffff;
   color: var(--accent-strong);
   text-decoration: none;
@@ -775,7 +781,7 @@ textarea {
   width: 100%;
   height: auto;
   border: 1px solid var(--panel-border);
-  border-radius: 4px;
+  border-radius: 6px;
   background: #ffffff;
 }
 
@@ -817,7 +823,7 @@ textarea {
   display: grid;
   gap: 6px;
   padding: 12px;
-  border-radius: 14px;
+  border-radius: 21px;
   background: #f8fbff;
   border: 1px solid var(--panel-border);
 }
@@ -877,7 +883,7 @@ textarea {
 .panel {
   padding: 22px;
   border: 1px solid var(--panel-border);
-  border-radius: 18px;
+  border-radius: 27px;
   background: var(--panel);
   box-shadow: var(--shadow);
 }
@@ -917,7 +923,7 @@ textarea {
   margin: 16px 0;
   padding: 12px;
   border: 1px solid var(--panel-border);
-  border-radius: 4px;
+  border-radius: 6px;
   background: #fff8e6;
 }
 
@@ -971,7 +977,7 @@ textarea {
   justify-self: end;
   padding: 8px;
   border: 1px solid var(--panel-border);
-  border-radius: 4px;
+  border-radius: 6px;
   background: #f6f6f6;
 }
 
@@ -1014,7 +1020,7 @@ textarea {
   min-height: 32px;
   padding: 4px 8px;
   border: 1px solid rgba(217, 152, 34, 0.4);
-  border-radius: 4px;
+  border-radius: 6px;
   background: rgba(217, 152, 34, 0.1);
   color: #d99822;
   font-size: 0.75rem;
@@ -1027,7 +1033,7 @@ textarea {
   min-height: 36px;
   padding: 6px 12px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 9px;
   background: #d99822;
   color: #0b1220;
   font-size: 0.875rem;
@@ -1067,7 +1073,7 @@ textarea {
 .board-editor-table-wrap {
   overflow-x: auto;
   border: 1px solid var(--panel-border);
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 .board-editor-table {
@@ -1185,7 +1191,7 @@ select {
   width: 100%;
   padding: 12px;
   border: 1px solid #cbd5e1;
-  border-radius: 4px;
+  border-radius: 6px;
   background: #ffffff;
 }
 
@@ -1205,7 +1211,7 @@ button {
   align-items: center;
   justify-content: center;
   padding: 10px 14px;
-  border-radius: 4px;
+  border-radius: 6px;
   border: 1px solid transparent;
   background: var(--accent);
   color: #ffffff;
@@ -1273,7 +1279,7 @@ button.comment-like-button:hover {
   width: 148px;
   aspect-ratio: 16 / 9;
   border: 1px solid var(--panel-border);
-  border-radius: 4px;
+  border-radius: 6px;
   object-fit: cover;
   background: #f6f6f6;
 }
@@ -1362,7 +1368,7 @@ button.comment-like-button:hover {
 .status-banner {
   margin-bottom: 16px;
   padding: 14px 16px;
-  border-radius: 14px;
+  border-radius: 21px;
   border: 1px solid transparent;
 }
 
@@ -1386,7 +1392,7 @@ button.comment-like-button:hover {
   gap: 6px;
   margin: 10px 0 16px;
   padding: 14px 16px;
-  border-radius: 8px;
+  border-radius: 12px;
   border: 1px solid rgba(180, 35, 24, 0.18);
   background: var(--danger-soft);
 }

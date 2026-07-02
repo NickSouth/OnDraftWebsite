@@ -75,6 +75,16 @@
     <% if (typeof structuredDataJson !== "undefined" && structuredDataJson) { %>
       <script type="application/ld+json"><%- structuredDataJson %></script>
     <% } %>
+    <link rel="preload" href="/vendor/fonts/newsreader/files/newsreader-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/vendor/fonts/source-sans-3/files/source-sans-3-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/vendor/fonts/newsreader/600.css" />
+    <link rel="stylesheet" href="/vendor/fonts/newsreader/700.css" />
+    <link rel="stylesheet" href="/vendor/fonts/newsreader/800.css" />
+    <link rel="stylesheet" href="/vendor/fonts/source-sans-3/400.css" />
+    <link rel="stylesheet" href="/vendor/fonts/source-sans-3/400-italic.css" />
+    <link rel="stylesheet" href="/vendor/fonts/source-sans-3/600.css" />
+    <link rel="stylesheet" href="/vendor/fonts/source-sans-3/700.css" />
+    <link rel="stylesheet" href="/vendor/fonts/source-sans-3/900.css" />
     <link rel="stylesheet" href="/styles.css" />
     <link rel="stylesheet" href="/tailwind.css" />
     <script src="/vendor/htmx/htmx.min.js" defer></script>
@@ -84,9 +94,6 @@
     <script src="/ondraftShell.js" defer></script>
     <script src="/articleShare.js" defer></script>
     <script src="/teamHelmetRecolor.js" defer></script>
-    <% if (typeof umamiWebsiteId !== "undefined" && umamiWebsiteId) { %>
-      <script defer src="https://cloud.umami.is/script.js" data-website-id="<%= umamiWebsiteId %>"></script>
-    <% } %>
   </head>
   <body class="min-h-screen bg-slate-50 p-0 text-slate-950 antialiased dark:bg-draft-ink dark:text-slate-100">
     <% const currentSession = typeof session !== "undefined" ? session : null; %>

@@ -17,9 +17,6 @@ describe("loadAppConfig", () => {
     expect(config.turnstile.siteKey).toBeNull();
     expect(config.turnstile.secretKey).toBeNull();
     expect(config.turnstile.verificationDisabled).toBe(false);
-    expect(config.analytics.umamiWebsiteId).toBeNull();
-    expect(config.analytics.umamiApiKey).toBeNull();
-    expect(config.analytics.umamiApiBaseUrl).toBe("https://api.umami.is/v1");
   });
 
   it("requires resend settings when the resend provider is selected", () => {
@@ -101,19 +98,6 @@ describe("loadAppConfig", () => {
     expect(config.turnstile.siteKey).toBe("site-key");
     expect(config.turnstile.secretKey).toBe("secret-key");
     expect(config.turnstile.verificationDisabled).toBe(true);
-  });
-
-  it("allows configuring Umami tracking and API settings", () => {
-    const config = loadAppConfig({
-      NODE_ENV: "test",
-      UMAMI_WEBSITE_ID: "website-key",
-      UMAMI_API_KEY: "umami-api-key",
-      UMAMI_API_BASE_URL: "https://cloud.umami.is/api",
-    });
-
-    expect(config.analytics.umamiWebsiteId).toBe("website-key");
-    expect(config.analytics.umamiApiKey).toBe("umami-api-key");
-    expect(config.analytics.umamiApiBaseUrl).toBe("https://cloud.umami.is/api");
   });
 
   it("rejects disabling Turnstile verification in production", () => {
