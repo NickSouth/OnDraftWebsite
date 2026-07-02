@@ -70,6 +70,7 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
   private newsletters: Newsletter[] = [];
   private consensusDiscrepancyWriteups: Array<{ year: number; playerName: string; writeup: ConsensusDiscrepancyWriteup }> = [];
   private tagList: Set<string> = new Set();
+  private appSettings = new Map<string, string>();
 
   constructor(options: InMemoryRepositoryOptions = {}) {
     const currentYear = new Date().getFullYear();
@@ -1259,6 +1260,15 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
     return Ok([...this.newsletters]
       .sort((first, second) => second.updatedAt.getTime() - first.updatedAt.getTime())
       .map((newsletter) => this.cloneNewsletter(newsletter)));
+  }
+
+  async getAppSetting(key: string): Promise<Result<string | null, BigBoardError>> {
+    return Ok(this.appSettings.get(key) ?? null);
+  }
+
+  async setAppSetting(key: string, value: string): Promise<Result<void, BigBoardError>> {
+    this.appSettings.set(key, value);
+    return Ok(undefined);
   }
 }
 

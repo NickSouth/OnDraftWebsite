@@ -1177,6 +1177,16 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
     });
     return Ok(newsletters.map((newsletter) => this.mapNewsletter(newsletter)));
   }
+
+  async getAppSetting(key: string): Promise<Result<string | null, BigBoardError>> {
+    const setting = await this.prisma.appSetting.findUnique({ where: { key } });
+    return Ok(setting?.value ?? null);
+  }
+
+  async setAppSetting(key: string, value: string): Promise<Result<void, BigBoardError>> {
+    await this.prisma.appSetting.upsert({ where: { key }, update: { value }, create: { key, value } });
+    return Ok(undefined);
+  }
 }
 
 export function CreatePrismaOnDraftRepository(prisma?: OnDraftPrismaClient): IOnDraftRepository {

@@ -104,4 +104,6 @@ export interface IOnDraftRepository {
     updateNewsletter(newsletter: Newsletter): Promise<Result<Newsletter, NewsletterError>>;
     getNewsletter(id: string): Promise<Result<Newsletter, NewsletterError>>;
     listNewsletters(): Promise<Result<Newsletter[], NewsletterError>>;
+    getAppSetting(key: string): Promise<Result<string | null, BigBoardError>>;
+    setAppSetting(key: string, value: string): Promise<Result<void, BigBoardError>>;
 }

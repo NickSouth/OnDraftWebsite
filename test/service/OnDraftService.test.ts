@@ -1094,7 +1094,68 @@ describe("OnDraftService big board editing", () => {
     }
   });
 
-  it("rejects duplicate published overall ranks and same-position position ranks", async () => {
+  it("rejects duplicate published overall ranks created through single-card saves", async () => {
+    const ondraftService = service();
+
+    const saved = await ondraftService.saveBigBoardEntries({
+      year: 2026,
+      creator: "Ryan",
+      entries: [
+        {
+          playerName: "Quarterback One",
+          school: "OnDraft",
+          position: "QB",
+          rank: 1,
+          posRank: 1,
+          height: { feet: 6, inches: 2 },
+          weight: 220,
+        },
+        {
+          playerName: "Quarterback Two",
+          school: "OnDraft",
+          position: "QB",
+          rank: 2,
+          posRank: 2,
+          height: { feet: 6, inches: 3 },
+          weight: 225,
+        },
+      ],
+    });
+
+    expect(saved.ok).toBe(true);
+    if (saved.ok === false) {
+      return;
+    }
+    const firstEntry = saved.value.entries.find((entry) => entry.playerName === "Quarterback One");
+    const secondEntry = saved.value.entries.find((entry) => entry.playerName === "Quarterback Two");
+    expect(firstEntry).toBeDefined();
+    expect(secondEntry).toBeDefined();
+    if (!firstEntry || !secondEntry) {
+      return;
+    }
+
+    const duplicated = await ondraftService.saveBigBoardEntry({
+      year: 2026,
+      creator: "Ryan",
+      entry: {
+        ...secondEntry,
+        rank: 1,
+        posRank: 1,
+      },
+    });
+    expect(duplicated.ok).toBe(true);
+
+    const first = await ondraftService.publishBigBoardEntryPlayerInfo(2026, "Ryan", firstEntry.id);
+    expect(first.ok).toBe(true);
+
+    const second = await ondraftService.publishBigBoardEntryPlayerInfo(2026, "Ryan", secondEntry.id);
+    expect(second.ok).toBe(false);
+    if (second.ok === false) {
+      expect(second.value.message).toContain("Overall rank 1 is already used");
+    }
+  });
+
+  it("normalizes duplicate submitted ranks on full-board saves instead of rejecting them", async () => {
     const ondraftService = service();
 
     const saved = await ondraftService.saveBigBoardEntries({
@@ -1126,15 +1187,12 @@ describe("OnDraftService big board editing", () => {
     if (saved.ok === false) {
       return;
     }
-
-    const first = await ondraftService.publishBigBoardEntryPlayerInfo(2026, "Ryan", saved.value.entries[0].id);
-    expect(first.ok).toBe(true);
-
-    const second = await ondraftService.publishBigBoardEntryPlayerInfo(2026, "Ryan", saved.value.entries[1].id);
-    expect(second.ok).toBe(false);
-    if (second.ok === false) {
-      expect(second.value.message).toContain("Overall rank 1 is already used");
-    }
+    const first = saved.value.entries.find((entry) => entry.playerName === "Quarterback One");
+    const second = saved.value.entries.find((entry) => entry.playerName === "Quarterback Two");
+    expect(first?.rank).toBe(1);
+    expect(first?.posRank).toBe(1);
+    expect(second?.rank).toBe(2);
+    expect(second?.posRank).toBe(2);
   });
 
   it("saves independent publication checkbox state for each section", async () => {

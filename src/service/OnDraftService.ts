@@ -83,6 +83,8 @@ export interface CreateArticleInput {
   imageUrl?: string;
 }
 
+export const DEFAULT_BIG_BOARD_YEAR_SETTING_KEY = "defaultBigBoardYear";
+
 export interface BigBoardEntryInput {
   year?: number;
   creator?: BigBoardCreator;
@@ -240,6 +242,8 @@ export interface IOnDraftService {
   refreshYoutubeVideoCatalog(options?: YoutubeCatalogRefreshOptions): Promise<Result<number, ArticleError>>;
   deleteYoutubeVideo(videoId: string): Promise<Result<void, ArticleError>>;
   getTags(): Promise<Result<string[], ArticleError>>;
+  resolveDefaultBigBoardYear(): Promise<number>;
+  setDefaultBigBoardYear(year: number | undefined): Promise<Result<number, BigBoardError>>;
 }
 
 class OnDraftService implements IOnDraftService {
@@ -986,7 +990,7 @@ class OnDraftService implements IOnDraftService {
     }
 
     const existingById = new Map(existingBoard.value.entries.map((entry) => [entry.id, entry]));
-    const entries = input.entries.map((entryInput) => {
+    const normalizedEntries = input.entries.map((entryInput) => {
       const existing = entryInput.id ? existingById.get(entryInput.id) : undefined;
       const next = this.normalizeBigBoardEntry(entryInput, existing);
       next.playerInfoPublished = entryInput.playerInfoPublished ?? existing?.playerInfoPublished ?? false;
@@ -994,6 +998,7 @@ class OnDraftService implements IOnDraftService {
       next.writeupPublished = entryInput.writeupPublished ?? existing?.writeupPublished ?? false;
       return next;
     });
+    const entries = this.recomputeBigBoardRankings(normalizedEntries);
 
     const validation = this.validatePublishedBigBoardEntries(entries);
     if (validation.ok === false) {
@@ -1186,7 +1191,15 @@ class OnDraftService implements IOnDraftService {
     if (normalizedYear.ok === false) {
       return Err(normalizedYear.value);
     }
-    return await this.repository.deleteBigBoardYear(normalizedYear.value);
+    const deleted = await this.repository.deleteBigBoardYear(normalizedYear.value);
+    if (deleted.ok === false) {
+      return deleted;
+    }
+    const currentDefault = await this.repository.getAppSetting(DEFAULT_BIG_BOARD_YEAR_SETTING_KEY);
+    if (currentDefault.ok === true && currentDefault.value === String(normalizedYear.value)) {
+      await this.repository.setAppSetting(DEFAULT_BIG_BOARD_YEAR_SETTING_KEY, "");
+    }
+    return deleted;
   }
 
   async getArticles(published = true): Promise<Result<Article[], ArticleError>> {
@@ -1686,6 +1699,55 @@ class OnDraftService implements IOnDraftService {
 
   async getTags(): Promise<Result<string[], ArticleError>> {
     return await this.repository.getTags();
+  }
+
+  async resolveDefaultBigBoardYear(): Promise<number> {
+    const stored = await this.repository.getAppSetting(DEFAULT_BIG_BOARD_YEAR_SETTING_KEY);
+    if (stored.ok === false || stored.value === null) {
+      return this.defaultBigBoardYear();
+    }
+    const parsed = Number.parseInt(stored.value, 10);
+    if (!Number.isInteger(parsed) || parsed < 1900 || parsed > 2100) {
+      return this.defaultBigBoardYear();
+    }
+    return parsed;
+  }
+
+  async setDefaultBigBoardYear(year: number | undefined): Promise<Result<number, BigBoardError>> {
+    const normalizedYear = this.normalizeBigBoardYear(year);
+    if (normalizedYear.ok === false) {
+      return Err(normalizedYear.value);
+    }
+    const saved = await this.repository.setAppSetting(DEFAULT_BIG_BOARD_YEAR_SETTING_KEY, String(normalizedYear.value));
+    if (saved.ok === false) {
+      return Err(saved.value);
+    }
+    return Ok(normalizedYear.value);
+  }
+
+  private recomputeBigBoardRankings(entries: BigBoardEntry[]): BigBoardEntry[] {
+    const rankedOrder = entries
+      .map((entry, index) => ({ entry, index }))
+      .filter(({ entry }) => entry.rank !== null)
+      .sort((a, b) => ((a.entry.rank as number) - (b.entry.rank as number)) || (a.index - b.index));
+    const rankById = new Map<string, number>();
+    const posRankById = new Map<string, number>();
+    const positionCounters = new Map<string, number>();
+    rankedOrder.forEach(({ entry }, orderIndex) => {
+      rankById.set(entry.id, orderIndex + 1);
+      if (entry.position) {
+        const nextPosRank = (positionCounters.get(entry.position) ?? 0) + 1;
+        positionCounters.set(entry.position, nextPosRank);
+        posRankById.set(entry.id, nextPosRank);
+      }
+    });
+    return entries.map((entry) => entry.rank === null
+      ? entry
+      : {
+        ...entry,
+        rank: rankById.get(entry.id) ?? entry.rank,
+        posRank: entry.position ? (posRankById.get(entry.id) ?? entry.posRank) : entry.posRank,
+      });
   }
 }
 

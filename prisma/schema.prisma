@@ -384,3 +384,12 @@ model ConsensusDiscrepancyWriteup {
   @@index([published])
   @@map("consensus_discrepancy_writeups")
 }
+
+// v2.1 c6-editor
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_settings")
+}

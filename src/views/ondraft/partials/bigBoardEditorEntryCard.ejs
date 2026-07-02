@@ -139,6 +139,19 @@
         <div class="board-editor-delete-cell">
           <button
             type="button"
+            class="board-editor-drag-handle"
+            data-drag-handle
+            aria-label="Drag to reorder <%= hasText(entry.playerName) ? entry.playerName : "draft board entry" %>"
+            title="Drag to reorder"
+          >
+            <svg class="size-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <circle cx="9" cy="6" r="1.6" /><circle cx="15" cy="6" r="1.6" />
+              <circle cx="9" cy="12" r="1.6" /><circle cx="15" cy="12" r="1.6" />
+              <circle cx="9" cy="18" r="1.6" /><circle cx="15" cy="18" r="1.6" />
+            </svg>
+          </button>
+          <button
+            type="button"
             class="board-editor-delete-row-button board-editor-entry-delete"
             data-delete-board-entry
             aria-label="Delete <%= hasText(entry.playerName) ? entry.playerName : "draft board entry" %>"
