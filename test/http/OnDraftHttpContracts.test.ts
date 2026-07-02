@@ -18,11 +18,6 @@ function testConfig(turnstile = { siteKey: null as string | null, secretKey: nul
       mailingListUnsubscribeSecret: "test-mailing-secret",
     },
     turnstile,
-    analytics: {
-      umamiWebsiteId: null,
-      umamiApiKey: null,
-      umamiApiBaseUrl: "https://api.umami.is/v1",
-    },
   };
 }
 
@@ -132,7 +127,8 @@ describe("OnDraft HTTP contracts", () => {
     expect(response.headers["content-security-policy"]).toContain("default-src 'self'");
     expect(response.headers["content-security-policy"]).toContain("frame-ancestors 'none'");
     expect(response.headers["content-security-policy"]).toContain("https://i.ytimg.com");
-    expect(response.headers["content-security-policy"]).toContain("https://gateway.umami.is");
+    expect(response.headers["content-security-policy"]).not.toContain("umami");
+    expect(response.text).not.toContain("cloud.umami.is");
     expect(response.headers["x-content-type-options"]).toBe("nosniff");
     expect(response.headers["x-frame-options"]).toBe("DENY");
     expect(response.headers["referrer-policy"]).toBe("strict-origin-when-cross-origin");
@@ -877,6 +873,22 @@ describe("OnDraft HTTP contracts", () => {
     expect(newsletterTab.text).toContain("no-reply@ondraftfootball.com");
     expect(newsletterTab.text).not.toContain("<!doctype html>");
 
+    // Record first-party pageviews BEFORE the first analytics-tab fetch (summaries cache for 60s).
+    // A plain visitor with a browser-like User-Agent is the only view that should be counted.
+    const visitor = request.agent(ondraft);
+    const visitorView = await visitor
+      .get("/articles")
+      .set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+    expect(visitorView.status).toBe(200);
+    // Admin browsing is recorded but flagged and excluded from aggregates.
+    const adminView = await admin
+      .get("/about")
+      .set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+    expect(adminView.status).toBe(200);
+    // Requests without a User-Agent are bot-flagged and excluded from aggregates.
+    const botView = await request(ondraft).get("/videos");
+    expect(botView.status).toBe(200);
+
     const analyticsTab = await admin.get("/admin/tabs/analytics").set("HX-Request", "true");
     expect(analyticsTab.status).toBe(200);
     expect(analyticsTab.text).toContain("Traffic Dashboard");
@@ -884,6 +896,12 @@ describe("OnDraft HTTP contracts", () => {
     expect(analyticsTab.text).toContain("Articles");
     expect(analyticsTab.text).toContain("Draft board");
     expect(analyticsTab.text).not.toContain("<!doctype html>");
+    // End-to-end local analytics: the visitor view is aggregated and rendered...
+    expect(analyticsTab.text).toContain("/articles");
+    expect(analyticsTab.text).not.toContain("Pending");
+    // ...while admin-session views and UA-less (bot-flagged) views are excluded.
+    expect(analyticsTab.text).not.toContain("/about");
+    expect(analyticsTab.text).not.toContain("/videos");
 
     const usersTab = await admin.get("/admin/tabs/users").set("HX-Request", "true");
     expect(usersTab.status).toBe(200);

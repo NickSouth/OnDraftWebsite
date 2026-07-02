@@ -17,18 +17,11 @@ export interface ITurnstileConfig {
   verificationDisabled: boolean;
 }
 
-export interface IAnalyticsConfig {
-  umamiWebsiteId: string | null;
-  umamiApiKey: string | null;
-  umamiApiBaseUrl: string;
-}
-
 export interface IAppConfig {
   port: number;
   repositoryMode: RepositoryMode;
   email: IEmailConfig;
   turnstile: ITurnstileConfig;
-  analytics: IAnalyticsConfig;
 }
 
 function readOptionalEnv(env: NodeJS.ProcessEnv, key: string): string | null {
@@ -153,9 +146,6 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): IAppConfig 
   const turnstileSiteKey = readOptionalEnv(env, "TURNSTILE_SITE_KEY");
   const turnstileSecretKey = readOptionalEnv(env, "TURNSTILE_SECRET_KEY");
   const turnstileVerificationDisabled = parseBooleanEnv(env, "TURNSTILE_VERIFICATION_DISABLED", errors);
-  const umamiWebsiteId = readOptionalEnv(env, "UMAMI_WEBSITE_ID");
-  const umamiApiKey = readOptionalEnv(env, "UMAMI_API_KEY");
-  const umamiApiBaseUrl = readOptionalEnv(env, "UMAMI_API_BASE_URL") ?? "https://api.umami.is/v1";
 
   if (provider === "resend") {
     requireEnv(env, "EMAIL_FROM", errors);
@@ -183,7 +173,6 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): IAppConfig 
   }
 
   parseUrl(appBaseUrl, "APP_BASE_URL", errors);
-  parseUrl(umamiApiBaseUrl, "UMAMI_API_BASE_URL", errors);
 
   if (env.NODE_ENV === "production" && provider === "logging") {
     errors.push("EMAIL_PROVIDER=logging is not allowed in production.");
@@ -209,11 +198,6 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): IAppConfig 
       siteKey: turnstileSiteKey,
       secretKey: turnstileSecretKey,
       verificationDisabled: turnstileVerificationDisabled,
-    },
-    analytics: {
-      umamiWebsiteId,
-      umamiApiKey,
-      umamiApiBaseUrl,
     },
   };
 }
