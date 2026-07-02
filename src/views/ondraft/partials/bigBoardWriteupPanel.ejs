@@ -8,18 +8,24 @@
   const publicFilmGradeCategory = publicGradeCategories.find((category) => category.key === "filmTraits");
   const publicGradeLayoutCategories = [
     publicPhysicalGradeCategory
-      ? { category: publicPhysicalGradeCategory, widthClass: "grid-cols-[repeat(2,3.85rem)]", alignClass: "" }
+      ? {
+          category: publicPhysicalGradeCategory,
+          widthClass: entry.writeupPublished ? "grid-cols-[repeat(2,3.25rem)]" : "grid-cols-[repeat(2,3.85rem)]",
+          alignClass: "",
+        }
       : null,
     publicFilmGradeCategory
       ? {
           category: publicFilmGradeCategory,
           widthClass: entry.writeupPublished
-            ? "grid-cols-[repeat(2,3.85rem)] sm:grid-cols-[repeat(3,3.85rem)] lg:grid-cols-[repeat(4,3.85rem)] xl:grid-cols-[repeat(5,3.85rem)]"
+            ? "grid-cols-[repeat(2,3.25rem)] sm:grid-cols-[repeat(3,3.25rem)] xl:grid-cols-[repeat(5,3.25rem)]"
             : "grid-cols-[repeat(2,3.85rem)] sm:grid-cols-[repeat(3,3.85rem)] lg:grid-cols-[repeat(5,3.85rem)]",
           alignClass: entry.writeupPublished ? "" : "lg:ml-auto",
         }
       : null,
   ].filter(Boolean);
+  const publicGradeTileSizeClass = entry.writeupPublished ? "h-[2rem] w-[3.25rem]" : "h-[2.25rem] w-[3.85rem]";
+  const publicGradeTileValueClass = entry.writeupPublished ? "text-[0.78rem]" : "text-[0.9rem]";
   const publicMobileGradeLayoutCategories = [
     publicPhysicalGradeCategory
       ? { category: publicPhysicalGradeCategory, widthClass: "grid-cols-[repeat(6,3rem)]" }
@@ -121,15 +127,15 @@
           </div>
         </div>
         <% if (publicGradeLayoutCategories.length > 0) { %>
-          <div class="mt-3 flex flex-col gap-2.5 overflow-visible <%= entry.writeupPublished ? "" : "lg:flex-row lg:items-start lg:justify-between lg:gap-5" %>">
+          <div class="mt-3 flex flex-col gap-2.5 overflow-visible <%= entry.writeupPublished ? "xl:flex-row xl:items-start xl:justify-between xl:gap-2" : "lg:flex-row lg:items-start lg:justify-between lg:gap-5" %>">
             <% publicGradeLayoutCategories.forEach(({ category, widthClass, alignClass }) => { %>
               <div class="grid gap-1.5 overflow-visible <%= alignClass %>">
                 <span class="text-[0.64rem] font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400"><%= category.label %></span>
                 <div class="grid <%= widthClass %> gap-1 overflow-visible">
                   <% category.traits.forEach((trait) => { %>
-                    <span class="draft-grade-trait-tile relative z-0 grid h-[2.25rem] w-[3.85rem] place-items-center gap-0.5 overflow-visible rounded bg-slate-100 px-1 py-1 text-center transition duration-150 hover:z-20 hover:scale-[1.04] hover:bg-slate-200 hover:shadow-lg hover:ring-1 hover:ring-draft-gold/60 dark:bg-white/10 dark:hover:bg-white/20" title="<%= trait %>">
+                    <span class="draft-grade-trait-tile relative z-0 grid <%= publicGradeTileSizeClass %> place-items-center gap-0.5 overflow-visible rounded bg-slate-100 px-1 py-1 text-center transition duration-150 hover:z-20 hover:scale-[1.04] hover:bg-slate-200 hover:shadow-lg hover:ring-1 hover:ring-draft-gold/60 dark:bg-white/10 dark:hover:bg-white/20" title="<%= trait %>">
                       <span class="draft-grade-trait-abbr text-[0.58rem] font-black uppercase leading-none text-slate-600 transition dark:text-slate-300"><%= publicGradeTraitAbbreviation(trait) %></span>
-                      <strong class="font-display text-[0.9rem] font-black leading-none text-draft-amber dark:text-draft-gold"><%= publicGradeTraitLabel(category.key, trait) %></strong>
+                      <strong class="font-display <%= publicGradeTileValueClass %> font-black leading-none text-draft-amber dark:text-draft-gold"><%= publicGradeTraitLabel(category.key, trait) %></strong>
                     </span>
                   <% }) %>
                 </div>
