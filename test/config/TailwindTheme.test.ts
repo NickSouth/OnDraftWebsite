@@ -8,15 +8,15 @@ describe("tailwind theme (v2.1 c1-foundation)", () => {
     expect(config.theme.extend.fontFamily.sans).toContain("sans-serif");
   });
 
-  it("scales the radius theme ~1.2x", () => {
+  it("scales the radius theme ~1.5x (v2.1 QA: 1.2x was too subtle)", () => {
     expect(config.theme.extend.borderRadius).toEqual({
-      sm: "0.15rem",
-      DEFAULT: "0.3rem",
-      md: "0.45rem",
-      lg: "0.6rem",
-      xl: "0.9rem",
-      "2xl": "1.2rem",
-      "3xl": "1.8rem",
+      sm: "0.1875rem",
+      DEFAULT: "0.375rem",
+      md: "0.5625rem",
+      lg: "0.75rem",
+      xl: "1.125rem",
+      "2xl": "1.5rem",
+      "3xl": "2.25rem",
     });
   });
 });

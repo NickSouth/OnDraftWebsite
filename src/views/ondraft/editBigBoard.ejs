@@ -638,6 +638,11 @@
         animation: 150,
         delay: 100,
         delayOnTouchOnly: true,
+        scroll: true,
+        forceAutoScrollFallback: true,
+        scrollSensitivity: 90,
+        scrollSpeed: 14,
+        bubbleScroll: true,
         onEnd: (event) => {
           if (event.oldIndex !== event.newIndex) {
             reindexBoardOrder();

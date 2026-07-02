@@ -2962,26 +2962,24 @@
     @apply pointer-events-none absolute inset-0 overflow-hidden;
   }
 
-  .od-hero-facets::before {
-    content: "";
-    @apply absolute inset-0;
-    background: theme("colors.draft.gold / 5%");
-    clip-path: polygon(58% 0, 100% 0, 100% 100%, 34% 100%);
+  .od-hero-facets svg {
+    @apply block h-full w-full;
   }
 
-  .od-hero-facets::after {
-    content: "";
-    @apply absolute inset-0;
-    background: theme("colors.draft.navy / 4%");
-    clip-path: polygon(76% 0, 100% 0, 100% 58%);
+  .od-facet-tint {
+    fill: theme("colors.draft.gold / 5%");
   }
 
-  .od-hero-facets:is([data-theme="dark"] *)::before {
-    background: theme("colors.draft.gold / 7%");
+  .od-facet-shade {
+    fill: theme("colors.draft.navy / 4%");
   }
 
-  .od-hero-facets:is([data-theme="dark"] *)::after {
-    background: theme("colors.draft.foam / 4%");
+  .od-hero-facets:is([data-theme="dark"] *) .od-facet-tint {
+    fill: theme("colors.draft.gold / 7%");
+  }
+
+  .od-hero-facets:is([data-theme="dark"] *) .od-facet-shade {
+    fill: theme("colors.draft.foam / 4%");
   }
 
   .od-slide-flow {
@@ -3158,7 +3156,7 @@
   }
 
   .od-search-suggest-panel {
-    @apply absolute left-0 right-0 top-[calc(100%+0.35rem)] z-40 grid max-h-[60vh] gap-0.5 overflow-y-auto rounded-lg border border-slate-200 bg-white/95 p-2 shadow-editorial backdrop-blur dark:border-white/10 dark:bg-draft-slate/95;
+    @apply absolute left-1/2 top-[calc(100%+0.35rem)] z-40 grid max-h-[60vh] w-[140%] max-w-[calc(100vw-1.5rem)] -translate-x-1/2 gap-0.5 overflow-y-auto overflow-x-hidden rounded-lg border border-slate-200 bg-white/95 p-2 shadow-editorial backdrop-blur dark:border-white/10 dark:bg-draft-slate/95;
   }
 
   .od-search-suggest-kicker {
@@ -3166,7 +3164,7 @@
   }
 
   .od-search-suggest-item {
-    @apply od-focus-ring flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-semibold text-slate-950 no-underline transition duration-150 hover:bg-draft-foam hover:text-draft-amber dark:text-white dark:hover:bg-white/10 dark:hover:text-draft-gold;
+    @apply od-focus-ring flex items-start gap-2 rounded-md px-2 py-1.5 text-sm font-semibold leading-snug text-slate-950 no-underline transition duration-150 hover:bg-draft-foam hover:text-draft-amber dark:text-white dark:hover:bg-white/10 dark:hover:text-draft-gold;
   }
 
   .od-search-result-type {

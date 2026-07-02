@@ -194,7 +194,7 @@
     });
   };
 
-  const showRouteSkeleton = (url) => {
+  const showRouteSkeleton = (url, triggerEvent) => {
     const name = skeletonNameForPath(url.pathname);
     const pageContent = document.querySelector("#page-content > .w-full");
     if (!name || !pageContent) {
@@ -204,6 +204,9 @@
 
     window.clearTimeout(skeletonTimeout);
     skeletonTimeout = window.setTimeout(() => {
+      if (triggerEvent?.defaultPrevented) {
+        return;
+      }
       const content = templateContent(`[data-page-skeleton="${name}"]`);
       if (!content) {
         showLoader(0);
@@ -243,7 +246,7 @@
     return name;
   };
 
-  const showResultSkeleton = (source) => {
+  const showResultSkeleton = (source, triggerEvent) => {
     const config = skeletonConfigFrom(source);
     if (!config) {
       return false;
@@ -258,6 +261,9 @@
 
     window.clearTimeout(skeletonTimeout);
     skeletonTimeout = window.setTimeout(() => {
+      if (triggerEvent?.defaultPrevented) {
+        return;
+      }
       const firstElement = content.firstElementChild;
       if (firstElement?.id && firstElement.id === target.id) {
         target.className = firstElement.className;
@@ -304,16 +310,19 @@
   window.addEventListener("ondraft:hide-global-loader", hideLoader);
 
   document.addEventListener("htmx:beforeRequest", (event) => {
+    if (event.defaultPrevented) {
+      return;
+    }
     const target = event.target;
     if (target instanceof HTMLElement && target.closest("[data-use-global-loader]")) {
       showLoader(0);
       return;
     }
     if (target instanceof HTMLElement && target.closest("[data-skip-global-loader]")) {
-      showResultSkeleton(target);
+      showResultSkeleton(target, event);
       return;
     }
-    if (!showResultSkeleton(target)) {
+    if (!showResultSkeleton(target, event)) {
       showLoader();
     }
   });
@@ -321,7 +330,7 @@
   document.addEventListener("click", (event) => {
     const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
     if (isLocalNavigation(link, event)) {
-      showRouteSkeleton(new URL(link.href, window.location.href));
+      showRouteSkeleton(new URL(link.href, window.location.href), event);
     }
   }, true);
 

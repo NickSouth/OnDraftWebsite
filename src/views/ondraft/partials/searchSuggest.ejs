@@ -12,7 +12,7 @@
     <% if (group.items.length > 0) { %>
       <p class="od-search-suggest-kicker"><%= group.label %></p>
       <% group.items.forEach((item) => { %>
-        <a class="od-search-suggest-item" href="<%= item.href %>"><span class="min-w-0 truncate"><%= item.text %></span></a>
+        <a class="od-search-suggest-item" href="<%= item.href %>"><span class="min-w-0 line-clamp-2"><%= item.text %></span></a>
       <% }) %>
     <% } %>
   <% }) %>
