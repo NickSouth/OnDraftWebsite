@@ -15,11 +15,6 @@ function testConfig(turnstile = { siteKey: null as string | null, secretKey: nul
       mailingListUnsubscribeSecret: "test-mailing-secret",
     },
     turnstile,
-    analytics: {
-      umamiWebsiteId: null,
-      umamiApiKey: null,
-      umamiApiBaseUrl: "https://api.umami.is/v1",
-    },
   };
 }
 

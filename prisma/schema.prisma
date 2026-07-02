@@ -392,6 +392,7 @@ model AppSetting {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("app_settings")
+}
 
 // v2.1 c7-analytics
 model PageView {
