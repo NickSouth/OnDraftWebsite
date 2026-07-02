@@ -893,6 +893,26 @@ describe("OnDraft HTTP contracts", () => {
     expect(usersTab.text).not.toContain("<!doctype html>");
   });
 
+  it("admin dashboard wrapper allows vertical page flow on small screens", async () => {
+    const ondraft = app();
+
+    const admin = await loginAdminAgent(ondraft);
+    const dashboard = await admin.get("/admin");
+
+    expect(dashboard.status).toBe(200);
+    expect(dashboard.text).toContain("od-admin-page max-w-none overflow-x-clip");
+    expect(dashboard.text).not.toContain("od-admin-page max-w-none overflow-hidden");
+
+    // The analytics filter form must not force a 28rem min-width at lg (1024-1279px),
+    // where the right nav rail squeezes the content column.
+    const analyticsTab = await admin.get("/admin/tabs/analytics").set("HX-Request", "true");
+    expect(analyticsTab.status).toBe(200);
+    expect(analyticsTab.text).toContain("xl:min-w-[28rem]");
+    expect(analyticsTab.text).not.toContain("lg:min-w-[28rem]");
+    // Note: the trend-chart scroll frame is not asserted here because the in-memory
+    // analytics summary is null, so only the "No trend data yet." empty state renders.
+  });
+
   it("lets admins save, edit, and send newsletters through the admin dashboard", async () => {
     const { ondraft, emailService } = appWithEmailCapture();
     const admin = await loginAdminAgent(ondraft);

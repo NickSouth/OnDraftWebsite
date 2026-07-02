@@ -58,7 +58,7 @@
       </div>
 
       <form
-        class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end lg:min-w-[28rem]"
+        class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end xl:min-w-[28rem]"
         hx-get="/admin/tabs/analytics"
         hx-target="#admin-dashboard-panel"
         hx-swap="innerHTML"
@@ -145,14 +145,16 @@
       </div>
 
       <% if (trendPoints.length > 0) { %>
-        <div class="mt-5 flex h-64 items-end gap-1 rounded-md border border-slate-200 bg-slate-50 px-3 pb-8 pt-4 dark:border-white/10 dark:bg-draft-ink/60">
-          <% trendPoints.slice(-24).forEach((point) => { %>
-            <div class="group relative flex min-w-4 flex-1 items-end justify-center gap-0.5">
-              <span class="w-2 rounded-t bg-draft-gold transition group-hover:bg-amber-300" style="height: <%= Math.max(4, Math.round((point.pageviews / trendMax) * 190)) %>px"></span>
-              <span class="w-2 rounded-t bg-sky-400 transition group-hover:bg-sky-300" style="height: <%= Math.max(4, Math.round((point.sessions / trendMax) * 190)) %>px"></span>
-              <span class="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-max -translate-x-1/2 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-slate-700 shadow-editorial group-hover:block dark:border-white/10 dark:bg-draft-slate dark:text-slate-100"><%= dateLabel(point.timestamp) %>: <%= point.pageviews.toLocaleString() %> / <%= point.sessions.toLocaleString() %></span>
-            </div>
-          <% }) %>
+        <div class="mt-5 overflow-x-auto rounded-md border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-draft-ink/60">
+          <div class="flex h-64 w-max min-w-full items-end gap-1 px-3 pb-8 pt-4">
+            <% trendPoints.slice(-24).forEach((point) => { %>
+              <div class="group relative flex min-w-4 flex-1 items-end justify-center gap-0.5">
+                <span class="w-2 rounded-t bg-draft-gold transition group-hover:bg-amber-300" style="height: <%= Math.max(4, Math.round((point.pageviews / trendMax) * 176)) %>px"></span>
+                <span class="w-2 rounded-t bg-sky-400 transition group-hover:bg-sky-300" style="height: <%= Math.max(4, Math.round((point.sessions / trendMax) * 176)) %>px"></span>
+                <span class="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-max -translate-x-1/2 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-slate-700 shadow-editorial group-hover:block dark:border-white/10 dark:bg-draft-slate dark:text-slate-100"><%= dateLabel(point.timestamp) %>: <%= point.pageviews.toLocaleString() %> / <%= point.sessions.toLocaleString() %></span>
+              </div>
+            <% }) %>
+          </div>
         </div>
       <% } else { %>
         <p class="mt-5 rounded-md border border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm font-bold text-slate-600 dark:border-white/10 dark:bg-draft-ink/60 dark:text-slate-300">No trend data yet.</p>
