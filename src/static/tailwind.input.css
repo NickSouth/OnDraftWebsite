@@ -2934,3 +2934,19 @@
     opacity: 1;
   }
 }
+
+/* === v2.1 c3-media === */
+@layer components {
+  .od-video-play-overlay {
+    @apply pointer-events-none absolute left-1/2 top-1/2 z-[1] grid size-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-slate-950/60 text-white shadow-lg ring-1 ring-white/50 backdrop-blur-sm transition duration-300 ease-out sm:size-14;
+  }
+
+  .od-video-play-overlay svg {
+    @apply size-5 translate-x-[6%] sm:size-6;
+  }
+
+  .group:hover .od-video-play-overlay,
+  .od-home-carousel-slide:hover .od-video-play-overlay {
+    @apply scale-110 bg-slate-950/75;
+  }
+}

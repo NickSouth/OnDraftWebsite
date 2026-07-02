@@ -60,6 +60,10 @@
                 <span class="text-slate-400 dark:text-slate-500">/</span>
                 <span><%= new Date(article.publicationDate).toLocaleDateString() %></span>
               <% } %>
+              <% if (article.readMinutes) { %>
+                <span class="text-slate-400 dark:text-slate-500">/</span>
+                <span><%= article.readMinutes %> min read</span>
+              <% } %>
               <% if (!article.published) { %>
                 <span class="rounded bg-draft-gold px-2 py-0.5 text-[0.62rem] text-draft-ink">Draft</span>
               <% } %>
@@ -139,6 +143,10 @@
                 <span class="text-slate-400 dark:text-slate-500">/</span>
                 <span><%= new Date(article.publicationDate).toLocaleDateString() %></span>
               <% } %>
+              <% if (article.readMinutes) { %>
+                <span class="text-slate-400 dark:text-slate-500">/</span>
+                <span><%= article.readMinutes %> min read</span>
+              <% } %>
             </span>
             <span class="font-display text-xl font-black leading-tight tracking-normal text-slate-950 transition group-hover:text-draft-amber dark:text-white dark:group-hover:text-draft-gold sm:text-3xl">
               <%= article.title %>
@@ -148,6 +156,10 @@
               <% if (article.publicationDate) { %>
                 <span>/</span>
                 <span><%= new Date(article.publicationDate).toLocaleDateString() %></span>
+              <% } %>
+              <% if (article.readMinutes) { %>
+                <span>/</span>
+                <span><%= article.readMinutes %> min read</span>
               <% } %>
             </span>
             <span class="text-sm font-bold text-slate-600 dark:text-slate-300">By <%= article.author %></span>

@@ -214,6 +214,9 @@
                   <div class="absolute inset-0 bg-[linear-gradient(135deg,#07111f,#263247_54%,#a75f12)]" aria-hidden="true"></div>
                 <% } %>
                 <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent" aria-hidden="true"></div>
+                <% if (item.type === "video") { %>
+                  <%- include("partials/videoPlayOverlay") %>
+                <% } %>
                 <div class="group relative p-4 sm:p-5 md:p-8">
                   <div class="mb-2 flex flex-wrap items-center gap-1.5 sm:mb-3 sm:gap-2">
                     <span class="rounded bg-draft-gold px-2 py-0.5 text-[0.68rem] font-black uppercase tracking-wide text-draft-ink sm:py-1 sm:text-xs"><%= item.type === "article" ? "Article" : "Video" %></span>
@@ -227,7 +230,7 @@
                   </p>
                   <div class="mt-3 flex items-center justify-between gap-2 sm:mt-5 sm:gap-4">
                     <span class="text-[0.68rem] font-bold uppercase tracking-[0.12em] text-slate-300 sm:text-xs sm:tracking-[0.16em]">
-                      <%= item.date.toLocaleDateString() %>
+                      <%= item.date.toLocaleDateString() %><% if (item.type === "article" && item.readMinutes) { %> &middot; <%= item.readMinutes %> min read<% } %>
                     </span>
                     <a class="od-primary-link" href="<%= item.href %>" <%= item.type === "video" ? 'target="_blank" rel="noopener noreferrer"' : "" %>>Open</a>
                   </div>

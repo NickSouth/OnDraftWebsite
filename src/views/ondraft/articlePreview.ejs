@@ -42,6 +42,9 @@
           <% if (article.publicationDate) { %>
             on <%= new Date(article.publicationDate).toLocaleDateString() %>
           <% } %>
+          <% if (typeof readMinutes === "number") { %>
+            &middot; <%= readMinutes %> min read
+          <% } %>
         </p>
       </div>
     </header>

@@ -46,6 +46,7 @@ type HomeFeedItem =
       tags: string[];
       imageUrl?: string;
       likes: number;
+      readMinutes: number | null;
     }
   | {
       type: "video";
@@ -603,6 +604,7 @@ class OnDraftController implements IOnDraftController {
       tags: article.tags ?? [],
       imageUrl: article.imageUrl,
       likes: article.likes,
+      readMinutes: this.service.articleReadMinutes(article),
     };
   }
 
@@ -1132,7 +1134,7 @@ class OnDraftController implements IOnDraftController {
     };
   }
 
-  private async popularArticles(range: "all" | "month" | "year"): Promise<Article[]> {
+  private async popularArticles(range: "all" | "month" | "year"): Promise<Array<Article & { readMinutes: number | null }>> {
     const result = await this.service.getFilteredArticles({
       published: true,
       sortBy: "likes",
@@ -1143,9 +1145,9 @@ class OnDraftController implements IOnDraftController {
       this.logger.warn(`Unable to load popular articles: ${result.value.message}`);
       return [];
     }
-    return result.value
+    return this.withReadMinutes(result.value
       .sort((first, second) => second.likes - first.likes || second.publicationDate.getTime() - first.publicationDate.getTime())
-      .slice(0, 10);
+      .slice(0, 10));
   }
 
   private parseLocalDate(value: unknown): Date {
@@ -1233,7 +1235,7 @@ class OnDraftController implements IOnDraftController {
     res.render("ondraft/articles", {
       session,
       isAdmin: isAdminSession(session),
-      articles: result.value,
+      articles: this.withReadMinutes(result.value),
       showingPublished,
       sortBy: this.articleSortBy(req),
       sortDirection: this.articleSortDirection(req),
@@ -1334,6 +1336,7 @@ class OnDraftController implements IOnDraftController {
       session,
       isAdmin: isAdminSession(session),
       article,
+      readMinutes: this.service.articleReadMinutes(article),
       likeActorId: this.likeActorId(session),
       values: this.articleFormValues(article),
       formAction: article.id === "preview" ? "/articles" : `/articles/${article.id}`,
@@ -1357,7 +1360,7 @@ class OnDraftController implements IOnDraftController {
       : result;
     res.render("ondraft/partials/articleList", {
       layout: false,
-      articles: result.value,
+      articles: this.withReadMinutes(result.value),
       showingPublished,
       isAdmin: isAdminSession(session),
       session,
@@ -1408,7 +1411,7 @@ class OnDraftController implements IOnDraftController {
       session,
       isAdmin: isAdminSession(session),
       requireLogin: false,
-      bookmarkedArticles,
+      bookmarkedArticles: this.withReadMinutes(bookmarkedArticles),
       bookmarkedForumPosts,
     });
   }
@@ -1961,6 +1964,7 @@ class OnDraftController implements IOnDraftController {
       session,
       isAdmin: isAdminSession(session),
       article,
+      readMinutes: this.service.articleReadMinutes(article),
       commentsLimit: 10,
       likeActorId: this.likeActorId(session),
       articleBookmarked: (await this.bookmarkedArticleIds(session)).includes(article.id),
@@ -3043,7 +3047,11 @@ class OnDraftController implements IOnDraftController {
       this.logger.error(`Failed to delete big board entry for player "${playerName}" ` + { error: result.value });
       res.status(this.mapBigBoardErrorToStatusCode(result.value)).send(result.value.message);
       return;
-    } 
+    }
+  }
+
+  private withReadMinutes(articles: Article[]): Array<Article & { readMinutes: number | null }> {
+    return articles.map((article) => ({ ...article, readMinutes: this.service.articleReadMinutes(article) }));
   }
 }
 
