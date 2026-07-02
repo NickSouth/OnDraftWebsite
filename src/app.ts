@@ -181,6 +181,8 @@ class ExpressApp implements IApp {
     this.app.use("/vendor/alpinejs-focus", express.static(path.join(process.cwd(), "node_modules", "@alpinejs", "focus", "dist")));
     this.app.use("/vendor/alpinejs-collapse", express.static(path.join(process.cwd(), "node_modules", "@alpinejs", "collapse", "dist")));
     this.app.use("/vendor/pdfjs", express.static(path.join(process.cwd(), "node_modules", "pdfjs-dist")));
+    this.app.use("/vendor/fonts/newsreader", express.static(path.join(process.cwd(), "node_modules", "@fontsource", "newsreader")));
+    this.app.use("/vendor/fonts/source-sans-3", express.static(path.join(process.cwd(), "node_modules", "@fontsource", "source-sans-3")));
     this.app.use(express.static(path.join(process.cwd(), "public"), {
       setHeaders: (res, filePath) => {
         if (path.extname(filePath).toLowerCase() === ".pdf") {
