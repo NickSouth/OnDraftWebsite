@@ -75,6 +75,16 @@
     <% if (typeof structuredDataJson !== "undefined" && structuredDataJson) { %>
       <script type="application/ld+json"><%- structuredDataJson %></script>
     <% } %>
+    <link rel="preload" href="/vendor/fonts/newsreader/files/newsreader-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/vendor/fonts/source-sans-3/files/source-sans-3-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/vendor/fonts/newsreader/600.css" />
+    <link rel="stylesheet" href="/vendor/fonts/newsreader/700.css" />
+    <link rel="stylesheet" href="/vendor/fonts/newsreader/800.css" />
+    <link rel="stylesheet" href="/vendor/fonts/source-sans-3/400.css" />
+    <link rel="stylesheet" href="/vendor/fonts/source-sans-3/400-italic.css" />
+    <link rel="stylesheet" href="/vendor/fonts/source-sans-3/600.css" />
+    <link rel="stylesheet" href="/vendor/fonts/source-sans-3/700.css" />
+    <link rel="stylesheet" href="/vendor/fonts/source-sans-3/900.css" />
     <link rel="stylesheet" href="/styles.css" />
     <link rel="stylesheet" href="/tailwind.css" />
     <script src="/vendor/htmx/htmx.min.js" defer></script>
