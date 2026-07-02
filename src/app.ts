@@ -115,6 +115,15 @@ class ExpressApp implements IApp {
       key: clientIp,
     }),
   );
+  // v2.1 c8-search
+  private readonly searchRateLimit = createRateLimitMiddleware(
+    new RateLimiter({
+      keyPrefix: "search",
+      limit: 120,
+      windowMs: 5 * 60 * 1000,
+      key: clientIp,
+    }),
+  );
   private readonly turnstileVerifier: TurnstileVerifier;
 
   constructor(
@@ -1024,6 +1033,26 @@ class ExpressApp implements IApp {
       "/settings/delete-account",
       asyncHandler(async (req, res) => {
         await this.authController.deleteAccountFromSettings(req, res, sessionStore(req));
+      }),
+    );
+
+    // v2.1 c8-search
+    this.app.get(
+      "/search/suggest",
+      this.searchRateLimit,
+      asyncHandler(async (req, res) => {
+        // Deliberately NOT recordPageView — keystroke suggestions must not inflate the pageview log.
+        const browserSession = touchOnDraftSession(sessionStore(req));
+        await this.controller.showSearchSuggest(req, res, browserSession);
+      }),
+    );
+
+    this.app.get(
+      "/search",
+      this.searchRateLimit,
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.showSearch(req, res, browserSession);
       }),
     );
 

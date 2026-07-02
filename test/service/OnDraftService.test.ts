@@ -4,8 +4,10 @@ import { CreateOnDraftService, parseYoutubeVideoId, type IOnDraftService } from 
 import { CreateUserPreferenceService } from "../../src/service/UserPreferenceService";
 import { IYoutubeVideoStatsService } from "../../src/service/YoutubeVideoStatsService";
 import { calculateDraftGrade, defaultDraftGrade, effectiveDraftBoardGrade, formatDraftBoardGrade, gradeTraitCategoriesForGrade, toDraftGrade, type DraftGrade } from "../../src/model/DraftGrades";
-import type { Position } from "../../src/model/OnDraftContent";
+import type { Article, BigBoardPlayerSearchHit, ForumPost, Position, Video } from "../../src/model/OnDraftContent";
 import type { IEmailService, SendEmailVerificationEmailInput, SendNewsletterEmailInput, SendPasswordResetEmailInput } from "../../src/email/EmailService";
+import { DatabaseError, type ForumPostError, type IOnDraftRepository } from "../../src/repository/OnDraftRepository";
+import { Err, Ok } from "../../src/lib/result";
 
 class CaptureEmailService implements IEmailService {
   newsletterEmails: SendNewsletterEmailInput[] = [];
@@ -1655,6 +1657,116 @@ describe("OnDraftService YouTube videos", () => {
     expect(refreshed.ok).toBe(true);
     if (refreshed.ok === true) {
       expect(refreshed.value.viewCount).toBe(99);
+    }
+  });
+});
+
+describe("OnDraftService site search (v2.1 c8-search)", () => {
+  function stubbedSearchRepository(overrides: Partial<IOnDraftRepository>): IOnDraftRepository {
+    const base = CreateInMemoryOnDraftRepository({ seedContent: false });
+    return Object.assign(Object.create(base), overrides);
+  }
+
+  it("rejects terms shorter than two characters", async () => {
+    const ondraftService = service();
+
+    const single = await ondraftService.searchSite("a");
+    expect(single.ok).toBe(false);
+    if (single.ok === false) {
+      expect(single.value.name).toBe("ArticleValidationError");
+    }
+
+    const blank = await ondraftService.searchSite("   ");
+    expect(blank.ok).toBe(false);
+    if (blank.ok === false) {
+      expect(blank.value.name).toBe("ArticleValidationError");
+    }
+  });
+
+  it("normalizes whitespace and caps the term at 100 characters before hitting the repository", async () => {
+    const capturedTerms: string[] = [];
+    const capture = async (term: string, _limit: number) => {
+      capturedTerms.push(term);
+      return Ok([]);
+    };
+    const repository = stubbedSearchRepository({
+      searchArticles: capture as IOnDraftRepository["searchArticles"],
+      searchYoutubeVideos: capture as IOnDraftRepository["searchYoutubeVideos"],
+      searchForumPosts: capture as IOnDraftRepository["searchForumPosts"],
+      searchBigBoardPlayers: capture as IOnDraftRepository["searchBigBoardPlayers"],
+    });
+    const ondraftService = CreateOnDraftService(repository);
+
+    const normalized = await ondraftService.searchSite("  quarterback \t  room  ");
+    expect(normalized.ok).toBe(true);
+    expect(capturedTerms.every((term) => term === "quarterback room")).toBe(true);
+
+    capturedTerms.length = 0;
+    const longTerm = "x".repeat(300);
+    const capped = await ondraftService.searchSite(longTerm);
+    expect(capped.ok).toBe(true);
+    expect(capturedTerms.every((term) => term.length === 100)).toBe(true);
+  });
+
+  it("aggregates results across the four content types", async () => {
+    const fakeArticle = (id: string) => ({ id } as unknown as Article);
+    const fakeVideo = (videoId: string) => ({ videoId } as unknown as Video);
+    const fakePost = (id: string) => ({ id } as unknown as ForumPost);
+    const fakePlayer = (playerName: string) => ({ playerName } as unknown as BigBoardPlayerSearchHit);
+    const repository = stubbedSearchRepository({
+      searchArticles: async () => Ok([fakeArticle("a1"), fakeArticle("a2")]),
+      searchYoutubeVideos: async () => Ok([fakeVideo("v1")]),
+      searchForumPosts: async () => Ok([fakePost("p1")]),
+      searchBigBoardPlayers: async () => Ok([fakePlayer("Player One")]),
+    });
+    const ondraftService = CreateOnDraftService(repository);
+
+    const result = await ondraftService.searchSite("  quarterback  room ");
+    expect(result.ok).toBe(true);
+    if (result.ok === true) {
+      expect(result.value.totalCount).toBe(5);
+      expect(result.value.term).toBe("quarterback room");
+      expect(result.value.articles).toHaveLength(2);
+      expect(result.value.videos).toHaveLength(1);
+      expect(result.value.hotTakes).toHaveLength(1);
+      expect(result.value.players).toHaveLength(1);
+    }
+  });
+
+  it("forwards limitPerType to every repository search and clamps it to 10", async () => {
+    const capturedLimits: number[] = [];
+    const capture = async (_term: string, limit: number) => {
+      capturedLimits.push(limit);
+      return Ok([]);
+    };
+    const repository = stubbedSearchRepository({
+      searchArticles: capture as IOnDraftRepository["searchArticles"],
+      searchYoutubeVideos: capture as IOnDraftRepository["searchYoutubeVideos"],
+      searchForumPosts: capture as IOnDraftRepository["searchForumPosts"],
+      searchBigBoardPlayers: capture as IOnDraftRepository["searchBigBoardPlayers"],
+    });
+    const ondraftService = CreateOnDraftService(repository);
+
+    await ondraftService.searchSite("quarterback", { limitPerType: 3 });
+    expect(capturedLimits).toHaveLength(4);
+    expect(capturedLimits.every((limit) => limit === 3)).toBe(true);
+
+    capturedLimits.length = 0;
+    await ondraftService.searchSite("quarterback", { limitPerType: 50 });
+    expect(capturedLimits.every((limit) => limit === 10)).toBe(true);
+  });
+
+  it("surfaces repository errors as Err values instead of throwing", async () => {
+    const repository = stubbedSearchRepository({
+      searchForumPosts: async () => Err(DatabaseError("The taproom is unreachable.") as ForumPostError),
+    });
+    const ondraftService = CreateOnDraftService(repository);
+
+    const result = await ondraftService.searchSite("quarterback");
+    expect(result.ok).toBe(false);
+    if (result.ok === false) {
+      expect(result.value.name).toBe("UnknownArticleError");
+      expect(result.value.message).toContain("The taproom is unreachable.");
     }
   });
 });
