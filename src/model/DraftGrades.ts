@@ -80,12 +80,14 @@ const FORMULA_POSITION_BY_APP_POSITION: Record<Position, FormulaPosition> = {
 export const DRAFT_GRADE_TRAIT_VALUES = [1, 2, 3, 4, 5, 6, 7, 8] as const;
 
 const DRAFT_GRADE_TRAIT_ABBREVIATIONS: Record<string, string> = {
+  // Universal physical traits
   Speed: "SPD",
   Acceleration: "ACC",
   Agility: "AGI",
   "Change of Direction": "COD",
   Strength: "STR",
   "Size / Frame": "FRA",
+  // QB
   "Arm Talent": "ARM",
   "Mechanics / Footwork": "MEC",
   "Quick Accuracy": "QAC",
@@ -93,78 +95,82 @@ const DRAFT_GRADE_TRAIT_ABBREVIATIONS: Record<string, string> = {
   "Deep Accuracy": "DAC",
   "Off Platform Accuracy": "OPA",
   "Ball Placement": "BPL",
-  "Pre-Snap Processing": "PRE",
-  Processing: "PRO",
+  "Pre-Snap Processing": "PSP",
+  Processing: "PRS",
   Anticipation: "ANT",
   "Play Extension": "PEX",
   "Decision Making": "DEC",
-  "Pressure Awareness": "PRS",
-  "Pocket Feel": "PKT",
-  "Contact Balance": "BAL",
+  "Pressure Awareness": "PRA",
+  "Pocket Feel": "PKF",
+  // RB
   Vision: "VIS",
-  "Footwork / Tempo": "TMP",
-  "Pad Level": "PAD",
-  "Receiving Skills": "REC",
-  "Pass Protection": "PP",
-  "Ball Security": "SEC",
-  "Explosiveness": "EXP",
+  Creativity: "CRE",
+  Tempo: "TEM",
+  Power: "POW",
+  "Contact Balance": "BAL",
+  Elusiveness: "ELU",
+  "Ball Security": "BSC",
+  "Route Running": "RR",
+  "Pass Blocking": "PBK",
+  // WR
   "Blocking / Toughness": "BLK",
-  "Route Tree": "RT",
+  "Route Tree": "RTR",
   "Short Route Running": "SRR",
   "Intermediate Route Running": "IRR",
   "Deep Route Running": "DRR",
-  Release: "REL",
-  Catching: "CAT",
+  Release: "RLS",
+  Catching: "CTH",
   "Catch In Traffic": "CIT",
-  "Contested Catching": "CON",
-  "Body Control": "BDY",
+  "Contested Catching": "CTT",
+  "Body Control": "BCL",
   "Run After Catch": "RAC",
-  "Inline Blocking": "IBK",
-  "Space Blocking": "SBK",
-  "Anchor / Balance": "ANC",
-  "Hand Usage": "HND",
-  "Pass Set": "PST",
-  "Mirror Ability": "MIR",
-  "Recovery Ability": "RCV",
-  "Second Level Blocking": "2LV",
-  "Pulling / Movement": "PUL",
-  "Combo Blocks": "CMB",
-  "Reach Blocks": "RCH",
-  "Awareness": "AWR",
-  "Get Off": "GO",
-  Bend: "BND",
-  Power: "PWR",
+  // TE
+  "Spatial Awareness": "SPA",
+  "Run Block Technique": "RBT",
+  "Run Block Effort": "RBE",
+  // OT / IOL (Hands is HAN by default; RB overrides to CTH below)
+  Range: "RNG",
+  Hands: "HAN",
+  Footwork: "FTW",
+  Anchor: "ANC",
+  "Get Off": "GET",
+  Striking: "STK",
+  Drive: "DRV",
+  Sustain: "SUS",
+  Balance: "BAL",
+  "Football IQ": "IQ",
+  // IDL / EDGE
   Finesse: "FIN",
   "Pass Rush Plan": "PRP",
   "Block Shed": "SHD",
-  Anchor: "ANC",
-  "Discipline & Diagnostics": "DSC",
-  Tackling: "TAK",
+  "Pad Level": "PDL",
+  "Discipline & Diagnostics": "DD",
+  Tackling: "TKL",
   Pursuit: "PUR",
+  Bend: "BND",
   Coverage: "COV",
-  "Gap Discipline": "GAP",
-  "Run Defense": "RDF",
-  "Pass Rush": "PRS",
-  "Stack & Shed": "STS",
-  "Zone Coverage": "ZON",
-  "Man Coverage": "MAN",
-  "Blitzing": "BLZ",
-  Range: "RNG",
-  "Ball Skills": "BAL",
-  "Press Technique": "PRS",
-  "Off Coverage": "OFF",
-  "Route Recognition": "REC",
-  "Click and Close": "CLK",
-  "Run Support": "RUN",
-  "Hip Fluidity": "HIP",
-  "Eye Discipline": "EYE",
-  "Open Field Tackling": "OFT",
-  "Deep Zone Coverage": "DZC",
-  "Intermediate Zone Coverage": "IZC",
-  "Run Recognition": "RR",
+  // LB
   "Block Take-On": "BTO",
-  "Block Shedding": "BSH",
+  "Block Avoidance": "BAV",
+  Diagnostics: "DIA",
   Discipline: "DIS",
+  "Man Coverage": "MCV",
+  "Zone Coverage": "ZCV",
+  "Play Action": "PAC",
+  Blitzing: "BTZ",
+  // CB / S
+  "Intermediate Zone Coverage": "IZC",
+  "Deep Zone Coverage": "DZC",
+  "Jam Press": "JPR",
+  "Bail Press": "BPR",
+  "Click and Close": "CC",
+  "Ball Skills": "BSK",
+  "Run Recognition": "RRC",
+  "Block Shedding": "SHD",
+};
+
+const DRAFT_GRADE_TRAIT_ABBREVIATION_OVERRIDES: Partial<Record<Position, Record<string, string>>> = {
+  RB: { Hands: "CTH" },
 };
 
 function formulaPositionFor(position: Position | ""): FormulaPosition | null {
@@ -188,7 +194,11 @@ function traitsFromFormula(traits: FormulaArchetypeData["Physicals"] | FormulaAr
   return Object.keys(traits);
 }
 
-export function abbreviateDraftGradeTrait(trait: string): string {
+export function abbreviateDraftGradeTrait(trait: string, position?: Position | ""): string {
+  const override = position ? DRAFT_GRADE_TRAIT_ABBREVIATION_OVERRIDES[position]?.[trait] : undefined;
+  if (override) {
+    return override;
+  }
   const known = DRAFT_GRADE_TRAIT_ABBREVIATIONS[trait];
   if (known) {
     return known;
