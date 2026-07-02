@@ -354,7 +354,7 @@
         <% const thumbnailUrl = video.thumbnailUrl || fallbackThumbnailUrl; %>
         <% const thumbnailNeedsFallback = Boolean(video.thumbnailUrl && video.thumbnailUrl !== fallbackThumbnailUrl); %>
         <article class="video-card od-card grid overflow-hidden transition hover:-translate-y-0.5 hover:border-draft-gold hover:shadow-editorial lg:grid-cols-[24rem_minmax(0,1fr)]">
-          <a class="group block overflow-hidden bg-draft-ink" href="<%= video.youtubeUrl %>" target="_blank" rel="noopener noreferrer">
+          <a class="group relative block overflow-hidden bg-draft-ink" href="<%= video.youtubeUrl %>" target="_blank" rel="noopener noreferrer">
             <img
               class="video-thumb h-full min-h-36 sm:min-h-56"
               src="<%= thumbnailUrl %>"
@@ -366,6 +366,7 @@
                 onerror="if (this.dataset.fallbackApplied === 'true') return; this.dataset.fallbackApplied = 'true'; this.src = this.dataset.fallbackSrc;"
               <% } %>
             />
+            <%- include("partials/videoPlayOverlay") %>
           </a>
           <div class="video-card-copy grid content-between gap-3 p-3.5 sm:gap-5 sm:p-6">
             <div class="video-card-meta grid gap-2">

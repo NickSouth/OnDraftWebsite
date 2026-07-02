@@ -42,6 +42,7 @@ const BANNED_PHRASE_PATTERNS = [...new Set(BANNED_PHRASES.map((phrase) => phrase
       .replace(/\s+/g, "\\s+");
     return new RegExp(`(^|[^a-z0-9])${escapedPhrase}([^a-z0-9]|$)`, "i");
   });
+const READ_TIME_WORDS_PER_MINUTE = 200;
 
 export function parseYoutubeVideoId(youtubeUrl: string): Result<string, ArticleError> {
   let parsed: URL;
@@ -243,6 +244,7 @@ export interface IOnDraftService {
   countDistinctBigBoardPlayers(): Promise<Result<number, BigBoardError>>;
   countPublishedArticles(): Promise<Result<number, ArticleError>>;
   countForumPosts(): Promise<Result<number, ForumPostError>>;
+  articleReadMinutes(article: Pick<Article, "content">): number | null;
 }
 
 class OnDraftService implements IOnDraftService {
@@ -1701,6 +1703,28 @@ class OnDraftService implements IOnDraftService {
 
   async countForumPosts(): Promise<Result<number, ForumPostError>> {
     return await this.repository.countForumPosts();
+  }
+
+  articleReadMinutes(article: Pick<Article, "content">): number | null {
+    const text = this.articleBodyText(article.content);
+    if (text === null) {
+      return null;
+    }
+    const words = this.wordCount(text);
+    if (words === 0) {
+      return null;
+    }
+    return Math.max(1, Math.ceil(words / READ_TIME_WORDS_PER_MINUTE));
+  }
+
+  private articleBodyText(content: ArticleContent): string | null {
+    if (content.type === "plainText") {
+      return content.text;
+    }
+    if (content.type === "html") {
+      return content.body.replace(/<[^>]*>/g, " ");
+    }
+    return null;
   }
 }
 
