@@ -1658,3 +1658,81 @@ describe("OnDraftService YouTube videos", () => {
     }
   });
 });
+
+describe("hero stat counts", () => {
+  const currentYear = new Date().getFullYear();
+
+  it("starts every count at zero on an empty service", async () => {
+    const ondraftService = service();
+
+    const players = await ondraftService.countDistinctBigBoardPlayers();
+    const articles = await ondraftService.countPublishedArticles();
+    const posts = await ondraftService.countForumPosts();
+
+    expect(players.ok && players.value).toBe(0);
+    expect(articles.ok && articles.value).toBe(0);
+    expect(posts.ok && posts.value).toBe(0);
+  });
+
+  it("dedupes the same player name across creators through the service boundary", async () => {
+    const ondraftService = service();
+
+    const ryanEntry = await ondraftService.createBigBoardEntry({
+      year: currentYear,
+      creator: "Ryan",
+      playerName: "Count Me",
+      school: "State",
+      position: "QB",
+      rank: 1,
+      posRank: 1,
+      height: { feet: 6, inches: 2 },
+      weight: 220,
+    });
+    const aleksEntry = await ondraftService.createBigBoardEntry({
+      year: currentYear,
+      creator: "Aleks",
+      playerName: "Count Me",
+      school: "State",
+      position: "QB",
+      rank: 1,
+      posRank: 1,
+      height: { feet: 6, inches: 2 },
+      weight: 220,
+    });
+    expect(ryanEntry.ok).toBe(true);
+    expect(aleksEntry.ok).toBe(true);
+
+    const players = await ondraftService.countDistinctBigBoardPlayers();
+
+    expect(players.ok && players.value).toBe(1);
+  });
+
+  it("counts a published article through the service boundary", async () => {
+    const ondraftService = service();
+
+    const created = await ondraftService.createArticle({
+      title: "Hero Count Article",
+      author: "Ryan McWalter",
+      writeup: "A short summary used to verify the hero count.",
+      published: true,
+      publicationDate: new Date("2026-01-01"),
+      content: { type: "plainText", text: "Body text for the hero count article." },
+    });
+    expect(created.ok).toBe(true);
+
+    const articles = await ondraftService.countPublishedArticles();
+
+    expect(articles.ok && articles.value).toBe(1);
+  });
+
+  it("counts a forum post through the service boundary", async () => {
+    const ondraftService = service();
+
+    const created = await ondraftService.createForumPost({ content: "take", userId: "u1", userName: "Fan" });
+    expect(created.ok).toBe(true);
+
+    const posts = await ondraftService.countForumPosts();
+
+    expect(posts.ok && posts.value).toBe(1);
+  });
+});

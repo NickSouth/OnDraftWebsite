@@ -1195,10 +1195,31 @@ class OnDraftController implements IOnDraftController {
     const latestItems = this.homeFeedItems(articles, videos).slice(0, 5);
     const popularArticles = await this.popularArticles("all");
 
+    const [playersScoutedResult, articlesWrittenResult, hotTakesPostedResult] = await Promise.all([
+      this.service.countDistinctBigBoardPlayers(),
+      this.service.countPublishedArticles(),
+      this.service.countForumPosts(),
+    ]);
+    if (playersScoutedResult.ok === false) {
+      this.logger.warn(`Unable to load players scouted count: ${playersScoutedResult.value.message}`);
+    }
+    if (articlesWrittenResult.ok === false) {
+      this.logger.warn(`Unable to load article count: ${articlesWrittenResult.value.message}`);
+    }
+    if (hotTakesPostedResult.ok === false) {
+      this.logger.warn(`Unable to load hot takes count: ${hotTakesPostedResult.value.message}`);
+    }
+    const heroStats = {
+      playersScouted: playersScoutedResult.ok === true ? playersScoutedResult.value : 0,
+      articlesWritten: articlesWrittenResult.ok === true ? articlesWrittenResult.value : 0,
+      hotTakesPosted: hotTakesPostedResult.ok === true ? hotTakesPostedResult.value : 0,
+    };
+
     res.render("ondraft/index", {
       session,
       isAdmin: isAdminSession(session),
       latestItems,
+      heroStats,
       popularArticles,
       popularRange: "all",
       metaTitle: "OnDraft Football | NFL Draft Analysis, Articles, Videos, and Draft Boards",

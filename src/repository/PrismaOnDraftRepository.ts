@@ -1177,6 +1177,19 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
     });
     return Ok(newsletters.map((newsletter) => this.mapNewsletter(newsletter)));
   }
+
+  async countDistinctBigBoardPlayers(): Promise<Result<number, BigBoardError>> {
+    const groups = await this.prisma.bigBoardEntry.groupBy({ by: ["playerName"] });
+    return Ok(groups.length);
+  }
+
+  async countPublishedArticles(): Promise<Result<number, ArticleError>> {
+    return Ok(await this.prisma.article.count({ where: { published: true } }));
+  }
+
+  async countForumPosts(): Promise<Result<number, ForumPostError>> {
+    return Ok(await this.prisma.forumPost.count());
+  }
 }
 
 export function CreatePrismaOnDraftRepository(prisma?: OnDraftPrismaClient): IOnDraftRepository {
