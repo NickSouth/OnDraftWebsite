@@ -1260,6 +1260,20 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
       .sort((first, second) => second.updatedAt.getTime() - first.updatedAt.getTime())
       .map((newsletter) => this.cloneNewsletter(newsletter)));
   }
+
+  async countDistinctBigBoardPlayers(): Promise<Result<number, BigBoardError>> {
+    const names = new Set<string>();
+    this.bigBoards.forEach((board) => board.entries.forEach((entry) => names.add(entry.playerName)));
+    return Ok(names.size);
+  }
+
+  async countPublishedArticles(): Promise<Result<number, ArticleError>> {
+    return Ok(this.articles.filter((article) => article.published).length);
+  }
+
+  async countForumPosts(): Promise<Result<number, ForumPostError>> {
+    return Ok(this.forumPosts.length);
+  }
 }
 
 export function CreateInMemoryOnDraftRepository(options?: InMemoryRepositoryOptions): IOnDraftRepository {

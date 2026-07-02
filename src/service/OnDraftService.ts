@@ -240,6 +240,9 @@ export interface IOnDraftService {
   refreshYoutubeVideoCatalog(options?: YoutubeCatalogRefreshOptions): Promise<Result<number, ArticleError>>;
   deleteYoutubeVideo(videoId: string): Promise<Result<void, ArticleError>>;
   getTags(): Promise<Result<string[], ArticleError>>;
+  countDistinctBigBoardPlayers(): Promise<Result<number, BigBoardError>>;
+  countPublishedArticles(): Promise<Result<number, ArticleError>>;
+  countForumPosts(): Promise<Result<number, ForumPostError>>;
 }
 
 class OnDraftService implements IOnDraftService {
@@ -1686,6 +1689,18 @@ class OnDraftService implements IOnDraftService {
 
   async getTags(): Promise<Result<string[], ArticleError>> {
     return await this.repository.getTags();
+  }
+
+  async countDistinctBigBoardPlayers(): Promise<Result<number, BigBoardError>> {
+    return await this.repository.countDistinctBigBoardPlayers();
+  }
+
+  async countPublishedArticles(): Promise<Result<number, ArticleError>> {
+    return await this.repository.countPublishedArticles();
+  }
+
+  async countForumPosts(): Promise<Result<number, ForumPostError>> {
+    return await this.repository.countForumPosts();
   }
 }
 

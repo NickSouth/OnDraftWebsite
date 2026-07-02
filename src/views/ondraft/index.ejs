@@ -3,10 +3,11 @@
 
 <section class="grid gap-5 sm:gap-8">
   <div class="relative overflow-hidden rounded-lg border border-slate-200 bg-white shadow-editorial dark:border-white/10 dark:bg-draft-slate">
-    <div class="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(217,152,34,0.22),transparent_34%),linear-gradient(135deg,rgba(7,17,31,0.02),rgba(7,17,31,0.1))] dark:bg-[radial-gradient(circle_at_20%_0%,rgba(217,152,34,0.2),transparent_32%),linear-gradient(135deg,rgba(255,255,255,0.06),rgba(7,17,31,0.1))]" aria-hidden="true"></div>
+    <div class="od-hero-flow" aria-hidden="true"></div>
+    <div class="od-hero-facets" aria-hidden="true"></div>
     <div class="relative grid items-center gap-5 p-4 sm:p-5 md:gap-8 md:p-8 xl:grid-cols-[0.9fr_1.1fr]">
       <div class="relative flex min-h-0 flex-col justify-between gap-5 md:min-h-[360px] md:gap-8">
-        <div class="max-w-none">
+        <div class="max-w-none" data-od-reveal>
           <p class="mb-2 text-[0.68rem] font-black uppercase tracking-[0.12em] text-draft-amber dark:text-draft-gold sm:text-xs sm:tracking-[0.16em] md:mb-3">Fresh from the tap</p>
           <div class="relative md:pr-44 xl:pr-52">
             <img class="pointer-events-none absolute right-0 -top-7 hidden h-32 w-44 object-contain drop-shadow-sm md:block xl:h-36 xl:w-52" src="/images/brand/OnDraftLogo-cropped.png" alt="" aria-hidden="true" />
@@ -19,70 +20,85 @@
             A collection of NFL and NFL Draft analysis, opinions, and predictions from a small team of college students. Enjoy articles, videos, and our draft board. Feel free to post your own takes in The Taproom, our community forum.
           </p>
 
-          <a class="od-primary-link mt-3 md:mt-4" href="/about">Learn More</a>
+          <div class="mt-4 flex flex-wrap items-center gap-2.5 md:mt-5" data-od-reveal style="--od-reveal-delay: 90ms">
+            <a class="od-primary-link" href="/articles">Read the latest articles</a>
+            <a class="od-secondary-link" href="/about">About OnDraft</a>
+          </div>
 
         </div>
 
-        <div class="grid gap-2 border-l-2 border-draft-gold pl-3 text-xs font-semibold text-slate-600 dark:text-slate-300 sm:border-l-4 sm:pl-4 sm:text-sm">
-          <p class="m-0">Like our work? Follow our other socials below, or consider supporting us with a donation to our Venmo linked below as well.</p>
-          <div class="grid gap-3 pt-2" aria-label="OnDraft social media links">
-            <a
-              class="od-focus-ring group flex min-h-9 w-fit items-center gap-2 rounded-md px-0 py-0 text-xs font-black text-slate-700 transition hover:text-draft-amber dark:text-slate-200 dark:hover:text-draft-gold sm:min-h-11 sm:gap-3 sm:text-sm"
-              href="https://www.youtube.com/channel/UCX7Py3t2L1pUYF6JxzzP4fA"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="OnDraft Football on YouTube"
-            >
-              <span class="grid size-9 shrink-0 place-items-center rounded-md bg-white p-1.5 shadow-sm ring-1 ring-slate-200 dark:ring-white/10 sm:size-11 sm:p-2">
-                <img class="h-5 w-8 object-contain sm:h-7 sm:w-10" src="/images/social/youtube-icon.svg" alt="YouTube" />
-              </span>
-              <span>/ @OnDraftFootball</span>
+        <div class="grid gap-2" data-od-reveal style="--od-reveal-delay: 150ms">
+          <p class="m-0 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Follow the pour &middot; support us on Venmo</p>
+          <div class="od-hero-social-row" aria-label="OnDraft social media links">
+            <a class="od-hero-social-link group" href="https://www.youtube.com/channel/UCX7Py3t2L1pUYF6JxzzP4fA" target="_blank" rel="noopener noreferrer" aria-label="OnDraft Football on YouTube" title="YouTube">
+              <img class="h-4 w-6 object-contain opacity-70 grayscale transition duration-200 group-hover:opacity-100 group-hover:grayscale-0 sm:h-5 sm:w-7" src="/images/social/youtube-icon.svg" alt="" />
             </a>
-
-            <a
-              class="od-focus-ring group flex min-h-9 w-fit items-center gap-2 rounded-md px-0 py-0 text-xs font-black text-slate-700 transition hover:text-draft-amber dark:text-slate-200 dark:hover:text-draft-gold sm:min-h-11 sm:gap-3 sm:text-sm"
-              href="https://x.com/OnDraftFootball"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="OnDraft Football on X"
-            >
-              <span class="grid size-9 shrink-0 place-items-center rounded-md bg-white p-1.5 shadow-sm ring-1 ring-slate-200 dark:ring-white/10 sm:size-11 sm:p-2">
-                <img class="size-6 object-contain sm:size-8" src="/images/social/x-icon.svg" alt="X" />
-              </span>
-              <span>/ @OnDraftFootball</span>
+            <a class="od-hero-social-link group" href="https://x.com/OnDraftFootball" target="_blank" rel="noopener noreferrer" aria-label="OnDraft Football on X" title="X">
+              <img class="size-4 object-contain opacity-70 grayscale transition duration-200 group-hover:opacity-100 group-hover:grayscale-0 sm:size-5" src="/images/social/x-icon.svg" alt="" />
             </a>
-
-            <a
-              class="od-focus-ring group flex min-h-9 w-fit items-center gap-2 rounded-md px-0 py-0 text-xs font-black text-slate-700 transition hover:text-draft-amber dark:text-slate-200 dark:hover:text-draft-gold sm:min-h-11 sm:gap-3 sm:text-sm"
-              href="https://www.tiktok.com/@ondraftfootball"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="OnDraft Football on TikTok"
-            >
-              <span class="grid size-9 shrink-0 place-items-center rounded-md bg-white p-1.5 shadow-sm ring-1 ring-slate-200 dark:ring-white/10 sm:size-11 sm:p-2">
-                <img class="size-6 object-contain sm:size-8" src="/images/social/tiktok-icon.svg" alt="TikTok" />
-              </span>
-              <span>/ @ondraftfootball</span>
+            <a class="od-hero-social-link group" href="https://www.tiktok.com/@ondraftfootball" target="_blank" rel="noopener noreferrer" aria-label="OnDraft Football on TikTok" title="TikTok">
+              <img class="size-4 object-contain opacity-70 grayscale transition duration-200 group-hover:opacity-100 group-hover:grayscale-0 sm:size-5" src="/images/social/tiktok-icon.svg" alt="" />
             </a>
-
-            <a
-              class="od-focus-ring group flex min-h-9 w-fit items-center gap-2 rounded-md px-0 py-0 text-xs font-black text-slate-700 transition hover:text-draft-amber dark:text-slate-200 dark:hover:text-draft-gold sm:min-h-11 sm:gap-3 sm:text-sm"
-              href="https://www.venmo.com/u/OnDraft-Football"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Support OnDraft Football on Venmo"
-            >
-              <span class="grid h-9 w-20 shrink-0 place-items-center rounded-md bg-white px-2 py-1 shadow-sm ring-1 ring-slate-200 transition group-hover:ring-draft-gold dark:ring-white/10 sm:h-11 sm:w-24 sm:py-1.5">
-                <img class="h-5 w-full object-contain sm:h-7" src="/images/social/venmo-logo-blue.png" alt="Venmo" />
-              </span>
-              <span>/ @OnDraft-Football</span>
+            <a class="od-hero-social-link group w-16 px-2 sm:w-20" href="https://www.venmo.com/u/OnDraft-Football" target="_blank" rel="noopener noreferrer" aria-label="Support OnDraft Football on Venmo" title="Support us on Venmo">
+              <img class="h-3.5 w-full object-contain opacity-70 grayscale transition duration-200 group-hover:opacity-100 group-hover:grayscale-0 sm:h-4" src="/images/social/venmo-logo-blue.png" alt="" />
             </a>
           </div>
         </div>
       </div>
 
+      <div class="grid content-start gap-3 sm:gap-4">
+      <div
+        class="grid grid-cols-3 gap-2 sm:gap-3"
+        data-od-reveal
+        aria-label="OnDraft by the numbers"
+        x-data="{
+          started: false,
+          start() {
+            if (this.started) return;
+            this.started = true;
+            const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            this.$root.querySelectorAll('[data-count-to]').forEach((el) => {
+              const target = Number(el.dataset.countTo) || 0;
+              if (reduce || target === 0) { el.textContent = target.toLocaleString(); return; }
+              const duration = 1400;
+              const startedAt = performance.now();
+              const tick = (now) => {
+                const t = Math.min(1, (now - startedAt) / duration);
+                const eased = 1 - Math.pow(1 - t, 3);
+                el.textContent = Math.round(target * eased).toLocaleString();
+                if (t < 1) window.requestAnimationFrame(tick);
+              };
+              window.requestAnimationFrame(tick);
+            });
+          },
+          init() {
+            if (!('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { this.start(); return; }
+            this.$root.querySelectorAll('[data-count-to]').forEach((el) => { el.textContent = '0'; });
+            const observer = new IntersectionObserver((entries) => {
+              entries.forEach((entry) => { if (entry.isIntersecting) { observer.disconnect(); this.start(); } });
+            }, { threshold: 0.35 });
+            observer.observe(this.$root);
+          }
+        }"
+      >
+        <div class="od-hero-stat">
+          <span class="od-hero-stat-number" data-count-to="<%= heroStats.playersScouted %>"><%= heroStats.playersScouted.toLocaleString() %></span>
+          <span class="od-hero-stat-label">Players Scouted</span>
+        </div>
+        <div class="od-hero-stat">
+          <span class="od-hero-stat-number" data-count-to="<%= heroStats.articlesWritten %>"><%= heroStats.articlesWritten.toLocaleString() %></span>
+          <span class="od-hero-stat-label">Articles Written</span>
+        </div>
+        <div class="od-hero-stat">
+          <span class="od-hero-stat-number" data-count-to="<%= heroStats.hotTakesPosted %>"><%= heroStats.hotTakesPosted.toLocaleString() %></span>
+          <span class="od-hero-stat-label">Hot Takes Posted</span>
+        </div>
+      </div>
+
       <div
         class="od-card overflow-hidden shadow-editorial"
+        data-od-reveal
+        style="--od-reveal-delay: 120ms"
         x-data="{
           active: 0,
           previous: 0,
@@ -211,7 +227,7 @@
                     <% } %>
                   />
                 <% } else { %>
-                  <div class="absolute inset-0 bg-[linear-gradient(135deg,#07111f,#263247_54%,#a75f12)]" aria-hidden="true"></div>
+                  <div class="od-slide-flow" aria-hidden="true"></div>
                 <% } %>
                 <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent" aria-hidden="true"></div>
                 <div class="group relative p-4 sm:p-5 md:p-8">
@@ -270,12 +286,13 @@
           </div>
         <% } %>
       </div>
+      </div>
     </div>
   </div>
 
-  <section class="relative isolate overflow-hidden rounded-lg border border-draft-gold/30 bg-draft-ink px-4 py-5 shadow-editorial dark:border-draft-gold/40 sm:px-7 sm:py-7 md:px-8">
-    <div class="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_10%_0%,rgba(217,152,34,0.32),transparent_30%),linear-gradient(135deg,rgba(11,18,32,0.98),rgba(18,28,43,0.94)_58%,rgba(167,95,18,0.26))]" aria-hidden="true"></div>
-    <div class="absolute inset-y-0 right-0 -z-10 hidden w-1/2 bg-draft-gold/10 [clip-path:polygon(9rem_0,100%_0,100%_100%,0_100%)] lg:block" aria-hidden="true"></div>
+  <section class="relative isolate overflow-hidden rounded-lg border border-draft-gold/30 bg-draft-ink px-4 py-5 shadow-editorial dark:border-draft-gold/40 sm:px-7 sm:py-7 md:px-8" data-od-reveal>
+    <div class="od-pulse-flow" aria-hidden="true"></div>
+    <div class="od-pulse-facets hidden lg:block" aria-hidden="true"></div>
     <div class="grid gap-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
       <div class="max-w-3xl">
         <p class="mb-2 text-[0.68rem] font-black uppercase tracking-[0.14em] text-draft-gold sm:mb-3 sm:text-xs sm:tracking-[0.18em]">Big board pulse</p>
@@ -288,7 +305,7 @@
     </div>
   </section>
 
-  <section class="grid gap-4">
+  <section class="grid gap-4" data-od-reveal>
     <%- include("partials/popularArticles", { popularArticles, popularRange }) %>
   </section>
 </section>

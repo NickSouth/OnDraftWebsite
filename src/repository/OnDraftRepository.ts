@@ -104,4 +104,7 @@ export interface IOnDraftRepository {
     updateNewsletter(newsletter: Newsletter): Promise<Result<Newsletter, NewsletterError>>;
     getNewsletter(id: string): Promise<Result<Newsletter, NewsletterError>>;
     listNewsletters(): Promise<Result<Newsletter[], NewsletterError>>;
+    countDistinctBigBoardPlayers(): Promise<Result<number, BigBoardError>>;
+    countPublishedArticles(): Promise<Result<number, ArticleError>>;
+    countForumPosts(): Promise<Result<number, ForumPostError>>;
 }

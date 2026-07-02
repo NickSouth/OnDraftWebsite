@@ -3151,4 +3151,27 @@ describe("OnDraft HTTP contracts", () => {
     expect(create.status).toBe(400);
     expect(create.text).toContain("PDF uploads must be 5 MB or smaller");
   });
+
+  it("renders the hero with stat badges, articles-first CTA, and slimmed socials", async () => {
+    const response = await request(app()).get("/");
+
+    expect(response.status).toBe(200);
+
+    expect(response.text).toContain("Players Scouted");
+    expect(response.text).toContain("Articles Written");
+    expect(response.text).toContain("Hot Takes Posted");
+    expect(response.text).toContain('data-count-to="');
+
+    expect(response.text).toContain('class="od-primary-link" href="/articles"');
+    expect(response.text).toContain('class="od-secondary-link" href="/about"');
+    expect(response.text).not.toContain(">Learn More<");
+
+    expect(response.text).toContain("od-hero-social-row");
+    expect(response.text).toContain('aria-label="OnDraft Football on YouTube"');
+    expect(response.text).toContain('aria-label="Support OnDraft Football on Venmo"');
+
+    expect(response.text).toContain("od-hero-flow");
+    expect(response.text).toContain("od-pulse-flow");
+    expect(response.text).toContain("data-od-reveal");
+  });
 });

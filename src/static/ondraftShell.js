@@ -111,6 +111,38 @@
     stages.forEach((stage) => window.requestAnimationFrame(() => stage.classList.add("is-ready")));
   };
 
+  const revealObserver = "IntersectionObserver" in window && !reducedMotion()
+    ? new window.IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) {
+          return;
+        }
+        revealObserver.unobserve(entry.target);
+        entry.target.classList.add("is-revealed");
+      });
+    }, { threshold: 0.15, rootMargin: "0px 0px -8% 0px" })
+    : null;
+
+  const observeReveals = (root = document) => {
+    if (!(root instanceof Document || root instanceof Element || root instanceof DocumentFragment)) {
+      return;
+    }
+    const elements = root.matches?.("[data-od-reveal]")
+      ? [root]
+      : [...root.querySelectorAll?.("[data-od-reveal]") ?? []];
+    elements.forEach((element) => {
+      if (element.dataset.odRevealObserved === "true") {
+        return;
+      }
+      element.dataset.odRevealObserved = "true";
+      if (!revealObserver) {
+        element.classList.add("is-revealed");
+        return;
+      }
+      revealObserver.observe(element);
+    });
+  };
+
   const isLocalNavigation = (link, event) => {
     if (!link || event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
       return false;
@@ -141,7 +173,7 @@
     if (pathname === "/bigboard/edit") return "bigboard-edit";
     if (pathname === "/hottakes") return "hottakes";
     if (pathname === "/bookmarks") return "bookmarks";
-    if (pathname === "/about" || pathname === "/login" || pathname === "/register" || pathname === "/reset-password") {
+    if (pathname === "/about" || pathname === "/login" || pathname === "/register" || pathname === "/reset-password" || pathname === "/search") {
       return "fallback";
     }
     return null;
@@ -309,6 +341,7 @@
     enhanceAnimatedDetails(event.detail?.target || document);
     animateSwapSurfaces(event.detail?.target || document);
     activatePageStage(event.detail?.target || document);
+    observeReveals(event.detail?.target || document);
   });
   document.addEventListener("htmx:responseError", hideLoader);
   document.addEventListener("htmx:sendError", hideLoader);
@@ -318,12 +351,14 @@
     enhanceAnimatedDetails();
     animateSwapSurfaces();
     activatePageStage();
+    observeReveals();
   });
   window.addEventListener("beforeunload", hideLoader);
   window.addEventListener("pagehide", hideLoader);
   window.addEventListener("pageshow", () => {
     hideLoader();
     activatePageStage();
+    observeReveals();
   });
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) {
@@ -338,6 +373,7 @@
         enhanceAnimatedDetails(node);
         animateSwapSurfaces(node);
         activatePageStage(node);
+        observeReveals(node);
       });
     });
   }).observe(document.documentElement, { childList: true, subtree: true });
@@ -345,4 +381,5 @@
   enhanceAnimatedDetails();
   animateSwapSurfaces();
   activatePageStage();
+  observeReveals();
 })();
