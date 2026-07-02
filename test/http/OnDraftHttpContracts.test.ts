@@ -3151,4 +3151,85 @@ describe("OnDraft HTTP contracts", () => {
     expect(create.status).toBe(400);
     expect(create.text).toContain("PDF uploads must be 5 MB or smaller");
   });
+
+  it("renders grades under the rundown when a writeup is published", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+
+    const saveBoard = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": "grades-under-rundown-edge",
+        "entries[0][playerName]": "Grades Under Rundown Edge",
+        "entries[0][school]": "Alabama",
+        "entries[0][position]": "EDGE",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-4",
+        "entries[0][weight]": "255",
+        "entries[0][rundown]": "Layout ordering rundown.",
+        "entries[0][strengths]": "Layout ordering strengths.",
+        "entries[0][weaknesses]": "Layout ordering weaknesses.",
+        "entries[0][playerInfoPublished]": "true",
+        "entries[0][writeupPublished]": "true",
+        "entries[0][gradePublished]": "true",
+        ...edgeGradePayload("entries[0]", "6", "6"),
+      });
+    expect(saveBoard.status).toBe(200);
+
+    const publicBoard = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
+    expect(publicBoard.status).toBe(200);
+    const t = publicBoard.text;
+    expect(t).toContain("Layout ordering rundown.");
+    const rundownIndex = t.indexOf(">Rundown</h3>");
+    const gradesIndex = t.indexOf(">Grades</h3>");
+    const strengthsIndex = t.indexOf(">Strengths</h3>");
+    expect(rundownIndex).toBeGreaterThan(-1);
+    expect(gradesIndex).toBeGreaterThan(-1);
+    expect(strengthsIndex).toBeGreaterThan(-1);
+    // With a published writeup, grades now render directly under the rundown, before strengths.
+    expect(rundownIndex).toBeLessThan(gradesIndex);
+    expect(gradesIndex).toBeLessThan(strengthsIndex);
+    // Trait tiles (tooltip + abbreviation) still work.
+    expect(t).toContain('title="Pass Rush Plan"');
+    expect(t).toContain(">PRP<");
+  });
+
+  it("keeps the grades-only layout unchanged when no writeup is published", async () => {
+    const ondraft = app();
+    const agent = await loginAdminAgent(ondraft);
+
+    const saveBoard = await agent
+      .post("/bigboard/edit")
+      .type("form")
+      .send({
+        year: "2026",
+        creator: "Ryan",
+        "entries[0][id]": "grades-only-layout-edge",
+        "entries[0][playerName]": "Grades Only Layout Edge",
+        "entries[0][school]": "Alabama",
+        "entries[0][position]": "EDGE",
+        "entries[0][rank]": "1",
+        "entries[0][posRank]": "1",
+        "entries[0][heightLabel]": "6-4",
+        "entries[0][weight]": "255",
+        "entries[0][playerInfoPublished]": "true",
+        "entries[0][writeupPublished]": "false",
+        "entries[0][gradePublished]": "true",
+        ...edgeGradePayload("entries[0]", "6", "6"),
+      });
+    expect(saveBoard.status).toBe(200);
+
+    const publicBoard = await request(ondraft).get("/bigboard?year=2026&creator=Ryan");
+    expect(publicBoard.status).toBe(200);
+    const t = publicBoard.text;
+    expect(t).toContain("Grades Only Layout Edge");
+    expect(t).toContain(">Grades</h3>");
+    expect(t).not.toContain(">Rundown</h3>");
+    // The no-writeup grades column keeps its original right-column placement.
+    expect(t).toContain("lg:col-start-2");
+  });
 });
