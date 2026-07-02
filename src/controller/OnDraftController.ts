@@ -5,7 +5,7 @@ import type { AdminUserListItem, IAuthService } from "../auth/AuthService";
 import type { BigBoardEditableEntryInput, ConsensusDiscrepancyWriteupInput, CreateArticleInput, CreateYoutubeVideoInput, IOnDraftService, NewsletterInput, SaveBigBoardEntriesInput, SiteSearchResults } from "../service/OnDraftService";
 import type { IUserPreferenceService, UserPreferenceError } from "../service/UserPreferenceService";
 import type { ILoggingService } from "../service/LoggingService";
-import type { AnalyticsCategory, AnalyticsPeriod, IAnalyticsService } from "../service/UmamiAnalyticsService";
+import type { AnalyticsCategory, AnalyticsPeriod, IAnalyticsService } from "../service/AnalyticsService";
 import { ArticleError, BigBoardError, ForumPostError } from "../repository/OnDraftRepository";
 import { publicArticleUploadUrl } from "../uploads/articlePdfUpload";
 import { BIG_BOARD_CREATORS, POSITIONS, type Article, type ArticleContent, type ArticleFilter, type BigBoard, type BigBoardCreator, type BigBoardEntry, type ForumPost, type ForumPostFilter, type Video, type VideoQuery } from "../model/OnDraftContent";
