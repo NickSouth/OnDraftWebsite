@@ -1190,6 +1190,16 @@ class PrismaOnDraftRepository implements IOnDraftRepository {
   async countForumPosts(): Promise<Result<number, ForumPostError>> {
     return Ok(await this.prisma.forumPost.count());
   }
+
+  async getAppSetting(key: string): Promise<Result<string | null, BigBoardError>> {
+    const setting = await this.prisma.appSetting.findUnique({ where: { key } });
+    return Ok(setting?.value ?? null);
+  }
+
+  async setAppSetting(key: string, value: string): Promise<Result<void, BigBoardError>> {
+    await this.prisma.appSetting.upsert({ where: { key }, update: { value }, create: { key, value } });
+    return Ok(undefined);
+  }
 }
 
 export function CreatePrismaOnDraftRepository(prisma?: OnDraftPrismaClient): IOnDraftRepository {

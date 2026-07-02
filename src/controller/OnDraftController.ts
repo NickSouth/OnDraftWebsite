@@ -142,6 +142,7 @@ export interface IOnDraftController {
   deleteArticle(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   deleteBigBoardEntry(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   getSavedSchools(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  setDefaultBigBoardYear(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
 }
 
 export type AdminDashboardTab = "users" | "content" | "newsletter" | "analytics";
@@ -1558,7 +1559,8 @@ class OnDraftController implements IOnDraftController {
 
   async showBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
     this.logger.info("Rendering big board page");
-    const selectedYear = this.parseBigBoardYear(req.query.year);
+    const parsedYear = this.parseBigBoardYear(req.query.year);
+    const selectedYear = parsedYear ?? await this.service.resolveDefaultBigBoardYear();
     const selectedCreator = this.parseBigBoardCreator(req.query.creator);
     const filter = this.buildBigBoardFilter(req);
     const result = await this.service.getBigBoard(selectedYear, selectedCreator, filter);
@@ -1655,6 +1657,8 @@ class OnDraftController implements IOnDraftController {
       return firstRank - secondRank || a.playerName.localeCompare(b.playerName);
     });
 
+    const defaultBigBoardYear = await this.service.resolveDefaultBigBoardYear();
+
     res.status(statusCode).render("ondraft/editBigBoard", {
       session,
       isAdmin: isAdminSession(session),
@@ -1675,6 +1679,7 @@ class OnDraftController implements IOnDraftController {
       errorMessage,
       statusMessage,
       validationIssues,
+      defaultBigBoardYear,
       currentPath: "/bigboard/edit",
       forceOverlaySidebar: true,
       layout: fragment ? false : undefined,
@@ -3073,6 +3078,37 @@ class OnDraftController implements IOnDraftController {
 
   private withReadMinutes(articles: Article[]): Array<Article & { readMinutes: number | null }> {
     return articles.map((article) => ({ ...article, readMinutes: this.service.articleReadMinutes(article) }));
+  }
+
+  async setDefaultBigBoardYear(req: Request, res: Response, _session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Setting default big board year");
+    const year = this.parseBigBoardYear(req.body.year);
+    const creator = this.parseBigBoardCreator(req.body.creator) ?? "Ryan";
+    const result = await this.service.setDefaultBigBoardYear(year);
+    if (result.ok === false) {
+      if (req.get("HX-Request") === "true") {
+        const defaultBigBoardYear = await this.service.resolveDefaultBigBoardYear();
+        res.status(this.mapBigBoardErrorToStatusCode(result.value)).render("ondraft/partials/bigBoardDefaultYearControl", {
+          layout: false,
+          board: { year: year ?? defaultBigBoardYear, creator },
+          defaultBigBoardYear,
+          errorMessage: result.value.message,
+        });
+        return;
+      }
+      res.status(this.mapBigBoardErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+    if (req.get("HX-Request") === "true") {
+      res.render("ondraft/partials/bigBoardDefaultYearControl", {
+        layout: false,
+        board: { year: result.value, creator },
+        defaultBigBoardYear: result.value,
+        errorMessage: null,
+      });
+      return;
+    }
+    res.redirect(`/bigboard/edit?year=${result.value}&creator=${encodeURIComponent(creator)}`);
   }
 }
 

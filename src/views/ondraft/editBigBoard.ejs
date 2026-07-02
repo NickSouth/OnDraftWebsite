@@ -89,6 +89,7 @@
               <% }) %>
             </div>
           </form>
+          <%- include("partials/bigBoardDefaultYearControl", { board, defaultBigBoardYear, errorMessage: null }) %>
         </div>
         <form class="create-board-year-form" method="post" action="/bigboard/years">
           <span>Create draft class</span>
@@ -234,6 +235,7 @@
     let pendingDeleteForm = null;
     let nativeSubmissionInProgress = false;
     let boardStructureDirty = document.querySelector("[data-big-board-editor-fragment]")?.dataset.boardStructureDirty === "true";
+    let sortableInstance = null;
 
     function entryId() {
       if (window.crypto && window.crypto.randomUUID) {
@@ -597,6 +599,68 @@
       form.requestSubmit();
     }
 
+    function cardHasRankableContent(form) {
+      return ["playerName", "school", "position", "heightLabel", "weight"].some((fieldName) => fieldValue(form, fieldName) !== "")
+        || hasAnyWriteupContent(form)
+        || hasAnyGradeContent(form)
+        || fieldValue(form, "rank") !== "";
+    }
+
+    function reindexBoardOrder() {
+      const forms = Array.from(document.querySelectorAll("#board-editor-cards [data-board-entry-form]"));
+      forms.forEach((form) => initializeForm(form));
+      let overallRank = 0;
+      const positionCounters = new Map();
+      forms.forEach((form) => {
+        if (!cardHasRankableContent(form)) {
+          return;
+        }
+        overallRank += 1;
+        setFieldValue(form, "rank", String(overallRank));
+        const position = fieldValue(form, "position");
+        if (position) {
+          const nextPosRank = (positionCounters.get(position) ?? 0) + 1;
+          positionCounters.set(position, nextPosRank);
+          setFieldValue(form, "posRank", String(nextPosRank));
+        }
+        updateFormState(form);
+      });
+    }
+
+    function initializeDragAndDrop() {
+      if (!list || typeof window.Sortable === "undefined" || editorAbortController.signal.aborted) {
+        return;
+      }
+      sortableInstance?.destroy();
+      sortableInstance = new window.Sortable(list, {
+        handle: "[data-drag-handle]",
+        draggable: "[data-board-entry-item]",
+        animation: 150,
+        delay: 100,
+        delayOnTouchOnly: true,
+        onEnd: (event) => {
+          if (event.oldIndex !== event.newIndex) {
+            reindexBoardOrder();
+          }
+        },
+      });
+    }
+
+    function ensureSortable(onReady) {
+      if (window.Sortable) {
+        onReady();
+        return;
+      }
+      let loader = document.querySelector("script[data-sortable-loader]");
+      if (!loader) {
+        loader = document.createElement("script");
+        loader.src = "/vendor/sortablejs/Sortable.min.js";
+        loader.dataset.sortableLoader = "true";
+        document.head.append(loader);
+      }
+      loader.addEventListener("load", onReady, { once: true });
+    }
+
     function updateFormState(form) {
       form.querySelectorAll("[data-editable-field]").forEach(syncEditableDisplay);
       form.querySelectorAll("[data-height-picker]").forEach(syncHeightPicker);
@@ -860,6 +924,11 @@
 
     lazyInitializeForms(document);
     updateEmptyState();
+    ensureSortable(initializeDragAndDrop);
+    editorAbortController.signal.addEventListener("abort", () => {
+      sortableInstance?.destroy();
+      sortableInstance = null;
+    });
 
     document.addEventListener("pointerdown", (event) => initializeClosestEntry(event.target), { capture: true, signal: editorAbortController.signal });
     document.addEventListener("focusin", (event) => initializeClosestEntry(event.target), { capture: true, signal: editorAbortController.signal });

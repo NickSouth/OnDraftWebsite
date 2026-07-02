@@ -88,6 +88,31 @@ async function loginAdminAgent(ondraft: ReturnType<typeof app>) {
   return agent;
 }
 
+// Seeds board entries one at a time via the single-card save route, which
+// (unlike the full-board POST /bigboard/edit) does not recompute rank/posRank,
+// so deliberately gapped ranks are stored exactly as submitted.
+async function seedBoardEntriesIndividually(agent: ReturnType<typeof request.agent>, payload: Record<string, string>) {
+  const base: Record<string, string> = {};
+  const entriesByIndex = new Map<string, Record<string, string>>();
+  for (const [key, value] of Object.entries(payload)) {
+    const match = key.match(/^entries\[(\d+)\]\[(.+)\]$/);
+    if (!match) {
+      base[key] = value;
+      continue;
+    }
+    const bucket = entriesByIndex.get(match[1]) ?? {};
+    bucket[`entries[0][${match[2]}]`] = value;
+    entriesByIndex.set(match[1], bucket);
+  }
+  for (const bucket of entriesByIndex.values()) {
+    const response = await agent
+      .post("/bigboard/edit/player")
+      .type("form")
+      .send({ ...base, ...bucket });
+    expect(response.status).toBe(200);
+  }
+}
+
 function edgeGradePayload(prefix: string, score = "6", potential = "6") {
   const physicalTraits = ["Speed", "Acceleration", "Agility", "Change of Direction", "Strength", "Size / Frame"];
   const filmTraits = ["Get Off", "Bend", "Power", "Finesse", "Pass Rush Plan", "Block Shed", "Pad Level", "Anchor", "Discipline & Diagnostics", "Tackling", "Pursuit", "Coverage"];
@@ -1947,89 +1972,81 @@ describe("OnDraft HTTP contracts", () => {
     const ondraft = app();
     const agent = await loginAdminAgent(ondraft);
 
-    const saveRyan = await agent
-      .post("/bigboard/edit")
-      .type("form")
-      .send({
-        year: "2026",
-        creator: "Ryan",
-        "entries[0][id]": "ryan-qb",
-        "entries[0][playerName]": "Quarterback Prospect",
-        "entries[0][school]": "Ryan State",
-        "entries[0][position]": "QB",
-        "entries[0][rank]": "1",
-        "entries[0][posRank]": "1",
-        "entries[0][heightLabel]": "6-2",
-        "entries[0][weight]": "220",
-        "entries[0][playerInfoPublished]": "true",
-        "entries[0][strengths]": "Copied Ryan strength should not appear.",
-        "entries[0][weaknesses]": "Copied Ryan weakness should not appear.",
-        "entries[0][rundown]": "Copied Ryan rundown should not appear.",
-        "entries[0][writeupPublished]": "true",
-        "entries[1][id]": "ryan-edge",
-        "entries[1][playerName]": "Edge Prospect",
-        "entries[1][school]": "OnDraft State",
-        "entries[1][position]": "EDGE",
-        "entries[1][rank]": "4",
-        "entries[1][posRank]": "1",
-        "entries[1][heightLabel]": "6-4",
-        "entries[1][weight]": "255",
-        "entries[1][playerInfoPublished]": "true",
-        "entries[2][id]": "ryan-tackle",
-        "entries[2][playerName]": "Tackle Prospect",
-        "entries[2][school]": "Published U",
-        "entries[2][position]": "OT",
-        "entries[2][rank]": "10",
-        "entries[2][posRank]": "2",
-        "entries[2][heightLabel]": "6-6",
-        "entries[2][weight]": "315",
-        "entries[2][playerInfoPublished]": "true",
-        "entries[3][id]": "ryan-one-board-edge",
-        "entries[3][playerName]": "One Board Edge",
-        "entries[3][school]": "Solo State",
-        "entries[3][position]": "EDGE",
-        "entries[3][rank]": "2",
-        "entries[3][posRank]": "5",
-        "entries[3][heightLabel]": "6-5",
-        "entries[3][weight]": "260",
-        "entries[3][playerInfoPublished]": "true",
-      });
-    expect(saveRyan.status).toBe(200);
+    await seedBoardEntriesIndividually(agent, {
+      year: "2026",
+      creator: "Ryan",
+      "entries[0][id]": "ryan-qb",
+      "entries[0][playerName]": "Quarterback Prospect",
+      "entries[0][school]": "Ryan State",
+      "entries[0][position]": "QB",
+      "entries[0][rank]": "1",
+      "entries[0][posRank]": "1",
+      "entries[0][heightLabel]": "6-2",
+      "entries[0][weight]": "220",
+      "entries[0][playerInfoPublished]": "true",
+      "entries[0][strengths]": "Copied Ryan strength should not appear.",
+      "entries[0][weaknesses]": "Copied Ryan weakness should not appear.",
+      "entries[0][rundown]": "Copied Ryan rundown should not appear.",
+      "entries[0][writeupPublished]": "true",
+      "entries[1][id]": "ryan-edge",
+      "entries[1][playerName]": "Edge Prospect",
+      "entries[1][school]": "OnDraft State",
+      "entries[1][position]": "EDGE",
+      "entries[1][rank]": "4",
+      "entries[1][posRank]": "1",
+      "entries[1][heightLabel]": "6-4",
+      "entries[1][weight]": "255",
+      "entries[1][playerInfoPublished]": "true",
+      "entries[2][id]": "ryan-tackle",
+      "entries[2][playerName]": "Tackle Prospect",
+      "entries[2][school]": "Published U",
+      "entries[2][position]": "OT",
+      "entries[2][rank]": "10",
+      "entries[2][posRank]": "2",
+      "entries[2][heightLabel]": "6-6",
+      "entries[2][weight]": "315",
+      "entries[2][playerInfoPublished]": "true",
+      "entries[3][id]": "ryan-one-board-edge",
+      "entries[3][playerName]": "One Board Edge",
+      "entries[3][school]": "Solo State",
+      "entries[3][position]": "EDGE",
+      "entries[3][rank]": "2",
+      "entries[3][posRank]": "5",
+      "entries[3][heightLabel]": "6-5",
+      "entries[3][weight]": "260",
+      "entries[3][playerInfoPublished]": "true",
+    });
 
-    const saveAleks = await agent
-      .post("/bigboard/edit")
-      .type("form")
-      .send({
-        year: "2026",
-        creator: "Aleks",
-        "entries[0][id]": "aleks-qb",
-        "entries[0][playerName]": "Quarterback Prospect",
-        "entries[0][school]": "Aleks Tech",
-        "entries[0][position]": "WR",
-        "entries[0][rank]": "13",
-        "entries[0][posRank]": "3",
-        "entries[0][heightLabel]": "5-11",
-        "entries[0][weight]": "185",
-        "entries[0][playerInfoPublished]": "true",
-        "entries[1][id]": "aleks-edge",
-        "entries[1][playerName]": "Edge Prospect",
-        "entries[1][school]": "OnDraft State",
-        "entries[1][position]": "EDGE",
-        "entries[1][rank]": "6",
-        "entries[1][posRank]": "2",
-        "entries[1][heightLabel]": "6-4",
-        "entries[1][weight]": "255",
-        "entries[1][playerInfoPublished]": "true",
-        "entries[2][id]": "aleks-tackle",
-        "entries[2][playerName]": "Tackle Prospect",
-        "entries[2][school]": "Private U",
-        "entries[2][position]": "IOL",
-        "entries[2][rank]": "30",
-        "entries[2][posRank]": "8",
-        "entries[2][heightLabel]": "6-3",
-        "entries[2][weight]": "295",
-      });
-    expect(saveAleks.status).toBe(200);
+    await seedBoardEntriesIndividually(agent, {
+      year: "2026",
+      creator: "Aleks",
+      "entries[0][id]": "aleks-qb",
+      "entries[0][playerName]": "Quarterback Prospect",
+      "entries[0][school]": "Aleks Tech",
+      "entries[0][position]": "WR",
+      "entries[0][rank]": "13",
+      "entries[0][posRank]": "3",
+      "entries[0][heightLabel]": "5-11",
+      "entries[0][weight]": "185",
+      "entries[0][playerInfoPublished]": "true",
+      "entries[1][id]": "aleks-edge",
+      "entries[1][playerName]": "Edge Prospect",
+      "entries[1][school]": "OnDraft State",
+      "entries[1][position]": "EDGE",
+      "entries[1][rank]": "6",
+      "entries[1][posRank]": "2",
+      "entries[1][heightLabel]": "6-4",
+      "entries[1][weight]": "255",
+      "entries[1][playerInfoPublished]": "true",
+      "entries[2][id]": "aleks-tackle",
+      "entries[2][playerName]": "Tackle Prospect",
+      "entries[2][school]": "Private U",
+      "entries[2][position]": "IOL",
+      "entries[2][rank]": "30",
+      "entries[2][posRank]": "8",
+      "entries[2][heightLabel]": "6-3",
+      "entries[2][weight]": "295",
+    });
 
     const consensus = await agent.get("/bigboard?year=2026&creator=Consensus");
 
@@ -2063,41 +2080,33 @@ describe("OnDraft HTTP contracts", () => {
     const ondraft = app();
     const agent = await loginAdminAgent(ondraft);
 
-    const saveRyan = await agent
-      .post("/bigboard/edit")
-      .type("form")
-      .send({
-        year: "2026",
-        creator: "Ryan",
-        "entries[0][id]": "disc-ryan-qb",
-        "entries[0][playerName]": "Discrepancy Quarterback",
-        "entries[0][school]": "Ryan State",
-        "entries[0][position]": "QB",
-        "entries[0][rank]": "1",
-        "entries[0][posRank]": "1",
-        "entries[0][heightLabel]": "6-2",
-        "entries[0][weight]": "220",
-        "entries[0][playerInfoPublished]": "true",
-      });
-    expect(saveRyan.status).toBe(200);
+    await seedBoardEntriesIndividually(agent, {
+      year: "2026",
+      creator: "Ryan",
+      "entries[0][id]": "disc-ryan-qb",
+      "entries[0][playerName]": "Discrepancy Quarterback",
+      "entries[0][school]": "Ryan State",
+      "entries[0][position]": "QB",
+      "entries[0][rank]": "1",
+      "entries[0][posRank]": "1",
+      "entries[0][heightLabel]": "6-2",
+      "entries[0][weight]": "220",
+      "entries[0][playerInfoPublished]": "true",
+    });
 
-    const saveAleks = await agent
-      .post("/bigboard/edit")
-      .type("form")
-      .send({
-        year: "2026",
-        creator: "Aleks",
-        "entries[0][id]": "disc-aleks-qb",
-        "entries[0][playerName]": "Discrepancy Quarterback",
-        "entries[0][school]": "Aleks Tech",
-        "entries[0][position]": "QB",
-        "entries[0][rank]": "20",
-        "entries[0][posRank]": "4",
-        "entries[0][heightLabel]": "6-1",
-        "entries[0][weight]": "215",
-        "entries[0][playerInfoPublished]": "true",
-      });
-    expect(saveAleks.status).toBe(200);
+    await seedBoardEntriesIndividually(agent, {
+      year: "2026",
+      creator: "Aleks",
+      "entries[0][id]": "disc-aleks-qb",
+      "entries[0][playerName]": "Discrepancy Quarterback",
+      "entries[0][school]": "Aleks Tech",
+      "entries[0][position]": "QB",
+      "entries[0][rank]": "20",
+      "entries[0][posRank]": "4",
+      "entries[0][heightLabel]": "6-1",
+      "entries[0][weight]": "215",
+      "entries[0][playerInfoPublished]": "true",
+    });
 
     const adminConsensus = await agent.get("/bigboard?year=2026&creator=Consensus");
     expect(adminConsensus.status).toBe(200);

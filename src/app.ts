@@ -183,6 +183,7 @@ class ExpressApp implements IApp {
     this.app.use("/vendor/pdfjs", express.static(path.join(process.cwd(), "node_modules", "pdfjs-dist")));
     this.app.use("/vendor/fonts/newsreader", express.static(path.join(process.cwd(), "node_modules", "@fontsource", "newsreader")));
     this.app.use("/vendor/fonts/source-sans-3", express.static(path.join(process.cwd(), "node_modules", "@fontsource", "source-sans-3")));
+    this.app.use("/vendor/sortablejs", express.static(path.join(process.cwd(), "node_modules", "sortablejs")));
     this.app.use(express.static(path.join(process.cwd(), "public"), {
       setHeaders: (res, filePath) => {
         if (path.extname(filePath).toLowerCase() === ".pdf") {
@@ -1308,6 +1309,18 @@ class ExpressApp implements IApp {
 
         const browserSession = recordPageView(sessionStore(req));
         await this.controller.deleteBigBoardYear(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/bigboard/default-year",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.setDefaultBigBoardYear(req, res, browserSession);
       }),
     );
 

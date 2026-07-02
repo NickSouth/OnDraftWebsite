@@ -107,4 +107,6 @@ export interface IOnDraftRepository {
     countDistinctBigBoardPlayers(): Promise<Result<number, BigBoardError>>;
     countPublishedArticles(): Promise<Result<number, ArticleError>>;
     countForumPosts(): Promise<Result<number, ForumPostError>>;
+    getAppSetting(key: string): Promise<Result<string | null, BigBoardError>>;
+    setAppSetting(key: string, value: string): Promise<Result<void, BigBoardError>>;
 }
