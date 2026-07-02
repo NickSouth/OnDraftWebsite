@@ -261,7 +261,7 @@
   }
 
   .od-search-submit {
-    @apply bg-draft-gold text-draft-ink hover:bg-amber-400 hover:text-draft-ink;
+    @apply bg-slate-100 text-draft-amber hover:bg-draft-gold hover:text-draft-ink dark:bg-white/10 dark:text-draft-gold dark:hover:bg-draft-gold dark:hover:text-draft-ink;
   }
 
   .od-page-stage {
@@ -2942,9 +2942,9 @@
     background: linear-gradient(
       132deg,
       theme("colors.draft.navy / 6%") 0%,
-      theme("colors.draft.foam / 45%") 42%,
-      theme("colors.draft.amber / 12%") 72%,
-      theme("colors.draft.gold / 24%") 100%
+      theme("colors.draft.steel / 14%") 48%,
+      theme("colors.draft.foam / 40%") 76%,
+      theme("colors.draft.gold / 20%") 100%
     );
   }
 
@@ -2952,9 +2952,11 @@
     background: linear-gradient(
       132deg,
       theme("colors.draft.navy") 0%,
-      color-mix(in srgb, theme("colors.draft.navy") 80%, theme("colors.draft.amber") 20%) 44%,
-      color-mix(in srgb, theme("colors.draft.amber") 60%, theme("colors.draft.navy") 40%) 76%,
-      color-mix(in srgb, theme("colors.draft.gold") 55%, theme("colors.draft.navy") 45%) 100%
+      color-mix(in srgb, theme("colors.draft.navy") 70%, theme("colors.draft.steel") 30%) 26%,
+      theme("colors.draft.steel") 54%,
+      color-mix(in srgb, theme("colors.draft.steel") 55%, theme("colors.draft.amber") 45%) 74%,
+      color-mix(in srgb, theme("colors.draft.amber") 75%, theme("colors.draft.navy") 25%) 88%,
+      color-mix(in srgb, theme("colors.draft.gold") 78%, theme("colors.draft.navy") 22%) 100%
     );
   }
 
@@ -3022,16 +3024,16 @@
   }
 
   .od-hero-stat {
-    @apply od-card flex flex-col items-center gap-0.5 px-2 py-2.5 text-center sm:gap-1 sm:px-3 sm:py-3;
+    @apply od-card flex flex-col items-center gap-0.5 px-2.5 py-1.5 text-center no-underline transition duration-200 hover:-translate-y-0.5 hover:border-draft-gold sm:px-3 sm:py-2;
   }
 
   .od-hero-stat-number {
-    @apply font-display text-xl font-black leading-none text-slate-950 dark:text-white sm:text-3xl;
+    @apply font-display text-lg font-black leading-none text-slate-950 dark:text-white sm:text-xl;
     font-variant-numeric: tabular-nums;
   }
 
   .od-hero-stat-label {
-    @apply text-[0.6rem] font-black uppercase tracking-[0.12em] text-draft-amber dark:text-draft-gold sm:text-xs sm:tracking-[0.16em];
+    @apply text-[0.58rem] font-black uppercase tracking-[0.12em] text-draft-amber dark:text-draft-gold sm:text-[0.65rem] sm:tracking-[0.14em];
   }
 
   .od-hero-social-row {

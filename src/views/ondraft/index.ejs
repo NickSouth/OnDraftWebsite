@@ -35,6 +35,55 @@
             <a class="od-secondary-link" href="/about">About OnDraft</a>
           </div>
 
+          <div
+            class="mt-3 flex flex-wrap gap-2"
+            data-od-reveal
+            style="--od-reveal-delay: 120ms"
+            aria-label="OnDraft by the numbers"
+            x-data="{
+              started: false,
+              start() {
+                if (this.started) return;
+                this.started = true;
+                const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                this.$root.querySelectorAll('[data-count-to]').forEach((el) => {
+                  const target = Number(el.dataset.countTo) || 0;
+                  if (reduce || target === 0) { el.textContent = target.toLocaleString(); return; }
+                  const duration = 1400;
+                  const startedAt = performance.now();
+                  const tick = (now) => {
+                    const t = Math.min(1, (now - startedAt) / duration);
+                    const eased = 1 - Math.pow(1 - t, 3);
+                    el.textContent = Math.round(target * eased).toLocaleString();
+                    if (t < 1) window.requestAnimationFrame(tick);
+                  };
+                  window.requestAnimationFrame(tick);
+                });
+              },
+              init() {
+                if (!('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { this.start(); return; }
+                this.$root.querySelectorAll('[data-count-to]').forEach((el) => { el.textContent = '0'; });
+                const observer = new IntersectionObserver((entries) => {
+                  entries.forEach((entry) => { if (entry.isIntersecting) { observer.disconnect(); this.start(); } });
+                }, { threshold: 0.35 });
+                observer.observe(this.$root);
+              }
+            }"
+          >
+            <a class="od-hero-stat" href="/bigboard" aria-label="View the draft board">
+              <span class="od-hero-stat-number" data-count-to="<%= heroStats.playersScouted %>"><%= heroStats.playersScouted.toLocaleString() %></span>
+              <span class="od-hero-stat-label">Players Scouted</span>
+            </a>
+            <a class="od-hero-stat" href="/articles" aria-label="Read our articles">
+              <span class="od-hero-stat-number" data-count-to="<%= heroStats.articlesWritten %>"><%= heroStats.articlesWritten.toLocaleString() %></span>
+              <span class="od-hero-stat-label">Articles Written</span>
+            </a>
+            <a class="od-hero-stat" href="/hottakes" aria-label="Visit the Taproom forum">
+              <span class="od-hero-stat-number" data-count-to="<%= heroStats.hotTakesPosted %>"><%= heroStats.hotTakesPosted.toLocaleString() %></span>
+              <span class="od-hero-stat-label">Hot Takes Posted</span>
+            </a>
+          </div>
+
         </div>
 
         <div class="grid gap-2" data-od-reveal style="--od-reveal-delay: 150ms">
@@ -57,54 +106,6 @@
       </div>
 
       <div class="grid content-start gap-3 sm:gap-4">
-      <div
-        class="grid grid-cols-3 gap-2 sm:gap-3"
-        data-od-reveal
-        aria-label="OnDraft by the numbers"
-        x-data="{
-          started: false,
-          start() {
-            if (this.started) return;
-            this.started = true;
-            const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-            this.$root.querySelectorAll('[data-count-to]').forEach((el) => {
-              const target = Number(el.dataset.countTo) || 0;
-              if (reduce || target === 0) { el.textContent = target.toLocaleString(); return; }
-              const duration = 1400;
-              const startedAt = performance.now();
-              const tick = (now) => {
-                const t = Math.min(1, (now - startedAt) / duration);
-                const eased = 1 - Math.pow(1 - t, 3);
-                el.textContent = Math.round(target * eased).toLocaleString();
-                if (t < 1) window.requestAnimationFrame(tick);
-              };
-              window.requestAnimationFrame(tick);
-            });
-          },
-          init() {
-            if (!('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { this.start(); return; }
-            this.$root.querySelectorAll('[data-count-to]').forEach((el) => { el.textContent = '0'; });
-            const observer = new IntersectionObserver((entries) => {
-              entries.forEach((entry) => { if (entry.isIntersecting) { observer.disconnect(); this.start(); } });
-            }, { threshold: 0.35 });
-            observer.observe(this.$root);
-          }
-        }"
-      >
-        <div class="od-hero-stat">
-          <span class="od-hero-stat-number" data-count-to="<%= heroStats.playersScouted %>"><%= heroStats.playersScouted.toLocaleString() %></span>
-          <span class="od-hero-stat-label">Players Scouted</span>
-        </div>
-        <div class="od-hero-stat">
-          <span class="od-hero-stat-number" data-count-to="<%= heroStats.articlesWritten %>"><%= heroStats.articlesWritten.toLocaleString() %></span>
-          <span class="od-hero-stat-label">Articles Written</span>
-        </div>
-        <div class="od-hero-stat">
-          <span class="od-hero-stat-number" data-count-to="<%= heroStats.hotTakesPosted %>"><%= heroStats.hotTakesPosted.toLocaleString() %></span>
-          <span class="od-hero-stat-label">Hot Takes Posted</span>
-        </div>
-      </div>
-
       <div
         class="od-card overflow-hidden shadow-editorial"
         data-od-reveal

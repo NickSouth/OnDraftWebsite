@@ -13,6 +13,7 @@ module.exports = {
           gold: "#d99822",
           amber: "#a75f12",
           navy: "#07111f",
+          steel: "#15304a",
           slate: "#121c2b",
           ink: "#0b1220",
           line: "#263247",
