@@ -1,5 +1,5 @@
 import { Err, Ok, Result } from "../lib/result";
-import { Article, ArticleFilter, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, Comment, ConsensusBigBoard, ConsensusDiscrepancyWriteup, DraftBoardFilter, ForumPost, ForumPostFilter, Newsletter, Video, VideoQuery } from "../model/OnDraftContent";
+import { Article, ArticleFilter, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, BigBoardPlayerSearchHit, Comment, ConsensusBigBoard, ConsensusDiscrepancyWriteup, DraftBoardFilter, ForumPost, ForumPostFilter, Newsletter, Video, VideoQuery } from "../model/OnDraftContent";
 import { defaultDraftGrade, effectiveDraftBoardGrade } from "../model/DraftGrades";
 import { ArticleNotFound, BigBoardNotFound, CommentNotFound, DuplicateBigBoardYear, DuplicatePlayer, DuplicateArticle, DuplicateForumPost, DuplicateNewsletter, ForumPostCommentNotFound, type ArticleError, type BigBoardError, type IOnDraftRepository, type NewsletterError, NewsletterNotFound, PlayerNotFound, ForumPostError, ForumPostNotFound } from "./OnDraftRepository";
 
@@ -1283,6 +1283,80 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
   async setAppSetting(key: string, value: string): Promise<Result<void, BigBoardError>> {
     this.appSettings.set(key, value);
     return Ok(undefined);
+  }
+
+  // v2.1 c8-search
+  async searchArticles(term: string, limit: number): Promise<Result<Article[], ArticleError>> {
+    const t = term.toLowerCase();
+    const matches = this.articles
+      .filter((article) => article.published)
+      .filter((article) =>
+        article.title.toLowerCase().includes(t) ||
+        article.author.toLowerCase().includes(t) ||
+        article.writeup.toLowerCase().includes(t) ||
+        (article.content.type === "plainText" && article.content.text.toLowerCase().includes(t)))
+      .sort((first, second) => second.publicationDate.getTime() - first.publicationDate.getTime())
+      .slice(0, limit);
+    return Ok(matches);
+  }
+
+  async searchYoutubeVideos(term: string, limit: number): Promise<Result<Video[], ArticleError>> {
+    const t = term.toLowerCase();
+    const matches = this.videos
+      .filter((video) => video.title.toLowerCase().includes(t))
+      .sort((first, second) => second.createdAt.getTime() - first.createdAt.getTime())
+      .slice(0, limit);
+    return Ok(matches);
+  }
+
+  async searchForumPosts(term: string, limit: number): Promise<Result<ForumPost[], ForumPostError>> {
+    const t = term.toLowerCase();
+    const matches = this.forumPosts
+      .filter((post) => post.content.toLowerCase().includes(t))
+      .sort((first, second) => second.createdAt.getTime() - first.createdAt.getTime())
+      .slice(0, limit);
+    return Ok(matches);
+  }
+
+  async searchBigBoardPlayers(term: string, limit: number): Promise<Result<BigBoardPlayerSearchHit[], BigBoardError>> {
+    const t = term.toLowerCase();
+    const candidates: BigBoardPlayerSearchHit[] = [];
+    this.bigBoards
+      .filter((board) => board.creator !== "Consensus")
+      .forEach((board) => {
+        board.entries.forEach((entry) => {
+          const matchesTerm =
+            entry.playerName.toLowerCase().includes(t) ||
+            entry.position.toLowerCase().includes(t) ||
+            entry.school.toLowerCase().includes(t);
+          if (entry.playerInfoPublished && matchesTerm) {
+            candidates.push({
+              playerName: entry.playerName,
+              position: entry.position,
+              school: entry.school,
+              year: board.year,
+              rank: entry.rank,
+              posRank: entry.posRank,
+            });
+          }
+        });
+      });
+    candidates.sort((first, second) => (
+      second.year - first.year ||
+      (first.rank ?? Number.MAX_SAFE_INTEGER) - (second.rank ?? Number.MAX_SAFE_INTEGER) ||
+      first.playerName.localeCompare(second.playerName)
+    ));
+    const seen = new Set<string>();
+    const hits: BigBoardPlayerSearchHit[] = [];
+    for (const candidate of candidates) {
+      const key = `${candidate.year}:${candidate.playerName.toLowerCase()}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      hits.push(candidate);
+    }
+    return Ok(hits.slice(0, limit));
   }
 }
 

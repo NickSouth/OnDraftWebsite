@@ -1,0 +1,21 @@
+<% if (results && results.totalCount > 0) { %>
+<div class="od-search-suggest-panel">
+  <%
+    const suggestGroups = [
+      { label: "Articles", items: results.articles.map((a) => ({ href: `/articles/${a.id}`, text: a.title })) },
+      { label: "Bar TV", items: results.videos.map((v) => ({ href: `/videos/${v.videoId}`, text: v.title })) },
+      { label: "Taproom", items: results.hotTakes.map((p) => ({ href: `/hottakes#hot-take-${p.id}`, text: p.content.length > 80 ? `${p.content.slice(0, 80)}…` : p.content })) },
+      { label: "Prospects", items: results.players.map((p) => ({ href: `/bigboard?year=${p.year}${p.school ? `&school=${encodeURIComponent(p.school)}` : ""}`, text: `${p.playerName} · ${p.school} · ${p.year}` })) },
+    ];
+  %>
+  <% suggestGroups.forEach((group) => { %>
+    <% if (group.items.length > 0) { %>
+      <p class="od-search-suggest-kicker"><%= group.label %></p>
+      <% group.items.forEach((item) => { %>
+        <a class="od-search-suggest-item" href="<%= item.href %>"><span class="min-w-0 truncate"><%= item.text %></span></a>
+      <% }) %>
+    <% } %>
+  <% }) %>
+  <a class="od-search-suggest-item font-black text-draft-amber dark:text-draft-gold" href="/search?q=<%= encodeURIComponent(query) %>">View all results &rarr;</a>
+</div>
+<% } %>

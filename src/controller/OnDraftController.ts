@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import type { IOnDraftBrowserSession } from "../session/OnDraftSession";
 import { isAdminSession, isVerifiedUserSession } from "../session/OnDraftSession";
 import type { AdminUserListItem, IAuthService } from "../auth/AuthService";
-import type { BigBoardEditableEntryInput, ConsensusDiscrepancyWriteupInput, CreateArticleInput, CreateYoutubeVideoInput, IOnDraftService, NewsletterInput, SaveBigBoardEntriesInput } from "../service/OnDraftService";
+import type { BigBoardEditableEntryInput, ConsensusDiscrepancyWriteupInput, CreateArticleInput, CreateYoutubeVideoInput, IOnDraftService, NewsletterInput, SaveBigBoardEntriesInput, SiteSearchResults } from "../service/OnDraftService";
 import type { IUserPreferenceService, UserPreferenceError } from "../service/UserPreferenceService";
 import type { ILoggingService } from "../service/LoggingService";
 import type { AnalyticsCategory, AnalyticsPeriod, IAnalyticsService } from "../service/UmamiAnalyticsService";
@@ -143,6 +143,9 @@ export interface IOnDraftController {
   deleteBigBoardEntry(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   getSavedSchools(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   setDefaultBigBoardYear(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  // v2.1 c8-search
+  showSearch(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  showSearchSuggest(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
 }
 
 export type AdminDashboardTab = "users" | "content" | "newsletter" | "analytics";
@@ -3109,6 +3112,51 @@ class OnDraftController implements IOnDraftController {
       return;
     }
     res.redirect(`/bigboard/edit?year=${result.value}&creator=${encodeURIComponent(creator)}`);
+  }
+
+  // v2.1 c8-search
+  async showSearch(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Rendering search page");
+    const rawTerm = (this.queryString(req, "q") ?? "").trim().slice(0, 100);
+    let results: SiteSearchResults | null = null;
+    if (rawTerm.length >= 2) {
+      const result = await this.service.searchSite(rawTerm);
+      if (result.ok === false && result.value.name !== "ArticleValidationError") {
+        res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
+        return;
+      }
+      if (result.ok === true) {
+        results = result.value;
+      }
+    }
+    const viewModel = {
+      session,
+      isAdmin: isAdminSession(session),
+      query: rawTerm,
+      results,
+      metaTitle: "Search | OnDraft Football",
+      metaDescription: "Search OnDraft Football articles, videos, Taproom hot takes, and draft board prospects.",
+      metaRobots: "noindex, follow",
+    };
+    if (req.get("HX-Request") === "true") {
+      res.render("ondraft/partials/searchResults", { ...viewModel, layout: false });
+      return;
+    }
+    res.render("ondraft/search", viewModel);
+  }
+
+  async showSearchSuggest(req: Request, res: Response, _session: IOnDraftBrowserSession): Promise<void> {
+    const rawTerm = (this.queryString(req, "q") ?? "").trim().slice(0, 100);
+    if (rawTerm.length < 2) {
+      res.render("ondraft/partials/searchSuggest", { layout: false, query: rawTerm, results: null });
+      return;
+    }
+    const result = await this.service.searchSite(rawTerm, { limitPerType: 3 });
+    res.render("ondraft/partials/searchSuggest", {
+      layout: false,
+      query: rawTerm,
+      results: result.ok === true ? result.value : null,
+    });
   }
 }
 

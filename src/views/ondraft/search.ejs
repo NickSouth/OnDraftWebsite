@@ -1,0 +1,42 @@
+<section class="mx-auto grid w-full max-w-6xl gap-5 sm:gap-8">
+  <div class="grid gap-4 border-b border-slate-200 pb-4 dark:border-white/10 sm:gap-5 sm:pb-6">
+    <div class="max-w-3xl">
+      <p class="text-xs font-black uppercase tracking-[0.2em] text-draft-amber dark:text-draft-gold">Search The Bar</p>
+      <h1 class="mt-1.5 font-display text-3xl font-black leading-tight text-slate-950 dark:text-white sm:mt-2 sm:text-5xl">Search</h1>
+      <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300 sm:mt-3 sm:text-base sm:leading-7">Find articles, Bar TV videos, Taproom hot takes, and draft board prospects.</p>
+    </div>
+    <form
+      action="/search"
+      method="get"
+      role="search"
+      class="w-full max-w-xl"
+      data-skip-global-loader
+      hx-get="/search"
+      hx-target="#search-results"
+      hx-swap="innerHTML"
+      hx-trigger="submit, input changed delay:400ms from:find input"
+      hx-push-url="true"
+      hx-sync="this:replace"
+    >
+      <div class="od-search-field">
+        <input
+          class="od-search-input"
+          type="search"
+          name="q"
+          value="<%= query %>"
+          placeholder="Search OnDraft…"
+          aria-label="Search OnDraft"
+          maxlength="100"
+          autocomplete="off"
+          autofocus
+        />
+        <button type="submit" class="od-search-icon-button od-search-submit right-1" aria-label="Run search">
+          <svg viewBox="0 0 24 24" class="size-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        </button>
+      </div>
+    </form>
+  </div>
+  <div id="search-results" class="od-swap-surface od-swap-active" aria-live="polite">
+    <%- include("partials/searchResults", { query, results, isAdmin, session }) %>
+  </div>
+</section>

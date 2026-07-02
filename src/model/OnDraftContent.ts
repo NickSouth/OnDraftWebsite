@@ -205,3 +205,13 @@ export type ConsensusWriteup = {
   ryanWriteup: string;
   aleksWriteup: string;
 };
+
+// v2.1 c8-search
+export type BigBoardPlayerSearchHit = {
+  playerName: string;
+  position: Position | "";
+  school: string;
+  year: number;
+  rank: number | null;
+  posRank: number | null;
+};
