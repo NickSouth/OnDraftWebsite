@@ -1295,6 +1295,9 @@ describe("OnDraft HTTP contracts", () => {
     expect(editor.text).toContain('hx-post="/bigboard/edit/delete-entry"');
     expect(editor.text).toContain("add player writeup");
     expect(editor.text).toContain("Save full board");
+    expect(editor.text).toContain("Sort by grades");
+    expect(editor.text).toContain("data-sort-by-grade");
+    expect(editor.text).toContain("sortBoardByGrade");
     expect(editor.text).toContain("data-board-dirty-actions");
     expect(editor.text).toContain("markBoardStructureDirty");
     expect(editor.text).toContain("scrollToFirstValidationError");
