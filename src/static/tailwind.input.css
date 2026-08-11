@@ -919,6 +919,14 @@
     @apply text-lg font-black text-slate-950 dark:text-white;
   }
 
+  .board-editor-toolbar-actions {
+    @apply flex flex-wrap items-center gap-2;
+  }
+
+  .board-editor-page .board-editor-sort-grade-button {
+    @apply od-secondary-link min-h-9 whitespace-nowrap px-3 py-1.5 text-sm font-black;
+  }
+
   .board-editor-dirty-actions {
     @apply flex flex-wrap items-center gap-2;
   }

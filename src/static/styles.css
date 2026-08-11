@@ -1014,6 +1014,7 @@ textarea {
   min-height: 36px;
   padding: 6px 12px;
   font-size: 0.875rem;
+  font-weight: 900;
   white-space: nowrap;
 }
 
