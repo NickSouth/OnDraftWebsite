@@ -2,6 +2,8 @@ import request from "supertest";
 import fs from "node:fs";
 import path from "node:path";
 import { createComposedApp } from "../../src/composition";
+import { defaultDraftGrade, gradeTraitCategoriesForGrade } from "../../src/model/DraftGrades";
+import type { Position } from "../../src/model/OnDraftContent";
 import type { IEmailService, SendEmailVerificationEmailInput, SendNewsletterEmailInput, SendPasswordResetEmailInput } from "../../src/email/EmailService";
 
 function testConfig(turnstile = { siteKey: null as string | null, secretKey: null as string | null, verificationDisabled: false }) {
@@ -121,6 +123,30 @@ function edgeGradePayload(prefix: string, score = "6", potential = "6") {
   });
   filmTraits.forEach((trait) => {
     payload[`${prefix}[grade][filmTraits][${trait}]`] = score;
+  });
+  return payload;
+}
+
+// Publishing a grade needs every trait filled, but the consensus order only depends on the board
+// grade — so fill the traits from the position config and pin the result with an override.
+function gradePayloadAt(prefix: string, position: Position, boardGrade: number) {
+  const base = defaultDraftGrade(position);
+  if (!base) {
+    throw new Error(`Missing grade config for ${position}`);
+  }
+  const [physicals, filmTraits] = gradeTraitCategoriesForGrade(base, position);
+  const payload: Record<string, string> = {
+    [`${prefix}[grade][position]`]: position,
+    [`${prefix}[grade][archetype]`]: base.archetype,
+    [`${prefix}[grade][potential]`]: "1",
+    [`${prefix}[grade][overrideDisplayGrade]`]: boardGrade.toFixed(2),
+    [`${prefix}[gradePublished]`]: "true",
+  };
+  physicals.traits.forEach((trait) => {
+    payload[`${prefix}[grade][physicalTraits][${trait}]`] = "1";
+  });
+  filmTraits.traits.forEach((trait) => {
+    payload[`${prefix}[grade][filmTraits][${trait}]`] = "1";
   });
   return payload;
 }
@@ -2006,6 +2032,7 @@ describe("OnDraft HTTP contracts", () => {
       "entries[0][weaknesses]": "Copied Ryan weakness should not appear.",
       "entries[0][rundown]": "Copied Ryan rundown should not appear.",
       "entries[0][writeupPublished]": "true",
+      ...gradePayloadAt("entries[0]", "QB", 6),
       "entries[1][id]": "ryan-edge",
       "entries[1][playerName]": "Edge Prospect",
       "entries[1][school]": "OnDraft State",
@@ -2015,6 +2042,7 @@ describe("OnDraft HTTP contracts", () => {
       "entries[1][heightLabel]": "6-4",
       "entries[1][weight]": "255",
       "entries[1][playerInfoPublished]": "true",
+      ...gradePayloadAt("entries[1]", "EDGE", 7.5),
       "entries[2][id]": "ryan-tackle",
       "entries[2][playerName]": "Tackle Prospect",
       "entries[2][school]": "Published U",
@@ -2024,6 +2052,7 @@ describe("OnDraft HTTP contracts", () => {
       "entries[2][heightLabel]": "6-6",
       "entries[2][weight]": "315",
       "entries[2][playerInfoPublished]": "true",
+      ...gradePayloadAt("entries[2]", "OT", 5),
       "entries[3][id]": "ryan-one-board-edge",
       "entries[3][playerName]": "One Board Edge",
       "entries[3][school]": "Solo State",
@@ -2033,6 +2062,7 @@ describe("OnDraft HTTP contracts", () => {
       "entries[3][heightLabel]": "6-5",
       "entries[3][weight]": "260",
       "entries[3][playerInfoPublished]": "true",
+      ...gradePayloadAt("entries[3]", "EDGE", 7.75),
     });
 
     await seedBoardEntriesIndividually(agent, {
@@ -2047,6 +2077,7 @@ describe("OnDraft HTTP contracts", () => {
       "entries[0][heightLabel]": "5-11",
       "entries[0][weight]": "185",
       "entries[0][playerInfoPublished]": "true",
+      ...gradePayloadAt("entries[0]", "WR", 6),
       "entries[1][id]": "aleks-edge",
       "entries[1][playerName]": "Edge Prospect",
       "entries[1][school]": "OnDraft State",
@@ -2056,6 +2087,7 @@ describe("OnDraft HTTP contracts", () => {
       "entries[1][heightLabel]": "6-4",
       "entries[1][weight]": "255",
       "entries[1][playerInfoPublished]": "true",
+      ...gradePayloadAt("entries[1]", "EDGE", 7.5),
       "entries[2][id]": "aleks-tackle",
       "entries[2][playerName]": "Tackle Prospect",
       "entries[2][school]": "Private U",
@@ -2110,6 +2142,7 @@ describe("OnDraft HTTP contracts", () => {
       "entries[0][heightLabel]": "6-2",
       "entries[0][weight]": "220",
       "entries[0][playerInfoPublished]": "true",
+      ...gradePayloadAt("entries[0]", "QB", 6),
     });
 
     await seedBoardEntriesIndividually(agent, {
@@ -2124,6 +2157,7 @@ describe("OnDraft HTTP contracts", () => {
       "entries[0][heightLabel]": "6-1",
       "entries[0][weight]": "215",
       "entries[0][playerInfoPublished]": "true",
+      ...gradePayloadAt("entries[0]", "QB", 6),
     });
 
     const adminConsensus = await agent.get("/bigboard?year=2026&creator=Consensus");
