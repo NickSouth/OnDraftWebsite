@@ -111,6 +111,38 @@
     stages.forEach((stage) => window.requestAnimationFrame(() => stage.classList.add("is-ready")));
   };
 
+  const revealObserver = "IntersectionObserver" in window && !reducedMotion()
+    ? new window.IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) {
+          return;
+        }
+        revealObserver.unobserve(entry.target);
+        entry.target.classList.add("is-revealed");
+      });
+    }, { threshold: 0.15, rootMargin: "0px 0px -8% 0px" })
+    : null;
+
+  const observeReveals = (root = document) => {
+    if (!(root instanceof Document || root instanceof Element || root instanceof DocumentFragment)) {
+      return;
+    }
+    const elements = root.matches?.("[data-od-reveal]")
+      ? [root]
+      : [...root.querySelectorAll?.("[data-od-reveal]") ?? []];
+    elements.forEach((element) => {
+      if (element.dataset.odRevealObserved === "true") {
+        return;
+      }
+      element.dataset.odRevealObserved = "true";
+      if (!revealObserver) {
+        element.classList.add("is-revealed");
+        return;
+      }
+      revealObserver.observe(element);
+    });
+  };
+
   const isLocalNavigation = (link, event) => {
     if (!link || event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
       return false;
@@ -141,7 +173,7 @@
     if (pathname === "/bigboard/edit") return "bigboard-edit";
     if (pathname === "/hottakes") return "hottakes";
     if (pathname === "/bookmarks") return "bookmarks";
-    if (pathname === "/about" || pathname === "/login" || pathname === "/register" || pathname === "/reset-password") {
+    if (pathname === "/about" || pathname === "/login" || pathname === "/register" || pathname === "/reset-password" || pathname === "/search") {
       return "fallback";
     }
     return null;
@@ -162,7 +194,7 @@
     });
   };
 
-  const showRouteSkeleton = (url) => {
+  const showRouteSkeleton = (url, triggerEvent) => {
     const name = skeletonNameForPath(url.pathname);
     const pageContent = document.querySelector("#page-content > .w-full");
     if (!name || !pageContent) {
@@ -172,6 +204,9 @@
 
     window.clearTimeout(skeletonTimeout);
     skeletonTimeout = window.setTimeout(() => {
+      if (triggerEvent?.defaultPrevented) {
+        return;
+      }
       const content = templateContent(`[data-page-skeleton="${name}"]`);
       if (!content) {
         showLoader(0);
@@ -211,7 +246,7 @@
     return name;
   };
 
-  const showResultSkeleton = (source) => {
+  const showResultSkeleton = (source, triggerEvent) => {
     const config = skeletonConfigFrom(source);
     if (!config) {
       return false;
@@ -226,6 +261,9 @@
 
     window.clearTimeout(skeletonTimeout);
     skeletonTimeout = window.setTimeout(() => {
+      if (triggerEvent?.defaultPrevented) {
+        return;
+      }
       const firstElement = content.firstElementChild;
       if (firstElement?.id && firstElement.id === target.id) {
         target.className = firstElement.className;
@@ -272,16 +310,19 @@
   window.addEventListener("ondraft:hide-global-loader", hideLoader);
 
   document.addEventListener("htmx:beforeRequest", (event) => {
+    if (event.defaultPrevented) {
+      return;
+    }
     const target = event.target;
     if (target instanceof HTMLElement && target.closest("[data-use-global-loader]")) {
       showLoader(0);
       return;
     }
     if (target instanceof HTMLElement && target.closest("[data-skip-global-loader]")) {
-      showResultSkeleton(target);
+      showResultSkeleton(target, event);
       return;
     }
-    if (!showResultSkeleton(target)) {
+    if (!showResultSkeleton(target, event)) {
       showLoader();
     }
   });
@@ -289,7 +330,7 @@
   document.addEventListener("click", (event) => {
     const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
     if (isLocalNavigation(link, event)) {
-      showRouteSkeleton(new URL(link.href, window.location.href));
+      showRouteSkeleton(new URL(link.href, window.location.href), event);
     }
   }, true);
 
@@ -309,6 +350,7 @@
     enhanceAnimatedDetails(event.detail?.target || document);
     animateSwapSurfaces(event.detail?.target || document);
     activatePageStage(event.detail?.target || document);
+    observeReveals(event.detail?.target || document);
   });
   document.addEventListener("htmx:responseError", hideLoader);
   document.addEventListener("htmx:sendError", hideLoader);
@@ -318,12 +360,14 @@
     enhanceAnimatedDetails();
     animateSwapSurfaces();
     activatePageStage();
+    observeReveals();
   });
   window.addEventListener("beforeunload", hideLoader);
   window.addEventListener("pagehide", hideLoader);
   window.addEventListener("pageshow", () => {
     hideLoader();
     activatePageStage();
+    observeReveals();
   });
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) {
@@ -338,6 +382,7 @@
         enhanceAnimatedDetails(node);
         animateSwapSurfaces(node);
         activatePageStage(node);
+        observeReveals(node);
       });
     });
   }).observe(document.documentElement, { childList: true, subtree: true });
@@ -345,4 +390,5 @@
   enhanceAnimatedDetails();
   animateSwapSurfaces();
   activatePageStage();
+  observeReveals();
 })();

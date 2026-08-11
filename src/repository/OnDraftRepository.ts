@@ -1,5 +1,5 @@
 import { Result } from "../lib/result";
-import { type BigBoard, Article, BigBoardCreator, BigBoardEntry, ArticleFilter, Comment, ForumPost, ForumPostFilter, DraftBoardFilter, Video, VideoQuery, ConsensusBigBoard, Newsletter, ConsensusDiscrepancyWriteup, } from "../model/OnDraftContent";
+import { type BigBoard, Article, BigBoardCreator, BigBoardEntry, ArticleFilter, Comment, ForumPost, ForumPostFilter, DraftBoardFilter, Video, VideoQuery, ConsensusBigBoard, Newsletter, ConsensusDiscrepancyWriteup, BigBoardPlayerSearchHit, } from "../model/OnDraftContent";
 
 export type BigBoardError = 
     | {name: "BigBoardNotFound"; message: string}
@@ -104,4 +104,14 @@ export interface IOnDraftRepository {
     updateNewsletter(newsletter: Newsletter): Promise<Result<Newsletter, NewsletterError>>;
     getNewsletter(id: string): Promise<Result<Newsletter, NewsletterError>>;
     listNewsletters(): Promise<Result<Newsletter[], NewsletterError>>;
+    countDistinctBigBoardPlayers(): Promise<Result<number, BigBoardError>>;
+    countPublishedArticles(): Promise<Result<number, ArticleError>>;
+    countForumPosts(): Promise<Result<number, ForumPostError>>;
+    getAppSetting(key: string): Promise<Result<string | null, BigBoardError>>;
+    setAppSetting(key: string, value: string): Promise<Result<void, BigBoardError>>;
+    // v2.1 c8-search
+    searchArticles(term: string, limit: number): Promise<Result<Article[], ArticleError>>;
+    searchYoutubeVideos(term: string, limit: number): Promise<Result<Video[], ArticleError>>;
+    searchForumPosts(term: string, limit: number): Promise<Result<ForumPost[], ForumPostError>>;
+    searchBigBoardPlayers(term: string, limit: number): Promise<Result<BigBoardPlayerSearchHit[], BigBoardError>>;
 }

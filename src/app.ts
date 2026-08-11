@@ -31,8 +31,8 @@ import {
   type IArticleHtmlImageAssetService,
 } from "./service/ArticleHtmlImageAssetService";
 import { ILoggingService } from "./service/LoggingService";
-import type { AnalyticsCategory, AnalyticsPeriod } from "./service/UmamiAnalyticsService";
-import type { IAnalyticsConfig, ITurnstileConfig } from "./config/AppConfig";
+import type { AnalyticsCategory, AnalyticsPeriod, IPageViewRecorder } from "./service/AnalyticsService";
+import type { ITurnstileConfig } from "./config/AppConfig";
 
 type AsyncRequestHandler = RequestHandler;
 
@@ -115,6 +115,15 @@ class ExpressApp implements IApp {
       key: clientIp,
     }),
   );
+  // v2.1 c8-search
+  private readonly searchRateLimit = createRateLimitMiddleware(
+    new RateLimiter({
+      keyPrefix: "search",
+      limit: 120,
+      windowMs: 5 * 60 * 1000,
+      key: clientIp,
+    }),
+  );
   private readonly turnstileVerifier: TurnstileVerifier;
 
   constructor(
@@ -126,7 +135,7 @@ class ExpressApp implements IApp {
     private readonly siteBaseUrl = "http://localhost:3000",
     private readonly helmetAssets: IHelmetAssetService = CreateHelmetAssetService(),
     private readonly articleHtmlImages: IArticleHtmlImageAssetService = CreateArticleHtmlImageAssetService(),
-    private readonly analyticsConfig: IAnalyticsConfig = { umamiWebsiteId: null, umamiApiKey: null, umamiApiBaseUrl: "https://api.umami.is/v1" },
+    private readonly pageViews?: IPageViewRecorder,
   ) {
     this.app = express();
     this.turnstileVerifier = new TurnstileVerifier(this.turnstileConfig, this.logger);
@@ -181,6 +190,9 @@ class ExpressApp implements IApp {
     this.app.use("/vendor/alpinejs-focus", express.static(path.join(process.cwd(), "node_modules", "@alpinejs", "focus", "dist")));
     this.app.use("/vendor/alpinejs-collapse", express.static(path.join(process.cwd(), "node_modules", "@alpinejs", "collapse", "dist")));
     this.app.use("/vendor/pdfjs", express.static(path.join(process.cwd(), "node_modules", "pdfjs-dist")));
+    this.app.use("/vendor/fonts/newsreader", express.static(path.join(process.cwd(), "node_modules", "@fontsource", "newsreader")));
+    this.app.use("/vendor/fonts/source-sans-3", express.static(path.join(process.cwd(), "node_modules", "@fontsource", "source-sans-3")));
+    this.app.use("/vendor/sortablejs", express.static(path.join(process.cwd(), "node_modules", "sortablejs")));
     this.app.use(express.static(path.join(process.cwd(), "public"), {
       setHeaders: (res, filePath) => {
         if (path.extname(filePath).toLowerCase() === ".pdf") {
@@ -207,6 +219,7 @@ class ExpressApp implements IApp {
     this.app.use(Layouts);
     this.app.use(express.urlencoded({ extended: true, limit: "1mb", parameterLimit: 5000 }));
     this.app.use((req, res, next) => this.exposeSessionLocals(req, res, next));
+    this.app.use((req, res, next) => this.recordFirstPartyPageView(req, res, next));
   }
 
   private setSecurityHeaders(_req: Request, res: Response, next: NextFunction): void {
@@ -218,11 +231,11 @@ class ExpressApp implements IApp {
         "object-src 'none'",
         "frame-ancestors 'none'",
         "form-action 'self'",
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://cloud.umami.is",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com",
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: https://img.youtube.com https://i.ytimg.com",
         "font-src 'self' data:",
-        "connect-src 'self' https://challenges.cloudflare.com https://www.googleapis.com https://cloud.umami.is https://api.umami.is https://gateway.umami.is",
+        "connect-src 'self' https://challenges.cloudflare.com https://www.googleapis.com",
         "frame-src https://challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com",
         "upgrade-insecure-requests",
       ].join("; "),
@@ -377,7 +390,42 @@ class ExpressApp implements IApp {
     res.locals.defaultPreviewImageUrl = defaultPreviewImageUrl;
     res.locals.relativeTime = formatRelativeTime;
     res.locals.turnstileSiteKey = this.turnstileConfig.verificationDisabled ? null : this.turnstileConfig.siteKey;
-    res.locals.umamiWebsiteId = this.analyticsConfig.umamiWebsiteId;
+    next();
+  }
+
+  private recordFirstPartyPageView(req: Request, res: Response, next: NextFunction): void {
+    if (!this.pageViews || req.method !== "GET" || req.get("HX-Request") === "true" || req.get("dnt") === "1") {
+      next();
+      return;
+    }
+
+    const store = sessionStore(req);
+    res.on("finish", () => {
+      try {
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          return;
+        }
+        const contentType = String(res.getHeader("content-type") ?? "");
+        if (!contentType.includes("text/html")) {
+          return;
+        }
+        const session = store.ondraft;
+        if (!session) {
+          return;
+        }
+        void this.pageViews?.recordPageView({
+          path: req.path,
+          browserId: session.browserId,
+          referrer: req.get("referer") ?? null,
+          userAgent: req.get("user-agent") ?? null,
+          host: req.get("host") ?? null,
+          authenticated: session.authenticatedUser !== null,
+          isAdmin: isAdminSession(session),
+        }).catch((error) => this.logger.warn(`Failed to record page view: ${error instanceof Error ? error.message : String(error)}`));
+      } catch {
+        // Never let analytics recording break a response.
+      }
+    });
     next();
   }
 
@@ -1027,6 +1075,26 @@ class ExpressApp implements IApp {
       }),
     );
 
+    // v2.1 c8-search
+    this.app.get(
+      "/search/suggest",
+      this.searchRateLimit,
+      asyncHandler(async (req, res) => {
+        // Deliberately NOT recordPageView — keystroke suggestions must not inflate the pageview log.
+        const browserSession = touchOnDraftSession(sessionStore(req));
+        await this.controller.showSearchSuggest(req, res, browserSession);
+      }),
+    );
+
+    this.app.get(
+      "/search",
+      this.searchRateLimit,
+      asyncHandler(async (req, res) => {
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.showSearch(req, res, browserSession);
+      }),
+    );
+
     this.app.get("/robots.txt", (_req, res) => {
       res.type("text/plain");
       res.send([
@@ -1310,6 +1378,18 @@ class ExpressApp implements IApp {
     );
 
     this.app.post(
+      "/bigboard/default-year",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        const browserSession = recordPageView(sessionStore(req));
+        await this.controller.setDefaultBigBoardYear(req, res, browserSession);
+      }),
+    );
+
+    this.app.post(
       "/bigboard/edit",
       asyncHandler(async (req, res) => {
         if (!this.requireAdmin(req, res)) {
@@ -1514,7 +1594,7 @@ export function CreateApp(
   sessionStore?: session.Store,
   turnstileConfig?: ITurnstileConfig,
   siteBaseUrl?: string,
-  analyticsConfig?: IAnalyticsConfig,
+  pageViewRecorder?: IPageViewRecorder,
 ): IApp {
-  return new ExpressApp(controller, authController, logger, sessionStore, turnstileConfig, siteBaseUrl, undefined, undefined, analyticsConfig);
+  return new ExpressApp(controller, authController, logger, sessionStore, turnstileConfig, siteBaseUrl, undefined, undefined, pageViewRecorder);
 }

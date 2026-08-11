@@ -2,10 +2,10 @@ import type { Request, Response } from "express";
 import type { IOnDraftBrowserSession } from "../session/OnDraftSession";
 import { isAdminSession, isVerifiedUserSession } from "../session/OnDraftSession";
 import type { AdminUserListItem, IAuthService } from "../auth/AuthService";
-import type { BigBoardEditableEntryInput, ConsensusDiscrepancyWriteupInput, CreateArticleInput, CreateYoutubeVideoInput, IOnDraftService, NewsletterInput, SaveBigBoardEntriesInput } from "../service/OnDraftService";
+import type { BigBoardEditableEntryInput, ConsensusDiscrepancyWriteupInput, CreateArticleInput, CreateYoutubeVideoInput, IOnDraftService, NewsletterInput, SaveBigBoardEntriesInput, SiteSearchResults } from "../service/OnDraftService";
 import type { IUserPreferenceService, UserPreferenceError } from "../service/UserPreferenceService";
 import type { ILoggingService } from "../service/LoggingService";
-import type { AnalyticsCategory, AnalyticsPeriod, IAnalyticsService } from "../service/UmamiAnalyticsService";
+import type { AnalyticsCategory, AnalyticsPeriod, IAnalyticsService } from "../service/AnalyticsService";
 import { ArticleError, BigBoardError, ForumPostError } from "../repository/OnDraftRepository";
 import { publicArticleUploadUrl } from "../uploads/articlePdfUpload";
 import { BIG_BOARD_CREATORS, POSITIONS, type Article, type ArticleContent, type ArticleFilter, type BigBoard, type BigBoardCreator, type BigBoardEntry, type ForumPost, type ForumPostFilter, type Video, type VideoQuery } from "../model/OnDraftContent";
@@ -46,6 +46,7 @@ type HomeFeedItem =
       tags: string[];
       imageUrl?: string;
       likes: number;
+      readMinutes: number | null;
     }
   | {
       type: "video";
@@ -141,6 +142,10 @@ export interface IOnDraftController {
   deleteArticle(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   deleteBigBoardEntry(req: any, res: Response, session: IOnDraftBrowserSession): Promise<void>;
   getSavedSchools(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  setDefaultBigBoardYear(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  // v2.1 c8-search
+  showSearch(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
+  showSearchSuggest(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void>;
 }
 
 export type AdminDashboardTab = "users" | "content" | "newsletter" | "analytics";
@@ -603,6 +608,7 @@ class OnDraftController implements IOnDraftController {
       tags: article.tags ?? [],
       imageUrl: article.imageUrl,
       likes: article.likes,
+      readMinutes: this.service.articleReadMinutes(article),
     };
   }
 
@@ -1132,7 +1138,7 @@ class OnDraftController implements IOnDraftController {
     };
   }
 
-  private async popularArticles(range: "all" | "month" | "year"): Promise<Article[]> {
+  private async popularArticles(range: "all" | "month" | "year"): Promise<Array<Article & { readMinutes: number | null }>> {
     const result = await this.service.getFilteredArticles({
       published: true,
       sortBy: "likes",
@@ -1143,9 +1149,9 @@ class OnDraftController implements IOnDraftController {
       this.logger.warn(`Unable to load popular articles: ${result.value.message}`);
       return [];
     }
-    return result.value
+    return this.withReadMinutes(result.value
       .sort((first, second) => second.likes - first.likes || second.publicationDate.getTime() - first.publicationDate.getTime())
-      .slice(0, 10);
+      .slice(0, 10));
   }
 
   private parseLocalDate(value: unknown): Date {
@@ -1195,10 +1201,31 @@ class OnDraftController implements IOnDraftController {
     const latestItems = this.homeFeedItems(articles, videos).slice(0, 5);
     const popularArticles = await this.popularArticles("all");
 
+    const [playersScoutedResult, articlesWrittenResult, hotTakesPostedResult] = await Promise.all([
+      this.service.countDistinctBigBoardPlayers(),
+      this.service.countPublishedArticles(),
+      this.service.countForumPosts(),
+    ]);
+    if (playersScoutedResult.ok === false) {
+      this.logger.warn(`Unable to load players scouted count: ${playersScoutedResult.value.message}`);
+    }
+    if (articlesWrittenResult.ok === false) {
+      this.logger.warn(`Unable to load article count: ${articlesWrittenResult.value.message}`);
+    }
+    if (hotTakesPostedResult.ok === false) {
+      this.logger.warn(`Unable to load hot takes count: ${hotTakesPostedResult.value.message}`);
+    }
+    const heroStats = {
+      playersScouted: playersScoutedResult.ok === true ? playersScoutedResult.value : 0,
+      articlesWritten: articlesWrittenResult.ok === true ? articlesWrittenResult.value : 0,
+      hotTakesPosted: hotTakesPostedResult.ok === true ? hotTakesPostedResult.value : 0,
+    };
+
     res.render("ondraft/index", {
       session,
       isAdmin: isAdminSession(session),
       latestItems,
+      heroStats,
       popularArticles,
       popularRange: "all",
       metaTitle: "OnDraft Football | NFL Draft Analysis, Articles, Videos, and Draft Boards",
@@ -1233,7 +1260,7 @@ class OnDraftController implements IOnDraftController {
     res.render("ondraft/articles", {
       session,
       isAdmin: isAdminSession(session),
-      articles: result.value,
+      articles: this.withReadMinutes(result.value),
       showingPublished,
       sortBy: this.articleSortBy(req),
       sortDirection: this.articleSortDirection(req),
@@ -1334,6 +1361,7 @@ class OnDraftController implements IOnDraftController {
       session,
       isAdmin: isAdminSession(session),
       article,
+      readMinutes: this.service.articleReadMinutes(article),
       likeActorId: this.likeActorId(session),
       values: this.articleFormValues(article),
       formAction: article.id === "preview" ? "/articles" : `/articles/${article.id}`,
@@ -1357,7 +1385,7 @@ class OnDraftController implements IOnDraftController {
       : result;
     res.render("ondraft/partials/articleList", {
       layout: false,
-      articles: result.value,
+      articles: this.withReadMinutes(result.value),
       showingPublished,
       isAdmin: isAdminSession(session),
       session,
@@ -1408,7 +1436,7 @@ class OnDraftController implements IOnDraftController {
       session,
       isAdmin: isAdminSession(session),
       requireLogin: false,
-      bookmarkedArticles,
+      bookmarkedArticles: this.withReadMinutes(bookmarkedArticles),
       bookmarkedForumPosts,
     });
   }
@@ -1534,7 +1562,8 @@ class OnDraftController implements IOnDraftController {
 
   async showBigBoard(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
     this.logger.info("Rendering big board page");
-    const selectedYear = this.parseBigBoardYear(req.query.year);
+    const parsedYear = this.parseBigBoardYear(req.query.year);
+    const selectedYear = parsedYear ?? await this.service.resolveDefaultBigBoardYear();
     const selectedCreator = this.parseBigBoardCreator(req.query.creator);
     const filter = this.buildBigBoardFilter(req);
     const result = await this.service.getBigBoard(selectedYear, selectedCreator, filter);
@@ -1631,6 +1660,8 @@ class OnDraftController implements IOnDraftController {
       return firstRank - secondRank || a.playerName.localeCompare(b.playerName);
     });
 
+    const defaultBigBoardYear = await this.service.resolveDefaultBigBoardYear();
+
     res.status(statusCode).render("ondraft/editBigBoard", {
       session,
       isAdmin: isAdminSession(session),
@@ -1651,6 +1682,7 @@ class OnDraftController implements IOnDraftController {
       errorMessage,
       statusMessage,
       validationIssues,
+      defaultBigBoardYear,
       currentPath: "/bigboard/edit",
       forceOverlaySidebar: true,
       layout: fragment ? false : undefined,
@@ -1961,6 +1993,7 @@ class OnDraftController implements IOnDraftController {
       session,
       isAdmin: isAdminSession(session),
       article,
+      readMinutes: this.service.articleReadMinutes(article),
       commentsLimit: 10,
       likeActorId: this.likeActorId(session),
       articleBookmarked: (await this.bookmarkedArticleIds(session)).includes(article.id),
@@ -3043,7 +3076,87 @@ class OnDraftController implements IOnDraftController {
       this.logger.error(`Failed to delete big board entry for player "${playerName}" ` + { error: result.value });
       res.status(this.mapBigBoardErrorToStatusCode(result.value)).send(result.value.message);
       return;
-    } 
+    }
+  }
+
+  private withReadMinutes(articles: Article[]): Array<Article & { readMinutes: number | null }> {
+    return articles.map((article) => ({ ...article, readMinutes: this.service.articleReadMinutes(article) }));
+  }
+
+  async setDefaultBigBoardYear(req: Request, res: Response, _session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Setting default big board year");
+    const year = this.parseBigBoardYear(req.body.year);
+    const creator = this.parseBigBoardCreator(req.body.creator) ?? "Ryan";
+    const result = await this.service.setDefaultBigBoardYear(year);
+    if (result.ok === false) {
+      if (req.get("HX-Request") === "true") {
+        const defaultBigBoardYear = await this.service.resolveDefaultBigBoardYear();
+        res.status(this.mapBigBoardErrorToStatusCode(result.value)).render("ondraft/partials/bigBoardDefaultYearControl", {
+          layout: false,
+          board: { year: year ?? defaultBigBoardYear, creator },
+          defaultBigBoardYear,
+          errorMessage: result.value.message,
+        });
+        return;
+      }
+      res.status(this.mapBigBoardErrorToStatusCode(result.value)).send(result.value.message);
+      return;
+    }
+    if (req.get("HX-Request") === "true") {
+      res.render("ondraft/partials/bigBoardDefaultYearControl", {
+        layout: false,
+        board: { year: result.value, creator },
+        defaultBigBoardYear: result.value,
+        errorMessage: null,
+      });
+      return;
+    }
+    res.redirect(`/bigboard/edit?year=${result.value}&creator=${encodeURIComponent(creator)}`);
+  }
+
+  // v2.1 c8-search
+  async showSearch(req: Request, res: Response, session: IOnDraftBrowserSession): Promise<void> {
+    this.logger.info("Rendering search page");
+    const rawTerm = (this.queryString(req, "q") ?? "").trim().slice(0, 100);
+    let results: SiteSearchResults | null = null;
+    if (rawTerm.length >= 2) {
+      const result = await this.service.searchSite(rawTerm);
+      if (result.ok === false && result.value.name !== "ArticleValidationError") {
+        res.status(this.mapArticleErrorToStatusCode(result.value)).send(result.value.message);
+        return;
+      }
+      if (result.ok === true) {
+        results = result.value;
+      }
+    }
+    const viewModel = {
+      session,
+      isAdmin: isAdminSession(session),
+      query: rawTerm,
+      results,
+      metaTitle: "Search | OnDraft Football",
+      metaDescription: "Search OnDraft Football articles, videos, Taproom hot takes, and draft board prospects.",
+      metaRobots: "noindex, follow",
+    };
+    if (req.get("HX-Request") === "true") {
+      res.render("ondraft/partials/searchResults", { ...viewModel, layout: false });
+      return;
+    }
+    res.render("ondraft/search", viewModel);
+  }
+
+  async showSearchSuggest(req: Request, res: Response, _session: IOnDraftBrowserSession): Promise<void> {
+    const rawTerm = (this.queryString(req, "q") ?? "").trim().slice(0, 100);
+    if (rawTerm.length < 2) {
+      res.render("ondraft/partials/searchSuggest", { layout: false, query: rawTerm, results: null });
+      return;
+    }
+    const result = await this.service.searchSite(rawTerm, { limitPerType: 3 });
+    res.render("ondraft/partials/searchSuggest", {
+      layout: false,
+      query: rawTerm,
+      results: result.ok === true ? result.value : null,
+    });
   }
 }
 

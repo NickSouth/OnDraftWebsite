@@ -7,7 +7,42 @@
       <span class="hidden sm:inline">OnDraft Football</span>
     </a>
 
+    <form
+      action="/search"
+      method="get"
+      role="search"
+      class="od-search-topbar hidden md:block"
+      data-skip-global-loader
+      x-data
+      @click.outside="document.getElementById('topbar-search-suggest').innerHTML = ''"
+      @keydown.escape="document.getElementById('topbar-search-suggest').innerHTML = ''"
+    >
+      <div class="od-search-field">
+        <input
+          class="od-search-input"
+          type="search"
+          name="q"
+          placeholder="Search OnDraft…"
+          aria-label="Search articles, videos, hot takes, and draft board prospects"
+          maxlength="100"
+          autocomplete="off"
+          hx-get="/search/suggest"
+          hx-trigger="input changed delay:300ms"
+          hx-target="#topbar-search-suggest"
+          hx-swap="innerHTML"
+          hx-sync="this:replace"
+        />
+        <button type="submit" class="od-search-icon-button od-search-submit right-1" aria-label="Search">
+          <svg viewBox="0 0 24 24" class="size-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        </button>
+      </div>
+      <div id="topbar-search-suggest"></div>
+    </form>
+
     <div class="flex min-w-0 shrink-0 items-center justify-end gap-1.5 sm:gap-2">
+      <a href="/search" class="od-icon-button md:hidden" aria-label="Search OnDraft" title="Search">
+        <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      </a>
       <% if (currentSession?.authenticatedUser) { %>
         <span class="hidden max-w-52 truncate text-sm text-slate-600 dark:text-slate-300 sm:inline">
           Signed in as <strong class="font-bold text-slate-950 dark:text-white"><%= currentSession.authenticatedUser.displayName %></strong>

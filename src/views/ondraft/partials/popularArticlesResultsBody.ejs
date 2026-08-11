@@ -23,7 +23,7 @@
         <span class="grid min-w-0 gap-1 sm:p-0">
           <span class="line-clamp-2 font-display text-[0.98rem] font-bold leading-tight sm:text-xl"><%= article.title %></span>
           <span class="flex min-w-0 flex-nowrap items-center gap-2 text-[0.7rem] leading-tight text-slate-600 dark:text-slate-300 sm:block sm:text-sm">
-            <span class="min-w-0 truncate">by <%= article.author %> on <%= article.publicationDate.toLocaleDateString() %></span>
+            <span class="min-w-0 truncate">by <%= article.author %> on <%= article.publicationDate.toLocaleDateString() %><% if (article.readMinutes) { %> &middot; <%= article.readMinutes %> min read<% } %></span>
             <span class="inline-flex shrink-0 items-center gap-1 rounded bg-draft-foam px-1.5 py-0.5 text-[0.68rem] font-black text-draft-amber dark:bg-white/10 dark:text-draft-gold sm:hidden">
               <span aria-hidden="true">&hearts;</span>
               <span><%= article.likes %></span>

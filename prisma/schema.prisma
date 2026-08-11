@@ -384,3 +384,31 @@ model ConsensusDiscrepancyWriteup {
   @@index([published])
   @@map("consensus_discrepancy_writeups")
 }
+
+// v2.1 c6-editor
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_settings")
+}
+
+// v2.1 c7-analytics
+model PageView {
+  id            String   @id
+  path          String
+  occurredAt    DateTime @default(now()) @map("occurred_at")
+  browserId     String   @map("browser_id")
+  referrerHost  String?  @map("referrer_host")
+  userAgent     String?  @map("user_agent")
+  deviceType    String   @default("desktop") @map("device_type")
+  authenticated Boolean  @default(false)
+  isAdmin       Boolean  @default(false) @map("is_admin")
+  isBot         Boolean  @default(false) @map("is_bot")
+
+  @@index([occurredAt])
+  @@index([path])
+  @@index([browserId, occurredAt])
+  @@map("page_views")
+}

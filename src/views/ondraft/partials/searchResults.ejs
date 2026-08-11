@@ -1,0 +1,115 @@
+<% if (!results) { %>
+  <div class="od-empty-state">
+    <div>
+      <p class="od-empty-state-kicker">Start your pour</p>
+      <p class="od-empty-state-title">Type at least 2 characters to search.</p>
+      <p class="od-empty-state-copy">Search articles, Bar TV, the Taproom, and draft board prospects.</p>
+    </div>
+  </div>
+<% } else if (results.totalCount === 0) { %>
+  <div class="od-empty-state">
+    <div>
+      <p class="od-empty-state-kicker">Dry tap</p>
+      <p class="od-empty-state-title">No matches for &ldquo;<%= results.term %>&rdquo;.</p>
+      <p class="od-empty-state-copy">Try a shorter or different term.</p>
+    </div>
+  </div>
+<% } else { %>
+  <div class="grid gap-6 sm:gap-8">
+    <% if (results.articles.length > 0) { %>
+      <section class="grid gap-2.5 sm:gap-3">
+        <h2 class="text-xs font-black uppercase tracking-[0.2em] text-draft-amber dark:text-draft-gold">Articles On Tap (<%= results.articles.length %>)</h2>
+        <ul class="od-stagger-list grid list-none gap-2.5 p-0 sm:gap-3">
+          <% results.articles.forEach((article) => { %>
+            <li class="od-card">
+              <a class="group grid min-w-0 grid-cols-[3rem_minmax(0,1fr)] items-center gap-2 text-slate-950 no-underline dark:text-white sm:gap-3" href="/articles/<%= article.id %>">
+                <span class="relative block aspect-square overflow-hidden rounded-md bg-draft-ink">
+                  <% if (article.imageUrl) { %>
+                    <img class="article-list-thumb" src="<%= article.imageUrl %>" alt="" loading="lazy" decoding="async" />
+                  <% } else { %>
+                    <span class="article-list-thumb article-list-thumb-empty">
+                      <img class="h-9 w-11 object-contain drop-shadow-sm" src="/images/brand/OnDraftLogo-cropped.png" alt="" loading="lazy" decoding="async" />
+                    </span>
+                  <% } %>
+                </span>
+                <span class="grid min-w-0 gap-1">
+                  <span class="flex flex-wrap items-center gap-1.5">
+                    <span class="od-search-result-type">Article</span>
+                    <span class="text-[0.68rem] font-semibold text-slate-500 dark:text-slate-400"><%= new Date(article.publicationDate).toLocaleDateString() %></span>
+                  </span>
+                  <span class="line-clamp-2 font-display text-base font-black leading-tight text-slate-950 transition group-hover:text-draft-amber dark:text-white dark:group-hover:text-draft-gold sm:line-clamp-1 sm:text-lg"><%= article.title %></span>
+                  <span class="min-w-0 truncate text-xs font-semibold text-slate-500 dark:text-slate-400">By <%= article.author %></span>
+                </span>
+              </a>
+            </li>
+          <% }) %>
+        </ul>
+      </section>
+    <% } %>
+    <% if (results.videos.length > 0) { %>
+      <section class="grid gap-2.5 sm:gap-3">
+        <h2 class="text-xs font-black uppercase tracking-[0.2em] text-draft-amber dark:text-draft-gold">Bar TV (<%= results.videos.length %>)</h2>
+        <ul class="od-stagger-list grid list-none gap-2.5 p-0 sm:gap-3">
+          <% results.videos.forEach((video) => { %>
+            <li class="od-card">
+              <a class="group grid min-w-0 grid-cols-[3rem_minmax(0,1fr)] items-center gap-2 text-slate-950 no-underline dark:text-white sm:gap-3" href="/videos/<%= video.videoId %>">
+                <span class="relative block aspect-square overflow-hidden rounded-md bg-draft-ink">
+                  <% if (video.thumbnailUrl) { %>
+                    <img class="article-list-thumb" src="<%= video.thumbnailUrl %>" alt="" loading="lazy" decoding="async" />
+                  <% } else { %>
+                    <span class="article-list-thumb article-list-thumb-empty">
+                      <img class="h-9 w-11 object-contain drop-shadow-sm" src="/images/brand/OnDraftLogo-cropped.png" alt="" loading="lazy" decoding="async" />
+                    </span>
+                  <% } %>
+                </span>
+                <span class="grid min-w-0 gap-1">
+                  <span class="flex flex-wrap items-center gap-1.5">
+                    <span class="od-search-result-type">Video</span>
+                    <span class="text-[0.68rem] font-semibold text-slate-500 dark:text-slate-400"><%= new Date(video.createdAt).toLocaleDateString() %></span>
+                  </span>
+                  <span class="line-clamp-2 font-display text-base font-black leading-tight text-slate-950 transition group-hover:text-draft-amber dark:text-white dark:group-hover:text-draft-gold sm:line-clamp-1 sm:text-lg"><%= video.title %></span>
+                </span>
+              </a>
+            </li>
+          <% }) %>
+        </ul>
+      </section>
+    <% } %>
+    <% if (results.hotTakes.length > 0) { %>
+      <section class="grid gap-2.5 sm:gap-3">
+        <h2 class="text-xs font-black uppercase tracking-[0.2em] text-draft-amber dark:text-draft-gold">Taproom Hot Takes (<%= results.hotTakes.length %>)</h2>
+        <ul class="od-stagger-list grid list-none gap-2.5 p-0 sm:gap-3">
+          <% results.hotTakes.forEach((post) => { %>
+            <li class="od-card">
+              <a class="group grid min-w-0 gap-1 text-slate-950 no-underline dark:text-white" href="/hottakes#hot-take-<%= post.id %>">
+                <span class="flex flex-wrap items-center gap-1.5">
+                  <span class="od-search-result-type">Hot Take</span>
+                  <span class="text-[0.68rem] font-semibold text-slate-500 dark:text-slate-400"><%= post.userName %> &middot; <%= new Date(post.createdAt).toLocaleDateString() %></span>
+                </span>
+                <span class="line-clamp-2 text-sm font-semibold leading-6 text-slate-800 transition group-hover:text-draft-amber dark:text-slate-200 dark:group-hover:text-draft-gold"><%= post.content.length > 120 ? `${post.content.slice(0, 120)}…` : post.content %></span>
+              </a>
+            </li>
+          <% }) %>
+        </ul>
+      </section>
+    <% } %>
+    <% if (results.players.length > 0) { %>
+      <section class="grid gap-2.5 sm:gap-3">
+        <h2 class="text-xs font-black uppercase tracking-[0.2em] text-draft-amber dark:text-draft-gold">Draft Board Prospects (<%= results.players.length %>)</h2>
+        <ul class="od-stagger-list grid list-none gap-2.5 p-0 sm:gap-3">
+          <% results.players.forEach((player) => { %>
+            <li class="od-card">
+              <a class="group grid min-w-0 gap-1 text-slate-950 no-underline dark:text-white" href="/bigboard?year=<%= player.year %><%- player.school ? `&amp;school=${encodeURIComponent(player.school)}` : "" %>">
+                <span class="flex flex-wrap items-center gap-1.5">
+                  <span class="od-search-result-type">Prospect</span>
+                  <span class="text-[0.68rem] font-semibold text-slate-500 dark:text-slate-400"><%= player.position %><%= player.posRank ?? "" %><% if (player.school) { %> &middot; <%= player.school %><% } %> &middot; <%= player.year %> class<% if (player.rank) { %> &middot; No. <%= player.rank %><% } %></span>
+                </span>
+                <span class="font-display text-base font-black leading-tight text-slate-950 transition group-hover:text-draft-amber dark:text-white dark:group-hover:text-draft-gold sm:text-lg"><%= player.playerName %></span>
+              </a>
+            </li>
+          <% }) %>
+        </ul>
+      </section>
+    <% } %>
+  </div>
+<% } %>
