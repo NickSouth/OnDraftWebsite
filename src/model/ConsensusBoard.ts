@@ -43,20 +43,19 @@ function consensusEntryDraft(
   discrepancyWriteupFor: ConsensusBoardInput["discrepancyWriteupFor"],
 ): ConsensusEntryDraft | null {
   const { Ryan, Aleks } = sources;
-  const source = Ryan ?? Aleks;
-  if (!source) {
-    throw new Error("Consensus entry cannot be created without a source player.");
-  }
 
-  // A player earns a consensus slot from published grades alone. One grader is enough;
-  // when both have graded, the consensus grade is the average of the two.
-  const gradedBy = [publishedBoardGrade(Ryan), publishedBoardGrade(Aleks)];
-  if (gradedBy.every((grade) => grade === null)) {
+  // A consensus needs both opinions: a player graded by only one of them is that grader's
+  // take, not a consensus, so the board admits a player only once both grades are published.
+  const ryanGrade = Ryan ? publishedBoardGrade(Ryan) : null;
+  const aleksGrade = Aleks ? publishedBoardGrade(Aleks) : null;
+  if (!Ryan || !Aleks || ryanGrade === null || aleksGrade === null) {
     return null;
   }
-  const consensusGrade = averageOf(gradedBy, 0);
+  const consensusGrade = (ryanGrade + aleksGrade) / 2;
 
-  const rankDiscrepency = typeof Ryan?.rank === "number" && typeof Aleks?.rank === "number"
+  // Ryan's published player info is the source of truth for the shared card.
+  const source = Ryan;
+  const rankDiscrepency = typeof Ryan.rank === "number" && typeof Aleks.rank === "number"
     ? Math.abs(Ryan.rank - Aleks.rank)
     : 0;
   const isBigDiscrepency = rankDiscrepency > CONSENSUS_RANK_DISCREPANCY_THRESHOLD;
@@ -77,12 +76,12 @@ function consensusEntryDraft(
         ? discrepancyWriteupFor(source.playerName) ?? { ryanWriteup: "", aleksWriteup: "", published: false }
         : undefined,
       consensusRankingContext: {
-        Ryan: Ryan ? { rank: Ryan.rank, posRank: Ryan.posRank } : undefined,
-        Aleks: Aleks ? { rank: Aleks.rank, posRank: Aleks.posRank } : undefined,
+        Ryan: { rank: Ryan.rank, posRank: Ryan.posRank },
+        Aleks: { rank: Aleks.rank, posRank: Aleks.posRank },
       },
     },
     consensusGrade,
-    averageRank: averageOf([Ryan?.rank, Aleks?.rank], Number.MAX_SAFE_INTEGER),
+    averageRank: averageOf([Ryan.rank, Aleks.rank], Number.MAX_SAFE_INTEGER),
   };
 }
 

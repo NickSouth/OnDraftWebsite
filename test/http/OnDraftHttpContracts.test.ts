@@ -2180,17 +2180,18 @@ describe("OnDraft HTTP contracts", () => {
     expect(consensus.text).not.toContain("/bigboard/edit?year=2026&amp;creator=Consensus");
     expect(consensus.text).toContain('href="/about#ryan-mcwalter"');
     expect(consensus.text).toContain('href="/about#aleks-ryabinkin"');
-    expect(consensus.text).toMatch(/1\. One Board Edge[\s\S]*EDGE1/);
-    expect(consensus.text).toMatch(/2\. Edge Prospect[\s\S]*EDGE2/);
-    expect(consensus.text).toMatch(/3\. Quarterback Prospect[\s\S]*QB1/);
+    expect(consensus.text).toMatch(/1\. Edge Prospect[\s\S]*EDGE1/);
+    expect(consensus.text).toMatch(/2\. Quarterback Prospect[\s\S]*QB1/);
     expect(consensus.text).toMatch(/Ryan(?:&#39;|')s Rank:\s*<strong>4<\/strong>[\s\S]*Aleks(?:&#39;|') Rank:\s*<strong>6<\/strong>/);
     expect(consensus.text).toMatch(/Ryan(?:&#39;|')s Rank:\s*<strong>1<\/strong>[\s\S]*Aleks(?:&#39;|') Rank:\s*<strong>13<\/strong>/);
     expect(consensus.text).toContain("Ryan State");
     expect(consensus.text).not.toContain("Aleks Tech");
     expect(consensus.text).toContain("Big discrepancy");
-    expect(consensus.text).toMatch(/4\. Tackle Prospect[\s\S]*Published U/);
-    expect(consensus.text).toMatch(/Tackle Prospect[\s\S]*Ryan(?:&#39;|')s Rank:\s*<strong>10<\/strong>/);
-    expect(consensus.text).not.toMatch(/Tackle Prospect[\s\S]*Aleks(?:&#39;|') Rank:\s*<strong>30<\/strong>/);
+    // Only Ryan ever graded this one, so it is his opinion rather than a consensus.
+    expect(consensus.text).not.toContain("One Board Edge");
+    // Aleks never published player info for the tackle, so it is one-sided too.
+    expect(consensus.text).not.toContain("Tackle Prospect");
+    expect(consensus.text).not.toContain("Published U");
     expect(consensus.text).not.toContain("Private U");
     expect(consensus.text).not.toContain("read player profile");
     expect(consensus.text).not.toContain("RUNDOWN");

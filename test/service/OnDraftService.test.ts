@@ -775,7 +775,6 @@ describe("OnDraftService big board editing", () => {
       expect(consensus.value.entries.map((entry) => entry.playerName)).toEqual([
         "Edge Prospect",
         "Quarterback Prospect",
-        "Tackle Prospect",
       ]);
 
       const quarterback = consensus.value.entries.find((entry) => entry.playerName === "Quarterback Prospect");
@@ -796,14 +795,10 @@ describe("OnDraftService big board editing", () => {
         bigDiscrepency: false,
       });
 
-      const tackle = consensus.value.entries.find((entry) => entry.playerName === "Tackle Prospect");
-      expect(tackle).toMatchObject({
-        school: "Published U",
-        position: "OT",
-        rank: 3,
-        posRank: 1,
-        bigDiscrepency: false,
-      });
+      // Aleks never published player info for the tackle, so his grade cannot count and the
+      // player is one-sided — no consensus slot, and none of his unpublished data leaks.
+      expect(consensus.value.entries.find((entry) => entry.playerName === "Tackle Prospect")).toBeUndefined();
+      expect(consensus.value.entries.map((entry) => entry.school)).not.toContain("Private U");
     }
   });
 
@@ -1033,9 +1028,35 @@ describe("OnDraftService big board editing", () => {
     });
     await ondraftService.createBigBoardEntry({
       year: 2026,
+      creator: "Aleks",
+      playerName: "Player Two",
+      school: "Aleks Tech",
+      position: "QB",
+      rank: 1,
+      posRank: 1,
+      height: { feet: 6, inches: 0 },
+      weight: 210,
+      grade: gradedAt("QB", 6),
+      gradePublished: true,
+    });
+    await ondraftService.createBigBoardEntry({
+      year: 2026,
       creator: "Ryan",
       playerName: "Receiver One",
       school: "Ryan State",
+      position: "WR",
+      rank: 9,
+      posRank: 1,
+      height: { feet: 6, inches: 1 },
+      weight: 200,
+      grade: gradedAt("WR", 7),
+      gradePublished: true,
+    });
+    await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Aleks",
+      playerName: "Receiver One",
+      school: "Aleks Tech",
       position: "WR",
       rank: 9,
       posRank: 1,
