@@ -160,6 +160,15 @@ function removeUploadedAssetsFromHtml(html: string) {
   }
 }
 
+function removeGeneratedArticleVideosFromHtml(html: string) {
+  const matches = html.matchAll(/\/generated\/article-videos\/v1\/([^"#]+?\.(?:mp4|webm))/g);
+  for (const match of matches) {
+    fs.rmSync(path.join(process.cwd(), "public", "generated", "article-videos", "v1", decodeURIComponent(match[1])), {
+      force: true,
+    });
+  }
+}
+
 function removeGeneratedArticleImagesFromHtml(html: string) {
   const matches = html.matchAll(/\/generated\/article-images\/v1\/([^"#]+?\.(?:jpg|png|gif|webp))/g);
   for (const match of matches) {
@@ -272,6 +281,68 @@ describe("OnDraft HTTP contracts", () => {
     expect(image.headers["content-type"]).toContain("image/png");
 
     removeGeneratedArticleImagesFromHtml(upload.body.url);
+  });
+
+  it("stores HTML article videos under predictable cacheable generated URLs", async () => {
+    const agent = await adminAgent();
+    const mp4 = Buffer.concat([
+      Buffer.from([0x00, 0x00, 0x00, 0x18]),
+      Buffer.from("ftypmp42"),
+      Buffer.alloc(64, 0x21),
+    ]);
+
+    const upload = await agent
+      .post("/articles/html-videos")
+      .attach("htmlVideo", mp4, { filename: "Pocket Passer Reel.mp4", contentType: "video/mp4" });
+
+    expect(upload.status).toBe(200);
+    expect(upload.body.url).toMatch(/^\/generated\/article-videos\/v1\/[0-9a-f]{16}-pocket-passer-reel\.mp4$/);
+
+    // Same bytes and name hash to the same key, so re-uploading is idempotent.
+    const secondUpload = await agent
+      .post("/articles/html-videos")
+      .attach("htmlVideo", mp4, { filename: "Pocket Passer Reel.mp4", contentType: "video/mp4" });
+
+    expect(secondUpload.status).toBe(200);
+    expect(secondUpload.body.url).toBe(upload.body.url);
+
+    const video = await request(app()).get(upload.body.url);
+    expect(video.status).toBe(200);
+    expect(video.headers["cache-control"]).toBe("public, max-age=31536000, immutable");
+    expect(video.headers["content-type"]).toContain("video/mp4");
+    // Range support is what lets the player scrub instead of buffering the whole file.
+    expect(video.headers["accept-ranges"]).toBe("bytes");
+
+    const ranged = await request(app()).get(upload.body.url).set("Range", "bytes=0-7");
+    expect(ranged.status).toBe(206);
+    expect(ranged.headers["content-range"]).toMatch(/^bytes 0-7\//);
+
+    removeGeneratedArticleVideosFromHtml(upload.body.url);
+  });
+
+  it("rejects HTML article video uploads that are not MP4 or WebM", async () => {
+    const agent = await adminAgent();
+
+    const upload = await agent
+      .post("/articles/html-videos")
+      .attach("htmlVideo", Buffer.from("not really a video"), { filename: "clip.mov", contentType: "video/quicktime" });
+
+    expect(upload.status).toBe(400);
+    expect(upload.body.error).toBe("Only MP4 or WebM files can be uploaded for HTML article videos.");
+  });
+
+  it("requires an admin session to upload HTML article videos", async () => {
+    // No attachment on purpose: the admin gate runs before multer reads the body, and
+    // racing an early 403 against an in-flight upload stream makes the client flaky.
+    const upload = await request(app()).post("/articles/html-videos");
+
+    expect(upload.status).toBe(403);
+  });
+
+  it("rejects generated article video paths outside the key boundary", async () => {
+    const response = await request(app()).get("/generated/article-videos/v1/not-a-key.mp4");
+
+    expect(response.status).toBe(404);
   });
 
   it("blocks cross-origin state-changing requests when an origin is present", async () => {

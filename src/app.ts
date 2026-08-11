@@ -14,7 +14,7 @@ import {
   RateLimiter,
 } from "./security/RateLimiter";
 import { TurnstileVerifier } from "./security/Turnstile";
-import { ARTICLE_HTML_IMAGE_MAX_BYTES, ARTICLE_PDF_MAX_BYTES, articleHtmlImageUpload, articleUpload } from "./uploads/articlePdfUpload";
+import { ARTICLE_HTML_IMAGE_MAX_BYTES, ARTICLE_HTML_VIDEO_MAX_BYTES, ARTICLE_PDF_MAX_BYTES, articleHtmlImageUpload, articleHtmlVideoUpload, articleUpload } from "./uploads/articlePdfUpload";
 import { formatRelativeTime } from "./view/formatRelativeTime";
 import {
   getAuthenticatedUser,
@@ -27,9 +27,13 @@ import {
 import { CreateHelmetAssetService, InvalidHelmetKeyError, type IHelmetAssetService } from "./service/HelmetAssetService";
 import {
   CreateArticleHtmlImageAssetService,
-  InvalidArticleHtmlImageKeyError,
   type IArticleHtmlImageAssetService,
 } from "./service/ArticleHtmlImageAssetService";
+import {
+  CreateArticleHtmlVideoAssetService,
+  type IArticleHtmlVideoAssetService,
+} from "./service/ArticleHtmlVideoAssetService";
+import { InvalidArticleHtmlAssetKeyError } from "./service/ArticleHtmlAssetStore";
 import { ILoggingService } from "./service/LoggingService";
 import type { AnalyticsCategory, AnalyticsPeriod, IPageViewRecorder } from "./service/AnalyticsService";
 import type { ITurnstileConfig } from "./config/AppConfig";
@@ -135,6 +139,7 @@ class ExpressApp implements IApp {
     private readonly siteBaseUrl = "http://localhost:3000",
     private readonly helmetAssets: IHelmetAssetService = CreateHelmetAssetService(),
     private readonly articleHtmlImages: IArticleHtmlImageAssetService = CreateArticleHtmlImageAssetService(),
+    private readonly articleHtmlVideos: IArticleHtmlVideoAssetService = CreateArticleHtmlVideoAssetService(),
     private readonly pageViews?: IPageViewRecorder,
   ) {
     this.app = express();
@@ -176,8 +181,26 @@ class ExpressApp implements IApp {
           res.setHeader("Cache-Control", this.articleHtmlImages.cacheControlHeader());
           res.sendFile(imagePath);
         } catch (error) {
-          if (error instanceof InvalidArticleHtmlImageKeyError || (error as NodeJS.ErrnoException).code === "ENOENT") {
+          if (error instanceof InvalidArticleHtmlAssetKeyError || (error as NodeJS.ErrnoException).code === "ENOENT") {
             res.status(404).send("Article image not found.");
+            return;
+          }
+          throw error;
+        }
+      }),
+    );
+    this.app.get(
+      "/generated/article-videos/v1/:videoKey",
+      asyncHandler(async (req, res) => {
+        const videoKey = typeof req.params.videoKey === "string" ? req.params.videoKey : "";
+        try {
+          const videoPath = await this.articleHtmlVideos.generatedVideoPath(videoKey);
+          res.setHeader("Cache-Control", this.articleHtmlVideos.cacheControlHeader());
+          // sendFile answers Range requests, which is what lets the player scrub.
+          res.sendFile(videoPath);
+        } catch (error) {
+          if (error instanceof InvalidArticleHtmlAssetKeyError || (error as NodeJS.ErrnoException).code === "ENOENT") {
+            res.status(404).send("Article video not found.");
             return;
           }
           throw error;
@@ -359,6 +382,23 @@ class ExpressApp implements IApp {
         : err instanceof Error
           ? err.message
           : "Unable to upload the HTML article image.";
+
+      res.status(400).json({ error: message });
+    });
+  }
+
+  private handleArticleHtmlVideoUpload(req: Request, res: Response, next: NextFunction): void {
+    articleHtmlVideoUpload.single("htmlVideo")(req, res, (err: unknown) => {
+      if (!err) {
+        next();
+        return;
+      }
+
+      const message = err instanceof Error && err.name === "MulterError" && err.message === "File too large"
+        ? `HTML article videos must be ${Math.floor(ARTICLE_HTML_VIDEO_MAX_BYTES / 1024 / 1024)} MB or smaller.`
+        : err instanceof Error
+          ? err.message
+          : "Unable to upload the HTML article video.";
 
       res.status(400).json({ error: message });
     });
@@ -1172,6 +1212,26 @@ class ExpressApp implements IApp {
       }),
     );
 
+    this.app.post(
+      "/articles/html-videos",
+      (req, res, next) => {
+        if (!this.requireAdmin(req, res)) {
+          return;
+        }
+
+        this.handleArticleHtmlVideoUpload(req, res, next);
+      },
+      asyncHandler(async (req, res) => {
+        if (!req.file) {
+          res.status(400).json({ error: "Choose a video before uploading." });
+          return;
+        }
+
+        const storedVideo = await this.articleHtmlVideos.storeUploadedVideo(req.file);
+        res.json(storedVideo);
+      }),
+    );
+
     this.app.get(
       "/articles/:id/edit",
       asyncHandler(async (req, res) => {
@@ -1596,5 +1656,5 @@ export function CreateApp(
   siteBaseUrl?: string,
   pageViewRecorder?: IPageViewRecorder,
 ): IApp {
-  return new ExpressApp(controller, authController, logger, sessionStore, turnstileConfig, siteBaseUrl, undefined, undefined, pageViewRecorder);
+  return new ExpressApp(controller, authController, logger, sessionStore, turnstileConfig, siteBaseUrl, undefined, undefined, undefined, pageViewRecorder);
 }
