@@ -1003,6 +1003,21 @@ textarea {
   border-bottom: 1px solid var(--panel-border);
 }
 
+.board-editor-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.board-editor-sort-grade-button {
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 0.875rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
 .board-editor-dirty-actions {
   display: flex;
   flex-wrap: wrap;

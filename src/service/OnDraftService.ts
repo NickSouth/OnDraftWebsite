@@ -25,6 +25,8 @@ const ARTICLE_WRITEUP_MAX_WORDS = 300;
 const ARTICLE_TAG_MAX_LENGTH = 24;
 const ARTICLE_TAG_MAX_COUNT = 12;
 const ARTICLE_TAG_PATTERN = /^[a-z0-9-]+$/;
+// Mirrors the key shape ArticleHtmlVideoAssetService hands back from an upload.
+const ARTICLE_VIDEO_SRC_PATTERN = /^\/generated\/article-videos\/v1\/[0-9a-f]{16}-[a-z0-9-]{1,36}\.(mp4|webm)$/;
 const COMMENT_TEXT_MAX_WORDS = 200;
 const COMMENT_TEXT_MAX_LENGTH = 2000;
 const DEFAULT_BIG_BOARD_CREATOR: BigBoardCreator = "Ryan";
@@ -371,19 +373,46 @@ class OnDraftService implements IOnDraftService {
         "ol",
         "p",
         "pre",
+        "source",
         "span",
         "strong",
         "ul",
+        "video",
       ],
       allowedAttributes: {
         a: ["href", "title", "target", "rel"],
         img: ["src", "alt", "title", "loading", "decoding"],
+        // No autoplay: these are full-size uploads and a page must not start pulling one on load.
+        video: ["src", "poster", "preload", "controls", "muted", "loop", "playsinline", "width", "height"],
+        source: ["src", "type"],
       },
       allowedSchemes: ["http", "https", "mailto"],
+      // sanitize-html's defaults plus source, so video markup closes the way img does.
+      selfClosing: ["img", "br", "hr", "area", "base", "basefont", "input", "link", "meta", "source"],
       transformTags: {
         a: sanitizeHtml.simpleTransform("a", { rel: "noopener noreferrer" }, true),
+        video: (tagName, attribs) => this.transformArticleVideoTag(tagName, attribs),
+        source: (tagName, attribs) => this.transformArticleVideoTag(tagName, attribs),
       },
+      // A source stripped of its src plays nothing, so drop the empty element too.
+      exclusiveFilter: (frame) => frame.tag === "source" && !frame.attribs.src,
     }).trim();
+  }
+
+  // Article video has to come from our own upload route: a foreign src would be blocked by the
+  // page's content security policy anyway, and would leak readers to a third-party host.
+  private transformArticleVideoTag(tagName: string, attribs: Record<string, string>): { tagName: string; attribs: Record<string, string> } {
+    // Deleting in place rather than rebuilding keeps the authored attribute order.
+    const next: Record<string, string> = { ...attribs };
+    if (!ARTICLE_VIDEO_SRC_PATTERN.test(next.src ?? "")) {
+      delete next.src;
+    }
+    if (tagName === "video") {
+      // Without controls the upload is unplayable, and metadata-only keeps page loads cheap.
+      next.controls = "controls";
+      next.preload = attribs.preload === "none" ? "none" : "metadata";
+    }
+    return { tagName, attribs: next };
   }
 
   private sanitizeArticleContent(content: ArticleContent): ArticleContent {
