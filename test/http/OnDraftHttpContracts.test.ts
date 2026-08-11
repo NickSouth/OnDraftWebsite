@@ -3017,6 +3017,84 @@ describe("OnDraft HTTP contracts", () => {
     expect(article.text).not.toContain("<iframe");
   });
 
+  it("keeps uploaded video embeds in HTML articles and normalizes their playback attributes", async () => {
+    const agent = await adminAgent();
+    const videoUrl = "/generated/article-videos/v1/1234567890abcdef-pocket-passer-reel.mp4";
+
+    const create = await agent
+      .post("/articles")
+      .type("form")
+      .send({
+        title: "HTML Video Room",
+        author: "Ryan McWalter",
+        writeup: "A short HTML summary.",
+        publicationDate: "2024-01-01",
+        contentType: "html",
+        content: `<p>Tape:</p><video src="${videoUrl}" autoplay onerror="alert(1)"></video>`,
+      });
+
+    expect(create.status).toBe(302);
+
+    const article = await agent.get(create.headers.location);
+
+    expect(article.status).toBe(200);
+    expect(article.text).toContain(`<video src="${videoUrl}" controls="controls" preload="metadata"></video>`);
+    // Autoplay would start pulling a 100 MB upload on page load.
+    expect(article.text).not.toContain("autoplay");
+    expect(article.text).not.toContain("onerror");
+  });
+
+  it("keeps multi-source video embeds and drops sources pointing off-site", async () => {
+    const agent = await adminAgent();
+    const webm = "/generated/article-videos/v1/1234567890abcdef-pocket-passer-reel.webm";
+
+    const create = await agent
+      .post("/articles")
+      .type("form")
+      .send({
+        title: "HTML Multi Source",
+        author: "Ryan McWalter",
+        writeup: "A short HTML summary.",
+        publicationDate: "2024-01-01",
+        contentType: "html",
+        content: `<video><source src="${webm}" type="video/webm"><source src="https://evil.example/clip.mp4" type="video/mp4"></video>`,
+      });
+
+    expect(create.status).toBe(302);
+
+    const article = await agent.get(create.headers.location);
+
+    expect(article.status).toBe(200);
+    expect(article.text).toContain(`<source src="${webm}" type="video/webm" />`);
+    expect(article.text).not.toContain("evil.example");
+    // The off-site source loses its src, so the empty element is dropped rather than left behind.
+    expect(article.text).not.toContain('<source type="video/mp4"');
+  });
+
+  it("strips video sources that are not uploaded article videos", async () => {
+    const agent = await adminAgent();
+
+    const create = await agent
+      .post("/articles")
+      .type("form")
+      .send({
+        title: "HTML Foreign Video",
+        author: "Ryan McWalter",
+        writeup: "A short HTML summary.",
+        publicationDate: "2024-01-01",
+        contentType: "html",
+        content: '<video src="https://evil.example/clip.mp4" controls></video><video src="/generated/article-videos/v1/../../secret.mp4" controls></video>',
+      });
+
+    expect(create.status).toBe(302);
+
+    const article = await agent.get(create.headers.location);
+
+    expect(article.status).toBe(200);
+    expect(article.text).not.toContain("evil.example");
+    expect(article.text).not.toContain("secret.mp4");
+  });
+
   it("swaps article content fields with the HTMX partial route", async () => {
     const agent = await adminAgent();
 
@@ -3027,6 +3105,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(createForm.text).toContain('type="date" name="publicationDate"');
     expect(createForm.text).toContain('data-hook-count');
     expect(createForm.text).toContain('data-hook-max-words="300"');
+    expect(createForm.text).toContain('<script src="/articleHtmlVideos.js" defer></script>');
     expect(createForm.text.indexOf('data-tag-editor')).toBeLessThan(createForm.text.indexOf('data-hook-input'));
 
     const pdfFields = await agent.get("/articles/new/content-fields?contentType=pdf");
@@ -3040,6 +3119,9 @@ describe("OnDraft HTTP contracts", () => {
     expect(htmlFields.text).toContain("<textarea");
     expect(htmlFields.text).toContain('data-html-image-uploader');
     expect(htmlFields.text).toContain('name="htmlImage"');
+    expect(htmlFields.text).toContain('data-html-video-uploader');
+    expect(htmlFields.text).toContain('name="htmlVideo"');
+    expect(htmlFields.text).toContain('accept="video/mp4,video/webm,.mp4,.webm"');
 
     const plainTextFields = await agent.get("/articles/new/content-fields?contentType=plainText");
     expect(plainTextFields.status).toBe(200);

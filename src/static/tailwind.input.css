@@ -784,27 +784,33 @@
     @apply m-0 rounded bg-slate-50 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-500 dark:bg-white/5 dark:text-slate-300;
   }
 
-  .html-image-uploader {
+  .html-image-uploader,
+  .html-video-uploader {
     @apply grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/[0.04] sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end;
   }
 
-  .html-image-uploader .secondary-button {
+  .html-image-uploader .secondary-button,
+  .html-video-uploader .secondary-button {
     @apply od-secondary-link w-full sm:w-auto;
   }
 
-  .html-image-uploader .secondary-button:disabled {
+  .html-image-uploader .secondary-button:disabled,
+  .html-video-uploader .secondary-button:disabled {
     @apply cursor-wait opacity-60;
   }
 
-  .html-image-uploader-status {
+  .html-image-uploader-status,
+  .html-video-uploader-status {
     @apply m-0 rounded bg-white px-3 py-2 text-xs font-bold text-slate-600 dark:bg-draft-ink dark:text-slate-300 sm:col-span-2;
   }
 
-  .html-image-uploader-status[data-state="success"] {
+  .html-image-uploader-status[data-state="success"],
+  .html-video-uploader-status[data-state="success"] {
     @apply text-emerald-700 dark:text-emerald-200;
   }
 
-  .html-image-uploader-status[data-state="error"] {
+  .html-image-uploader-status[data-state="error"],
+  .html-video-uploader-status[data-state="error"] {
     @apply text-red-700 dark:text-red-200;
   }
 
