@@ -1,4 +1,4 @@
-// Generated from the analyst's master_dictionary_functions.py (external hand-off, not tracked in repo; last received 2026-07-01). Do not edit weights by hand.
+// Generated from the analyst's master_dictionary_functions.py (external hand-off, not tracked in repo; last received 2026-08-12). Do not edit weights by hand.
 
 export const DRAFT_GRADE_FORMULAS = {
   "QB": {
@@ -88,8 +88,8 @@ export const DRAFT_GRADE_FORMULAS = {
         }
       },
       "Project": {
-        "Physical Weight": 0.43,
-        "Film Weight": 0.57,
+        "Physical Weight": 0.4,
+        "Film Weight": 0.6,
         "Physicals": {
           "Speed": 0.18,
           "Acceleration": 0.19,
