@@ -124,9 +124,12 @@
           <span id="big-board-save-status" class="save-status"><%= statusMessage || "" %></span>
         </span>
       </div>
-      <div class="board-editor-dirty-actions" data-board-dirty-actions hidden>
-        <span class="board-editor-unsaved-label">Unsaved</span>
-        <button type="button" class="board-editor-save-board-button" data-save-full-board>Save full board</button>
+      <div class="board-editor-toolbar-actions">
+        <button type="button" class="secondary-button board-editor-sort-grade-button" data-sort-by-grade>Sort by grades</button>
+        <div class="board-editor-dirty-actions" data-board-dirty-actions hidden>
+          <span class="board-editor-unsaved-label">Unsaved</span>
+          <button type="button" class="board-editor-save-board-button" data-save-full-board>Save full board</button>
+        </div>
       </div>
     </div>
 
@@ -231,6 +234,7 @@
     const confirmEntryDelete = deleteModal?.querySelector("[data-confirm-entry-delete]");
     const dirtyActions = document.querySelector("[data-board-dirty-actions]");
     const saveFullBoardButton = document.querySelector("[data-save-full-board]");
+    const sortByGradeButton = document.querySelector("[data-sort-by-grade]");
     const unsavedChangesMessage = "You have unsaved changes, are you sure you want to exit?";
     let pendingDeleteForm = null;
     let nativeSubmissionInProgress = false;
@@ -625,6 +629,31 @@
         }
         updateFormState(form);
       });
+    }
+
+    function gradeSortValue(item) {
+      const form = item.querySelector("[data-board-entry-form]");
+      return form ? numericGradeValue(form.querySelector("[data-grade-final-input]")?.value) : null;
+    }
+
+    // Highest grade first, ungraded cards held at the bottom in their existing order.
+    function sortBoardByGrade() {
+      if (!list) {
+        return;
+      }
+      const ordered = Array.from(list.querySelectorAll("[data-board-entry-item]"))
+        .map((item, index) => ({ item, index, grade: gradeSortValue(item) }))
+        .sort((first, second) => {
+          if (first.grade === null || second.grade === null) {
+            return (first.grade === null ? 1 : 0) - (second.grade === null ? 1 : 0) || first.index - second.index;
+          }
+          return second.grade - first.grade || first.index - second.index;
+        });
+      if (ordered.every((entry, position) => entry.index === position)) {
+        return;
+      }
+      ordered.forEach(({ item }) => list.append(item));
+      reindexBoardOrder();
     }
 
     function initializeDragAndDrop() {
@@ -1034,6 +1063,11 @@
     }, editorListenerOptions);
 
     saveFullBoardButton?.addEventListener("click", submitFullBoard);
+    sortByGradeButton?.addEventListener("click", () => {
+      if (window.confirm("Reorder the whole board by grade? Every player and position rank is rewritten, with ungraded players moved to the bottom.")) {
+        sortBoardByGrade();
+      }
+    }, editorListenerOptions);
     scrollToFirstValidationError();
 
     document.addEventListener("click", (event) => {

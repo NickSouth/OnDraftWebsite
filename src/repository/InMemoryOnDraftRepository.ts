@@ -1,6 +1,7 @@
 import { Err, Ok, Result } from "../lib/result";
 import { Article, ArticleFilter, BIG_BOARD_CREATORS, BigBoard, BigBoardCreator, BigBoardEntry, BigBoardPlayerSearchHit, Comment, ConsensusBigBoard, ConsensusDiscrepancyWriteup, DraftBoardFilter, ForumPost, ForumPostFilter, Newsletter, Video, VideoQuery } from "../model/OnDraftContent";
-import { defaultDraftGrade, effectiveDraftBoardGrade } from "../model/DraftGrades";
+import { defaultDraftGrade } from "../model/DraftGrades";
+import { buildConsensusBigBoard } from "../model/ConsensusBoard";
 import { ArticleNotFound, BigBoardNotFound, CommentNotFound, DuplicateBigBoardYear, DuplicatePlayer, DuplicateArticle, DuplicateForumPost, DuplicateNewsletter, ForumPostCommentNotFound, type ArticleError, type BigBoardError, type IOnDraftRepository, type NewsletterError, NewsletterNotFound, PlayerNotFound, ForumPostError, ForumPostNotFound } from "./OnDraftRepository";
 
 const MEMORY_LOAD_TEST_SCHOOLS = [
@@ -570,111 +571,15 @@ class InMemoryOnDraftRepository implements IOnDraftRepository {
   }
 
   private generateConsensusBigBoard(year: number): BigBoard {
-    const ryanBoard = this.findBigBoard(year, "Ryan");
-    const aleksBoard = this.findBigBoard(year, "Aleks");
-    const entriesByPlayer = new Map<string, { Ryan?: BigBoardEntry; Aleks?: BigBoardEntry }>();
-    type ConsensusEntryDraft = {
-      entry: BigBoardEntry;
-      averageRank: number;
-      ryanRank: number;
-      aleksRank: number;
-    };
-
-    ryanBoard?.entries.filter((entry) => entry.playerInfoPublished).forEach((entry) => {
-      entriesByPlayer.set(entry.playerName, {
-        ...entriesByPlayer.get(entry.playerName),
-        Ryan: entry,
-      });
+    return buildConsensusBigBoard({
+      year,
+      ryanEntries: this.findBigBoard(year, "Ryan")?.entries ?? [],
+      aleksEntries: this.findBigBoard(year, "Aleks")?.entries ?? [],
+      discrepancyWriteupFor: (playerName) => {
+        const writeup = this.findConsensusDiscrepancyWriteup(year, playerName);
+        return writeup ? this.cloneConsensusDiscrepancyWriteup(writeup) : undefined;
+      },
     });
-    aleksBoard?.entries.filter((entry) => entry.playerInfoPublished).forEach((entry) => {
-      entriesByPlayer.set(entry.playerName, {
-        ...entriesByPlayer.get(entry.playerName),
-        Aleks: entry,
-      });
-    });
-
-    const average = (values: Array<number | null | undefined>): number => {
-      const rankedValues = values.filter((value): value is number => typeof value === "number");
-      if (rankedValues.length === 0) {
-        return Number.MAX_SAFE_INTEGER;
-      }
-      return rankedValues.reduce((sum, value) => sum + value, 0) / rankedValues.length;
-    };
-
-    const nullableAverage = (values: Array<number | null | undefined>): number | null => {
-      const numericValues = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
-      if (numericValues.length === 0) {
-        return null;
-      }
-      return numericValues.reduce((sum, value) => sum + value, 0) / numericValues.length;
-    };
-
-    const compareOverall = (first: ConsensusEntryDraft, second: ConsensusEntryDraft): number => (
-      first.averageRank - second.averageRank ||
-      first.ryanRank - second.ryanRank ||
-      first.aleksRank - second.aleksRank ||
-      first.entry.playerName.localeCompare(second.entry.playerName)
-    );
-
-    const consensusDrafts: ConsensusEntryDraft[] = [...entriesByPlayer.values()].map(({ Ryan, Aleks }) => {
-      const sourceOfTruth = Ryan ?? Aleks;
-      if (!sourceOfTruth) {
-        throw new Error("Consensus entry cannot be created without a source player.");
-      }
-
-      const averageRank = average([Ryan?.rank, Aleks?.rank]);
-      const rankDiscrepency = typeof Ryan?.rank === "number" && typeof Aleks?.rank === "number"
-        ? Math.abs(Ryan.rank - Aleks.rank)
-        : 0;
-      const averageFinalGrade = nullableAverage([
-        Ryan?.gradePublished ? effectiveDraftBoardGrade(Ryan.grade) : null,
-        Aleks?.gradePublished ? effectiveDraftBoardGrade(Aleks.grade) : null,
-      ]);
-
-      return {
-        entry: {
-          ...sourceOfTruth,
-          id: `consensus-${sourceOfTruth.id}`,
-          rank: null,
-          posRank: null,
-          grade: null,
-          writeup: { strengths: "", weaknesses: "", rundown: "" },
-          writeupPublished: false,
-          gradePublished: averageFinalGrade !== null,
-          gradeSummary: averageFinalGrade !== null ? { finalGrade: averageFinalGrade } : undefined,
-          bigDiscrepency: rankDiscrepency > 10,
-          discWriteup: rankDiscrepency > 10
-            ? this.cloneConsensusDiscrepancyWriteup(this.findConsensusDiscrepancyWriteup(year, sourceOfTruth.playerName) ?? { ryanWriteup: "", aleksWriteup: "", published: false })
-            : undefined,
-          consensusRankingContext: {
-            Ryan: Ryan ? { rank: Ryan.rank, posRank: Ryan.posRank } : undefined,
-            Aleks: Aleks ? { rank: Aleks.rank, posRank: Aleks.posRank } : undefined,
-          },
-        },
-        averageRank,
-        ryanRank: Ryan?.rank ?? Number.MAX_SAFE_INTEGER,
-        aleksRank: Aleks?.rank ?? Number.MAX_SAFE_INTEGER,
-      };
-    });
-
-    consensusDrafts.sort(compareOverall);
-    consensusDrafts.forEach((draft, index) => {
-      draft.entry.rank = index + 1;
-    });
-
-    const draftsByPosition = new Map<string, ConsensusEntryDraft[]>();
-    consensusDrafts.forEach((draft) => {
-      const positionDrafts = draftsByPosition.get(draft.entry.position) ?? [];
-      positionDrafts.push(draft);
-      draftsByPosition.set(draft.entry.position, positionDrafts);
-    });
-    draftsByPosition.forEach((positionDrafts) => {
-      positionDrafts.forEach((draft, index) => {
-        draft.entry.posRank = index + 1;
-      });
-    });
-
-    return { year, creator: "Consensus", entries: consensusDrafts.map((draft) => draft.entry) };
   }
 
   async createBigBoardYear(year: number): Promise<Result<void, BigBoardError>> {

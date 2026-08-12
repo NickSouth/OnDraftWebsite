@@ -22,7 +22,9 @@ describe("InMemoryOnDraftRepository", () => {
 
     expect(ryan.ok && ryan.value.entries).toHaveLength(50);
     expect(aleks.ok && aleks.value.entries).toHaveLength(50);
-    expect(consensus.ok && consensus.value.entries).toHaveLength(50);
+    // The seed publishes grades for only the first 12 players, and the consensus board
+    // now admits graded players only.
+    expect(consensus.ok && consensus.value.entries).toHaveLength(12);
   });
 
   describe("v2.1 search", () => {

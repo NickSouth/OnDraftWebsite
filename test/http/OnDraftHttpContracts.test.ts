@@ -2,6 +2,8 @@ import request from "supertest";
 import fs from "node:fs";
 import path from "node:path";
 import { createComposedApp } from "../../src/composition";
+import { defaultDraftGrade, gradeTraitCategoriesForGrade } from "../../src/model/DraftGrades";
+import type { Position } from "../../src/model/OnDraftContent";
 import type { IEmailService, SendEmailVerificationEmailInput, SendNewsletterEmailInput, SendPasswordResetEmailInput } from "../../src/email/EmailService";
 
 function testConfig(turnstile = { siteKey: null as string | null, secretKey: null as string | null, verificationDisabled: false }) {
@@ -125,10 +127,43 @@ function edgeGradePayload(prefix: string, score = "6", potential = "6") {
   return payload;
 }
 
+// Publishing a grade needs every trait filled, but the consensus order only depends on the board
+// grade — so fill the traits from the position config and pin the result with an override.
+function gradePayloadAt(prefix: string, position: Position, boardGrade: number) {
+  const base = defaultDraftGrade(position);
+  if (!base) {
+    throw new Error(`Missing grade config for ${position}`);
+  }
+  const [physicals, filmTraits] = gradeTraitCategoriesForGrade(base, position);
+  const payload: Record<string, string> = {
+    [`${prefix}[grade][position]`]: position,
+    [`${prefix}[grade][archetype]`]: base.archetype,
+    [`${prefix}[grade][potential]`]: "1",
+    [`${prefix}[grade][overrideDisplayGrade]`]: boardGrade.toFixed(2),
+    [`${prefix}[gradePublished]`]: "true",
+  };
+  physicals.traits.forEach((trait) => {
+    payload[`${prefix}[grade][physicalTraits][${trait}]`] = "1";
+  });
+  filmTraits.traits.forEach((trait) => {
+    payload[`${prefix}[grade][filmTraits][${trait}]`] = "1";
+  });
+  return payload;
+}
+
 function removeUploadedAssetsFromHtml(html: string) {
   const matches = html.matchAll(/\/uploads\/articles\/([^"#]+?\.(?:pdf|jpg|jpeg|png|gif|webp))/g);
   for (const match of matches) {
     fs.rmSync(path.join(process.cwd(), "public", "uploads", "articles", decodeURIComponent(match[1])), {
+      force: true,
+    });
+  }
+}
+
+function removeGeneratedArticleVideosFromHtml(html: string) {
+  const matches = html.matchAll(/\/generated\/article-videos\/v1\/([^"#]+?\.(?:mp4|webm))/g);
+  for (const match of matches) {
+    fs.rmSync(path.join(process.cwd(), "public", "generated", "article-videos", "v1", decodeURIComponent(match[1])), {
       force: true,
     });
   }
@@ -246,6 +281,68 @@ describe("OnDraft HTTP contracts", () => {
     expect(image.headers["content-type"]).toContain("image/png");
 
     removeGeneratedArticleImagesFromHtml(upload.body.url);
+  });
+
+  it("stores HTML article videos under predictable cacheable generated URLs", async () => {
+    const agent = await adminAgent();
+    const mp4 = Buffer.concat([
+      Buffer.from([0x00, 0x00, 0x00, 0x18]),
+      Buffer.from("ftypmp42"),
+      Buffer.alloc(64, 0x21),
+    ]);
+
+    const upload = await agent
+      .post("/articles/html-videos")
+      .attach("htmlVideo", mp4, { filename: "Pocket Passer Reel.mp4", contentType: "video/mp4" });
+
+    expect(upload.status).toBe(200);
+    expect(upload.body.url).toMatch(/^\/generated\/article-videos\/v1\/[0-9a-f]{16}-pocket-passer-reel\.mp4$/);
+
+    // Same bytes and name hash to the same key, so re-uploading is idempotent.
+    const secondUpload = await agent
+      .post("/articles/html-videos")
+      .attach("htmlVideo", mp4, { filename: "Pocket Passer Reel.mp4", contentType: "video/mp4" });
+
+    expect(secondUpload.status).toBe(200);
+    expect(secondUpload.body.url).toBe(upload.body.url);
+
+    const video = await request(app()).get(upload.body.url);
+    expect(video.status).toBe(200);
+    expect(video.headers["cache-control"]).toBe("public, max-age=31536000, immutable");
+    expect(video.headers["content-type"]).toContain("video/mp4");
+    // Range support is what lets the player scrub instead of buffering the whole file.
+    expect(video.headers["accept-ranges"]).toBe("bytes");
+
+    const ranged = await request(app()).get(upload.body.url).set("Range", "bytes=0-7");
+    expect(ranged.status).toBe(206);
+    expect(ranged.headers["content-range"]).toMatch(/^bytes 0-7\//);
+
+    removeGeneratedArticleVideosFromHtml(upload.body.url);
+  });
+
+  it("rejects HTML article video uploads that are not MP4 or WebM", async () => {
+    const agent = await adminAgent();
+
+    const upload = await agent
+      .post("/articles/html-videos")
+      .attach("htmlVideo", Buffer.from("not really a video"), { filename: "clip.mov", contentType: "video/quicktime" });
+
+    expect(upload.status).toBe(400);
+    expect(upload.body.error).toBe("Only MP4 or WebM files can be uploaded for HTML article videos.");
+  });
+
+  it("requires an admin session to upload HTML article videos", async () => {
+    // No attachment on purpose: the admin gate runs before multer reads the body, and
+    // racing an early 403 against an in-flight upload stream makes the client flaky.
+    const upload = await request(app()).post("/articles/html-videos");
+
+    expect(upload.status).toBe(403);
+  });
+
+  it("rejects generated article video paths outside the key boundary", async () => {
+    const response = await request(app()).get("/generated/article-videos/v1/not-a-key.mp4");
+
+    expect(response.status).toBe(404);
   });
 
   it("blocks cross-origin state-changing requests when an origin is present", async () => {
@@ -1269,6 +1366,9 @@ describe("OnDraft HTTP contracts", () => {
     expect(editor.text).toContain('hx-post="/bigboard/edit/delete-entry"');
     expect(editor.text).toContain("add player writeup");
     expect(editor.text).toContain("Save full board");
+    expect(editor.text).toContain("Sort by grades");
+    expect(editor.text).toContain("data-sort-by-grade");
+    expect(editor.text).toContain("sortBoardByGrade");
     expect(editor.text).toContain("data-board-dirty-actions");
     expect(editor.text).toContain("markBoardStructureDirty");
     expect(editor.text).toContain("scrollToFirstValidationError");
@@ -2006,6 +2106,7 @@ describe("OnDraft HTTP contracts", () => {
       "entries[0][weaknesses]": "Copied Ryan weakness should not appear.",
       "entries[0][rundown]": "Copied Ryan rundown should not appear.",
       "entries[0][writeupPublished]": "true",
+      ...gradePayloadAt("entries[0]", "QB", 6),
       "entries[1][id]": "ryan-edge",
       "entries[1][playerName]": "Edge Prospect",
       "entries[1][school]": "OnDraft State",
@@ -2015,6 +2116,7 @@ describe("OnDraft HTTP contracts", () => {
       "entries[1][heightLabel]": "6-4",
       "entries[1][weight]": "255",
       "entries[1][playerInfoPublished]": "true",
+      ...gradePayloadAt("entries[1]", "EDGE", 7.5),
       "entries[2][id]": "ryan-tackle",
       "entries[2][playerName]": "Tackle Prospect",
       "entries[2][school]": "Published U",
@@ -2024,6 +2126,7 @@ describe("OnDraft HTTP contracts", () => {
       "entries[2][heightLabel]": "6-6",
       "entries[2][weight]": "315",
       "entries[2][playerInfoPublished]": "true",
+      ...gradePayloadAt("entries[2]", "OT", 5),
       "entries[3][id]": "ryan-one-board-edge",
       "entries[3][playerName]": "One Board Edge",
       "entries[3][school]": "Solo State",
@@ -2033,6 +2136,7 @@ describe("OnDraft HTTP contracts", () => {
       "entries[3][heightLabel]": "6-5",
       "entries[3][weight]": "260",
       "entries[3][playerInfoPublished]": "true",
+      ...gradePayloadAt("entries[3]", "EDGE", 7.75),
     });
 
     await seedBoardEntriesIndividually(agent, {
@@ -2047,6 +2151,7 @@ describe("OnDraft HTTP contracts", () => {
       "entries[0][heightLabel]": "5-11",
       "entries[0][weight]": "185",
       "entries[0][playerInfoPublished]": "true",
+      ...gradePayloadAt("entries[0]", "WR", 6),
       "entries[1][id]": "aleks-edge",
       "entries[1][playerName]": "Edge Prospect",
       "entries[1][school]": "OnDraft State",
@@ -2056,6 +2161,7 @@ describe("OnDraft HTTP contracts", () => {
       "entries[1][heightLabel]": "6-4",
       "entries[1][weight]": "255",
       "entries[1][playerInfoPublished]": "true",
+      ...gradePayloadAt("entries[1]", "EDGE", 7.5),
       "entries[2][id]": "aleks-tackle",
       "entries[2][playerName]": "Tackle Prospect",
       "entries[2][school]": "Private U",
@@ -2074,17 +2180,18 @@ describe("OnDraft HTTP contracts", () => {
     expect(consensus.text).not.toContain("/bigboard/edit?year=2026&amp;creator=Consensus");
     expect(consensus.text).toContain('href="/about#ryan-mcwalter"');
     expect(consensus.text).toContain('href="/about#aleks-ryabinkin"');
-    expect(consensus.text).toMatch(/1\. One Board Edge[\s\S]*EDGE1/);
-    expect(consensus.text).toMatch(/2\. Edge Prospect[\s\S]*EDGE2/);
-    expect(consensus.text).toMatch(/3\. Quarterback Prospect[\s\S]*QB1/);
+    expect(consensus.text).toMatch(/1\. Edge Prospect[\s\S]*EDGE1/);
+    expect(consensus.text).toMatch(/2\. Quarterback Prospect[\s\S]*QB1/);
     expect(consensus.text).toMatch(/Ryan(?:&#39;|')s Rank:\s*<strong>4<\/strong>[\s\S]*Aleks(?:&#39;|') Rank:\s*<strong>6<\/strong>/);
     expect(consensus.text).toMatch(/Ryan(?:&#39;|')s Rank:\s*<strong>1<\/strong>[\s\S]*Aleks(?:&#39;|') Rank:\s*<strong>13<\/strong>/);
     expect(consensus.text).toContain("Ryan State");
     expect(consensus.text).not.toContain("Aleks Tech");
     expect(consensus.text).toContain("Big discrepancy");
-    expect(consensus.text).toMatch(/4\. Tackle Prospect[\s\S]*Published U/);
-    expect(consensus.text).toMatch(/Tackle Prospect[\s\S]*Ryan(?:&#39;|')s Rank:\s*<strong>10<\/strong>/);
-    expect(consensus.text).not.toMatch(/Tackle Prospect[\s\S]*Aleks(?:&#39;|') Rank:\s*<strong>30<\/strong>/);
+    // Only Ryan ever graded this one, so it is his opinion rather than a consensus.
+    expect(consensus.text).not.toContain("One Board Edge");
+    // Aleks never published player info for the tackle, so it is one-sided too.
+    expect(consensus.text).not.toContain("Tackle Prospect");
+    expect(consensus.text).not.toContain("Published U");
     expect(consensus.text).not.toContain("Private U");
     expect(consensus.text).not.toContain("read player profile");
     expect(consensus.text).not.toContain("RUNDOWN");
@@ -2110,6 +2217,7 @@ describe("OnDraft HTTP contracts", () => {
       "entries[0][heightLabel]": "6-2",
       "entries[0][weight]": "220",
       "entries[0][playerInfoPublished]": "true",
+      ...gradePayloadAt("entries[0]", "QB", 6),
     });
 
     await seedBoardEntriesIndividually(agent, {
@@ -2124,6 +2232,7 @@ describe("OnDraft HTTP contracts", () => {
       "entries[0][heightLabel]": "6-1",
       "entries[0][weight]": "215",
       "entries[0][playerInfoPublished]": "true",
+      ...gradePayloadAt("entries[0]", "QB", 6),
     });
 
     const adminConsensus = await agent.get("/bigboard?year=2026&creator=Consensus");
@@ -2909,6 +3018,84 @@ describe("OnDraft HTTP contracts", () => {
     expect(article.text).not.toContain("<iframe");
   });
 
+  it("keeps uploaded video embeds in HTML articles and normalizes their playback attributes", async () => {
+    const agent = await adminAgent();
+    const videoUrl = "/generated/article-videos/v1/1234567890abcdef-pocket-passer-reel.mp4";
+
+    const create = await agent
+      .post("/articles")
+      .type("form")
+      .send({
+        title: "HTML Video Room",
+        author: "Ryan McWalter",
+        writeup: "A short HTML summary.",
+        publicationDate: "2024-01-01",
+        contentType: "html",
+        content: `<p>Tape:</p><video src="${videoUrl}" autoplay onerror="alert(1)"></video>`,
+      });
+
+    expect(create.status).toBe(302);
+
+    const article = await agent.get(create.headers.location);
+
+    expect(article.status).toBe(200);
+    expect(article.text).toContain(`<video src="${videoUrl}" controls="controls" preload="metadata"></video>`);
+    // Autoplay would start pulling a 100 MB upload on page load.
+    expect(article.text).not.toContain("autoplay");
+    expect(article.text).not.toContain("onerror");
+  });
+
+  it("keeps multi-source video embeds and drops sources pointing off-site", async () => {
+    const agent = await adminAgent();
+    const webm = "/generated/article-videos/v1/1234567890abcdef-pocket-passer-reel.webm";
+
+    const create = await agent
+      .post("/articles")
+      .type("form")
+      .send({
+        title: "HTML Multi Source",
+        author: "Ryan McWalter",
+        writeup: "A short HTML summary.",
+        publicationDate: "2024-01-01",
+        contentType: "html",
+        content: `<video><source src="${webm}" type="video/webm"><source src="https://evil.example/clip.mp4" type="video/mp4"></video>`,
+      });
+
+    expect(create.status).toBe(302);
+
+    const article = await agent.get(create.headers.location);
+
+    expect(article.status).toBe(200);
+    expect(article.text).toContain(`<source src="${webm}" type="video/webm" />`);
+    expect(article.text).not.toContain("evil.example");
+    // The off-site source loses its src, so the empty element is dropped rather than left behind.
+    expect(article.text).not.toContain('<source type="video/mp4"');
+  });
+
+  it("strips video sources that are not uploaded article videos", async () => {
+    const agent = await adminAgent();
+
+    const create = await agent
+      .post("/articles")
+      .type("form")
+      .send({
+        title: "HTML Foreign Video",
+        author: "Ryan McWalter",
+        writeup: "A short HTML summary.",
+        publicationDate: "2024-01-01",
+        contentType: "html",
+        content: '<video src="https://evil.example/clip.mp4" controls></video><video src="/generated/article-videos/v1/../../secret.mp4" controls></video>',
+      });
+
+    expect(create.status).toBe(302);
+
+    const article = await agent.get(create.headers.location);
+
+    expect(article.status).toBe(200);
+    expect(article.text).not.toContain("evil.example");
+    expect(article.text).not.toContain("secret.mp4");
+  });
+
   it("swaps article content fields with the HTMX partial route", async () => {
     const agent = await adminAgent();
 
@@ -2919,6 +3106,7 @@ describe("OnDraft HTTP contracts", () => {
     expect(createForm.text).toContain('type="date" name="publicationDate"');
     expect(createForm.text).toContain('data-hook-count');
     expect(createForm.text).toContain('data-hook-max-words="300"');
+    expect(createForm.text).toContain('<script src="/articleHtmlVideos.js" defer></script>');
     expect(createForm.text.indexOf('data-tag-editor')).toBeLessThan(createForm.text.indexOf('data-hook-input'));
 
     const pdfFields = await agent.get("/articles/new/content-fields?contentType=pdf");
@@ -2932,6 +3120,9 @@ describe("OnDraft HTTP contracts", () => {
     expect(htmlFields.text).toContain("<textarea");
     expect(htmlFields.text).toContain('data-html-image-uploader');
     expect(htmlFields.text).toContain('name="htmlImage"');
+    expect(htmlFields.text).toContain('data-html-video-uploader');
+    expect(htmlFields.text).toContain('name="htmlVideo"');
+    expect(htmlFields.text).toContain('accept="video/mp4,video/webm,.mp4,.webm"');
 
     const plainTextFields = await agent.get("/articles/new/content-fields?contentType=plainText");
     expect(plainTextFields.status).toBe(200);

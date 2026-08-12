@@ -48,6 +48,8 @@ async function seedConsensusDiscrepancyBoard(ondraftService: IOnDraftService): P
     posRank: 1,
     height: { feet: 6, inches: 2 },
     weight: 220,
+    grade: gradedAt("QB", 6),
+    gradePublished: true,
   });
   const aleksEntry = await ondraftService.createBigBoardEntry({
     year: 2026,
@@ -59,6 +61,8 @@ async function seedConsensusDiscrepancyBoard(ondraftService: IOnDraftService): P
     posRank: 4,
     height: { feet: 6, inches: 1 },
     weight: 215,
+    grade: gradedAt("QB", 6),
+    gradePublished: true,
   });
   if (ryanEntry.ok === false || aleksEntry.ok === false) {
     throw new Error("Failed to seed consensus discrepancy board.");
@@ -81,6 +85,12 @@ function filledGrade(position: Position, score = 6, potential = 6): DraftGrade {
     physicalTraits: Object.fromEntries(categories[0].traits.map((trait) => [trait, score])),
     filmTraits: Object.fromEntries(categories[1].traits.map((trait) => [trait, score])),
   };
+}
+
+// Consensus ordering is driven by the board grade, so pin it with an override instead of
+// depending on the trait math. The 1/1 base keeps the calculated grade well clear of the override.
+function gradedAt(position: Position, boardGrade: number): DraftGrade {
+  return { ...filledGrade(position, 1, 1), overrideDisplayGrade: boardGrade };
 }
 
 describe("Draft grade calculations", () => {
@@ -677,7 +687,7 @@ describe("OnDraftService big board editing", () => {
     }
   });
 
-  it("generates a consensus board from Ryan and Aleks rankings using Ryan player info as the source of truth", async () => {
+  it("generates a consensus board from Ryan and Aleks grades using Ryan player info as the source of truth", async () => {
     const ondraftService = service();
 
     await ondraftService.createBigBoardEntry({
@@ -690,6 +700,8 @@ describe("OnDraftService big board editing", () => {
       posRank: 1,
       height: { feet: 6, inches: 2 },
       weight: 220,
+      grade: gradedAt("QB", 6),
+      gradePublished: true,
     });
     await ondraftService.createBigBoardEntry({
       year: 2026,
@@ -701,6 +713,8 @@ describe("OnDraftService big board editing", () => {
       posRank: 3,
       height: { feet: 5, inches: 11 },
       weight: 185,
+      grade: gradedAt("WR", 6),
+      gradePublished: true,
     });
     await ondraftService.createBigBoardEntry({
       year: 2026,
@@ -712,6 +726,8 @@ describe("OnDraftService big board editing", () => {
       posRank: 1,
       height: { feet: 6, inches: 4 },
       weight: 255,
+      grade: gradedAt("EDGE", 7.5),
+      gradePublished: true,
     });
     await ondraftService.createBigBoardEntry({
       year: 2026,
@@ -723,6 +739,8 @@ describe("OnDraftService big board editing", () => {
       posRank: 2,
       height: { feet: 6, inches: 4 },
       weight: 255,
+      grade: gradedAt("EDGE", 7.5),
+      gradePublished: true,
     });
     await ondraftService.createBigBoardEntry({
       year: 2026,
@@ -734,6 +752,8 @@ describe("OnDraftService big board editing", () => {
       posRank: 2,
       height: { feet: 6, inches: 6 },
       weight: 315,
+      grade: gradedAt("OT", 5),
+      gradePublished: true,
     });
     await ondraftService.createBigBoardEntry({
       year: 2026,
@@ -755,7 +775,6 @@ describe("OnDraftService big board editing", () => {
       expect(consensus.value.entries.map((entry) => entry.playerName)).toEqual([
         "Edge Prospect",
         "Quarterback Prospect",
-        "Tackle Prospect",
       ]);
 
       const quarterback = consensus.value.entries.find((entry) => entry.playerName === "Quarterback Prospect");
@@ -776,14 +795,10 @@ describe("OnDraftService big board editing", () => {
         bigDiscrepency: false,
       });
 
-      const tackle = consensus.value.entries.find((entry) => entry.playerName === "Tackle Prospect");
-      expect(tackle).toMatchObject({
-        school: "Published U",
-        position: "OT",
-        rank: 3,
-        posRank: 1,
-        bigDiscrepency: false,
-      });
+      // Aleks never published player info for the tackle, so his grade cannot count and the
+      // player is one-sided — no consensus slot, and none of his unpublished data leaks.
+      expect(consensus.value.entries.find((entry) => entry.playerName === "Tackle Prospect")).toBeUndefined();
+      expect(consensus.value.entries.map((entry) => entry.school)).not.toContain("Private U");
     }
   });
 
@@ -896,6 +911,8 @@ describe("OnDraftService big board editing", () => {
       posRank: 1,
       height: { feet: 6, inches: 2 },
       weight: 220,
+      grade: gradedAt("QB", 6),
+      gradePublished: true,
     });
     await ondraftService.createBigBoardEntry({
       year: 2026,
@@ -907,6 +924,8 @@ describe("OnDraftService big board editing", () => {
       posRank: 2,
       height: { feet: 6, inches: 1 },
       weight: 215,
+      grade: gradedAt("QB", 6),
+      gradePublished: true,
     });
 
     const saved = await ondraftService.saveConsensusDiscrepancyWriteup({
@@ -963,19 +982,23 @@ describe("OnDraftService big board editing", () => {
     }
   });
 
-  it("assigns sequential consensus ranks and uses Ryan rankings to break average ties", async () => {
+  it("assigns sequential consensus ranks by grade and uses grader rankings to break grade ties", async () => {
     const ondraftService = service();
 
+    // Player One and Player Two tie on grade, so the graders' own rankings decide the order.
+    // Player Two is ranked higher despite sorting later alphabetically.
     await ondraftService.createBigBoardEntry({
       year: 2026,
       creator: "Ryan",
       playerName: "Player One",
       school: "Ryan State",
       position: "QB",
-      rank: 1,
-      posRank: 1,
+      rank: 5,
+      posRank: 2,
       height: { feet: 6, inches: 2 },
       weight: 220,
+      grade: gradedAt("QB", 6),
+      gradePublished: true,
     });
     await ondraftService.createBigBoardEntry({
       year: 2026,
@@ -983,10 +1006,12 @@ describe("OnDraftService big board editing", () => {
       playerName: "Player One",
       school: "Aleks Tech",
       position: "QB",
-      rank: 3,
+      rank: 5,
       posRank: 3,
       height: { feet: 6, inches: 1 },
       weight: 215,
+      grade: gradedAt("QB", 6),
+      gradePublished: true,
     });
     await ondraftService.createBigBoardEntry({
       year: 2026,
@@ -994,10 +1019,25 @@ describe("OnDraftService big board editing", () => {
       playerName: "Player Two",
       school: "Ryan State",
       position: "QB",
-      rank: 2,
-      posRank: 2,
+      rank: 1,
+      posRank: 1,
       height: { feet: 6, inches: 0 },
       weight: 210,
+      grade: gradedAt("QB", 6),
+      gradePublished: true,
+    });
+    await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Aleks",
+      playerName: "Player Two",
+      school: "Aleks Tech",
+      position: "QB",
+      rank: 1,
+      posRank: 1,
+      height: { feet: 6, inches: 0 },
+      weight: 210,
+      grade: gradedAt("QB", 6),
+      gradePublished: true,
     });
     await ondraftService.createBigBoardEntry({
       year: 2026,
@@ -1005,10 +1045,25 @@ describe("OnDraftService big board editing", () => {
       playerName: "Receiver One",
       school: "Ryan State",
       position: "WR",
-      rank: 3,
+      rank: 9,
       posRank: 1,
       height: { feet: 6, inches: 1 },
       weight: 200,
+      grade: gradedAt("WR", 7),
+      gradePublished: true,
+    });
+    await ondraftService.createBigBoardEntry({
+      year: 2026,
+      creator: "Aleks",
+      playerName: "Receiver One",
+      school: "Aleks Tech",
+      position: "WR",
+      rank: 9,
+      posRank: 1,
+      height: { feet: 6, inches: 1 },
+      weight: 200,
+      grade: gradedAt("WR", 7),
+      gradePublished: true,
     });
 
     const consensus = await ondraftService.getBigBoard(2026, "Consensus");
@@ -1020,9 +1075,9 @@ describe("OnDraftService big board editing", () => {
         rank: entry.rank,
         posRank: entry.posRank,
       }))).toEqual([
-        { playerName: "Player One", rank: 1, posRank: 1 },
-        { playerName: "Player Two", rank: 2, posRank: 2 },
-        { playerName: "Receiver One", rank: 3, posRank: 1 },
+        { playerName: "Receiver One", rank: 1, posRank: 1 },
+        { playerName: "Player Two", rank: 2, posRank: 1 },
+        { playerName: "Player One", rank: 3, posRank: 2 },
       ]);
     }
   });

@@ -244,8 +244,8 @@ describe("QB grade formula weights (FS-8)", () => {
 
   it("applies the revised Project split and film weights", () => {
     const project = qbArchetypes["Project"];
-    expect(project["Physical Weight"]).toBe(0.43);
-    expect(project["Film Weight"]).toBe(0.57);
+    expect(project["Physical Weight"]).toBe(0.4);
+    expect(project["Film Weight"]).toBe(0.6);
     expect(project["Film Traits"]["Arm Talent"]).toBe(0.1);
     expect(project["Film Traits"]["Ball Placement"]).toBe(0.05);
     expect(project["Film Traits"]["Pre-Snap Processing"]).toBe(0.08);
@@ -343,10 +343,12 @@ describe("QB grade calculation with revised weights (FS-8)", () => {
 
   it("computes the Project archetype with the new weights", () => {
     const calculation = calculateDraftGrade(qbGrade("Project", 6, P, F));
-    // Old-weight displayGrade was 6.4748.
+    // Only the category split moved this time (0.43/0.57 -> 0.40/0.60), so the trait
+    // composites are untouched and the board grade shifts by 0.03 * (film - physical).
     expect(calculation).not.toBeNull();
+    expect(calculation!.physicalGrade).toBeCloseTo(5.56, 3);
     expect(calculation!.filmGrade).toBeCloseTo(5.03, 3);
-    expect(calculation!.displayGrade).toBeCloseTo(6.4079, 3);
+    expect(calculation!.displayGrade).toBeCloseTo(6.392, 3);
   });
 
   it("keeps Field General grades stable (unchanged archetype)", () => {

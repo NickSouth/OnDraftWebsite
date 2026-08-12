@@ -6,8 +6,13 @@ import multer from "multer";
 export const ARTICLE_PDF_MAX_BYTES = 5 * 1024 * 1024;
 export const ARTICLE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 export const ARTICLE_HTML_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+export const ARTICLE_HTML_VIDEO_MAX_BYTES = 100 * 1024 * 1024;
 export const ARTICLE_UPLOAD_PUBLIC_PATH = "/uploads/articles";
 export const ARTICLE_UPLOAD_DIRECTORY = path.join(process.cwd(), "public", "uploads", "articles");
+// Videos stream to disk rather than through memory, so they need a scratch directory.
+// It must stay outside public/ (express.static would serve a half-written upload) while
+// remaining on the same filesystem as the asset store, which renames files out of it.
+export const ARTICLE_HTML_VIDEO_TEMP_DIRECTORY = path.join(process.cwd(), "tmp", "article-video-uploads");
 
 fs.mkdirSync(ARTICLE_UPLOAD_DIRECTORY, { recursive: true });
 
@@ -16,6 +21,11 @@ const allowedImageMimeTypes = new Map([
   ["image/png", ".png"],
   ["image/gif", ".gif"],
   ["image/webp", ".webp"],
+]);
+
+const allowedVideoMimeTypes = new Map([
+  ["video/mp4", ".mp4"],
+  ["video/webm", ".webm"],
 ]);
 
 const storage = multer.diskStorage({
@@ -91,8 +101,38 @@ export const articleHtmlImageUpload = multer({
   },
 });
 
+export const articleHtmlVideoUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      fs.mkdirSync(ARTICLE_HTML_VIDEO_TEMP_DIRECTORY, { recursive: true });
+      cb(null, ARTICLE_HTML_VIDEO_TEMP_DIRECTORY);
+    },
+    filename: (_req, _file, cb) => {
+      cb(null, `${Date.now()}-${randomUUID()}.upload`);
+    },
+  }),
+  limits: {
+    fileSize: ARTICLE_HTML_VIDEO_MAX_BYTES,
+    files: 1,
+    fields: 2,
+    parts: 4,
+  },
+  fileFilter: (_req, file, cb) => {
+    if (!allowedVideoMimeTypes.has(file.mimetype)) {
+      cb(new Error("Only MP4 or WebM files can be uploaded for HTML article videos."));
+      return;
+    }
+
+    cb(null, true);
+  },
+});
+
 export function articleImageExtensionForMimeType(mimeType: string): string | undefined {
   return allowedImageMimeTypes.get(mimeType);
+}
+
+export function articleVideoExtensionForMimeType(mimeType: string): string | undefined {
+  return allowedVideoMimeTypes.get(mimeType);
 }
 
 export function publicArticleUploadUrl(filename: string): string {
