@@ -618,7 +618,7 @@ textarea {
 
 .article-cover-thumb {
   width: clamp(96px, 18vw, 140px);
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 16 / 9;
   border: 1px solid var(--panel-border);
   border-radius: 6px;
   object-fit: cover;

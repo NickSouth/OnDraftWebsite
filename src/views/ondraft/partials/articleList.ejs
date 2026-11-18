@@ -43,10 +43,10 @@
     <% articles.forEach((article) => { %>
       <% const articleHref = isAdmin && !article.published ? `/articles/${article.id}/preview` : `/articles/${article.id}`; %>
       <li id="article-list-item-<%= article.id %>" class="article-list-row od-card">
-        <a class="group grid min-w-0 grid-cols-[3rem_minmax(0,1fr)] items-start gap-2 text-slate-950 no-underline dark:text-white sm:grid-cols-[4rem_minmax(0,1fr)] sm:gap-3 md:grid-cols-[4.5rem_minmax(0,1fr)_auto]" href="<%= articleHref %>">
-          <span class="relative block aspect-square overflow-hidden rounded-md bg-draft-ink">
+        <a class="group grid min-w-0 grid-cols-[4.5rem_minmax(0,1fr)] items-start gap-2 text-slate-950 no-underline dark:text-white sm:grid-cols-[6rem_minmax(0,1fr)] sm:gap-3 md:grid-cols-[7rem_minmax(0,1fr)_auto]" href="<%= articleHref %>">
+          <span class="relative block aspect-video overflow-hidden rounded-md bg-draft-ink">
             <% if (article.imageUrl) { %>
-              <img class="article-list-thumb" src="<%= article.imageUrl %>" alt="" loading="lazy" decoding="async" />
+              <%- include("articleThumb", { src: article.imageUrl }) %>
             <% } else { %>
               <span class="article-list-thumb article-list-thumb-empty">
                 <img class="h-9 w-11 object-contain drop-shadow-sm" src="/images/brand/OnDraftLogo-cropped.png" alt="" loading="lazy" decoding="async" />
@@ -121,11 +121,11 @@
   <ul class="od-stagger-list grid list-none gap-3 p-0 sm:gap-5">
     <% articles.forEach((article) => { %>
       <% const articleHref = isAdmin && !article.published ? `/articles/${article.id}/preview` : `/articles/${article.id}`; %>
-      <li id="article-list-item-<%= article.id %>" class="od-card grid overflow-hidden transition hover:-translate-y-0.5 hover:border-draft-gold hover:shadow-editorial lg:grid-cols-[18rem_minmax(0,1fr)_auto]">
+      <li id="article-list-item-<%= article.id %>" class="od-card grid overflow-hidden transition hover:-translate-y-0.5 hover:border-draft-gold hover:shadow-editorial lg:grid-cols-[24rem_minmax(0,1fr)_auto]">
         <a class="group grid min-w-0 text-slate-950 no-underline dark:text-white lg:contents" href="<%= articleHref %>">
-          <span class="relative block aspect-[16/9] overflow-hidden bg-draft-ink sm:aspect-[16/10] lg:aspect-auto lg:min-h-56">
+          <span class="relative block aspect-video overflow-hidden bg-draft-ink lg:aspect-auto lg:min-h-[13.5rem]">
             <% if (article.imageUrl) { %>
-              <img class="article-list-thumb" src="<%= article.imageUrl %>" alt="" loading="lazy" decoding="async" />
+              <%- include("articleThumb", { src: article.imageUrl }) %>
             <% } else { %>
               <span class="article-list-thumb article-list-thumb-empty">
                 <img class="h-16 w-20 object-contain drop-shadow-sm" src="/images/brand/OnDraftLogo-cropped.png" alt="" loading="lazy" decoding="async" />

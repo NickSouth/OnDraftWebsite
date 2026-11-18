@@ -3018,6 +3018,58 @@ describe("OnDraft HTTP contracts", () => {
     expect(article.text).not.toContain("<iframe");
   });
 
+  it("keeps the article styling classes in HTML articles and strips every other class and inline style", async () => {
+    const agent = await adminAgent();
+
+    const create = await agent
+      .post("/articles")
+      .type("form")
+      .send({
+        title: "Styled HTML Film Room",
+        author: "Ryan McWalter",
+        writeup: "A short HTML summary.",
+        publicationDate: "2024-01-01",
+        contentType: "html",
+        content: '<p class="kicker od-card">Weekly Series</p><p class="title" style="color:red">Power Rankings</p><p class="lede">Intro</p><h3><span class="rank hidden">01</span> Bengals</h3><p class="fixed inset-0">Body</p>',
+      });
+
+    expect(create.status).toBe(302);
+
+    const article = await agent.get(create.headers.location);
+
+    expect(article.status).toBe(200);
+    expect(article.text).toContain('<div class="article-body article-html-body"><p class="kicker">Weekly Series</p><p class="title">Power Rankings</p><p class="lede">Intro</p><h3><span class="rank">01</span> Bengals</h3><p>Body</p></div>');
+  });
+
+  it("renders an uploaded article thumbnail uncropped on the article page and in the article list", async () => {
+    const agent = await adminAgent();
+
+    const create = await agent
+      .post("/articles")
+      .field("title", "Wide Thumbnail Film Room")
+      .field("author", "Ryan McWalter")
+      .field("writeup", "A short summary.")
+      .field("publicationDate", "2024-01-01")
+      .field("contentType", "plainText")
+      .field("content", "Body.")
+      .field("published", "true")
+      .attach("image", Buffer.from("fake image bytes"), { filename: "wide.png", contentType: "image/png" });
+
+    expect(create.status).toBe(302);
+
+    const article = await agent.get(create.headers.location);
+    const imageUrl = article.text.match(/class="article-list-thumb" src="([^"]+)"/)?.[1];
+
+    // The fitted image sits over a blurred copy of itself instead of being cropped to the slot.
+    expect(imageUrl).toMatch(/^\/uploads\/articles\/.+\.png$/);
+    expect(article.text).toContain(`<span class="article-cover-thumb">`);
+    expect(article.text).toContain(`<img class="article-thumb-backdrop" src="${imageUrl}" alt="" aria-hidden="true"`);
+
+    const list = await agent.get("/articles/filter?status=published");
+    expect(list.text).toContain(`<img class="article-thumb-backdrop" src="${imageUrl}" alt="" aria-hidden="true"`);
+    expect(list.text).toContain(`<img class="article-list-thumb" src="${imageUrl}" alt=""`);
+  });
+
   it("keeps uploaded video embeds in HTML articles and normalizes their playback attributes", async () => {
     const agent = await adminAgent();
     const videoUrl = "/generated/article-videos/v1/1234567890abcdef-pocket-passer-reel.mp4";

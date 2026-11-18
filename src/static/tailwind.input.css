@@ -1967,8 +1967,15 @@
     min-height: 1.15em;
   }
 
+  /* Thumbnails are never cropped: the image is fitted inside its slot and a blurred copy of it
+     (.article-thumb-backdrop) fills whatever space is left, so wide and square art both work.
+     Absolutely positioned so the slot, not the image's own shape, decides the size. */
   .article-list-thumb {
-    @apply block h-full w-full object-cover transition duration-300;
+    @apply absolute inset-0 block h-full w-full rounded-none border-0 bg-transparent object-contain transition duration-300;
+  }
+
+  .article-thumb-backdrop {
+    @apply pointer-events-none absolute inset-0 block h-full w-full scale-125 object-cover opacity-70 blur-xl;
   }
 
   .group:hover .article-list-thumb {
@@ -1984,7 +1991,7 @@
   }
 
   .od-article-page {
-    @apply mx-auto grid w-full max-w-3xl gap-6 text-slate-950 dark:text-slate-100;
+    @apply mx-auto grid w-full max-w-6xl gap-6 text-slate-950 dark:text-slate-100;
   }
 
   .od-article-page .article-page-actions {
@@ -2000,7 +2007,7 @@
   }
 
   .od-article-page .article-header {
-    @apply m-0 grid gap-5 sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-center;
+    @apply m-0 grid gap-5 sm:grid-cols-[16rem_minmax(0,1fr)] sm:items-center;
   }
 
   .od-article-page .article-header:not(:has(.article-cover-thumb)) {
@@ -2020,7 +2027,7 @@
   }
 
   .od-article-page .article-cover-thumb {
-    @apply aspect-[4/3] w-full rounded-lg border border-slate-200 object-cover shadow-sm dark:border-white/10;
+    @apply relative block aspect-video w-full overflow-hidden rounded-lg border border-slate-200 bg-draft-ink shadow-sm dark:border-white/10;
   }
 
   .od-article-page .article-actions {
@@ -2044,8 +2051,9 @@
     @apply size-5 shrink-0;
   }
 
+  /* Article text sits straight on the page: no card around it, so it reads as part of the site. */
   .od-article-page .article-body {
-    @apply whitespace-pre-wrap rounded-lg border border-slate-200 bg-white p-5 text-lg leading-8 text-slate-800 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-100 sm:p-7;
+    @apply whitespace-pre-wrap text-lg leading-8 text-slate-800 dark:text-slate-100;
   }
 
   .od-article-page .article-html-body {
@@ -2690,7 +2698,7 @@
     }
 
     .od-article-page .article-body {
-      @apply p-3.5 text-base leading-7;
+      @apply text-base leading-7;
     }
 
     .od-article-page .article-comments-section {
@@ -3185,5 +3193,102 @@
 
   .od-search-result-type {
     @apply shrink-0 rounded bg-draft-gold/15 px-1.5 py-0.5 text-[0.62rem] font-black uppercase tracking-[0.1em] text-draft-amber dark:text-draft-gold;
+  }
+}
+
+/* === article html typography === */
+/* Styles the tags the article sanitizer lets through (see sanitizeArticleHtml), plus its four
+   optional classes: kicker, title, lede and rank. */
+@layer components {
+  /* styles.css pins p, li, span and a to 1rem, which would stop them following the article size. */
+  .od-article-page .article-html-body p,
+  .od-article-page .article-html-body li,
+  .od-article-page .article-html-body span,
+  .od-article-page .article-html-body a {
+    font-size: inherit;
+    line-height: inherit;
+  }
+
+  /* The column is wide on big screens, so the copy steps up to keep lines readable. */
+  .od-article-page .article-html-body {
+    @apply 2xl:text-xl 2xl:leading-9;
+  }
+
+  .od-article-page .article-html-body h2 {
+    @apply mt-10 border-t border-slate-200 pt-8 font-sans text-2xl font-black uppercase leading-tight tracking-wide text-slate-950 dark:border-white/10 dark:text-white sm:text-[1.7rem];
+  }
+
+  .od-article-page .article-html-body > h2:first-child,
+  .od-article-page .article-html-body hr + h2 {
+    @apply mt-0 border-t-0 pt-0;
+  }
+
+  .od-article-page .article-html-body h3 {
+    @apply mt-8 font-sans text-xl font-extrabold leading-snug text-slate-950 dark:text-white sm:text-2xl;
+  }
+
+  .od-article-page .article-html-body h4 {
+    @apply mt-6 font-sans text-lg font-extrabold leading-snug text-slate-950 dark:text-white;
+  }
+
+  .od-article-page .article-html-body h2 + *,
+  .od-article-page .article-html-body h3 + *,
+  .od-article-page .article-html-body h4 + * {
+    @apply mt-2;
+  }
+
+  .od-article-page .article-html-body hr {
+    @apply my-8 border-0 border-t-2 border-draft-gold;
+  }
+
+  .od-article-page .article-html-body a {
+    @apply font-semibold text-draft-amber underline underline-offset-2 transition hover:text-draft-gold dark:text-draft-gold;
+  }
+
+  .od-article-page .article-html-body ul,
+  .od-article-page .article-html-body ol {
+    @apply grid gap-1.5 pl-6;
+  }
+
+  .od-article-page .article-html-body ul {
+    @apply list-disc;
+  }
+
+  .od-article-page .article-html-body ol {
+    @apply list-decimal;
+  }
+
+  .od-article-page .article-html-body blockquote {
+    @apply border-l-4 border-draft-gold pl-4 font-display text-xl italic leading-8 text-slate-700 dark:text-slate-200;
+  }
+
+  .od-article-page .article-html-body img,
+  .od-article-page .article-html-body video {
+    @apply h-auto max-w-full rounded-lg;
+  }
+
+  .od-article-page .article-html-body pre {
+    @apply overflow-x-auto rounded-lg bg-slate-100 p-4 text-sm leading-6 dark:bg-white/[0.06];
+  }
+
+  .od-article-page .article-html-body .kicker {
+    @apply text-xs font-black uppercase tracking-[0.18em] text-draft-amber dark:text-draft-gold sm:text-sm;
+  }
+
+  .od-article-page .article-html-body .title {
+    @apply mt-2 font-display text-4xl font-black leading-[1.05] tracking-normal text-slate-950 dark:text-white sm:text-5xl;
+  }
+
+  .od-article-page .article-html-body .lede {
+    @apply font-display text-xl leading-8 text-slate-600 dark:text-slate-400;
+  }
+
+  .od-article-page .article-html-body .title + .lede {
+    @apply mt-3 font-sans text-lg;
+  }
+
+  .od-article-page .article-html-body .rank {
+    @apply mr-2 text-draft-amber dark:text-draft-gold;
+    font-variant-numeric: tabular-nums;
   }
 }

@@ -22,10 +22,10 @@
         <ul class="od-stagger-list grid list-none gap-2.5 p-0 sm:gap-3">
           <% results.articles.forEach((article) => { %>
             <li class="od-card">
-              <a class="group grid min-w-0 grid-cols-[3rem_minmax(0,1fr)] items-center gap-2 text-slate-950 no-underline dark:text-white sm:gap-3" href="/articles/<%= article.id %>">
-                <span class="relative block aspect-square overflow-hidden rounded-md bg-draft-ink">
+              <a class="group grid min-w-0 grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-2 text-slate-950 no-underline dark:text-white sm:gap-3" href="/articles/<%= article.id %>">
+                <span class="relative block aspect-video overflow-hidden rounded-md bg-draft-ink">
                   <% if (article.imageUrl) { %>
-                    <img class="article-list-thumb" src="<%= article.imageUrl %>" alt="" loading="lazy" decoding="async" />
+                    <%- include("articleThumb", { src: article.imageUrl }) %>
                   <% } else { %>
                     <span class="article-list-thumb article-list-thumb-empty">
                       <img class="h-9 w-11 object-contain drop-shadow-sm" src="/images/brand/OnDraftLogo-cropped.png" alt="" loading="lazy" decoding="async" />

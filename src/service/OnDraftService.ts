@@ -26,6 +26,9 @@ const ARTICLE_TAG_MAX_LENGTH = 24;
 const ARTICLE_TAG_MAX_COUNT = 12;
 const ARTICLE_TAG_PATTERN = /^[a-z0-9-]+$/;
 // Mirrors the key shape ArticleHtmlVideoAssetService hands back from an upload.
+// Styling hooks for HTML articles, defined under .article-html-body in tailwind.input.css. A
+// fixed list, so pasted HTML can ask for article typography but cannot borrow other site classes.
+const ARTICLE_HTML_CLASSES = ["kicker", "title", "lede", "rank"];
 const ARTICLE_VIDEO_SRC_PATTERN = /^\/generated\/article-videos\/v1\/[0-9a-f]{16}-[a-z0-9-]{1,36}\.(mp4|webm)$/;
 const COMMENT_TEXT_MAX_WORDS = 200;
 const COMMENT_TEXT_MAX_LENGTH = 2000;
@@ -386,6 +389,7 @@ class OnDraftService implements IOnDraftService {
         video: ["src", "poster", "preload", "controls", "muted", "loop", "playsinline", "width", "height"],
         source: ["src", "type"],
       },
+      allowedClasses: { "*": ARTICLE_HTML_CLASSES },
       allowedSchemes: ["http", "https", "mailto"],
       // sanitize-html's defaults plus source, so video markup closes the way img does.
       selfClosing: ["img", "br", "hr", "area", "base", "basefont", "input", "link", "meta", "source"],

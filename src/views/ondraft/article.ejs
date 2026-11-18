@@ -7,7 +7,7 @@
   </div>
   <header class="article-header">
     <% if (article.imageUrl) { %>
-      <img class="article-cover-thumb" src="<%= article.imageUrl %>" alt="" />
+      <span class="article-cover-thumb"><%- include("partials/articleThumb", { src: article.imageUrl }) %></span>
     <% } %>
     <div>
       <p class="article-section-kicker">Articles On Tap</p>
