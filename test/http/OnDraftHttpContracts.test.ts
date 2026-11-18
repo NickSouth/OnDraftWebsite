@@ -3119,10 +3119,13 @@ describe("OnDraft HTTP contracts", () => {
     expect(htmlFields.text).toContain("HTML content");
     expect(htmlFields.text).toContain("<textarea");
     expect(htmlFields.text).toContain('data-html-image-uploader');
-    expect(htmlFields.text).toContain('name="htmlImage"');
+    expect(htmlFields.text).toContain('data-html-image-input');
     expect(htmlFields.text).toContain('data-html-video-uploader');
-    expect(htmlFields.text).toContain('name="htmlVideo"');
+    expect(htmlFields.text).toContain('data-html-video-input');
     expect(htmlFields.text).toContain('accept="video/mp4,video/webm,.mp4,.webm"');
+    // The uploader inputs post through their own buttons; naming them would submit them with the article form.
+    expect(htmlFields.text).not.toContain('name="htmlImage"');
+    expect(htmlFields.text).not.toContain('name="htmlVideo"');
 
     const plainTextFields = await agent.get("/articles/new/content-fields?contentType=plainText");
     expect(plainTextFields.status).toBe(200);
@@ -3151,6 +3154,46 @@ describe("OnDraft HTTP contracts", () => {
     expect(preview.text).toMatch(/\/images\/article-defaults\/(?:football|helmet|uprights)\.png/);
     expect(preview.text).toContain('name="published" value="false"');
     expect(preview.text).toContain('name="published" value="true"');
+  });
+
+  it("previews an HTML article when the browser submits every empty file input in the form", async () => {
+    const agent = await adminAgent();
+
+    // A browser sends each named file input on submit, even with no file chosen, and the
+    // upload parser counts every one of them against the article form's file limit.
+    const createForm = await agent.get("/articles/new");
+    const htmlFields = await agent.get("/articles/new/content-fields?contentType=html");
+    const fileInputNames = [...`${createForm.text}${htmlFields.text}`.matchAll(/<input type="file" name="([^"]+)"/g)]
+      .map((match) => match[1])
+      .filter((name) => name !== "pdf");
+    expect(fileInputNames).toContain("image");
+
+    const boundary = "----OnDraftEmptyFileInputs";
+    const textFields: Record<string, string> = {
+      title: "HTML Preview Film Room",
+      author: "Ryan McWalter",
+      writeup: "A short preview summary.",
+      publicationDate: "2024-01-01",
+      contentType: "html",
+      content: "<p>Pasted HTML article body.</p>",
+    };
+    const body = [
+      ...Object.entries(textFields).map(([name, value]) =>
+        `--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`),
+      ...fileInputNames.map((name) =>
+        `--${boundary}\r\nContent-Disposition: form-data; name="${name}"; filename=""\r\nContent-Type: application/octet-stream\r\n\r\n\r\n`),
+      `--${boundary}--\r\n`,
+    ].join("");
+
+    const preview = await agent
+      .post("/articles/preview")
+      .set("Content-Type", `multipart/form-data; boundary=${boundary}`)
+      .send(body);
+
+    expect(preview.status).toBe(200);
+    expect(preview.text).not.toContain("Too many files");
+    expect(preview.text).toContain("Article Preview");
+    expect(preview.text).toContain("Pasted HTML article body.");
   });
 
   it("lets admins save drafts and swap to the unpublished article list", async () => {
