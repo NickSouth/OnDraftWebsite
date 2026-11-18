@@ -14,7 +14,7 @@ import {
   RateLimiter,
 } from "./security/RateLimiter";
 import { TurnstileVerifier } from "./security/Turnstile";
-import { ARTICLE_HTML_IMAGE_MAX_BYTES, ARTICLE_HTML_VIDEO_MAX_BYTES, ARTICLE_PDF_MAX_BYTES, articleHtmlImageUpload, articleHtmlVideoUpload, articleUpload } from "./uploads/articlePdfUpload";
+import { ARTICLE_HTML_IMAGE_MAX_BYTES, ARTICLE_HTML_VIDEO_MAX_BYTES, ARTICLE_PDF_MAX_BYTES, ARTICLE_UPLOAD_DIRECTORY, ARTICLE_UPLOAD_PUBLIC_PATH, articleHtmlImageUpload, articleHtmlVideoUpload, articleUpload } from "./uploads/articlePdfUpload";
 import { formatRelativeTime } from "./view/formatRelativeTime";
 import {
   getAuthenticatedUser,
@@ -216,13 +216,15 @@ class ExpressApp implements IApp {
     this.app.use("/vendor/fonts/newsreader", express.static(path.join(process.cwd(), "node_modules", "@fontsource", "newsreader")));
     this.app.use("/vendor/fonts/source-sans-3", express.static(path.join(process.cwd(), "node_modules", "@fontsource", "source-sans-3")));
     this.app.use("/vendor/sortablejs", express.static(path.join(process.cwd(), "node_modules", "sortablejs")));
-    this.app.use(express.static(path.join(process.cwd(), "public"), {
-      setHeaders: (res, filePath) => {
-        if (path.extname(filePath).toLowerCase() === ".pdf") {
-          res.setHeader("Content-Disposition", "inline");
-        }
-      },
-    }));
+    const showPdfsInline = (res: Response, filePath: string): void => {
+      if (path.extname(filePath).toLowerCase() === ".pdf") {
+        res.setHeader("Content-Disposition", "inline");
+      }
+    };
+    // Thumbnails and PDFs keep their /uploads/articles URLs wherever the files are stored; on a
+    // host with an upload volume they are not under public/, so they need their own mount.
+    this.app.use(ARTICLE_UPLOAD_PUBLIC_PATH, express.static(ARTICLE_UPLOAD_DIRECTORY, { setHeaders: showPdfsInline }));
+    this.app.use(express.static(path.join(process.cwd(), "public"), { setHeaders: showPdfsInline }));
     this.app.use(
       session({
         name: "ondraft.sid",

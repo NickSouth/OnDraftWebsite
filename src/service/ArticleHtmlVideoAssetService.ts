@@ -4,6 +4,7 @@ import { createReadStream } from "node:fs";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { articleVideoExtensionForMimeType } from "../uploads/articlePdfUpload";
+import { UPLOAD_STORAGE } from "../uploads/uploadStorage";
 import { ArticleHtmlAssetStore, InvalidArticleHtmlAssetKeyError } from "./ArticleHtmlAssetStore";
 
 const ARTICLE_HTML_VIDEO_CACHE_VERSION = "v1";
@@ -24,7 +25,7 @@ export interface IArticleHtmlVideoAssetService {
 
 export class ArticleHtmlVideoAssetService implements IArticleHtmlVideoAssetService {
   private readonly store = new ArticleHtmlAssetStore(
-    path.resolve(process.cwd(), "public", "generated", "article-videos", ARTICLE_HTML_VIDEO_CACHE_VERSION),
+    path.resolve(UPLOAD_STORAGE.articleVideos, ARTICLE_HTML_VIDEO_CACHE_VERSION),
     VIDEO_KEY_PATTERN,
   );
 

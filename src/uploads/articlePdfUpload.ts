@@ -2,19 +2,19 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import multer from "multer";
+import { UPLOAD_STORAGE } from "./uploadStorage";
 
 export const ARTICLE_PDF_MAX_BYTES = 5 * 1024 * 1024;
 export const ARTICLE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 export const ARTICLE_HTML_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 export const ARTICLE_HTML_VIDEO_MAX_BYTES = 100 * 1024 * 1024;
 export const ARTICLE_UPLOAD_PUBLIC_PATH = "/uploads/articles";
-export const ARTICLE_UPLOAD_DIRECTORY = path.join(process.cwd(), "public", "uploads", "articles");
+// Thumbnails and PDFs. On a host with an upload volume this is on the volume, not in public/.
+export const ARTICLE_UPLOAD_DIRECTORY = UPLOAD_STORAGE.articleUploads;
 // Videos stream to disk rather than through memory, so they need a scratch directory.
 // It must stay outside public/ (express.static would serve a half-written upload) while
 // remaining on the same filesystem as the asset store, which renames files out of it.
-export const ARTICLE_HTML_VIDEO_TEMP_DIRECTORY = path.join(process.cwd(), "tmp", "article-video-uploads");
-
-fs.mkdirSync(ARTICLE_UPLOAD_DIRECTORY, { recursive: true });
+export const ARTICLE_HTML_VIDEO_TEMP_DIRECTORY = UPLOAD_STORAGE.videoTemp;
 
 const allowedImageMimeTypes = new Map([
   ["image/jpeg", ".jpg"],

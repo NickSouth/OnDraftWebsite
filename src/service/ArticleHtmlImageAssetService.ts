@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { articleImageExtensionForMimeType } from "../uploads/articlePdfUpload";
+import { UPLOAD_STORAGE } from "../uploads/uploadStorage";
 import { ArticleHtmlAssetStore, InvalidArticleHtmlAssetKeyError } from "./ArticleHtmlAssetStore";
 
 const ARTICLE_HTML_IMAGE_CACHE_VERSION = "v1";
@@ -22,7 +23,7 @@ export interface IArticleHtmlImageAssetService {
 
 export class ArticleHtmlImageAssetService implements IArticleHtmlImageAssetService {
   private readonly store = new ArticleHtmlAssetStore(
-    path.resolve(process.cwd(), "public", "generated", "article-images", ARTICLE_HTML_IMAGE_CACHE_VERSION),
+    path.resolve(UPLOAD_STORAGE.articleImages, ARTICLE_HTML_IMAGE_CACHE_VERSION),
     IMAGE_KEY_PATTERN,
   );
 
