@@ -42,12 +42,12 @@
 
         <ul class="grid list-none gap-3 p-0 sm:gap-5">
           <% bookmarkedArticles.forEach((article) => { %>
-            <li class="od-card grid grid-cols-[4.25rem_minmax(0,1fr)] overflow-hidden transition hover:-translate-y-0.5 hover:border-draft-gold hover:shadow-editorial sm:grid-cols-[14rem_minmax(0,1fr)]">
-              <a class="group block overflow-hidden bg-draft-ink" href="/articles/<%= article.id %>">
+            <li class="od-card grid grid-cols-[5.5rem_minmax(0,1fr)] overflow-hidden transition hover:-translate-y-0.5 hover:border-draft-gold hover:shadow-editorial sm:grid-cols-[14rem_minmax(0,1fr)]">
+              <a class="group relative block min-h-[3.1rem] overflow-hidden bg-draft-ink sm:min-h-[7.875rem]" href="/articles/<%= article.id %>">
                 <% if (article.imageUrl) { %>
-                  <img class="article-list-thumb aspect-square sm:aspect-[16/10]" src="<%= article.imageUrl %>" alt="" loading="lazy" decoding="async" />
+                  <%- include("partials/articleThumb", { src: article.imageUrl }) %>
                 <% } else { %>
-                  <span class="article-list-thumb article-list-thumb-empty aspect-square sm:aspect-[16/10]">
+                  <span class="article-list-thumb article-list-thumb-empty">
                     <img class="h-9 w-11 object-contain drop-shadow-sm sm:h-16 sm:w-20" src="/images/brand/OnDraftLogo-cropped.png" alt="" loading="lazy" decoding="async" />
                   </span>
                 <% } %>

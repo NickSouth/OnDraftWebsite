@@ -72,6 +72,17 @@
     HTML content
     <textarea name="content" data-html-content><%= values.content || "" %></textarea>
   </label>
+  <details class="rounded-md border border-slate-300 bg-white/60 p-3 text-sm leading-6 text-slate-700 dark:border-white/15 dark:bg-white/[0.04] dark:text-slate-200">
+    <summary class="cursor-pointer font-black text-draft-amber dark:text-draft-gold">HTML formatting guide</summary>
+    <p class="mt-2">Plain tags are styled for you: <code>h2</code> for sections, <code>h3</code> for sub-headings, <code>p</code>, lists, <code>blockquote</code>, <code>img</code>, <code>video</code>, and <code>hr</code> for a gold rule. Inline styles and other classes are removed. Four optional classes add the feature-article look:</p>
+    <pre class="mt-2 overflow-x-auto rounded bg-slate-100 p-3 text-xs leading-5 dark:bg-black/30"><code>&lt;p class="kicker"&gt;OnDraft Football / Weekly Series&lt;/p&gt;
+&lt;p class="title"&gt;Week 11 NFL Power Rankings&lt;/p&gt;
+&lt;p class="lede"&gt;A larger, quieter intro paragraph.&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2&gt;Tier 1: Pick Your Poison&lt;/h2&gt;
+&lt;h3&gt;&lt;span class="rank"&gt;01&lt;/span&gt; Cincinnati Bengals&lt;/h3&gt;
+&lt;p&gt;Body copy.&lt;/p&gt;</code></pre>
+  </details>
   <div class="html-image-uploader" data-html-image-uploader>
     <label>
       HTML article image

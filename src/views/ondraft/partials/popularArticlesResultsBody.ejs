@@ -9,11 +9,11 @@
 <% } else { %>
   <div class="od-stagger-list grid gap-3 px-1 py-1">
     <% popularArticles.forEach((article, index) => { %>
-      <a href="/articles/<%= article.id %>" class="od-card od-focus-ring grid grid-cols-[2.25rem_4rem_minmax(0,1fr)] items-center gap-2 overflow-hidden p-2.5 text-slate-950 no-underline transition hover:-translate-y-0.5 hover:border-draft-gold dark:text-white sm:grid-cols-[3.5rem_6rem_minmax(0,1fr)_auto] sm:gap-3 sm:p-0">
+      <a href="/articles/<%= article.id %>" class="od-card od-focus-ring grid grid-cols-[2.25rem_5rem_minmax(0,1fr)] items-center gap-2 overflow-hidden p-2.5 text-slate-950 no-underline transition hover:-translate-y-0.5 hover:border-draft-gold dark:text-white sm:grid-cols-[3.5rem_9rem_minmax(0,1fr)_auto] sm:gap-3 sm:p-0">
         <span class="grid size-8 place-items-center rounded-md bg-slate-100 font-display text-base font-black text-slate-700 dark:bg-white/10 dark:text-white sm:size-12 sm:text-xl"><%= index + 1 %></span>
-        <span class="relative block aspect-square overflow-hidden rounded-md bg-draft-ink sm:h-full sm:min-h-24 sm:rounded-none">
+        <span class="relative block aspect-video overflow-hidden rounded-md bg-draft-ink sm:aspect-auto sm:h-full sm:min-h-[5.0625rem] sm:rounded-none">
           <% if (article.imageUrl) { %>
-            <img class="article-list-thumb" src="<%= article.imageUrl %>" alt="" loading="lazy" decoding="async" />
+            <%- include("articleThumb", { src: article.imageUrl }) %>
           <% } else { %>
             <span class="article-list-thumb article-list-thumb-empty">
               <img class="h-9 w-11 object-contain drop-shadow-sm" src="/images/brand/OnDraftLogo-cropped.png" alt="" loading="lazy" decoding="async" />

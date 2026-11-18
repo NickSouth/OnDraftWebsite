@@ -33,7 +33,7 @@
   <article class="readable-page preview-article od-article-page">
     <header class="article-header">
       <% if (article.imageUrl) { %>
-        <img class="article-cover-thumb" src="<%= article.imageUrl %>" alt="" />
+        <span class="article-cover-thumb"><%- include("partials/articleThumb", { src: article.imageUrl }) %></span>
       <% } %>
       <div>
         <h1><%= article.title %></h1>
